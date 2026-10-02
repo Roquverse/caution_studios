@@ -1,0 +1,26 @@
+{
+  "name": "caution-studio-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "packageManager": "npm@11.19.0",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "turbo run dev",
+    "dev:web": "npm run dev --workspace=apps/web",
+    "dev:auth": "npm run dev --workspace=apps/auth",
+    "dev:user": "npm run dev --workspace=apps/user",
+    "dev:admin": "npm run dev --workspace=apps/admin",
+    "build": "turbo run build",
+    "build:web": "npm run build --workspace=apps/web",
+    "build:auth": "npm run build --workspace=apps/auth",
+    "build:user": "npm run build --workspace=apps/user",
+    "build:admin": "npm run build --workspace=apps/admin",
+    "lint": "turbo run lint"
+  },
+  "devDependencies": {
+    "turbo": "^2.4.4"
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "name": "@caution/tailwind-config",
+  "version": "1.0.0",
+  "private": true,
+  "main": "./tailwind.config.js",
+  "scripts": {
+    "dev": "echo 0",
+    "build": "echo 0",
+    "lint": "echo 0"
+  }
+}
