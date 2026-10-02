@@ -166,7 +166,7 @@ export default function LandingPage() {
     <div className="min-h-screen bg-white text-gray-900 flex flex-col">
       {/* 1. Header Navigation */}
       <Navbar
-        brandName="Music Website"
+        brandName="Caution Studio"
         currentPath="/"
         onStartFree={handleStartFree}
         onSignIn={handleSignIn}
@@ -303,7 +303,7 @@ export default function LandingPage() {
       </main>
 
       {/* 9. Dark Mega Footer */}
-      <Footer brandName="Music Website" />
+      <Footer brandName="Caution Studio" />
 
       {/* 10. Sticky Bottom Audio Player Bar */}
       <AudioPlayer

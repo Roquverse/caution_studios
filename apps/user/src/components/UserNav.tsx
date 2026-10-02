@@ -16,17 +16,16 @@ export function UserNav({ activePath = '/' }: { activePath?: string }) {
     <header className="sticky top-0 z-30 w-full bg-white border-b border-gray-200/80 shadow-xs">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex h-16 items-center justify-between">
         {/* Left: Brand */}
-        <div className="flex items-center gap-8">
-          <a href="/" className="flex items-center gap-2.5 font-bold text-gray-950">
-            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-gray-950 text-white">
-              <Music2 className="h-4 w-4 stroke-[2.5]" />
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-base tracking-tight">Music Website</span>
-              <Badge variant="brand" size="sm">
-                Creator App
-              </Badge>
-            </div>
+        <div className="flex items-center gap-6">
+          <a href="/" className="flex items-center gap-2.5 font-bold text-gray-950 group">
+            <img
+              src="/logo.png"
+              alt="Caution Studio"
+              className="h-9 w-auto max-w-[150px] object-contain transition-transform duration-200 group-hover:scale-105"
+            />
+            <Badge variant="brand" size="sm">
+              Creator App
+            </Badge>
           </a>
 
           {/* Desktop Nav */}

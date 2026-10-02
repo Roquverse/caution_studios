@@ -18,7 +18,7 @@ export default function ContactPage() {
   return (
     <div className="min-h-screen bg-white text-gray-900 flex flex-col">
       <Navbar
-        brandName="Music Website"
+        brandName="Caution Studio"
         currentPath="/contact"
         onStartFree={() => (window.location.href = 'http://localhost:3001/register')}
         onSignIn={() => (window.location.href = 'http://localhost:3001/login')}
@@ -104,7 +104,7 @@ export default function ContactPage() {
         </div>
       </main>
 
-      <Footer brandName="Music Website" />
+      <Footer brandName="Caution Studio" />
     </div>
   );
 }

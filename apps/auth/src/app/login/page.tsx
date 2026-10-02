@@ -36,11 +36,12 @@ export default function LoginPage() {
       <div className="w-full lg:w-1/2 flex flex-col justify-between p-8 sm:p-12 lg:p-16 bg-white">
         <div>
           {/* Logo */}
-          <a href="http://localhost:3000" className="inline-flex items-center gap-2.5 font-extrabold text-xl tracking-tight text-gray-950">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gray-950 text-white shadow-sm">
-              <Music2 className="h-5 w-5 stroke-[2.5]" />
-            </div>
-            <span>Music Website</span>
+          <a href="http://localhost:3000" className="inline-flex items-center gap-2.5 font-extrabold text-xl tracking-tight text-gray-950 group">
+            <img
+              src="/logo.png"
+              alt="Caution Studio"
+              className="h-12 w-auto max-w-[180px] object-contain transition-transform duration-200 group-hover:scale-105"
+            />
           </a>
         </div>
 

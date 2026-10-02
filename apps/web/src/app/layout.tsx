@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'Music Website | Royalty Free Music for Video Creators',
+  title: 'Caution Studio | Royalty Free Music for Video Creators',
   description:
     'Download high-quality, royalty-free music and sound effects for YouTube, TikTok, commercial videos, games, and films.',
   keywords: [

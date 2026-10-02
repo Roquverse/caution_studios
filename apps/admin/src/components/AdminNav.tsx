@@ -16,17 +16,16 @@ export function AdminNav({ activePath = '/' }: { activePath?: string }) {
     <header className="sticky top-0 z-30 w-full bg-[#090A0F] text-white border-b border-gray-800 shadow-md">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex h-16 items-center justify-between">
         {/* Left: Brand */}
-        <div className="flex items-center gap-8">
-          <a href="/" className="flex items-center gap-2.5 font-bold text-white">
-            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#1E50FF] text-white">
-              <Music2 className="h-4 w-4 stroke-[2.5]" />
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-base tracking-tight">Music Website</span>
-              <span className="bg-red-500/20 text-red-400 border border-red-500/40 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">
-                Admin
-              </span>
-            </div>
+        <div className="flex items-center gap-6">
+          <a href="/" className="flex items-center gap-2.5 font-bold text-white group">
+            <img
+              src="/logo.png"
+              alt="Caution Studio"
+              className="h-9 w-auto max-w-[150px] object-contain brightness-0 invert transition-transform duration-200 group-hover:scale-105"
+            />
+            <span className="bg-red-500/20 text-red-400 border border-red-500/40 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">
+              Admin
+            </span>
           </a>
 
           {/* Desktop Nav */}

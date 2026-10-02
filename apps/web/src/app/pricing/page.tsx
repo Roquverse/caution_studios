@@ -10,7 +10,7 @@ export default function PricingPage() {
   return (
     <div className="min-h-screen bg-white text-gray-900 flex flex-col">
       <Navbar
-        brandName="Music Website"
+        brandName="Caution Studio"
         currentPath="/pricing"
         onStartFree={() => (window.location.href = 'http://localhost:3001/register')}
         onSignIn={() => (window.location.href = 'http://localhost:3001/login')}
@@ -115,7 +115,7 @@ export default function PricingPage() {
         </div>
       </main>
 
-      <Footer brandName="Music Website" />
+      <Footer brandName="Caution Studio" />
     </div>
   );
 }

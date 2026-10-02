@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'Admin Control Center | Music Website',
+  title: 'Admin Control Center | Caution Studio',
   description: 'Manage audio catalog, metadata, licenses, and creator subscribers.'
 };
 

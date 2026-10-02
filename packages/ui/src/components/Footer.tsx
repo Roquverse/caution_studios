@@ -9,7 +9,7 @@ export interface FooterProps {
 }
 
 export const Footer: React.FC<FooterProps> = ({
-  brandName = 'Music Website',
+  brandName = 'Caution Studio',
   onNavigate,
   className
 }) => {
@@ -32,10 +32,11 @@ export const Footer: React.FC<FooterProps> = ({
           {/* Brand & Mission column (takes 2 cols on lg) */}
           <div className="lg:col-span-2 space-y-4">
             <div className="flex items-center gap-2.5 text-white font-extrabold text-xl tracking-tight">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#1E50FF] text-white">
-                <Music2 className="h-4 w-4 stroke-[2.5]" />
-              </div>
-              <span>{brandName}</span>
+              <img
+                src="/logo.png"
+                alt={brandName}
+                className="h-11 w-auto max-w-[170px] object-contain brightness-0 invert"
+              />
             </div>
 
             <p className="text-sm font-semibold text-white">

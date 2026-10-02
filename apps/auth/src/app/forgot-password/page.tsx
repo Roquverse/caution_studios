@@ -17,11 +17,12 @@ export default function ForgotPasswordPage() {
     <div className="min-h-screen flex items-center justify-center p-6 bg-slate-50">
       <div className="max-w-md w-full bg-white rounded-3xl border border-gray-100 p-8 sm:p-10 shadow-soft-card">
         <div className="mb-6 text-center">
-          <a href="http://localhost:3000" className="inline-flex items-center gap-2 font-extrabold text-xl tracking-tight text-gray-950 mb-6">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gray-950 text-white shadow-sm">
-              <Music2 className="h-5 w-5 stroke-[2.5]" />
-            </div>
-            <span>Music Website</span>
+          <a href="http://localhost:3000" className="inline-flex items-center justify-center gap-2 mb-6 group">
+            <img
+              src="/logo.png"
+              alt="Caution Studio"
+              className="h-12 w-auto max-w-[180px] object-contain transition-transform duration-200 group-hover:scale-105"
+            />
           </a>
 
           <h1 className="text-2xl font-extrabold text-gray-950 tracking-tight">

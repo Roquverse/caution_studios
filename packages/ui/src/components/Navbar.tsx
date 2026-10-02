@@ -32,7 +32,7 @@ const DEFAULT_ITEMS: NavItem[] = [
 ];
 
 export const Navbar: React.FC<NavbarProps> = ({
-  brandName = 'Music Website',
+  brandName = 'Caution Studio',
   items = DEFAULT_ITEMS,
   currentPath = '/',
   onNavigate,
@@ -67,10 +67,11 @@ export const Navbar: React.FC<NavbarProps> = ({
             onClick={(e) => handleLinkClick(e, '/')}
             className="flex items-center gap-2.5 font-extrabold text-xl tracking-tight text-gray-950 group"
           >
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gray-950 text-white group-hover:bg-[#1E50FF] transition-colors shadow-sm">
-              <Music2 className="h-5 w-5 stroke-[2.5]" />
-            </div>
-            <span>{brandName}</span>
+            <img
+              src="/logo.png"
+              alt={brandName}
+              className="h-11 w-auto max-w-[170px] object-contain transition-transform duration-200 group-hover:scale-105"
+            />
           </a>
 
           {/* Desktop Navigation Links */}
@@ -101,25 +102,6 @@ export const Navbar: React.FC<NavbarProps> = ({
 
         {/* Right CTA / Auth Buttons */}
         <div className="hidden md:flex items-center gap-4">
-          {userPortalUrl && (
-            <a
-              href={userPortalUrl}
-              className="text-xs font-semibold text-gray-600 hover:text-black flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-gray-200"
-            >
-              <span>User App</span>
-              <ExternalLink className="h-3 w-3" />
-            </a>
-          )}
-          {adminPortalUrl && (
-            <a
-              href={adminPortalUrl}
-              className="text-xs font-semibold text-gray-600 hover:text-black flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-gray-200"
-            >
-              <span>Admin App</span>
-              <ExternalLink className="h-3 w-3" />
-            </a>
-          )}
-
           <Button
             variant="primary"
             size="md"

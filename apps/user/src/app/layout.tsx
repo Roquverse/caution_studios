@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'Creator Portal | Music Website',
+  title: 'Creator Portal | Caution Studio',
   description: 'Manage your royalty-free music licenses, downloads, and channel clearances.'
 };
 

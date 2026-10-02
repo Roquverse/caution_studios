@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'Music Website Auth | Creator Sign In & Registration',
+  title: 'Caution Studio Auth | Creator Sign In & Registration',
   description: 'Sign in to access your royalty-free music downloads and licenses.'
 };
 
