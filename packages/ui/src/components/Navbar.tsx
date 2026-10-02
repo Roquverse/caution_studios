@@ -67,11 +67,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             onClick={(e) => handleLinkClick(e, '/')}
             className="flex items-center gap-2.5 font-extrabold text-xl tracking-tight text-gray-950 group"
           >
-            <img
-              src="/logo.png"
-              alt={brandName}
-              className="h-11 w-auto max-w-[170px] object-contain transition-transform duration-200 group-hover:scale-105"
-            />
+            <img src="/logo.png" alt={brandName} style={{ width: 120 }} />
           </a>
 
           {/* Desktop Navigation Links */}
@@ -86,13 +82,13 @@ export const Navbar: React.FC<NavbarProps> = ({
                   className={cn(
                     'relative text-sm font-medium transition-colors py-2',
                     isActive
-                      ? 'text-[#1E50FF] font-semibold'
+                      ? 'text-black font-semibold'
                       : 'text-gray-600 hover:text-gray-950'
                   )}
                 >
                   {item.label}
                   {isActive && (
-                    <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#1E50FF] rounded-full" />
+                    <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-black rounded-full" />
                   )}
                 </a>
               );
@@ -107,7 +103,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             size="md"
             pill
             onClick={onStartFree}
-            className="text-xs font-bold tracking-wide uppercase px-6 py-2.5 shadow-md shadow-[#1E50FF]/25 hover:shadow-glow-brand"
+            className="text-xs font-bold tracking-wide uppercase px-6 py-2.5 shadow-md hover:shadow-lg"
           >
             START FREE NOW
           </Button>
@@ -153,7 +149,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 key={item.label}
                 href={item.href}
                 onClick={(e) => handleLinkClick(e, item.href)}
-                className="px-3 py-2 text-base font-medium text-gray-700 hover:text-[#1E50FF] hover:bg-blue-50/50 rounded-lg"
+                className="px-3 py-2 text-base font-medium text-gray-700 hover:text-black hover:bg-gray-100 rounded-lg"
               >
                 {item.label}
               </a>

@@ -89,11 +89,11 @@ export default function RegisterPage() {
 
             <div className="p-3 bg-gray-50 rounded-xl border border-gray-100 space-y-1.5 text-xs text-gray-600">
               <div className="flex items-center gap-2">
-                <Check className="h-3.5 w-3.5 text-[#1E50FF] stroke-[3]" />
+                <Check className="h-3.5 w-3.5 text-black stroke-[3]" />
                 <span>Full access to 10,000+ songs and stems</span>
               </div>
               <div className="flex items-center gap-2">
-                <Check className="h-3.5 w-3.5 text-[#1E50FF] stroke-[3]" />
+                <Check className="h-3.5 w-3.5 text-black stroke-[3]" />
                 <span>Automated Content ID clearance for your channel</span>
               </div>
             </div>
@@ -104,7 +104,7 @@ export default function RegisterPage() {
               size="lg"
               pill
               isLoading={isLoading}
-              className="w-full text-xs font-bold uppercase tracking-wider py-3.5 shadow-md shadow-[#1E50FF]/25 hover:shadow-glow-brand"
+              className="w-full text-xs font-bold uppercase tracking-wider py-3.5 shadow-md shadow-black/20 hover:bg-zinc-800"
             >
               START FREE NOW
             </Button>
@@ -112,7 +112,7 @@ export default function RegisterPage() {
 
           <p className="mt-6 text-center text-xs text-gray-500">
             Already have an account?{' '}
-            <a href="/login" className="text-[#1E50FF] font-semibold hover:underline">
+            <a href="/login" className="text-black font-semibold hover:underline">
               Sign In
             </a>
           </p>
@@ -125,8 +125,8 @@ export default function RegisterPage() {
 
       {/* Right Column: Visual Artwork */}
       <div className="hidden lg:flex w-1/2 bg-[#090A0F] p-12 text-white flex-col justify-between relative overflow-hidden">
-        <div className="absolute top-1/3 left-1/3 w-96 h-96 bg-purple-600/25 blur-3xl pointer-events-none rounded-full" />
-        <div className="absolute bottom-10 right-10 w-80 h-80 bg-blue-500/20 blur-3xl pointer-events-none rounded-full" />
+        <div className="absolute top-1/3 left-1/3 w-96 h-96 bg-white/5 blur-3xl pointer-events-none rounded-full" />
+        <div className="absolute bottom-10 right-10 w-80 h-80 bg-zinc-700/10 blur-3xl pointer-events-none rounded-full" />
 
         <div className="relative z-10 flex justify-end">
           <a href="http://localhost:3000" className="text-xs font-medium text-gray-400 hover:text-white flex items-center gap-1">

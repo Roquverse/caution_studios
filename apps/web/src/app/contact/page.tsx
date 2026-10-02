@@ -84,7 +84,7 @@ export default function ContactPage() {
                     placeholder="Tell us about your video project, channel, or licensing requirements..."
                     value={message}
                     onChange={(e) => setMessage(e.target.value)}
-                    className="w-full rounded-xl border border-gray-200 p-3 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-[#1E50FF] focus:ring-2 focus:ring-[#1E50FF]/20"
+                    className="w-full rounded-xl border border-gray-200 p-3 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-black focus:ring-2 focus:ring-black/10"
                   />
                 </div>
 
@@ -93,7 +93,7 @@ export default function ContactPage() {
                   variant="primary"
                   size="lg"
                   pill
-                  className="w-full text-xs font-bold uppercase tracking-wider py-3.5 shadow-md shadow-[#1E50FF]/25"
+                  className="w-full text-xs font-bold uppercase tracking-wider py-3.5 shadow-md shadow-black/20 hover:bg-zinc-800"
                   rightIcon={<Send className="h-3.5 w-3.5" />}
                 >
                   Submit Inquiry

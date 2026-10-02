@@ -31,10 +31,10 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
         className
       )}
     >
-      {/* Soft Ambient Background Glows */}
-      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[350px] bg-gradient-to-tr from-blue-300/30 via-indigo-200/20 to-purple-300/25 blur-3xl pointer-events-none -z-10 rounded-full" />
-      <div className="absolute top-10 left-12 w-72 h-72 bg-pink-300/20 blur-3xl pointer-events-none -z-10 rounded-full" />
-      <div className="absolute top-20 right-10 w-80 h-80 bg-blue-400/20 blur-3xl pointer-events-none -z-10 rounded-full" />
+      {/* Soft Ambient Monochrome Lighting */}
+      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[350px] bg-gradient-to-tr from-zinc-200/30 via-slate-100/40 to-zinc-200/20 blur-3xl pointer-events-none -z-10 rounded-full" />
+      <div className="absolute top-10 left-12 w-72 h-72 bg-gray-200/30 blur-3xl pointer-events-none -z-10 rounded-full" />
+      <div className="absolute top-20 right-10 w-80 h-80 bg-zinc-200/25 blur-3xl pointer-events-none -z-10 rounded-full" />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative">
         {/* Floating Visual Asset: Top Left Boombox with Headphones */}
@@ -104,7 +104,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
               size="lg"
               pill
               onClick={onStartFree}
-              className="text-xs uppercase font-bold tracking-wider px-8 py-3.5 border-gray-300 text-gray-800 hover:border-[#1E50FF] hover:text-[#1E50FF] bg-white shadow-sm"
+              className="text-xs uppercase font-bold tracking-wider px-8 py-3.5 border-zinc-300 text-zinc-900 hover:border-black hover:bg-zinc-100 bg-white shadow-sm"
             >
               START FREE NOW
             </Button>
@@ -114,7 +114,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
               size="lg"
               pill
               onClick={onPricing}
-              className="text-xs uppercase font-bold tracking-wider px-10 py-3.5 shadow-lg shadow-[#1E50FF]/30 hover:shadow-glow-brand"
+              className="text-xs uppercase font-bold tracking-wider px-10 py-3.5 shadow-lg shadow-black/20 hover:bg-zinc-800"
             >
               PRICING
             </Button>

@@ -63,7 +63,7 @@ export default function ForgotPasswordPage() {
               variant="primary"
               size="lg"
               pill
-              className="w-full text-xs font-bold uppercase tracking-wider py-3.5 shadow-md shadow-[#1E50FF]/25"
+              className="w-full text-xs font-bold uppercase tracking-wider py-3.5 shadow-md shadow-black/20 hover:bg-zinc-800"
             >
               Send Reset Link
             </Button>

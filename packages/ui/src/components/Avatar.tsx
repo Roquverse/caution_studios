@@ -41,7 +41,7 @@ export const Avatar: React.FC<AvatarProps> = ({
     <div className="relative inline-block shrink-0">
       <div
         className={cn(
-          'relative flex items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-blue-100 to-indigo-100 font-semibold text-[#1E50FF] border border-gray-200/80 shadow-sm',
+          'relative flex items-center justify-center overflow-hidden rounded-full bg-zinc-200 font-semibold text-zinc-900 border border-zinc-300 shadow-sm',
           sizeClasses[size],
           className
         )}

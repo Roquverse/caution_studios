@@ -33,7 +33,7 @@ export const StatsCard: React.FC<StatsCardProps> = ({
           {title}
         </span>
         {icon && (
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-50 text-[#1E50FF]">
+          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-zinc-100 text-black">
             {icon}
           </div>
         )}

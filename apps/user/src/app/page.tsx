@@ -161,7 +161,7 @@ export default function UserDashboard() {
                 placeholder="Add YouTube or TikTok handle..."
                 value={newChannelHandle}
                 onChange={(e) => setNewChannelHandle(e.target.value)}
-                className="text-xs px-3 py-1.5 rounded-full border border-gray-200 focus:outline-none focus:border-[#1E50FF] w-full sm:w-56"
+                className="text-xs px-3 py-1.5 rounded-full border border-gray-200 focus:outline-none focus:border-black w-full sm:w-56"
               />
               <Button type="submit" variant="primary" size="sm" pill leftIcon={<Plus className="h-3 w-3" />}>
                 Add
@@ -204,7 +204,7 @@ export default function UserDashboard() {
                 Click any track to listen or generate an official PDF license certificate.
               </p>
             </div>
-            <a href="/library" className="text-xs text-[#1E50FF] hover:underline font-semibold">
+            <a href="/library" className="text-xs text-black hover:underline font-semibold">
               Explore All Tracks
             </a>
           </div>

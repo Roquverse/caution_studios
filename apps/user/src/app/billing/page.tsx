@@ -45,15 +45,15 @@ export default function UserBillingPage() {
 
           <div className="pt-6 grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
             <div className="flex items-center gap-2 text-gray-700">
-              <Check className="h-4 w-4 text-[#1E50FF] stroke-[3]" />
+              <Check className="h-4 w-4 text-black stroke-[3]" />
               <span>Unlimited WAV & MP3 downloads</span>
             </div>
             <div className="flex items-center gap-2 text-gray-700">
-              <Check className="h-4 w-4 text-[#1E50FF] stroke-[3]" />
+              <Check className="h-4 w-4 text-black stroke-[3]" />
               <span>Worldwide commercial client clearance</span>
             </div>
             <div className="flex items-center gap-2 text-gray-700">
-              <Check className="h-4 w-4 text-[#1E50FF] stroke-[3]" />
+              <Check className="h-4 w-4 text-black stroke-[3]" />
               <span>Broadcast, cinema & streaming rights</span>
             </div>
           </div>
@@ -87,7 +87,7 @@ export default function UserBillingPage() {
                     <button
                       type="button"
                       onClick={() => alert('Invoice receipt downloaded!')}
-                      className="text-[#1E50FF] font-semibold hover:underline inline-flex items-center gap-1"
+                      className="text-black font-semibold hover:underline inline-flex items-center gap-1"
                     >
                       <Download className="h-3 w-3" /> PDF
                     </button>

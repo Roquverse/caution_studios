@@ -99,7 +99,7 @@ export default function AdminDashboardPage() {
                 <h3 className="text-base font-bold text-gray-950">Top Downloaded Tracks</h3>
                 <p className="text-xs text-gray-500">Highest commercial synchronization volume this month</p>
               </div>
-              <a href="/tracks" className="text-xs text-[#1E50FF] font-semibold hover:underline flex items-center gap-1">
+              <a href="/tracks" className="text-xs text-black font-semibold hover:underline flex items-center gap-1">
                 View Catalog <ArrowUpRight className="h-3 w-3" />
               </a>
             </div>

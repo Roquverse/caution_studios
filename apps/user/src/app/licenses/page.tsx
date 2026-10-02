@@ -115,7 +115,7 @@ export default function UserLicensesPage() {
                       <button
                         type="button"
                         onClick={() => setSelectedTrack(lic.track)}
-                        className="inline-flex items-center gap-1 text-xs font-semibold text-[#1E50FF] hover:underline"
+                        className="inline-flex items-center gap-1 text-xs font-semibold text-black hover:underline"
                       >
                         <FileText className="h-3.5 w-3.5" />
                         <span>View Certificate</span>

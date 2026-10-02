@@ -30,8 +30,8 @@ export default function FAQPage() {
         <FAQSection />
 
         <div className="max-w-2xl mx-auto px-4 text-center pb-20">
-          <div className="bg-blue-50/70 border border-blue-200/60 rounded-3xl p-8 space-y-4">
-            <Mail className="h-8 w-8 text-[#1E50FF] mx-auto" />
+          <div className="bg-zinc-50 border border-zinc-200 rounded-3xl p-8 space-y-4">
+            <Mail className="h-8 w-8 text-black mx-auto" />
             <h3 className="text-lg font-bold text-gray-900">Still have questions?</h3>
             <p className="text-xs text-gray-600 max-w-md mx-auto">
               Our licensing support specialists are ready to help clarify custom licenses, multi-channel clearances, or enterprise broadcast contracts.

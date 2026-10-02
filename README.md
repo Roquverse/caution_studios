@@ -21,7 +21,7 @@ Caution Studio/
 │   │   └── src/index.ts       # Track, SubscriptionPlan, Testimonial, FAQItem, User, FilterState
 │   │
 │   ├── tailwind-config/       # Centralized Tailwind CSS design tokens (@caution/tailwind-config)
-│   │   └── tailwind.config.js # Brand royal blue (#1E50FF), shadows, gradients, and keyframes
+│   │   └── tailwind.config.js # Brand luxury monochrome (black & white), shadows, gradients, and keyframes
 │   │
 │   └── ui/                    # Reusable Tailwind CSS Component Library (@caution/ui)
 │       └── src/

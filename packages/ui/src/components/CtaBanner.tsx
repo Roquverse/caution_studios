@@ -25,7 +25,7 @@ export const CtaBanner: React.FC<CtaBannerProps> = ({
       )}
     >
       {/* Soft Ambient Radial Glow */}
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[350px] bg-gradient-to-r from-blue-100/60 via-purple-100/50 to-pink-100/40 blur-3xl pointer-events-none -z-10 rounded-full" />
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[350px] bg-gradient-to-r from-zinc-200/50 via-gray-100/50 to-zinc-200/40 blur-3xl pointer-events-none -z-10 rounded-full" />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative">
         {/* Floating Boombox on the Left */}
@@ -77,7 +77,7 @@ export const CtaBanner: React.FC<CtaBannerProps> = ({
               size="lg"
               pill
               onClick={onStartFree}
-              className="text-xs uppercase font-bold tracking-wider px-10 py-3.5 shadow-lg shadow-[#1E50FF]/30 hover:shadow-glow-brand"
+              className="text-xs uppercase font-bold tracking-wider px-10 py-3.5 shadow-lg shadow-black/20 hover:bg-zinc-800"
             >
               START FREE NOW
             </Button>

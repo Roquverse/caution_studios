@@ -56,22 +56,22 @@ export default function LoginPage() {
           </div>
 
           {/* Quick Demo Login Buttons */}
-          <div className="mb-6 p-3 bg-blue-50/60 rounded-xl border border-blue-100 space-y-2">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-blue-800 block">
+          <div className="mb-6 p-3 bg-zinc-50 rounded-xl border border-zinc-200 space-y-2">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-zinc-900 block">
               Quick One-Click Demo Access
             </span>
             <div className="grid grid-cols-2 gap-2">
               <button
                 type="button"
                 onClick={() => handleDemoLogin('user')}
-                className="text-xs font-semibold py-1.5 px-3 bg-white text-blue-700 rounded-lg border border-blue-200 hover:bg-blue-50 transition-colors shadow-2xs text-center"
+                className="text-xs font-semibold py-1.5 px-3 bg-white text-zinc-900 rounded-lg border border-zinc-200 hover:bg-zinc-100 transition-colors shadow-2xs text-center"
               >
                 Sign In as Creator
               </button>
               <button
                 type="button"
                 onClick={() => handleDemoLogin('admin')}
-                className="text-xs font-semibold py-1.5 px-3 bg-[#090A0F] text-white rounded-lg hover:bg-gray-800 transition-colors shadow-2xs text-center"
+                className="text-xs font-semibold py-1.5 px-3 bg-black text-white rounded-lg hover:bg-zinc-800 transition-colors shadow-2xs text-center"
               >
                 Sign In as Admin
               </button>
@@ -101,10 +101,10 @@ export default function LoginPage() {
 
             <div className="flex items-center justify-between text-xs">
               <label className="flex items-center gap-2 cursor-pointer text-gray-600">
-                <input type="checkbox" className="rounded border-gray-300 text-[#1E50FF] focus:ring-[#1E50FF]" />
+                <input type="checkbox" className="rounded border-gray-300 text-black focus:ring-black" />
                 <span>Remember me</span>
               </label>
-              <a href="/forgot-password" className="text-[#1E50FF] hover:underline font-medium">
+              <a href="/forgot-password" className="text-black hover:underline font-medium">
                 Forgot password?
               </a>
             </div>
@@ -115,7 +115,7 @@ export default function LoginPage() {
               size="lg"
               pill
               isLoading={isLoading}
-              className="w-full text-xs font-bold uppercase tracking-wider py-3.5 shadow-md shadow-[#1E50FF]/25 hover:shadow-glow-brand"
+              className="w-full text-xs font-bold uppercase tracking-wider py-3.5 shadow-md shadow-black/20 hover:bg-zinc-800"
             >
               Sign In to Account
             </Button>
@@ -123,7 +123,7 @@ export default function LoginPage() {
 
           <p className="mt-8 text-center text-xs text-gray-500">
             Don&apos;t have an account?{' '}
-            <a href="/register" className="text-[#1E50FF] font-semibold hover:underline">
+            <a href="/register" className="text-black font-semibold hover:underline">
               Start Free Now
             </a>
           </p>
@@ -137,8 +137,8 @@ export default function LoginPage() {
       {/* Right Column: Creative Artwork Showpiece */}
       <div className="hidden lg:flex w-1/2 bg-[#090A0F] p-12 text-white flex-col justify-between relative overflow-hidden">
         {/* Glow backdrop */}
-        <div className="absolute top-1/4 right-1/4 w-96 h-96 bg-[#1E50FF]/20 blur-3xl pointer-events-none rounded-full" />
-        <div className="absolute bottom-10 left-10 w-80 h-80 bg-purple-600/20 blur-3xl pointer-events-none rounded-full" />
+        <div className="absolute top-1/4 right-1/4 w-96 h-96 bg-white/5 blur-3xl pointer-events-none rounded-full" />
+        <div className="absolute bottom-10 left-10 w-80 h-80 bg-zinc-700/10 blur-3xl pointer-events-none rounded-full" />
 
         <div className="relative z-10 flex justify-end">
           <a href="http://localhost:3000" className="text-xs font-medium text-gray-400 hover:text-white flex items-center gap-1">

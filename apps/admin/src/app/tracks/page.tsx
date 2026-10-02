@@ -262,7 +262,7 @@ export default function AdminTracksPage() {
               <select
                 value={genre}
                 onChange={(e) => setGenre(e.target.value)}
-                className="w-full text-xs rounded-xl border border-gray-200 p-2.5 bg-white focus:outline-none focus:border-[#1E50FF]"
+                className="w-full text-xs rounded-xl border border-gray-200 p-2.5 bg-white focus:outline-none focus:border-black"
               >
                 <option value="Cinematic">Cinematic</option>
                 <option value="Electronic">Electronic</option>
@@ -279,7 +279,7 @@ export default function AdminTracksPage() {
               <select
                 value={mood}
                 onChange={(e) => setMood(e.target.value)}
-                className="w-full text-xs rounded-xl border border-gray-200 p-2.5 bg-white focus:outline-none focus:border-[#1E50FF]"
+                className="w-full text-xs rounded-xl border border-gray-200 p-2.5 bg-white focus:outline-none focus:border-black"
               >
                 <option value="Uplifting">Uplifting</option>
                 <option value="Epic">Epic</option>
@@ -298,7 +298,7 @@ export default function AdminTracksPage() {
           />
 
           {/* Audio Upload Dropzone */}
-          <div className="border-2 border-dashed border-gray-200 rounded-2xl p-6 text-center hover:border-[#1E50FF] transition-colors cursor-pointer bg-slate-50/50">
+          <div className="border-2 border-dashed border-gray-200 rounded-2xl p-6 text-center hover:border-black transition-colors cursor-pointer bg-slate-50/50">
             <UploadCloud className="h-8 w-8 text-gray-400 mx-auto mb-2" />
             <span className="text-xs font-semibold text-gray-700 block">
               Drag and drop master audio (WAV, FLAC, MP3 320kbps)

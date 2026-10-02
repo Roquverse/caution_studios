@@ -38,7 +38,7 @@ export function UserNav({ activePath = '/' }: { activePath?: string }) {
                   href={link.href}
                   className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
                     isActive
-                      ? 'bg-blue-50 text-[#1E50FF]'
+                      ? 'bg-black text-white'
                       : 'text-gray-600 hover:text-gray-950 hover:bg-gray-100'
                   }`}
                 >

@@ -51,7 +51,7 @@ export const LicensingGrid: React.FC<LicensingGridProps> = ({
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-y-4 gap-x-2 text-left mb-12 max-w-4xl mx-auto">
           {platforms.map((platform, idx) => (
             <div key={idx} className="flex items-center gap-2 text-xs sm:text-sm font-medium text-gray-700">
-              <Check className="h-4 w-4 text-[#1E50FF] stroke-[3] shrink-0" />
+              <Check className="h-4 w-4 text-black stroke-[3] shrink-0" />
               <span className="truncate">{platform}</span>
             </div>
           ))}
@@ -64,7 +64,7 @@ export const LicensingGrid: React.FC<LicensingGridProps> = ({
             size="md"
             pill
             onClick={onStartFree}
-            className="text-xs font-bold uppercase tracking-wider px-8 py-3 shadow-md shadow-[#1E50FF]/25 hover:shadow-glow-brand"
+            className="text-xs font-bold uppercase tracking-wider px-8 py-3 shadow-md shadow-black/20 hover:bg-zinc-800"
           >
             START FREE NOW
           </Button>

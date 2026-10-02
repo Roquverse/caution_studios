@@ -67,15 +67,15 @@ export const LicenseCertificateModal: React.FC<LicenseCertificateModalProps> = (
     >
       <div className="space-y-4">
         {/* Certificate Card */}
-        <div className="rounded-xl border border-blue-200 bg-gradient-to-br from-blue-50/50 via-white to-indigo-50/30 p-5 shadow-inner">
-          <div className="flex items-center justify-between pb-3 border-b border-blue-100">
-            <div className="flex items-center gap-2 text-blue-900">
-              <ShieldCheck className="h-5 w-5 text-[#1E50FF]" />
+        <div className="rounded-xl border border-zinc-200 bg-zinc-50/80 p-5 shadow-inner">
+          <div className="flex items-center justify-between pb-3 border-b border-zinc-200">
+            <div className="flex items-center gap-2 text-zinc-900">
+              <ShieldCheck className="h-5 w-5 text-black" />
               <span className="text-xs font-bold uppercase tracking-wider">
                 Official Content ID Clearance
               </span>
             </div>
-            <span className="text-[11px] font-mono font-semibold bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">
+            <span className="text-[11px] font-mono font-semibold bg-zinc-200 text-zinc-900 px-2 py-0.5 rounded-full">
               Perpetual Sync
             </span>
           </div>
@@ -108,7 +108,7 @@ export const LicenseCertificateModal: React.FC<LicenseCertificateModalProps> = (
             <button
               type="button"
               onClick={copyLicense}
-              className="flex items-center gap-1 text-xs text-[#1E50FF] hover:text-[#1542e6] font-medium"
+              className="flex items-center gap-1 text-xs text-black hover:underline font-semibold"
             >
               {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
               <span>{copied ? 'Copied' : 'Copy'}</span>

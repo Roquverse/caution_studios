@@ -4,22 +4,23 @@ module.exports = {
     extend: {
       colors: {
         brand: {
-          50: '#eff6ff',
-          100: '#dbeafe',
-          200: '#bfdbfe',
-          300: '#93c5fd',
-          400: '#60a5fa',
-          500: '#2563eb', // Electric royal blue matching the reference design
-          600: '#1d4ed8',
-          700: '#1e40af',
-          800: '#1e3a8a',
-          900: '#172554',
-          DEFAULT: '#1E50FF',
-          dark: '#143cc9',
-          light: '#3d6cff'
+          50: '#fafafa',
+          100: '#f4f4f5',
+          200: '#e4e4e7',
+          300: '#d4d4d8',
+          400: '#a1a1aa',
+          500: '#71717a',
+          600: '#52525b',
+          700: '#3f3f46',
+          800: '#27272a',
+          900: '#18181b',
+          950: '#090a0f',
+          DEFAULT: '#000000',
+          dark: '#000000',
+          light: '#27272a'
         },
         dark: {
-          950: '#060709',
+          950: '#000000',
           900: '#090A0F',
           850: '#0f1118',
           800: '#151722',
@@ -38,9 +39,8 @@ module.exports = {
         ]
       },
       boxShadow: {
-        'glow-brand': '0 0 25px -5px rgba(37, 99, 235, 0.4)',
-        'glow-purple': '0 0 35px -5px rgba(168, 85, 247, 0.35)',
-        'soft-card': '0 10px 30px -10px rgba(0, 0, 0, 0.06), 0 4px 12px -4px rgba(0, 0, 0, 0.04)',
+        'glow-brand': '0 0 25px -5px rgba(0, 0, 0, 0.25)',
+        'soft-card': '0 10px 30px -10px rgba(0, 0, 0, 0.05), 0 4px 12px -4px rgba(0, 0, 0, 0.03)',
         'premium': '0 20px 40px -15px rgba(0, 0, 0, 0.08)'
       },
       animation: {

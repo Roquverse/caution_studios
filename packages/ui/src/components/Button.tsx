@@ -31,15 +31,15 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
 
     const variants = {
       primary:
-        'bg-[#1E50FF] hover:bg-[#1542e6] text-white shadow-sm hover:shadow-glow-brand focus-visible:ring-[#1E50FF]',
+        'bg-black hover:bg-zinc-800 text-white shadow-sm hover:shadow-md focus-visible:ring-black',
       secondary:
-        'bg-white hover:bg-gray-50 text-gray-900 border border-gray-200 hover:border-gray-300 shadow-sm focus-visible:ring-gray-400',
+        'bg-white hover:bg-zinc-50 text-gray-900 border border-zinc-200 hover:border-zinc-300 shadow-sm focus-visible:ring-zinc-400',
       outline:
-        'bg-transparent hover:bg-blue-50/50 text-[#1E50FF] border border-[#1E50FF] focus-visible:ring-[#1E50FF]',
+        'bg-transparent hover:bg-black hover:text-white text-black border border-black focus-visible:ring-black',
       dark:
-        'bg-[#090A0F] hover:bg-gray-900 text-white shadow-sm focus-visible:ring-gray-800',
+        'bg-black hover:bg-zinc-800 text-white shadow-sm focus-visible:ring-black',
       ghost:
-        'bg-transparent hover:bg-gray-100 text-gray-700 hover:text-gray-900 focus-visible:ring-gray-400',
+        'bg-transparent hover:bg-zinc-100 text-gray-700 hover:text-gray-900 focus-visible:ring-gray-400',
       danger:
         'bg-red-600 hover:bg-red-700 text-white shadow-sm focus-visible:ring-red-600'
     };

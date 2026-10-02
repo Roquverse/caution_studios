@@ -111,7 +111,7 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
               aria-label="Shuffle"
               className={cn(
                 'text-xs p-1.5 rounded-full hover:bg-gray-100 transition-colors',
-                isShuffle ? 'text-[#1E50FF]' : 'text-gray-400'
+                isShuffle ? 'text-black font-bold' : 'text-gray-400'
               )}
             >
               <Shuffle className="h-3.5 w-3.5" />
@@ -130,7 +130,7 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
               type="button"
               onClick={onPlayToggle}
               aria-label={isPlaying ? 'Pause' : 'Play'}
-              className="flex h-10 w-10 items-center justify-center rounded-full bg-[#1E50FF] text-white shadow-md hover:bg-[#1542e6] hover:scale-105 transition-transform"
+              className="flex h-10 w-10 items-center justify-center rounded-full bg-black text-white shadow-md hover:bg-zinc-800 hover:scale-105 transition-transform"
             >
               {isPlaying ? (
                 <Pause className="h-5 w-5 fill-white" />
@@ -154,7 +154,7 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
               aria-label="Repeat"
               className={cn(
                 'text-xs p-1.5 rounded-full hover:bg-gray-100 transition-colors',
-                isRepeat ? 'text-[#1E50FF]' : 'text-gray-400'
+                isRepeat ? 'text-black font-bold' : 'text-gray-400'
               )}
             >
               <Repeat className="h-3.5 w-3.5" />
@@ -207,7 +207,7 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
                 setVolume(parseFloat(e.target.value));
                 setIsMuted(false);
               }}
-              className="h-1.5 w-16 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-[#1E50FF]"
+              className="h-1.5 w-16 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-black"
             />
           </div>
 
@@ -217,7 +217,7 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
             onClick={() => onDownload && onDownload(currentTrack)}
             title="Download track"
             aria-label="Download track"
-            className="flex items-center gap-1.5 bg-[#1E50FF] hover:bg-[#1542e6] text-white text-xs font-semibold px-3.5 py-1.5 rounded-full shadow-sm"
+            className="flex items-center gap-1.5 bg-black hover:bg-zinc-800 text-white text-xs font-semibold px-3.5 py-1.5 rounded-full shadow-sm"
           >
             <Download className="h-3.5 w-3.5" />
             <span>Download</span>

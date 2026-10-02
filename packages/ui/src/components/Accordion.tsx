@@ -47,7 +47,7 @@ export const Accordion: React.FC<AccordionProps> = ({
             className={cn(
               'rounded-xl border transition-all duration-200 overflow-hidden',
               isOpen
-                ? 'bg-blue-50/40 border-blue-200/80 shadow-sm'
+                ? 'bg-zinc-50 border-zinc-300 shadow-sm'
                 : 'bg-white border-gray-200/70 hover:border-gray-300'
             )}
           >
@@ -59,14 +59,14 @@ export const Accordion: React.FC<AccordionProps> = ({
               <span className="text-base text-gray-850 font-medium">{item.title}</span>
               <span className="ml-4 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-gray-500">
                 {isOpen ? (
-                  <Minus className="h-4 w-4 text-[#1E50FF]" />
+                  <Minus className="h-4 w-4 text-black" />
                 ) : (
                   <Plus className="h-4 w-4 text-gray-600" />
                 )}
               </span>
             </button>
             {isOpen && (
-              <div className="px-6 pb-6 pt-1 text-sm text-gray-600 leading-relaxed border-t border-blue-100/50">
+              <div className="px-6 pb-6 pt-1 text-sm text-gray-600 leading-relaxed border-t border-zinc-200">
                 {item.content}
               </div>
             )}

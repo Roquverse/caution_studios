@@ -69,7 +69,7 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
                 spotlightOnly: false
               })
             }
-            className="text-xs text-[#1E50FF] hover:underline"
+            className="text-xs text-black font-semibold hover:underline"
           >
             Reset
           </button>
@@ -91,7 +91,7 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
                 <span className="flex items-center gap-2">
                   {sec.name}
                   {activeCount > 0 && (
-                    <span className="h-4 w-4 rounded-full bg-blue-100 text-[#1E50FF] text-[10px] font-bold flex items-center justify-center">
+                    <span className="h-4 w-4 rounded-full bg-black text-white text-[10px] font-bold flex items-center justify-center">
                       {activeCount}
                     </span>
                   )}
@@ -115,7 +115,7 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
                         className={cn(
                           'text-xs px-2.5 py-1 rounded-full transition-all flex items-center gap-1',
                           isSelected
-                            ? 'bg-[#1E50FF] text-white font-medium shadow-sm'
+                            ? 'bg-black text-white font-medium shadow-sm'
                             : 'bg-gray-100 text-gray-600 hover:bg-gray-200/80'
                         )}
                       >
@@ -138,12 +138,12 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
             className="flex items-center justify-between w-full text-sm font-medium text-gray-700 hover:text-black"
           >
             <span className="flex items-center gap-1.5">
-              <Sparkles className="h-4 w-4 text-amber-500" /> Spotlight
+              <Sparkles className="h-4 w-4 text-black" /> Spotlight
             </span>
             <div
               className={cn(
                 'w-9 h-5 rounded-full transition-colors relative p-0.5',
-                filters.spotlightOnly ? 'bg-[#1E50FF]' : 'bg-gray-200'
+                filters.spotlightOnly ? 'bg-black' : 'bg-gray-200'
               )}
             >
               <div
