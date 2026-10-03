@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { supabase } from '../../lib/supabaseClient';
-import { Check, ArrowRight, AlertCircle } from 'lucide-react';
+import { Check, ArrowRight, AlertCircle, ArrowUpRight } from 'lucide-react';
 
 export default function SignUpPage() {
   const router = useRouter();
@@ -55,70 +55,124 @@ export default function SignUpPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#07090D] text-white flex flex-col justify-center py-12 px-4 sm:px-6 lg:px-8 selection:bg-[#04564f] selection:text-white">
-      <div className="sm:mx-auto sm:w-full sm:max-w-md text-center">
-        <Link href="/" className="inline-block">
-          <img
-            src="/logo.png"
-            alt="Caution Studio"
-            className="h-8 w-auto object-contain brightness-0 invert mx-auto"
-            style={{ width: 140 }}
-          />
-        </Link>
-        <h2 className="mt-4 text-2xl sm:text-3xl font-black text-white tracking-tight">
-          Create your account
-        </h2>
-        <p className="mt-1 text-xs text-gray-400">
-          Join Caution Studio as an artist, producer, or both
-        </p>
+    <div className="min-h-screen bg-[#07090D] text-white flex flex-col lg:flex-row selection:bg-[#04564f] selection:text-white">
+      {/* Left Column: Brand, Editorial, and Ecosystem Context */}
+      <div className="w-full lg:w-5/12 xl:w-1/2 p-8 sm:p-12 lg:p-16 flex flex-col justify-between border-b lg:border-b-0 lg:border-r border-white/[0.08] bg-[#0A0D14]">
+        <div>
+          {/* Brand Logo */}
+          <Link href="/" className="inline-block">
+            <img
+              src="/logo.png"
+              alt="Caution Studio"
+              className="h-8 w-auto object-contain brightness-0 invert"
+              style={{ width: 140 }}
+            />
+          </Link>
+
+          {/* Telemetry pill */}
+          <div className="mt-12 mb-6 inline-flex items-center gap-2 px-3 py-1 rounded-[4px] bg-white/[0.04] border border-white/[0.08] text-[11px] font-mono text-gray-400 uppercase tracking-widest">
+            <span className="h-1.5 w-1.5 rounded-full bg-[#2dd4bf]" />
+            <span>Artist & Producer Portal</span>
+          </div>
+
+          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black text-white tracking-[-0.03em] leading-tight max-w-lg">
+            Stream beats like Spotify. <br />
+            License masters like a pro.
+          </h1>
+
+          <p className="mt-4 text-sm text-gray-400 leading-relaxed max-w-md">
+            Join hundreds of recording artists and producers licensing studio-grade beats, separated trackout stems, and atomic exclusive buyouts.
+          </p>
+
+          {/* Value Checklist */}
+          <div className="mt-10 space-y-3.5 max-w-md">
+            {[
+              '24-Bit master WAVs + separated stems (.ZIP)',
+              'Automated Content ID clearance for YouTube, TikTok & DSPs',
+              'Atomic 100% exclusive buyouts with signed legal contracts',
+              'Instant NGN settlement powered by Paystack'
+            ].map((feat, i) => (
+              <div key={i} className="flex items-start gap-3 text-xs text-gray-300">
+                <span className="font-mono text-[#2dd4bf] text-[11px] font-bold shrink-0 mt-0.5">
+                  0{i + 1}
+                </span>
+                <span className="leading-snug">{feat}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Bottom Editorial Quote */}
+        <div className="mt-12 pt-8 border-t border-white/[0.08] flex items-center justify-between text-xs text-gray-500">
+          <span>© {new Date().getFullYear()} Caution Studio Inc.</span>
+          <Link href="/" className="hover:text-white transition-colors flex items-center gap-1">
+            Back to Home <ArrowUpRight className="h-3 w-3" />
+          </Link>
+        </div>
       </div>
 
-      <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
-        <div className="bg-[#0E131B] p-6 sm:p-8 rounded-2xl border border-white/10 shadow-2xl space-y-5">
+      {/* Right Column: Clean, Flat, Human Onboarding Form */}
+      <div className="w-full lg:w-7/12 xl:w-1/2 p-6 sm:p-12 lg:p-16 flex flex-col justify-center bg-[#07090D]">
+        <div className="max-w-md w-full mx-auto">
+          {/* Form Header */}
+          <div className="mb-8">
+            <h2 className="text-2xl font-black text-white tracking-[-0.02em]">
+              Create an account
+            </h2>
+            <p className="mt-1 text-xs text-gray-400">
+              Already have an account?{' '}
+              <Link href="/sign-in" className="text-[#2dd4bf] font-semibold hover:underline">
+                Sign in
+              </Link>
+            </p>
+          </div>
+
+          {/* Error Message */}
           {errorMessage && (
-            <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-xs flex items-center gap-2">
-              <AlertCircle className="h-4 w-4 shrink-0" />
+            <div className="mb-6 p-3 rounded-[6px] bg-red-950/40 border border-red-800/40 text-red-300 text-xs flex items-center gap-2.5">
+              <AlertCircle className="h-4 w-4 shrink-0 text-red-400" />
               <span>{errorMessage}</span>
             </div>
           )}
 
-          <form onSubmit={handleSignUp} className="space-y-4">
-            {/* Role picker */}
+          <form onSubmit={handleSignUp} className="space-y-5">
+            {/* Flat Role Segmented Selector */}
             <div>
-              <label className="block text-xs font-semibold text-gray-300 mb-1.5">
-                Account role (one account can hold both)
+              <label className="block text-[11px] font-mono uppercase tracking-wider text-gray-400 mb-2">
+                Select Role
               </label>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-2 gap-2 p-1 bg-[#0F131C] border border-white/[0.08] rounded-[6px]">
                 <button
                   type="button"
                   onClick={() => toggleRole('artist')}
-                  className={`p-2.5 rounded-lg border text-xs font-medium text-left flex items-center justify-between transition-all ${
+                  className={`py-2 px-3 text-xs font-semibold rounded-[4px] transition-all flex items-center justify-center gap-1.5 ${
                     roles.includes('artist')
-                      ? 'bg-[#04564f]/30 border-[#2dd4bf] text-white font-bold'
-                      : 'bg-[#131924] border-white/10 text-gray-400 hover:text-white'
+                      ? 'bg-[#04564f] text-white'
+                      : 'text-gray-400 hover:text-white hover:bg-white/[0.03]'
                   }`}
                 >
+                  {roles.includes('artist') && <Check className="h-3.5 w-3.5 stroke-[2.5]" />}
                   <span>Recording Artist</span>
-                  {roles.includes('artist') && <Check className="h-3.5 w-3.5 text-[#2dd4bf]" />}
                 </button>
 
                 <button
                   type="button"
                   onClick={() => toggleRole('producer')}
-                  className={`p-2.5 rounded-lg border text-xs font-medium text-left flex items-center justify-between transition-all ${
+                  className={`py-2 px-3 text-xs font-semibold rounded-[4px] transition-all flex items-center justify-center gap-1.5 ${
                     roles.includes('producer')
-                      ? 'bg-[#04564f]/30 border-[#2dd4bf] text-white font-bold'
-                      : 'bg-[#131924] border-white/10 text-gray-400 hover:text-white'
+                      ? 'bg-[#04564f] text-white'
+                      : 'text-gray-400 hover:text-white hover:bg-white/[0.03]'
                   }`}
                 >
+                  {roles.includes('producer') && <Check className="h-3.5 w-3.5 stroke-[2.5]" />}
                   <span>Beat Producer</span>
-                  {roles.includes('producer') && <Check className="h-3.5 w-3.5 text-[#2dd4bf]" />}
                 </button>
               </div>
             </div>
 
+            {/* Display Name */}
             <div>
-              <label className="block text-xs font-semibold text-gray-300 mb-1">
+              <label className="block text-[11px] font-mono uppercase tracking-wider text-gray-400 mb-1.5">
                 Display Name / Stage Name
               </label>
               <input
@@ -126,28 +180,33 @@ export default function SignUpPage() {
                 required
                 value={displayName}
                 onChange={(e) => setDisplayName(e.target.value)}
-                placeholder="e.g. Samuel Drake"
-                className="w-full h-10 px-3 rounded-lg bg-[#131924] border border-white/10 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-[#2dd4bf] transition-colors"
+                placeholder="e.g. Samuel Rivers"
+                className="w-full h-11 px-3.5 rounded-[6px] bg-[#0F131C] border border-white/[0.1] text-xs text-white placeholder-gray-500 focus:outline-none focus:border-[#04564f] transition-colors"
               />
             </div>
 
+            {/* Handle */}
             <div>
-              <label className="block text-xs font-semibold text-gray-300 mb-1">
-                Handle (URL username)
+              <label className="block text-[11px] font-mono uppercase tracking-wider text-gray-400 mb-1.5">
+                Username Handle
               </label>
-              <input
-                type="text"
-                required
-                value={handle}
-                onChange={(e) => setHandle(e.target.value)}
-                placeholder="e.g. samuel_sound"
-                className="w-full h-10 px-3 rounded-lg bg-[#131924] border border-white/10 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-[#2dd4bf] transition-colors font-mono"
-              />
+              <div className="relative flex items-center">
+                <span className="absolute left-3.5 text-xs text-gray-500 font-mono">@</span>
+                <input
+                  type="text"
+                  required
+                  value={handle}
+                  onChange={(e) => setHandle(e.target.value)}
+                  placeholder="samuel_sound"
+                  className="w-full h-11 pl-8 pr-3.5 rounded-[6px] bg-[#0F131C] border border-white/[0.1] text-xs text-white placeholder-gray-500 font-mono focus:outline-none focus:border-[#04564f] transition-colors"
+                />
+              </div>
             </div>
 
+            {/* Email Address */}
             <div>
-              <label className="block text-xs font-semibold text-gray-300 mb-1">
-                Email address
+              <label className="block text-[11px] font-mono uppercase tracking-wider text-gray-400 mb-1.5">
+                Email Address
               </label>
               <input
                 type="email"
@@ -155,12 +214,13 @@ export default function SignUpPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="artist@cautionstudio.com"
-                className="w-full h-10 px-3 rounded-lg bg-[#131924] border border-white/10 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-[#2dd4bf] transition-colors"
+                className="w-full h-11 px-3.5 rounded-[6px] bg-[#0F131C] border border-white/[0.1] text-xs text-white placeholder-gray-500 focus:outline-none focus:border-[#04564f] transition-colors"
               />
             </div>
 
+            {/* Password */}
             <div>
-              <label className="block text-xs font-semibold text-gray-300 mb-1">
+              <label className="block text-[11px] font-mono uppercase tracking-wider text-gray-400 mb-1.5">
                 Password
               </label>
               <input
@@ -168,27 +228,30 @@ export default function SignUpPage() {
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-                className="w-full h-10 px-3 rounded-lg bg-[#131924] border border-white/10 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-[#2dd4bf] transition-colors"
+                placeholder="••••••••••••"
+                className="w-full h-11 px-3.5 rounded-[6px] bg-[#0F131C] border border-white/[0.1] text-xs text-white placeholder-gray-500 focus:outline-none focus:border-[#04564f] transition-colors"
               />
             </div>
 
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full h-11 rounded-lg bg-[#04564f] hover:bg-[#03453f] text-white font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-all shadow-lg shadow-[#04564f]/30 mt-2 active:scale-95 disabled:opacity-50"
-            >
-              <span>{loading ? 'Creating account...' : 'Create account'}</span>
-              <ArrowRight className="h-3.5 w-3.5" />
-            </button>
+            {/* Flat Submit Button (NO SHADOWS) */}
+            <div className="pt-2">
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full h-11 rounded-[6px] bg-[#04564f] hover:bg-[#03453f] text-white font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-colors disabled:opacity-50 cursor-pointer"
+              >
+                <span>{loading ? 'Creating account...' : 'Create Account'}</span>
+                <ArrowRight className="h-3.5 w-3.5" />
+              </button>
+            </div>
           </form>
 
-          <div className="pt-4 border-t border-white/10 text-center text-xs text-gray-400">
-            Already have an account?{' '}
-            <Link href="/sign-in" className="text-[#2dd4bf] font-semibold hover:underline">
-              Sign in
-            </Link>
-          </div>
+          {/* Terms */}
+          <p className="mt-6 text-[11px] text-gray-500 text-center leading-relaxed">
+            By creating an account, you agree to Caution Studio&apos;s{' '}
+            <span className="text-gray-400">Terms of Service</span> and{' '}
+            <span className="text-gray-400">Master License Agreement</span>.
+          </p>
         </div>
       </div>
     </div>

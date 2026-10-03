@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { supabase } from '../../lib/supabaseClient';
-import { ArrowRight, AlertCircle } from 'lucide-react';
+import { ArrowRight, AlertCircle, ArrowUpRight } from 'lucide-react';
 
 export default function SignInPage() {
   const router = useRouter();
@@ -37,37 +37,74 @@ export default function SignInPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#07090D] text-white flex flex-col justify-center py-12 px-4 sm:px-6 lg:px-8 selection:bg-[#04564f] selection:text-white">
-      <div className="sm:mx-auto sm:w-full sm:max-w-md text-center">
-        <Link href="/" className="inline-block">
-          <img
-            src="/logo.png"
-            alt="Caution Studio"
-            className="h-8 w-auto object-contain brightness-0 invert mx-auto"
-            style={{ width: 140 }}
-          />
-        </Link>
-        <h2 className="mt-4 text-2xl sm:text-3xl font-black text-white tracking-tight">
-          Sign in to Caution Studio
-        </h2>
-        <p className="mt-1 text-xs text-gray-400">
-          Access your streaming licenses, downloads, and producer studio
-        </p>
+    <div className="min-h-screen bg-[#07090D] text-white flex flex-col lg:flex-row selection:bg-[#04564f] selection:text-white">
+      {/* Left Column: Brand & Context */}
+      <div className="w-full lg:w-5/12 xl:w-1/2 p-8 sm:p-12 lg:p-16 flex flex-col justify-between border-b lg:border-b-0 lg:border-r border-white/[0.08] bg-[#0A0D14]">
+        <div>
+          {/* Brand Logo */}
+          <Link href="/" className="inline-block">
+            <img
+              src="/logo.png"
+              alt="Caution Studio"
+              className="h-8 w-auto object-contain brightness-0 invert"
+              style={{ width: 140 }}
+            />
+          </Link>
+
+          {/* Telemetry pill */}
+          <div className="mt-12 mb-6 inline-flex items-center gap-2 px-3 py-1 rounded-[4px] bg-white/[0.04] border border-white/[0.08] text-[11px] font-mono text-gray-400 uppercase tracking-widest">
+            <span className="h-1.5 w-1.5 rounded-full bg-[#2dd4bf]" />
+            <span>Secure Studio Access</span>
+          </div>
+
+          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black text-white tracking-[-0.03em] leading-tight max-w-lg">
+            Welcome back to <br />
+            your studio catalog.
+          </h1>
+
+          <p className="mt-4 text-sm text-gray-400 leading-relaxed max-w-md">
+            Manage your leased tracks, download separated stems, access your licensed releases, and monitor sync performance.
+          </p>
+        </div>
+
+        {/* Bottom Status */}
+        <div className="mt-12 pt-8 border-t border-white/[0.08] flex items-center justify-between text-xs text-gray-500">
+          <span>© {new Date().getFullYear()} Caution Studio Inc.</span>
+          <Link href="/" className="hover:text-white transition-colors flex items-center gap-1">
+            Back to Home <ArrowUpRight className="h-3 w-3" />
+          </Link>
+        </div>
       </div>
 
-      <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
-        <div className="bg-[#0E131B] p-6 sm:p-8 rounded-2xl border border-white/10 shadow-2xl space-y-5">
+      {/* Right Column: Clean, Flat Login Form (NO SHADOWS) */}
+      <div className="w-full lg:w-7/12 xl:w-1/2 p-6 sm:p-12 lg:p-16 flex flex-col justify-center bg-[#07090D]">
+        <div className="max-w-md w-full mx-auto">
+          {/* Header */}
+          <div className="mb-8">
+            <h2 className="text-2xl font-black text-white tracking-[-0.02em]">
+              Sign in to your account
+            </h2>
+            <p className="mt-1 text-xs text-gray-400">
+              New to Caution Studio?{' '}
+              <Link href="/sign-up" className="text-[#2dd4bf] font-semibold hover:underline">
+                Create an account
+              </Link>
+            </p>
+          </div>
+
+          {/* Error Message */}
           {errorMsg && (
-            <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-xs flex items-center gap-2">
-              <AlertCircle className="h-4 w-4 shrink-0" />
+            <div className="mb-6 p-3 rounded-[6px] bg-red-950/40 border border-red-800/40 text-red-300 text-xs flex items-center gap-2.5">
+              <AlertCircle className="h-4 w-4 shrink-0 text-red-400" />
               <span>{errorMsg}</span>
             </div>
           )}
 
-          <form onSubmit={handleSignIn} className="space-y-4">
+          <form onSubmit={handleSignIn} className="space-y-5">
+            {/* Email Address */}
             <div>
-              <label className="block text-xs font-semibold text-gray-300 mb-1">
-                Email address
+              <label className="block text-[11px] font-mono uppercase tracking-wider text-gray-400 mb-1.5">
+                Email Address
               </label>
               <input
                 type="email"
@@ -75,13 +112,14 @@ export default function SignInPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="artist@cautionstudio.com"
-                className="w-full h-10 px-3 rounded-lg bg-[#131924] border border-white/10 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-[#2dd4bf] transition-colors"
+                className="w-full h-11 px-3.5 rounded-[6px] bg-[#0F131C] border border-white/[0.1] text-xs text-white placeholder-gray-500 focus:outline-none focus:border-[#04564f] transition-colors"
               />
             </div>
 
+            {/* Password */}
             <div>
-              <div className="flex items-center justify-between mb-1">
-                <label className="block text-xs font-semibold text-gray-300">
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="block text-[11px] font-mono uppercase tracking-wider text-gray-400">
                   Password
                 </label>
                 <a href="#" className="text-[11px] text-[#2dd4bf] hover:underline">
@@ -93,27 +131,23 @@ export default function SignInPage() {
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-                className="w-full h-10 px-3 rounded-lg bg-[#131924] border border-white/10 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-[#2dd4bf] transition-colors"
+                placeholder="••••••••••••"
+                className="w-full h-11 px-3.5 rounded-[6px] bg-[#0F131C] border border-white/[0.1] text-xs text-white placeholder-gray-500 focus:outline-none focus:border-[#04564f] transition-colors"
               />
             </div>
 
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full h-11 rounded-lg bg-[#04564f] hover:bg-[#03453f] text-white font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-all shadow-lg shadow-[#04564f]/30 mt-2 active:scale-95 disabled:opacity-50"
-            >
-              <span>{loading ? 'Signing in...' : 'Sign in'}</span>
-              <ArrowRight className="h-3.5 w-3.5" />
-            </button>
+            {/* Flat Submit Button (NO SHADOWS) */}
+            <div className="pt-2">
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full h-11 rounded-[6px] bg-[#04564f] hover:bg-[#03453f] text-white font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-colors disabled:opacity-50 cursor-pointer"
+              >
+                <span>{loading ? 'Signing in...' : 'Sign In'}</span>
+                <ArrowRight className="h-3.5 w-3.5" />
+              </button>
+            </div>
           </form>
-
-          <div className="pt-4 border-t border-white/10 text-center text-xs text-gray-400">
-            Don&apos;t have an account yet?{' '}
-            <Link href="/sign-up" className="text-[#2dd4bf] font-semibold hover:underline">
-              Create an account
-            </Link>
-          </div>
         </div>
       </div>
     </div>
