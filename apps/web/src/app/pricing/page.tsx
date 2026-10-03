@@ -39,7 +39,7 @@ export default function PricingPage() {
             <button
               type="button"
               onClick={() => setBillingPeriod(billingPeriod === 'yearly' ? 'monthly' : 'yearly')}
-              className="relative inline-flex h-7 w-12 items-center rounded-full bg-black transition-colors focus:outline-none"
+              className="relative inline-flex h-7 w-12 items-center rounded-full bg-[#04564f] transition-colors focus:outline-none"
             >
               <span
                 className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform ${
@@ -61,13 +61,13 @@ export default function PricingPage() {
                   key={plan.id}
                   className={`rounded-3xl p-8 border transition-all duration-300 relative flex flex-col justify-between ${
                     plan.popular
-                      ? 'border-black shadow-2xl bg-white ring-2 ring-black'
+                      ? 'border-[#04564f] shadow-2xl shadow-[#04564f]/15 bg-white ring-2 ring-[#04564f]'
                       : 'border-gray-200 bg-white hover:border-gray-300 shadow-sm'
                   }`}
                 >
                   {plan.badge && (
                     <div className="absolute -top-3.5 left-1/2 -translate-x-1/2">
-                      <span className="bg-black text-white text-xs font-bold uppercase tracking-wider px-3.5 py-1 rounded-full shadow-sm">
+                      <span className="bg-[#04564f] text-white text-xs font-bold uppercase tracking-wider px-3.5 py-1 rounded-full shadow-sm">
                         {plan.badge}
                       </span>
                     </div>
@@ -90,7 +90,7 @@ export default function PricingPage() {
                       </span>
                       {plan.features.map((feat, idx) => (
                         <div key={idx} className="flex items-start gap-2.5 text-xs text-gray-700">
-                          <Check className="h-4 w-4 text-black shrink-0 stroke-[3] mt-0.5" />
+                          <Check className="h-4 w-4 text-[#04564f] shrink-0 stroke-[3] mt-0.5" />
                           <span>{feat}</span>
                         </div>
                       ))}

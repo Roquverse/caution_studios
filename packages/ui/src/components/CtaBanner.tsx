@@ -77,7 +77,7 @@ export const CtaBanner: React.FC<CtaBannerProps> = ({
               size="lg"
               pill
               onClick={onStartFree}
-              className="text-xs uppercase font-bold tracking-wider px-10 py-3.5 shadow-lg shadow-black/20 hover:bg-zinc-800"
+              className="text-xs uppercase font-bold tracking-wider px-10 py-3.5 shadow-lg shadow-[#04564f]/25 hover:bg-[#03453f]"
             >
               START FREE NOW
             </Button>

@@ -70,7 +70,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             <img
               src="/logo.png"
               alt={brandName}
-              className="h-11 sm:h-12 w-auto object-contain"
+              style={{ width: 150 }}
             />
           </a>
 
@@ -86,13 +86,13 @@ export const Navbar: React.FC<NavbarProps> = ({
                   className={cn(
                     'relative text-sm font-medium transition-colors py-2',
                     isActive
-                      ? 'text-black font-semibold'
+                      ? 'text-[#04564f] font-semibold'
                       : 'text-gray-600 hover:text-gray-950'
                   )}
                 >
                   {item.label}
                   {isActive && (
-                    <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-black rounded-full" />
+                    <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#04564f] rounded-full" />
                   )}
                 </a>
               );

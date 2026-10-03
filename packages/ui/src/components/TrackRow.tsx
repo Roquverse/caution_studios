@@ -82,7 +82,7 @@ export const TrackRow: React.FC<TrackRowProps> = ({
           className={cn(
             'hidden md:flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-all focus:outline-none',
             isCurrent && isPlaying
-              ? 'bg-black text-white shadow-sm shadow-black/20'
+              ? 'bg-[#04564f] text-white shadow-sm shadow-[#04564f]/30'
               : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100'
           )}
         >
@@ -113,7 +113,7 @@ export const TrackRow: React.FC<TrackRowProps> = ({
       <div className="flex-1 max-w-xl flex items-center gap-3 px-2">
         {isCurrent ? (
           <div className="w-full flex items-center gap-3">
-            <Volume2 className="h-4 w-4 text-black shrink-0 animate-pulse" />
+            <Volume2 className="h-4 w-4 text-[#04564f] shrink-0 animate-pulse" />
             <div className="flex-1">
               <WaveformVisualizer
                 waveform={track.waveform}
@@ -121,7 +121,7 @@ export const TrackRow: React.FC<TrackRowProps> = ({
                 isPlaying={isPlaying}
                 onSeek={onSeek}
                 height={26}
-                activeColor="#000000"
+                activeColor="#04564f"
                 inactiveColor="#CBD5E1"
               />
             </div>

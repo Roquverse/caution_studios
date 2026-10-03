@@ -104,7 +104,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
               size="lg"
               pill
               onClick={onStartFree}
-              className="text-xs uppercase font-bold tracking-wider px-8 py-3.5 border-zinc-300 text-zinc-900 hover:border-black hover:bg-zinc-100 bg-white shadow-sm"
+              className="text-xs uppercase font-bold tracking-wider px-8 py-3.5 border-zinc-300 text-zinc-900 hover:border-[#04564f] hover:text-[#04564f] hover:bg-[#04564f]/5 bg-white shadow-sm"
             >
               START FREE NOW
             </Button>
@@ -114,7 +114,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
               size="lg"
               pill
               onClick={onPricing}
-              className="text-xs uppercase font-bold tracking-wider px-10 py-3.5 shadow-lg shadow-black/20 hover:bg-zinc-800"
+              className="text-xs uppercase font-bold tracking-wider px-10 py-3.5 shadow-lg shadow-[#04564f]/25 hover:bg-[#03453f]"
             >
               PRICING
             </Button>

@@ -89,11 +89,11 @@ export default function RegisterPage() {
 
             <div className="p-3 bg-gray-50 rounded-xl border border-gray-100 space-y-1.5 text-xs text-gray-600">
               <div className="flex items-center gap-2">
-                <Check className="h-3.5 w-3.5 text-black stroke-[3]" />
+                <Check className="h-3.5 w-3.5 text-[#04564f] stroke-[3]" />
                 <span>Full access to 10,000+ songs and stems</span>
               </div>
               <div className="flex items-center gap-2">
-                <Check className="h-3.5 w-3.5 text-black stroke-[3]" />
+                <Check className="h-3.5 w-3.5 text-[#04564f] stroke-[3]" />
                 <span>Automated Content ID clearance for your channel</span>
               </div>
             </div>
@@ -104,7 +104,7 @@ export default function RegisterPage() {
               size="lg"
               pill
               isLoading={isLoading}
-              className="w-full text-xs font-bold uppercase tracking-wider py-3.5 shadow-md shadow-black/20 hover:bg-zinc-800"
+              className="w-full text-xs font-bold uppercase tracking-wider py-3.5 shadow-md shadow-[#04564f]/20 hover:bg-[#03453f]"
             >
               START FREE NOW
             </Button>

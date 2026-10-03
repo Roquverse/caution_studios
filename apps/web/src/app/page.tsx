@@ -230,7 +230,7 @@ export default function LandingPage() {
                       Showing {filteredTracks.length} tracks
                     </span>
                     {isPlaying && (
-                      <span className="flex items-center gap-1.5 text-black font-semibold bg-zinc-100 px-2.5 py-1 rounded-full border border-zinc-200">
+                      <span className="flex items-center gap-1.5 text-[#04564f] font-semibold bg-[#04564f]/10 px-2.5 py-1 rounded-full border border-[#04564f]/20">
                         <Music className="h-3 w-3 animate-spin" />
                         Now Playing Audio
                       </span>
@@ -278,7 +278,7 @@ export default function LandingPage() {
                             sortBy: 'popular'
                           })
                         }
-                        className="text-xs text-black font-semibold underline hover:no-underline"
+                        className="text-xs text-[#04564f] font-semibold underline hover:no-underline"
                       >
                         Reset all filters
                       </button>

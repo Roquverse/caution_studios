@@ -64,7 +64,7 @@ export const LicensingGrid: React.FC<LicensingGridProps> = ({
             size="md"
             pill
             onClick={onStartFree}
-            className="text-xs font-bold uppercase tracking-wider px-8 py-3 shadow-md shadow-black/20 hover:bg-zinc-800"
+            className="text-xs font-bold uppercase tracking-wider px-8 py-3 shadow-md shadow-[#04564f]/20 hover:bg-[#03453f]"
           >
             START FREE NOW
           </Button>

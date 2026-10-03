@@ -28,7 +28,7 @@ export const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
   onSeek,
   height = 28,
   className,
-  activeColor = '#000000',
+  activeColor = '#04564f',
   inactiveColor = '#E2E8F0'
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);

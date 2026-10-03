@@ -71,7 +71,7 @@ export default function LoginPage() {
               <button
                 type="button"
                 onClick={() => handleDemoLogin('admin')}
-                className="text-xs font-semibold py-1.5 px-3 bg-black text-white rounded-lg hover:bg-zinc-800 transition-colors shadow-2xs text-center"
+                className="text-xs font-semibold py-1.5 px-3 bg-[#04564f] text-white rounded-lg hover:bg-[#03453f] transition-colors shadow-2xs text-center"
               >
                 Sign In as Admin
               </button>
@@ -101,10 +101,10 @@ export default function LoginPage() {
 
             <div className="flex items-center justify-between text-xs">
               <label className="flex items-center gap-2 cursor-pointer text-gray-600">
-                <input type="checkbox" className="rounded border-gray-300 text-black focus:ring-black" />
+                <input type="checkbox" className="rounded border-gray-300 text-[#04564f] focus:ring-[#04564f]" />
                 <span>Remember me</span>
               </label>
-              <a href="/forgot-password" className="text-black hover:underline font-medium">
+              <a href="/forgot-password" className="text-[#04564f] hover:underline font-medium">
                 Forgot password?
               </a>
             </div>
@@ -115,7 +115,7 @@ export default function LoginPage() {
               size="lg"
               pill
               isLoading={isLoading}
-              className="w-full text-xs font-bold uppercase tracking-wider py-3.5 shadow-md shadow-black/20 hover:bg-zinc-800"
+              className="w-full text-xs font-bold uppercase tracking-wider py-3.5 shadow-md shadow-[#04564f]/20 hover:bg-[#03453f]"
             >
               Sign In to Account
             </Button>

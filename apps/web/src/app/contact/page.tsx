@@ -93,7 +93,7 @@ export default function ContactPage() {
                   variant="primary"
                   size="lg"
                   pill
-                  className="w-full text-xs font-bold uppercase tracking-wider py-3.5 shadow-md shadow-black/20 hover:bg-zinc-800"
+                  className="w-full text-xs font-bold uppercase tracking-wider py-3.5 shadow-md shadow-[#04564f]/20 hover:bg-[#03453f]"
                   rightIcon={<Send className="h-3.5 w-3.5" />}
                 >
                   Submit Inquiry
