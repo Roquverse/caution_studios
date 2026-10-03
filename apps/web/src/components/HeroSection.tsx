@@ -20,8 +20,9 @@ import {
 
 interface HeroSectionProps {
   onAnalyze: (link: string) => void;
-  onBookCall: () => void;
+  onBookCall?: () => void;
   onSignIn?: () => void;
+  onGetStarted?: () => void;
   onOpenAssessment?: () => void;
   cartCount?: number;
   onOpenCart?: () => void;
@@ -31,6 +32,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
   onAnalyze,
   onBookCall,
   onSignIn,
+  onGetStarted,
   onOpenAssessment,
   cartCount = 0,
   onOpenCart
@@ -144,27 +146,11 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                 <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-[#2dd4bf] transition-all duration-300 group-hover:w-full" />
               </a>
             ))}
-
-            {/* Assessment Pill in Desktop Nav */}
-            <button
-              type="button"
-              onClick={() => {
-                if (onOpenAssessment) onOpenAssessment();
-                else {
-                  const input = document.querySelector('input[placeholder*="Spotify"]') as HTMLInputElement;
-                  if (input) input.focus();
-                }
-              }}
-              className="flex items-center gap-1.5 text-xs lg:text-sm font-semibold text-[#2dd4bf] hover:text-white transition-colors"
-            >
-              <Sparkles className="h-3.5 w-3.5 text-[#2dd4bf]" />
-              <span>Assessment</span>
-            </button>
           </nav>
 
           {/* Right Action & Mobile Menu Toggle */}
-          <div className="flex items-center gap-3">
-            {onOpenCart && (
+          <div className="flex items-center gap-3 sm:gap-4">
+            {onOpenCart && cartCount > 0 && (
               <button
                 type="button"
                 onClick={onOpenCart}
@@ -172,32 +158,39 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                 aria-label="View Cart"
               >
                 <ShoppingBag className="h-4 w-4" />
-                {cartCount > 0 && (
-                  <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-[#2dd4bf] text-black font-bold text-[10px] flex items-center justify-center">
-                    {cartCount}
-                  </span>
-                )}
+                <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-[#04564f] text-white font-bold text-[10px] flex items-center justify-center">
+                  {cartCount}
+                </span>
               </button>
             )}
 
-            {onSignIn && (
-              <button
-                type="button"
-                onClick={onSignIn}
-                className="hidden sm:inline-flex text-xs font-semibold text-gray-300 hover:text-white px-3 py-1.5 transition-colors"
-              >
-                Sign In
-              </button>
-            )}
+            <a
+              href="/sign-in"
+              onClick={(e) => {
+                if (onSignIn) {
+                  e.preventDefault();
+                  onSignIn();
+                }
+              }}
+              className="text-xs sm:text-sm font-medium text-gray-300 hover:text-white px-2 sm:px-3 py-1.5 transition-colors"
+            >
+              Sign In
+            </a>
 
             <Button
-              variant="outline"
+              variant="primary"
               size="sm"
               pill
-              onClick={onBookCall}
-              className="hidden sm:inline-flex text-xs font-bold uppercase tracking-wider px-5 py-2 border-white/20 text-white hover:bg-white hover:text-black hover:border-white transition-all shadow-sm"
+              onClick={() => {
+                if (onGetStarted) {
+                  onGetStarted();
+                } else {
+                  window.location.href = '/sign-up';
+                }
+              }}
+              className="text-xs font-bold uppercase tracking-wider px-4 sm:px-5 py-2 sm:py-2.5 bg-[#04564f] hover:bg-[#03453f] text-white transition-all shadow-md shadow-[#04564f]/30"
             >
-              Book a Call
+              Get Started
             </Button>
 
             {/* Mobile Hamburger Button */}
@@ -233,17 +226,22 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
               ))}
 
               <div className="pt-4 border-t border-white/10 space-y-2.5">
-                <button
-                  type="button"
+                <Button
+                  variant="primary"
+                  size="md"
+                  pill
                   onClick={() => {
                     setMobileMenuOpen(false);
-                    if (onOpenAssessment) onOpenAssessment();
+                    if (onGetStarted) {
+                      onGetStarted();
+                    } else {
+                      window.location.href = '/sign-up';
+                    }
                   }}
-                  className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl bg-gradient-to-r from-[#04564f] to-[#067268] text-white text-xs font-bold uppercase tracking-wider shadow-md"
+                  className="w-full text-xs font-bold uppercase tracking-wider py-3 bg-[#04564f] hover:bg-[#03453f] text-white"
                 >
-                  <Sparkles className="h-4 w-4" />
-                  Artist Assessment
-                </button>
+                  Get Started
+                </Button>
 
                 <Button
                   variant="outline"
@@ -251,11 +249,15 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                   pill
                   onClick={() => {
                     setMobileMenuOpen(false);
-                    onBookCall();
+                    if (onSignIn) {
+                      onSignIn();
+                    } else {
+                      window.location.href = '/sign-in';
+                    }
                   }}
                   className="w-full text-xs font-bold uppercase tracking-wider py-3 border-white/20 text-white hover:bg-white hover:text-black"
                 >
-                  Book a Call
+                  Sign In
                 </Button>
               </div>
             </div>
@@ -279,18 +281,10 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
           industry.
         </p>
 
-        {/* Artist Assessment Pill Badge */}
-        <div className="mt-8 flex justify-center">
-          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/10 backdrop-blur-md border border-white/15 text-xs font-medium text-gray-200">
-            <Disc3 className="h-3.5 w-3.5 text-[#2dd4bf] animate-spin" />
-            <span>Start your Artist Assessment</span>
-          </div>
-        </div>
-
         {/* Spotify / Profile Link Input Pill */}
         <form
           onSubmit={handleSubmit}
-          className="mt-5 max-w-xl mx-auto relative flex items-center bg-white rounded-full p-1.5 shadow-2xl shadow-black/60 border border-white/20"
+          className="mt-8 max-w-xl mx-auto relative flex items-center bg-white rounded-full p-1.5 shadow-2xl shadow-black/60 border border-white/20"
         >
           <div className="pl-4 text-gray-400 pointer-events-none">
             <Search className="h-4 w-4" />

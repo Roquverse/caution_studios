@@ -129,6 +129,8 @@ export default function LandingPage() {
         onAnalyze={handleAnalyze}
         onBookCall={() => setIsBookCallOpen(true)}
         onOpenAssessment={() => setIsAssessmentOpen(true)}
+        onSignIn={() => (window.location.href = '/sign-in')}
+        onGetStarted={() => (window.location.href = '/sign-up')}
         cartCount={cart.length}
         onOpenCart={() => setIsCartOpen(true)}
       />

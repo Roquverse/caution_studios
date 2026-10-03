@@ -84,7 +84,7 @@ export const TopNav: React.FC = () => {
             href="/sign-up"
             className="hidden sm:inline-flex h-8 px-4 rounded-pill border border-border hover:border-text-faint text-text text-xs font-semibold items-center justify-center transition-colors"
           >
-            Start free
+            Get started
           </Link>
 
           {/* Mobile hamburger */}
@@ -125,7 +125,7 @@ export const TopNav: React.FC = () => {
               onClick={() => setMobileMenuOpen(false)}
               className="flex-1 h-9 rounded-sm bg-accent text-center text-xs font-medium text-text flex items-center justify-center"
             >
-              Start free
+              Get started
             </Link>
           </div>
         </div>

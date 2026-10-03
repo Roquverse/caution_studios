@@ -109,7 +109,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             onClick={onStartFree}
             className="text-xs font-bold tracking-wide uppercase px-6 py-2.5 shadow-md hover:shadow-lg"
           >
-            START FREE NOW
+            GET STARTED
           </Button>
 
           <button
@@ -131,7 +131,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             onClick={onStartFree}
             className="text-xs font-bold px-3 py-1.5"
           >
-            START FREE
+            GET STARTED
           </Button>
           <button
             type="button"
@@ -175,7 +175,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               onClick={onStartFree}
               className="w-full text-xs font-bold uppercase tracking-wider py-3"
             >
-              START FREE NOW
+              GET STARTED
             </Button>
           </div>
         </div>
