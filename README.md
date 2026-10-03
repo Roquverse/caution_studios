@@ -1,149 +1,140 @@
-# Music Licensing Platform — Next.js Monorepo for Vercel
+# Caution Studio: Beat Streaming & Licensing Marketplace
 
-A full-stack, production-ready Next.js monorepo built using Turborepo and Tailwind CSS, modeled precisely after the royalty-free music licensing platform reference design.
-
-![Music Website Reference](apps/web/public/images/hero_boombox.jpg)
+Production-ready Next.js monorepo built according to the **Caution Studio: Build Spec**.
 
 ---
 
-## 🏗 Monorepo Architecture
+## 1. Locked Decisions
 
-This workspace is structured as a high-performance **npm workspaces + Turborepo** monorepo designed for effortless deployment to **Vercel**:
+| Area | Decision |
+| :--- | :--- |
+| **Web** | Next.js (App Router, TypeScript) |
+| **Backend & Auth** | Supabase (Postgres, Auth, Row Level Security, Edge Functions) |
+| **Media Storage** | Cloudflare R2 (zero egress), accessed via signed URLs |
+| **Payments** | Paystack (Nigerian Naira `NGN` & international cards) |
+| **Aesthetic** | Dark, flat, deep green accent (`#0F4F49`), live accent (`#3DBFA8`), 1px hairlines (`#26292A`). No purple, pink, gradients or glow. Shadow only under hero search bar. |
+| **Roles** | Artist, Producer (one account can hold both) |
+
+---
+
+## 2. Repository Layout
 
 ```
-Caution Studio/
-├── package.json               # Root workspaces configuration & Turbo pipelines
-├── turbo.json                 # Build & development cache configuration
-├── vercel.json                # Vercel deployment descriptor
-│
-├── packages/
-│   ├── types/                 # Shared TypeScript interfaces & types (@caution/types)
-│   │   └── src/index.ts       # Track, SubscriptionPlan, Testimonial, FAQItem, User, FilterState
-│   │
-│   ├── tailwind-config/       # Centralized Tailwind CSS design tokens (@caution/tailwind-config)
-│   │   └── tailwind.config.js # Brand luxury monochrome (black & white), shadows, gradients, and keyframes
-│   │
-│   └── ui/                    # Reusable Tailwind CSS Component Library (@caution/ui)
-│       └── src/
-│           ├── components/
-│           │   ├── Button.tsx               # Primary, outline, secondary, pill variants
-│           │   ├── Badge.tsx                # Genre & mood pill badges
-│           │   ├── Card.tsx                 # Glass & elevated cards
-│           │   ├── Input.tsx                # Styled inputs & SearchInput
-│           │   ├── Rating.tsx               # 5-star yellow rating
-│           │   ├── Avatar.tsx               # Avatar with initials & status indicator
-│           │   ├── Accordion.tsx            # Animated collapsible FAQ items (+ / -)
-│           │   ├── Modal.tsx                # Accessible backdrop dialog
-│           │   ├── WaveformVisualizer.tsx   # Interactive animated audio waveform
-│           │   ├── TrackRow.tsx             # Audio catalog track row with scrubber & actions
-│           │   ├── FilterSidebar.tsx        # Left filter sidebar (Mood, Theme, Genre, Instrument)
-│           │   ├── AudioPlayer.tsx          # Sticky bottom playback dock with controls & volume
-│           │   ├── Navbar.tsx               # Header with logo, links, and 'START FREE NOW' CTA
-│           │   ├── Footer.tsx               # Dark mega-footer matching reference design
-│           │   ├── HeroSection.tsx          # Floating 3D boombox, clef, and album art compositions
-│           │   ├── BrandsRow.tsx            # 5-logo Logoipsum partner bar
-│           │   ├── LicensingGrid.tsx        # 18-platform worldwide licensing checklist
-│           │   ├── TestimonialsSection.tsx  # Client Testimonials slider
-│           │   ├── FAQSection.tsx           # Collapsible FAQ accordion
-│           │   ├── CtaBanner.tsx            # 'Join 40,000 creators' bottom banner
-│           │   ├── StatsCard.tsx            # Analytics & metric cards
-│           │   └── LicenseCertificateModal.tsx # YouTube Content ID clearance certificate
-│           ├── utils/
-│           │   ├── cn.ts                    # ClassName utility
-│           │   └── audioSynth.ts            # Web Audio API real sound generator
-│           └── data/
-│               └── mockTracks.ts            # Realistic catalog data matching screenshot
-│
-└── apps/
-    ├── web/                   # Port 3000: Marketing & Landing Application
-    │   ├── src/app/page.tsx   # Exact reference design recreation with interactive audio playback
-    │   ├── src/app/pricing/   # Creator, Pro Commercial, and Studio Enterprise plans
-    │   ├── src/app/faq/       # Comprehensive licensing & Content ID FAQs
-    │   └── src/app/contact/   # Licensing inquiry & enterprise support
-    │
-    ├── auth/                  # Port 3001: Authentication Portal
-    │   ├── src/app/login/     # Creator & Admin sign-in with demo shortcuts
-    │   ├── src/app/register/  # 14-day trial signup with channel clearance input
-    │   └── src/app/forgot-password/ # Password recovery flow
-    │
-    ├── user/                  # Port 3002: Creator Portal & Dashboard
-    │   ├── src/app/page.tsx   # Overview, whitelisted channels & recent licenses
-    │   ├── src/app/library/   # Full catalog browser with live waveform player
-    │   ├── src/app/licenses/  # Downloaded licenses & clearance certificate generator
-    │   └── src/app/billing/   # Subscription management & invoice history
-    │
-    └── admin/                 # Port 3003: Admin & Operations Portal
-        ├── src/app/page.tsx   # MRR, total streams, and active creator telemetry
-        ├── src/app/tracks/    # Catalog manager with audio upload modal & tagging
-        ├── src/app/licenses/  # YouTube Content ID claims resolver
-        └── src/app/users/     # Creator subscribers list & role manager
+caution-studio/
+├─ apps/
+│  └─ web/                    # Next.js marketplace + dashboards (Port 3000)
+│     ├─ app/                 # App Router screens & routes
+│     ├─ components/          # Audio, marketplace, studio & layout components
+│     └─ lib/                 # Supabase client, Paystack helpers, Cloudflare R2
+├─ packages/
+│  ├─ tokens/                 # Design tokens (CSS vars + JS/RN export)
+│  ├─ types/                  # Supabase database types, shared Zod schemas
+│  ├─ licenses/               # License definitions (Basic, Premium, Exclusive) + PDF template
+│  ├─ tailwind-config/        # Centralized Tailwind presets
+│  └─ ui/                     # UI components & audio synthesizer
+├─ supabase/
+│  ├─ migrations/             # SQL schema, RLS, triggers & atomic exclusive lock
+│  └─ functions/              # Paystack-webhook, signed-url, issue-license
+└─ README.md
 ```
 
 ---
 
-## 🚀 Getting Started
+## 3. Design Tokens (`packages/tokens`)
 
-### 1. Install Dependencies
-Run `npm install` from the root directory:
+```css
+:root {
+  /* surfaces */
+  --bg:          #0B0C0C;
+  --surface:     #121414;
+  --surface-2:   #181B1B;
+  --border:      #26292A;
+
+  /* text */
+  --text:        #F5F5F2;
+  --text-muted:  #A9ABA8;
+  --text-faint:  #6B6E6C;
+
+  /* accent (deep green) */
+  --accent:      #0F4F49;   /* primary button fill */
+  --accent-live: #3DBFA8;   /* active nav, playing state, waveform progress */
+
+  /* semantic */
+  --sold:        #8A867E;   /* muted gray for sold beats */
+  --danger:      #C0563F;
+
+  /* shape */
+  --radius-sm: 6px;
+  --radius-pill: 999px;
+  --space: 8px;             /* all spacing is multiples of 8 */
+}
+```
+
+- **Type**: Heavy tight grotesque for display headlines (tracking about `-0.03em`), Inter for UI. Sentence case everywhere.
+- **Icons**: 1.5px outline set (Lucide).
+- **Rules**: Flat surfaces, 1px hairlines, shadow **only** under the hero search bar, and no gradients anywhere.
+
+---
+
+## 4. Routes & Screens
+
+| Route | Screen | Access |
+| :--- | :--- | :--- |
+| `/` | Hero, license platforms, beat spotlight, pricing, FAQ | Public |
+| `/beats` | Browse with filters (genre, mood, BPM, key, producer) | Public |
+| `/beats/[slug]` | Beat detail, license selector, waveform player | Public |
+| `/pricing` | Free vs Plus (₦3,000/mo), license tiers | Public |
+| `/producers/[handle]` | Producer profile and their beats | Public |
+| `/sign-in`, `/sign-up` | Auth with role selection (Artist / Producer) | Guest |
+| `/checkout/success` | Order confirmation & immediate file downloads | Signed in |
+| `/library` | My licenses, stem downloads & PDF agreements | Artist |
+| `/likes` | Liked beats | Signed in |
+| `/studio` | Producer overview, stats & revenue chart | Producer |
+| `/studio/upload` | 3-step beat upload & R2 storage flow | Producer |
+
+---
+
+## 5. Licensing Tiers & Custom Pricing
+
+| Tier | Price | Streams Cap | Video Cap | Stems Included | Ownership |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **Starter Lease** | **₦3,000** `/ mo` | 100,000 | 1 | No (MP3 only) | Non-exclusive |
+| **Premium Beat** | **₦30,000** `one-time` | 500,000 | 2 | Yes (Full WAV Stems) | Non-exclusive + Radio |
+| **Exclusive Rights** | **₦100,000** `one-time` | Unlimited | Unlimited | Yes (Full WAV Stems) | 100% Sole Ownership |
+
+---
+
+## 6. Atomic Exclusive Lock (Spec 7.4)
+
+When an exclusive license is purchased, the database executes an atomic lock to guarantee no race conditions can occur:
+
+```sql
+create or replace function acquire_exclusive_beat(p_beat_id uuid)
+returns boolean as $$
+declare
+  v_updated_id uuid;
+begin
+  update beats
+  set status = 'sold', sold_at = now()
+  where id = p_beat_id and status = 'live'
+  returning id into v_updated_id;
+
+  return v_updated_id is not null;
+end;
+$$ language plpgsql security definer;
+```
+
+---
+
+## 7. Getting Started
+
+### Install Dependencies
 ```bash
 npm install
 ```
 
-### 2. Development Servers
-You can run any individual application or all of them together:
-
-| Application | Command | Local URL |
-| :--- | :--- | :--- |
-| **Marketing (Web)** | `npm run dev:web` | [http://localhost:3000](http://localhost:3000) |
-| **Auth Portal** | `npm run dev:auth` | [http://localhost:3001](http://localhost:3001) |
-| **User Creator App** | `npm run dev:user` | [http://localhost:3002](http://localhost:3002) |
-| **Admin Control** | `npm run dev:admin` | [http://localhost:3003](http://localhost:3003) |
-| **All Apps Concurrently** | `npm run dev` | Turborepo boots all 4 apps |
-
-### 3. Production Build
-Verify compilation of all packages and apps:
+### Run Web Marketplace
 ```bash
-npm run build
+npm run dev:web
 ```
-
----
-
-## 🎨 Design & Components Highlights
-
-1. **Faithful Visual Recreation**:
-   - **Hero Section**: Exact typography (*"Get royalty free music for your videos"*), electric royal blue pill buttons, floating vintage red boombox with headphones, 3D golden treble clef, neon EDM artwork, and subtle ambient blur backlights.
-   - **Brands Bar**: 5 geometric Logoipsum partner emblems.
-   - **Licensing Grid**: 18 video platforms (YouTube, TikTok, Twitch, Cinema, Commercials, Weddings, etc.) with blue checkmarks.
-   - **Music Catalog Table**: Filterable by Mood, Video Theme, Genre, and Instrument.
-   - **Real Interactive Audio**: Powered by `WebAudioSynth`, clicking Play on any track synthesizes rich melodic chord loops, animates the waveform scrubber, and launches the persistent bottom `AudioPlayer` dock!
-   - **Client Testimonials**: 5-star ratings, author avatars, and carousel controls.
-   - **Collapsible FAQ**: Expandable items with item #3 (*"How do the plans work and what do they cover?"*) matching the reference.
-   - **Dark Mega Footer**: Complete with products, licensing terms, copyright, and social icons.
-
-2. **Component Reusability (`@caution/ui`)**:
-   - Every button, input, badge, table, modal, and player component is defined once in `packages/ui` and imported across all 4 applications.
-   - Zero duplication of styling or UI logic.
-
----
-
-## ☁️ Deploying to Vercel
-
-### Option A: 4 Separate Vercel Projects (Recommended)
-Create 4 projects in the Vercel Dashboard pointing to this Git repository:
-1. **Web Project**: Set **Root Directory** to `apps/web`.
-2. **Auth Project**: Set **Root Directory** to `apps/auth`.
-3. **User Project**: Set **Root Directory** to `apps/user`.
-4. **Admin Project**: Set **Root Directory** to `apps/admin`.
-
-Vercel automatically detects Next.js and utilizes the root workspace cache.
-
-### Option B: Monorepo Micro-Frontends (Multi-Zones / Rewrites)
-Use Next.js rewrites in `apps/web/next.config.mjs` to proxy subpaths:
-- `/auth/:path*` ➔ `https://auth.yourdomain.com/:path*`
-- `/app/:path*` ➔ `https://user.yourdomain.com/:path*`
-- `/admin/:path*` ➔ `https://admin.yourdomain.com/:path*`
-
----
-
-## 📜 License
-Private & Proprietary — Created for Caution Studio.
+Open **`http://localhost:3000`** in your browser.

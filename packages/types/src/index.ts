@@ -1,51 +1,156 @@
-export type MoodType =
-  | 'Uplifting'
-  | 'Epic'
-  | 'Chill'
-  | 'Dramatic'
-  | 'Energetic'
-  | 'Dark'
-  | 'Romantic'
-  | 'Peaceful';
+/**
+ * Caution Studio Database & Application Types
+ * Matching Supabase Schema (Spec Section 6)
+ */
 
-export type VideoThemeType =
-  | 'Vlog'
-  | 'Commercial'
-  | 'Cinematic'
-  | 'Travel'
-  | 'Gaming'
-  | 'Fashion'
-  | 'Corporate'
-  | 'Podcast';
+export type AppRole = 'artist' | 'producer';
+export type BeatStatus = 'draft' | 'processing' | 'live' | 'sold' | 'removed';
+export type LicenseType = 'basic' | 'premium' | 'exclusive';
+export type OrderStatus = 'pending' | 'paid' | 'failed' | 'refunded';
+export type PlanTier = 'free' | 'plus';
 
-export type GenreType =
-  | 'Cinematic'
-  | 'Electronic'
-  | 'Funk'
-  | 'Hip Hop'
-  | 'Lofi'
-  | 'Pop'
-  | 'Rock'
-  | 'Ambient'
-  | 'Acoustic'
-  | 'Orchestral';
+export interface Profile {
+  id: string;
+  handle: string;
+  display_name: string;
+  avatar_url?: string | null;
+  bio?: string | null;
+  roles: AppRole[];
+  plan: PlanTier;
+  stripe_customer_id?: string | null;
+  stripe_account_id?: string | null;
+  stripe_payouts_enabled: boolean;
+  basic_leases_used_this_period: number;
+  period_resets_at?: string | null;
+  created_at: string;
+}
 
-export type InstrumentType =
-  | 'Acoustic Guitar'
-  | 'Electric Guitar'
-  | 'Piano'
-  | 'Synthesizer'
-  | 'Drums'
-  | 'Strings'
-  | 'Brass'
-  | 'Bass';
+export interface Beat {
+  id: string;
+  producer_id: string;
+  slug: string;
+  title: string;
+  description?: string | null;
+  genre: string;
+  moods: string[];
+  tags: string[];
+  bpm?: number | null;
+  musical_key?: string | null;
+  cover_url?: string | null;
+  status: BeatStatus;
+  master_wav_key?: string | null;
+  stems_zip_key?: string | null;
+  preview_tagged_key?: string | null;
+  preview_clean_key?: string | null;
+  waveform_peaks?: number[] | null;
+  duration_seconds?: number | null;
+  play_count: number;
+  like_count: number;
+  sold_at?: string | null;
+  published_at?: string | null;
+  created_at: string;
 
+  // Joined fields for UI convenience
+  producer?: Profile;
+  licenses?: BeatLicense[];
+}
+
+export interface BeatLicense {
+  beat_id: string;
+  type: LicenseType;
+  price_cents: number;
+  enabled: boolean;
+}
+
+export interface Order {
+  id: string;
+  buyer_id: string;
+  status: OrderStatus;
+  subtotal_cents: number;
+  credit_cents: number;
+  tax_cents: number;
+  total_cents: number;
+  stripe_payment_intent_id?: string | null;
+  paystack_reference?: string | null;
+  created_at: string;
+}
+
+export interface OrderItem {
+  id: string;
+  order_id: string;
+  beat_id: string;
+  producer_id: string;
+  license: LicenseType;
+  price_cents: number;
+  platform_fee_cents: number;
+  producer_amount_cents: number;
+  beat?: Beat;
+}
+
+export interface License {
+  id: string;
+  order_item_id: string;
+  buyer_id: string;
+  beat_id: string;
+  type: LicenseType;
+  stream_cap?: number | null;
+  video_cap?: number | null;
+  agreement_pdf_key: string;
+  issued_at: string;
+  beat?: Beat;
+}
+
+export interface Like {
+  user_id: string;
+  beat_id: string;
+  created_at: string;
+}
+
+export interface Follow {
+  follower_id: string;
+  producer_id: string;
+}
+
+export interface AudioJob {
+  id: string;
+  beat_id: string;
+  state: 'queued' | 'running' | 'done' | 'failed';
+  error?: string | null;
+  attempts: number;
+  created_at: string;
+}
+
+export interface ProducerTag {
+  producer_id: string;
+  tag_audio_key: string;
+}
+
+export interface CartItem {
+  beat: Beat;
+  licenseType: LicenseType;
+  priceCents: number;
+}
+
+export interface FilterState {
+  searchQuery: string;
+  selectedGenres: string[];
+  selectedMoods: string[];
+  bpmRange?: [number, number];
+  musicalKey?: string;
+  producer?: string;
+  sortBy?: 'popular' | 'newest' | 'price_low' | 'price_high' | 'bpm';
+  selectedThemes?: string[];
+  selectedInstruments?: string[];
+  spotlightOnly?: boolean;
+}
+
+/** Legacy / UI Compatibility Interface */
 export interface Track {
   id: string;
   title: string;
   artist: string;
-  duration: number; // in seconds
-  formattedDuration: string; // e.g. "2:28"
+  duration: number;
+  formattedDuration: string;
   genre: string[];
   mood: string[];
   theme: string[];
@@ -53,88 +158,9 @@ export interface Track {
   bpm: number;
   coverUrl: string;
   audioUrl: string;
-  waveform: number[]; // relative heights between 0.1 and 1.0 for rendering
+  waveform: number[];
   isFeatured?: boolean;
   isSpotlight?: boolean;
   downloadsCount?: number;
   playsCount?: number;
-  hasVocal?: boolean;
-  createdAt?: string;
-}
-
-export type LicensePlan = 'creator' | 'pro' | 'enterprise';
-
-export interface SubscriptionPlan {
-  id: string;
-  name: string;
-  slug: LicensePlan;
-  priceMonthly: number;
-  priceYearly: number;
-  billingPeriod: 'monthly' | 'yearly';
-  description: string;
-  badge?: string;
-  popular?: boolean;
-  features: string[];
-  coverage: string[];
-}
-
-export interface Testimonial {
-  id: string;
-  name: string;
-  role: string;
-  company: string;
-  avatar: string;
-  rating: number; // 1-5
-  quote: string;
-}
-
-export interface FAQItem {
-  id: string;
-  question: string;
-  answer: string;
-  category?: 'general' | 'licensing' | 'billing' | 'technical';
-}
-
-export interface User {
-  id: string;
-  name: string;
-  email: string;
-  avatar?: string;
-  role: 'user' | 'admin' | 'creator';
-  channels?: {
-    platform: 'youtube' | 'tiktok' | 'twitch' | 'instagram' | 'facebook';
-    handle: string;
-    whitelisted: boolean;
-  }[];
-  subscription?: {
-    planId: string;
-    planName: string;
-    status: 'active' | 'canceled' | 'trialing';
-    renewDate: string;
-  };
-  favorites?: string[]; // track IDs
-}
-
-export interface DownloadRecord {
-  id: string;
-  trackId: string;
-  trackTitle: string;
-  trackArtist: string;
-  coverUrl: string;
-  downloadedAt: string;
-  licenseNumber: string;
-  intendedPlatform: string;
-  fileFormat: 'WAV' | 'MP3';
-}
-
-export interface FilterState {
-  searchQuery: string;
-  selectedMoods: string[];
-  selectedThemes: string[];
-  selectedGenres: string[];
-  selectedInstruments: string[];
-  spotlightOnly: boolean;
-  minBpm?: number;
-  maxBpm?: number;
-  sortBy: 'popular' | 'newest' | 'duration' | 'bpm';
 }

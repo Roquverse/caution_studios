@@ -1,0 +1,25 @@
+:root {
+  /* surfaces */
+  --bg:          #0B0C0C;
+  --surface:     #121414;
+  --surface-2:   #181B1B;
+  --border:      #26292A;
+
+  /* text */
+  --text:        #F5F5F2;
+  --text-muted:  #A9ABA8;
+  --text-faint:  #6B6E6C;
+
+  /* accent (deep green) */
+  --accent:      #0F4F49;   /* primary button fill */
+  --accent-live: #3DBFA8;   /* active nav, playing state, waveform progress */
+
+  /* semantic */
+  --sold:        #8A867E;   /* muted gray for sold beats */
+  --danger:      #C0563F;
+
+  /* shape */
+  --radius-sm: 6px;
+  --radius-pill: 999px;
+  --space: 8px;             /* all spacing is multiples of 8 */
+}

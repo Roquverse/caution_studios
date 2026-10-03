@@ -1,121 +1,227 @@
 'use client';
 
-import React, { useState } from 'react';
-import { Navbar, Footer, Button, Card, Badge, MOCK_PLANS } from '@caution/ui';
-import { Check, ShieldCheck, Zap } from 'lucide-react';
+import React from 'react';
+import Link from 'next/link';
+import { TopNav } from '../../components/layout/TopNav';
+import { HomeFooter } from '../../components/home/HomeFooter';
+import { CartDrawer } from '../../components/cart/CartDrawer';
+import { NowPlayingPanel } from '../../components/audio/NowPlayingPanel';
+import { formatNaira } from '../../lib/paystack';
+import { Check, Sparkles, ArrowRight, ShieldCheck } from 'lucide-react';
 
 export default function PricingPage() {
-  const [billingPeriod, setBillingPeriod] = useState<'yearly' | 'monthly'>('yearly');
+  const licenseTiers = [
+    {
+      name: 'Starter Lease',
+      priceNgn: 3000,
+      period: 'per beat',
+      features: [
+        'Untagged 320kbps MP3 Master',
+        'Up to 100,000 monetized streams',
+        '1 monetized music video',
+        'Non-exclusive commercial distribution',
+        'Instant signed PDF license'
+      ]
+    },
+    {
+      name: 'Premium Beat Plan',
+      priceNgn: 30000,
+      period: 'one-time purchase',
+      isPopular: true,
+      features: [
+        'Master 24-bit WAV + 320kbps MP3',
+        'Full trackout separated stems (.ZIP)',
+        'Up to 500,000 monetized streams',
+        '2 monetized music videos',
+        'Terrestrial and satellite radio play',
+        'For-profit live performance rights'
+      ]
+    },
+    {
+      name: 'Exclusive Rights',
+      priceNgn: 100000,
+      period: 'sole master ownership',
+      features: [
+        '100% sole exclusive ownership',
+        'Unlimited streams, sales & broadcast',
+        'Master WAV + all separated stems',
+        'Beat permanently retired from store',
+        'TV, film, cinema & gaming sync clearance',
+        'Full legal copyright transfer assignment'
+      ]
+    }
+  ];
 
   return (
-    <div className="min-h-screen bg-white text-gray-900 flex flex-col">
-      <Navbar
-        brandName="Caution Studio"
-        currentPath="/pricing"
-        onStartFree={() => (window.location.href = 'http://localhost:3001/register')}
-        onSignIn={() => (window.location.href = 'http://localhost:3001/login')}
-        userPortalUrl="http://localhost:3002"
-        adminPortalUrl="http://localhost:3003"
-        onNavigate={(href) => (window.location.href = href)}
-      />
+    <div className="min-h-screen bg-bg text-text flex flex-col pb-24">
+      <TopNav />
 
-      <main className="flex-1 py-16 lg:py-24">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <Badge variant="brand" size="md" className="mb-4">
-            Transparent Music Licensing
-          </Badge>
-          <h1 className="text-4xl sm:text-5xl font-black text-gray-950 tracking-tight">
-            Simple plans for creators of all sizes
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-16">
+        {/* Header */}
+        <div className="text-center max-w-2xl mx-auto mb-14">
+          <span className="text-xs font-bold uppercase tracking-wider text-accent-live">
+            Plans &amp; Licensing
+          </span>
+          <h1 className="text-3xl sm:text-5xl font-black text-text tracking-[-0.03em] mt-2">
+            Built for independent artists
           </h1>
-          <p className="mt-4 text-base text-gray-500 max-w-2xl mx-auto">
-            Unlimited downloads. Direct Content ID clearance. All tracks cleared for commercial monetization worldwide.
+          <p className="text-sm text-text-muted mt-3">
+            Choose single beat licenses or subscribe to Plus for monthly lease credits and clean, untagged preview streaming.
           </p>
+        </div>
 
-          {/* Billing Switcher */}
-          <div className="mt-10 flex items-center justify-center gap-3">
-            <span className={`text-sm font-semibold ${billingPeriod === 'monthly' ? 'text-gray-900' : 'text-gray-400'}`}>
-              Monthly billing
-            </span>
-            <button
-              type="button"
-              onClick={() => setBillingPeriod(billingPeriod === 'yearly' ? 'monthly' : 'yearly')}
-              className="relative inline-flex h-7 w-12 items-center rounded-full bg-[#04564f] transition-colors focus:outline-none"
-            >
-              <span
-                className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform ${
-                  billingPeriod === 'yearly' ? 'translate-x-6' : 'translate-x-1'
-                }`}
-              />
-            </button>
-            <span className={`text-sm font-semibold flex items-center gap-1.5 ${billingPeriod === 'yearly' ? 'text-gray-900' : 'text-gray-400'}`}>
-              Annual billing <span className="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2 py-0.5 rounded-full">Save 35%</span>
-            </span>
+        {/* Free vs Plus Subscription Plans */}
+        <div className="mb-20">
+          <div className="text-xs font-bold uppercase tracking-wider text-text-muted mb-4 text-center">
+            Artist Membership Tiers
           </div>
 
-          {/* Pricing Cards */}
-          <div className="mt-14 grid grid-cols-1 md:grid-cols-3 gap-8 text-left">
-            {MOCK_PLANS.map((plan) => {
-              const price = billingPeriod === 'yearly' ? plan.priceYearly : plan.priceMonthly;
-              return (
-                <div
-                  key={plan.id}
-                  className={`rounded-3xl p-8 border transition-all duration-300 relative flex flex-col justify-between ${
-                    plan.popular
-                      ? 'border-[#04564f] shadow-2xl shadow-[#04564f]/15 bg-white ring-2 ring-[#04564f]'
-                      : 'border-gray-200 bg-white hover:border-gray-300 shadow-sm'
-                  }`}
-                >
-                  {plan.badge && (
-                    <div className="absolute -top-3.5 left-1/2 -translate-x-1/2">
-                      <span className="bg-[#04564f] text-white text-xs font-bold uppercase tracking-wider px-3.5 py-1 rounded-full shadow-sm">
-                        {plan.badge}
-                      </span>
-                    </div>
-                  )}
-
-                  <div>
-                    <h3 className="text-xl font-bold text-gray-950">{plan.name}</h3>
-                    <p className="mt-2 text-xs text-gray-500 leading-relaxed min-h-[36px]">
-                      {plan.description}
-                    </p>
-
-                    <div className="mt-6 flex items-baseline gap-1">
-                      <span className="text-4xl font-black text-gray-950">${price}</span>
-                      <span className="text-xs text-gray-400 font-medium">/ month billed {billingPeriod}</span>
-                    </div>
-
-                    <div className="mt-8 space-y-3 border-t border-gray-100 pt-6">
-                      <span className="text-xs font-bold uppercase tracking-wider text-gray-400 block">
-                        Included Features:
-                      </span>
-                      {plan.features.map((feat, idx) => (
-                        <div key={idx} className="flex items-start gap-2.5 text-xs text-gray-700">
-                          <Check className="h-4 w-4 text-[#04564f] shrink-0 stroke-[3] mt-0.5" />
-                          <span>{feat}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="mt-8 pt-4">
-                    <Button
-                      variant={plan.popular ? 'primary' : 'secondary'}
-                      size="md"
-                      pill
-                      className="w-full text-xs font-bold uppercase tracking-wider py-3"
-                      onClick={() => (window.location.href = `http://localhost:3001/register?plan=${plan.slug}`)}
-                    >
-                      Subscribe to {plan.name}
-                    </Button>
-                  </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto">
+            {/* Free */}
+            <div className="p-6 sm:p-8 rounded-sm bg-surface border border-border flex flex-col justify-between">
+              <div>
+                <h3 className="text-lg font-bold text-text">Free Artist</h3>
+                <div className="mt-3 flex items-baseline gap-1">
+                  <span className="text-3xl sm:text-4xl font-black font-mono text-text">₦0</span>
+                  <span className="text-xs text-text-muted">forever</span>
                 </div>
-              );
-            })}
+                <p className="text-xs text-text-muted mt-2">
+                  Browse, search, and preview beats with watermarked audio tags.
+                </p>
+
+                <ul className="mt-6 pt-5 border-t border-border space-y-2.5 text-xs text-text-muted">
+                  <li className="flex items-center gap-2">
+                    <Check className="h-4 w-4 text-accent-live" />
+                    <span>Unlimited watermarked preview streaming</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Check className="h-4 w-4 text-accent-live" />
+                    <span>Standard Paystack checkout</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Check className="h-4 w-4 text-accent-live" />
+                    <span>Library & license agreement storage</span>
+                  </li>
+                </ul>
+              </div>
+
+              <div className="pt-8">
+                <Link
+                  href="/beats"
+                  className="w-full h-10 rounded-pill bg-surface hover:bg-surface-2 text-text font-semibold text-xs flex items-center justify-center border border-border"
+                >
+                  Start free
+                </Link>
+              </div>
+            </div>
+
+            {/* Plus */}
+            <div className="p-6 sm:p-8 rounded-sm bg-surface-2 border border-accent-live ring-1 ring-accent-live flex flex-col justify-between relative">
+              <div className="absolute -top-2.5 right-6 px-2.5 py-0.5 rounded-sm bg-accent border border-accent text-[10px] font-bold text-text uppercase tracking-wider">
+                Artist Plus
+              </div>
+
+              <div>
+                <h3 className="text-lg font-bold text-text">Caution Plus</h3>
+                <div className="mt-3 flex items-baseline gap-1">
+                  <span className="text-3xl sm:text-4xl font-black font-mono text-text">
+                    {formatNaira(3000)}
+                  </span>
+                  <span className="text-xs text-text-muted">/ month</span>
+                </div>
+                <p className="text-xs text-text-muted mt-2">
+                  Untagged preview streaming and 2 free Starter leases every month.
+                </p>
+
+                <ul className="mt-6 pt-5 border-t border-border space-y-2.5 text-xs text-text-muted">
+                  <li className="flex items-center gap-2 text-text font-medium">
+                    <Check className="h-4 w-4 text-accent-live" />
+                    <span>2 Starter leases included monthly (₦6,000 value)</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Check className="h-4 w-4 text-accent-live" />
+                    <span>Clean 128kbps MP3 preview streaming (zero voice tags)</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Check className="h-4 w-4 text-accent-live" />
+                    <span>15% discount on trackout stems and exclusive rights</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Check className="h-4 w-4 text-accent-live" />
+                    <span>Priority A&amp;R playlist pitching recommendation</span>
+                  </li>
+                </ul>
+              </div>
+
+              <div className="pt-8">
+                <Link
+                  href="/sign-up"
+                  className="w-full h-10 rounded-pill bg-accent hover:bg-[#135d56] text-text font-semibold text-xs flex items-center justify-center border border-accent shadow-sm"
+                >
+                  Subscribe to Plus for {formatNaira(3000)}/mo
+                </Link>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Per-Beat License Tiers Breakdown */}
+        <div>
+          <div className="text-xs font-bold uppercase tracking-wider text-text-muted mb-4 text-center">
+            Per-Beat License Tiers
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {licenseTiers.map((tier) => (
+              <div
+                key={tier.name}
+                className={`p-6 rounded-sm bg-surface border ${
+                  tier.isPopular ? 'border-accent-live bg-surface-2' : 'border-border'
+                } flex flex-col justify-between`}
+              >
+                <div>
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-base font-bold text-text">{tier.name}</h3>
+                    {tier.isPopular && (
+                      <span className="px-2 py-0.5 rounded-sm bg-accent text-[10px] font-bold text-text uppercase">
+                        Popular
+                      </span>
+                    )}
+                  </div>
+                  <div className="mt-3 flex items-baseline gap-1">
+                    <span className="text-2xl sm:text-3xl font-black font-mono text-text">
+                      {formatNaira(tier.priceNgn)}
+                    </span>
+                    <span className="text-xs text-text-muted">{tier.period}</span>
+                  </div>
+
+                  <ul className="mt-5 pt-4 border-t border-border space-y-2 text-xs text-text-muted">
+                    {tier.features.map((f, i) => (
+                      <li key={i} className="flex items-start gap-2">
+                        <Check className="h-3.5 w-3.5 text-accent-live shrink-0 mt-0.5" />
+                        <span>{f}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+
+                <div className="pt-6">
+                  <Link
+                    href="/beats"
+                    className="w-full h-9 rounded-pill bg-surface hover:bg-surface-2 text-text text-xs font-medium border border-border flex items-center justify-center"
+                  >
+                    Browse beats
+                  </Link>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       </main>
 
-      <Footer brandName="Caution Studio" />
+      <HomeFooter />
+      <CartDrawer />
+      <NowPlayingPanel />
     </div>
   );
 }

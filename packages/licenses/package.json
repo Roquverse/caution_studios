@@ -1,0 +1,17 @@
+{
+  "name": "@caution/licenses",
+  "version": "1.0.0",
+  "private": true,
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "scripts": {
+    "build": "echo 0",
+    "lint": "echo 0"
+  },
+  "dependencies": {
+    "@caution/types": "*"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.0"
+  }
+}

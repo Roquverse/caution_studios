@@ -1,16 +1,20 @@
 import type { Metadata } from 'next';
 import './globals.css';
+import { AudioProvider } from '../components/audio/AudioProvider';
+import { MiniPlayer } from '../components/audio/MiniPlayer';
 
 export const metadata: Metadata = {
-  title: 'Caution Studio | Royalty Free Music for Video Creators',
+  title: 'Caution Studio | Beat Streaming & Licensing Marketplace',
   description:
-    'Download high-quality, royalty-free music and sound effects for YouTube, TikTok, commercial videos, games, and films.',
+    'Original beats from independent producers. Preview every track, lease it or buy exclusively, and get your files and a signed license the moment you pay.',
   keywords: [
-    'royalty free music',
-    'youtube music licensing',
-    'background music',
-    'sound effects',
-    'commercial music license'
+    'beat marketplace',
+    'buy beats',
+    'lease beats',
+    'afrobeats',
+    'exclusive beat license',
+    'music producer marketplace',
+    'caution studio'
   ]
 };
 
@@ -29,8 +33,11 @@ export default function RootLayout({
           rel="stylesheet"
         />
       </head>
-      <body className="min-h-screen bg-white text-slate-900 selection:bg-black selection:text-white">
-        {children}
+      <body className="min-h-screen bg-bg text-text selection:bg-accent selection:text-text antialiased">
+        <AudioProvider>
+          {children}
+          <MiniPlayer />
+        </AudioProvider>
       </body>
     </html>
   );

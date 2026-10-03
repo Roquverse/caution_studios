@@ -9,9 +9,12 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@caution/licenses": "*",
     "@caution/tailwind-config": "*",
+    "@caution/tokens": "*",
     "@caution/types": "*",
     "@caution/ui": "*",
+    "@supabase/supabase-js": "^2.39.0",
     "clsx": "^2.1.1",
     "lucide-react": "^0.475.0",
     "next": "^14.2.15",
