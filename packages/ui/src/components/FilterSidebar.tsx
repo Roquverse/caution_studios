@@ -41,10 +41,10 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
   };
 
   const sections = [
-    { id: 'mood', name: 'Mood', items: MOODS, selected: filters.selectedMoods, key: 'selectedMoods' as const },
-    { id: 'theme', name: 'Video Theme', items: THEMES, selected: filters.selectedThemes, key: 'selectedThemes' as const },
-    { id: 'genre', name: 'Genre', items: GENRES, selected: filters.selectedGenres, key: 'selectedGenres' as const },
-    { id: 'instrument', name: 'Instrument', items: INSTRUMENTS, selected: filters.selectedInstruments, key: 'selectedInstruments' as const }
+    { id: 'mood', name: 'Mood', items: MOODS, selected: filters.selectedMoods || [], key: 'selectedMoods' as const },
+    { id: 'theme', name: 'Video Theme', items: THEMES, selected: filters.selectedThemes || [], key: 'selectedThemes' as const },
+    { id: 'genre', name: 'Genre', items: GENRES, selected: filters.selectedGenres || [], key: 'selectedGenres' as const },
+    { id: 'instrument', name: 'Instrument', items: INSTRUMENTS, selected: filters.selectedInstruments || [], key: 'selectedInstruments' as const }
   ];
 
   return (
@@ -53,10 +53,10 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
         <span className="text-xs font-bold uppercase tracking-wider text-gray-400 flex items-center gap-1.5">
           <SlidersHorizontal className="h-3.5 w-3.5" /> Filters
         </span>
-        {(filters.selectedGenres.length > 0 ||
-          filters.selectedMoods.length > 0 ||
-          filters.selectedThemes.length > 0 ||
-          filters.selectedInstruments.length > 0 ||
+        {(((filters.selectedGenres?.length || 0) > 0) ||
+          ((filters.selectedMoods?.length || 0) > 0) ||
+          ((filters.selectedThemes?.length || 0) > 0) ||
+          ((filters.selectedInstruments?.length || 0) > 0) ||
           filters.spotlightOnly) && (
           <button
             type="button"

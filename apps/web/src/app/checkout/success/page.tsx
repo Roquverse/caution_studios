@@ -10,6 +10,14 @@ import { CheckCircle2, Download, FileText, ArrowRight, ShieldCheck } from 'lucid
 import { SEEDED_BEATS } from '../../../lib/seedBeats';
 
 export default function CheckoutSuccessPage() {
+  return (
+    <React.Suspense fallback={<div className="min-h-screen bg-bg" />}>
+      <CheckoutSuccessContent />
+    </React.Suspense>
+  );
+}
+
+function CheckoutSuccessContent() {
   const searchParams = useSearchParams();
   const reference = searchParams.get('reference') || `CS_REF_${Date.now()}`;
   const orderId = searchParams.get('order_id') || `ord_${Date.now()}`;

@@ -6,6 +6,10 @@ import { PillarsSection } from '../components/PillarsSection';
 import { GetHeardSection } from '../components/GetHeardSection';
 import { TurningPassionSection } from '../components/TurningPassionSection';
 import { PricingSection } from '../components/PricingSection';
+import { MusicLicensingSection } from '../components/MusicLicensingSection';
+import { ClientTestimonialsSection } from '../components/ClientTestimonialsSection';
+import { FaqSection } from '../components/FaqSection';
+import { JoinCreatorsSection } from '../components/JoinCreatorsSection';
 import { HowWeMakeItHappenSection } from '../components/HowWeMakeItHappenSection';
 import { FreshFromStudioSection } from '../components/FreshFromStudioSection';
 import { LetsTalkSection } from '../components/LetsTalkSection';
@@ -136,21 +140,6 @@ export default function LandingPage() {
         onOpenCart={() => setIsCartOpen(true)}
       />
 
-      {/* 2. 4 Pillars Row (Distribution, Marketing, Playlisting, Radio Promotion) */}
-      <PillarsSection />
-
-      {/* 3. Get Heard Where It Matters Most (4 Numbered Cards + Get Featured Banner) */}
-      <GetHeardSection
-        onGetFeatured={() => {
-          setSelectedPlan({ name: 'Premium Beat Plan', price: '₦30,000' });
-        }}
-      />
-
-      {/* 4. Vertical Connector Line */}
-      <div className="flex justify-center py-2 bg-white">
-        <div className="w-[1px] h-8 bg-gray-300" />
-      </div>
-
       {/* 5. Turning Passion into Milestones (500M+ Streams, 100k+ Playlists, 300% Growth) */}
       <TurningPassionSection
         onQualify={() => setIsAssessmentOpen(true)}
@@ -165,22 +154,42 @@ export default function LandingPage() {
         onSelectPlan={handleSelectPlan}
       />
 
-      {/* 7. How We Make It Happen? (01 Submit, 02 Precision Playlisting, 03 Growth + Mockup Cards) */}
-      <HowWeMakeItHappenSection />
-
-      {/* 8. Fresh from the Studio (4 Interactive Track Cards with Audio Synth Playback) */}
-      <FreshFromStudioSection
-        currentTrack={currentTrack}
-        isPlaying={isPlaying}
-        onPlayTrack={handlePlayToggle}
+      {/* 7. Music Licensing & Interactive Beat Catalog (Matching Reference Design) */}
+      <MusicLicensingSection
+        onStartFree={() => (window.location.href = '/sign-up')}
+        onSelectTrack={(track) => {
+          handlePlayToggle({
+            id: track.id,
+            title: track.title,
+            artist: track.artist,
+            duration: track.duration,
+            formattedDuration: track.formattedDuration,
+            genre: [track.genre],
+            mood: [track.mood],
+            theme: [track.theme],
+            instruments: [track.instrument],
+            bpm: 120,
+            coverUrl: track.coverUrl,
+            audioUrl: '',
+            waveform: track.waveform,
+            downloadsCount: 1200,
+            playsCount: 8400
+          });
+        }}
       />
 
-      {/* 9. Let's Talk About Your Music (Direct A&R Call + Interactive Calendar Widget) */}
-      <LetsTalkSection
-        onBookCall={() => setIsBookCallOpen(true)}
+      {/* 8. Client Testimonials Carousel */}
+      <ClientTestimonialsSection />
+
+      {/* 9. Frequently Asked Questions Accordion */}
+      <FaqSection />
+
+      {/* 10. Join 40,000 Creators CTA Banner */}
+      <JoinCreatorsSection
+        onStartFree={() => (window.location.href = '/sign-up')}
       />
 
-      {/* 10. Footer (Brand info, Explore, Insights, Follow, and Navigation Pill Bar) */}
+      {/* 11. Footer (Brand info, Explore, Insights, Follow) */}
       <LandingFooter
         onOpenAssessment={() => setIsAssessmentOpen(true)}
         onBookCall={() => setIsBookCallOpen(true)}
@@ -205,26 +214,6 @@ export default function LandingPage() {
           />
         </div>
       )}
-
-      {/* Interactive Modals & Drawers */}
-      <ArtistAssessmentModal
-        isOpen={isAssessmentOpen}
-        onClose={() => setIsAssessmentOpen(false)}
-        spotifyLink={assessmentLink}
-        onSelectPlan={handleSelectPlan}
-      />
-
-      <BookCallModal
-        isOpen={isBookCallOpen}
-        onClose={() => setIsBookCallOpen(false)}
-      />
-
-      <CheckoutPlanModal
-        isOpen={!!selectedPlan}
-        onClose={() => setSelectedPlan(null)}
-        plan={selectedPlan}
-      />
-
       <CartDrawer />
       <NowPlayingPanel />
     </div>

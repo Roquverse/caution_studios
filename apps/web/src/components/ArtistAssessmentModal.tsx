@@ -28,7 +28,7 @@ export const ArtistAssessmentModal: React.FC<ArtistAssessmentModalProps> = ({
       isOpen={isOpen}
       onClose={onClose}
       title="Artist Assessment Diagnostic"
-      maxWidth="max-w-2xl"
+      maxWidth="2xl"
     >
       <div className="space-y-6">
         {/* Profile Header Card */}

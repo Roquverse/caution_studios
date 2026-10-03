@@ -41,7 +41,7 @@ export const CheckoutPlanModal: React.FC<CheckoutPlanModalProps> = ({
       isOpen={isOpen}
       onClose={handleReset}
       title={isSuccess ? 'Payment Successful' : `Subscribe to ${plan.name}`}
-      maxWidth="max-w-md"
+      maxWidth="md"
     >
       {isSuccess ? (
         <div className="py-6 text-center space-y-4">

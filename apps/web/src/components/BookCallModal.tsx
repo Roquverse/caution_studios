@@ -43,7 +43,7 @@ export const BookCallModal: React.FC<BookCallModalProps> = ({ isOpen, onClose })
       isOpen={isOpen}
       onClose={handleReset}
       title={submitted ? 'Call Booked' : 'Book an A&R Strategy Session'}
-      maxWidth="max-w-xl"
+      maxWidth="xl"
     >
       {submitted ? (
         <div className="py-6 text-center space-y-4">

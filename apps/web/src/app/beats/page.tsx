@@ -15,6 +15,14 @@ import { Beat, FilterState } from '@caution/types';
 import { LayoutList, LayoutGrid, Music2 } from 'lucide-react';
 
 export default function BeatsPage() {
+  return (
+    <React.Suspense fallback={<div className="min-h-screen bg-bg" />}>
+      <BeatsContent />
+    </React.Suspense>
+  );
+}
+
+function BeatsContent() {
   const searchParams = useSearchParams();
   const initialGenre = searchParams.get('genre');
   const initialQuery = searchParams.get('q') || '';

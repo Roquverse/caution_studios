@@ -164,3 +164,36 @@ export interface Track {
   downloadsCount?: number;
   playsCount?: number;
 }
+
+export interface FAQItem {
+  id: string;
+  question: string;
+  answer: string;
+}
+
+export interface Testimonial {
+  id: string;
+  name: string;
+  role: string;
+  company: string;
+  avatar: string;
+  rating: number;
+  quote: string;
+}
+
+export interface SubscriptionPlan {
+  id: string;
+  name: string;
+  slug?: string;
+  priceMonthly?: number;
+  priceYearly?: number;
+  billingPeriod?: string;
+  badge?: string;
+  popular?: boolean;
+  price?: string;
+  period?: string;
+  description: string;
+  isRecommended?: boolean;
+  features: string[];
+  coverage?: string[];
+}

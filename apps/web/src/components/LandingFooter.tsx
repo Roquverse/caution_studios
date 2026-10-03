@@ -112,37 +112,6 @@ export const LandingFooter: React.FC<LandingFooterProps> = ({
           </div>
         </div>
 
-        {/* Floating Quick Navigation Pill Bar (Matching the Reference Mockup) */}
-        <div className="mt-10 mb-6 flex justify-center">
-          <div className="inline-flex flex-wrap items-center justify-center gap-2 sm:gap-4 bg-[#121824] border border-white/10 px-4 sm:px-6 py-2.5 rounded-full text-xs font-medium text-gray-300 shadow-xl">
-            <a href="#hero" className="hover:text-white transition-colors">Home</a>
-            <span className="text-gray-700">·</span>
-            <a href="#about" className="hover:text-white transition-colors">About Us</a>
-            <span className="text-gray-700">·</span>
-            <a href="#tracks" className="hover:text-white transition-colors">Artists</a>
-            <span className="text-gray-700">·</span>
-            <a href="#process" className="hover:text-white transition-colors">Services</a>
-            <span className="text-gray-700">·</span>
-            <a href="#pricing" className="hover:text-white transition-colors">Plans</a>
-            <span className="text-gray-700">·</span>
-            <button
-              type="button"
-              onClick={onOpenAssessment}
-              className="text-[#2dd4bf] font-bold hover:underline uppercase tracking-wider"
-            >
-              Artist Assessment
-            </button>
-            <span className="text-gray-700">·</span>
-            <button
-              type="button"
-              onClick={onBookCall}
-              className="hover:text-white transition-colors"
-            >
-              Contact
-            </button>
-          </div>
-        </div>
-
         {/* Bottom System Bar */}
         <div className="flex flex-col sm:flex-row items-center justify-between text-xs text-gray-500 gap-4">
           <div className="flex items-center gap-2">
