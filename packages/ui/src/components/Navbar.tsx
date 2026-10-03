@@ -65,9 +65,13 @@ export const Navbar: React.FC<NavbarProps> = ({
           <a
             href="/"
             onClick={(e) => handleLinkClick(e, '/')}
-            className="flex items-center gap-2.5 font-extrabold text-xl tracking-tight text-gray-950 group"
+            className="flex items-center"
           >
-            <img src="/logo.png" alt={brandName} style={{ width: 120 }} />
+            <img
+              src="/logo.png"
+              alt={brandName}
+              className="h-11 sm:h-12 w-auto object-contain"
+            />
           </a>
 
           {/* Desktop Navigation Links */}
