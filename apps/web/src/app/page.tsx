@@ -1,45 +1,34 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import {
-  Navbar,
-  HeroSection,
-  BrandsRow,
-  LicensingGrid,
-  FilterSidebar,
-  TrackRow,
-  AudioPlayer,
-  TestimonialsSection,
-  FAQSection,
-  CtaBanner,
-  Footer,
-  LicenseCertificateModal,
-  SearchInput,
-  audioSynth,
-  MOCK_TRACKS
-} from '@caution/ui';
-import { Track, FilterState } from '@caution/types';
-import { Sparkles, Music } from 'lucide-react';
+import React, { useState } from 'react';
+import { HeroSection } from '../components/HeroSection';
+import { PillarsSection } from '../components/PillarsSection';
+import { GetHeardSection } from '../components/GetHeardSection';
+import { TurningPassionSection } from '../components/TurningPassionSection';
+import { PricingSection } from '../components/PricingSection';
+import { HowWeMakeItHappenSection } from '../components/HowWeMakeItHappenSection';
+import { FreshFromStudioSection } from '../components/FreshFromStudioSection';
+import { LetsTalkSection } from '../components/LetsTalkSection';
+import { LandingFooter } from '../components/LandingFooter';
+import { ArtistAssessmentModal } from '../components/ArtistAssessmentModal';
+import { BookCallModal } from '../components/BookCallModal';
+import { CheckoutPlanModal } from '../components/CheckoutPlanModal';
+import { AudioPlayer, audioSynth, MOCK_TRACKS } from '@caution/ui';
+import { Track } from '@caution/types';
 
 export default function LandingPage() {
-  const [tracks, setTracks] = useState<Track[]>(MOCK_TRACKS);
-  const [currentTrack, setCurrentTrack] = useState<Track | null>(MOCK_TRACKS[1]); // "Beat Blitz" pre-selected matching screenshot!
+  // Modal states
+  const [isAssessmentOpen, setIsAssessmentOpen] = useState(false);
+  const [assessmentLink, setAssessmentLink] = useState('');
+  const [isBookCallOpen, setIsBookCallOpen] = useState(false);
+  const [selectedPlan, setSelectedPlan] = useState<{ name: string; price: string } | null>(null);
+
+  // Audio Playback states
+  const [currentTrack, setCurrentTrack] = useState<Track | null>(null);
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
-  const [currentTime, setCurrentTime] = useState<number>(80); // 1:20 matching screenshot!
-  const [favorites, setFavorites] = useState<string[]>(['track-2']);
-  const [licenseModalTrack, setLicenseModalTrack] = useState<Track | null>(null);
+  const [currentTime, setCurrentTime] = useState<number>(0);
 
-  const [filters, setFilters] = useState<FilterState>({
-    searchQuery: '',
-    selectedMoods: [],
-    selectedThemes: [],
-    selectedGenres: [],
-    selectedInstruments: [],
-    spotlightOnly: false,
-    sortBy: 'popular'
-  });
-
-  // Handle Play / Pause Toggle with real audio synthesizer
+  // Handle Play/Pause
   const handlePlayToggle = (track: Track) => {
     if (currentTrack?.id === track.id && isPlaying) {
       audioSynth.stop();
@@ -88,242 +77,126 @@ export default function LandingPage() {
   };
 
   const handleNextTrack = () => {
-    if (!currentTrack) return;
-    const currentIdx = tracks.findIndex((t) => t.id === currentTrack.id);
-    const nextIdx = (currentIdx + 1) % tracks.length;
-    handlePlayToggle(tracks[nextIdx]);
+    const list = MOCK_TRACKS;
+    if (!currentTrack) {
+      if (list.length > 0) handlePlayToggle(list[0]);
+      return;
+    }
+    const currentIdx = list.findIndex((t) => t.id === currentTrack.id);
+    const nextIdx = (currentIdx + 1) % list.length;
+    handlePlayToggle(list[nextIdx]);
   };
 
   const handlePrevTrack = () => {
-    if (!currentTrack) return;
-    const currentIdx = tracks.findIndex((t) => t.id === currentTrack.id);
-    const prevIdx = (currentIdx - 1 + tracks.length) % tracks.length;
-    handlePlayToggle(tracks[prevIdx]);
+    const list = MOCK_TRACKS;
+    if (!currentTrack) {
+      if (list.length > 0) handlePlayToggle(list[0]);
+      return;
+    }
+    const currentIdx = list.findIndex((t) => t.id === currentTrack.id);
+    const prevIdx = (currentIdx - 1 + list.length) % list.length;
+    handlePlayToggle(list[prevIdx]);
   };
 
-  const toggleFavorite = (track: Track) => {
-    setFavorites((prev) =>
-      prev.includes(track.id) ? prev.filter((id) => id !== track.id) : [...prev, track.id]
-    );
+  const handleAnalyze = (link: string) => {
+    setAssessmentLink(link);
+    setIsAssessmentOpen(true);
   };
 
-  // Filter tracks based on search & category selections
-  const filteredTracks = tracks.filter((track) => {
-    if (
-      filters.searchQuery &&
-      !track.title.toLowerCase().includes(filters.searchQuery.toLowerCase()) &&
-      !track.artist.toLowerCase().includes(filters.searchQuery.toLowerCase()) &&
-      !track.genre.some((g) => g.toLowerCase().includes(filters.searchQuery.toLowerCase()))
-    ) {
-      return false;
-    }
-    if (filters.spotlightOnly && !track.isSpotlight) {
-      return false;
-    }
-    if (
-      filters.selectedGenres.length > 0 &&
-      !track.genre.some((g) => filters.selectedGenres.includes(g))
-    ) {
-      return false;
-    }
-    if (
-      filters.selectedMoods.length > 0 &&
-      !track.mood.some((m) => filters.selectedMoods.includes(m))
-    ) {
-      return false;
-    }
-    if (
-      filters.selectedThemes.length > 0 &&
-      !track.theme.some((t) => filters.selectedThemes.includes(t))
-    ) {
-      return false;
-    }
-    if (
-      filters.selectedInstruments.length > 0 &&
-      !track.instruments.some((i) => filters.selectedInstruments.includes(i))
-    ) {
-      return false;
-    }
-    return true;
-  });
-
-  const scrollToPricing = () => {
-    const el = document.getElementById('pricing-section');
-    if (el) el.scrollIntoView({ behavior: 'smooth' });
-    else window.location.href = '/pricing';
-  };
-
-  const handleStartFree = () => {
-    // Navigate to auth app registration or portal
-    window.location.href = 'http://localhost:3001/register';
-  };
-
-  const handleSignIn = () => {
-    window.location.href = 'http://localhost:3001/login';
+  const handleSelectPlan = (planName: string, price: string) => {
+    setSelectedPlan({ name: planName, price });
   };
 
   return (
-    <div className="min-h-screen bg-white text-gray-900 flex flex-col">
-      {/* 1. Header Navigation */}
-      <Navbar
-        brandName="Caution Studio"
-        currentPath="/"
-        onStartFree={handleStartFree}
-        onSignIn={handleSignIn}
-        userPortalUrl="http://localhost:3002"
-        adminPortalUrl="http://localhost:3003"
-        onNavigate={(href) => {
-          if (href === '/pricing') scrollToPricing();
-          else if (href === '/faq') {
-            const el = document.getElementById('faq-section');
-            if (el) el.scrollIntoView({ behavior: 'smooth' });
-          } else if (href.startsWith('#')) {
-            const el = document.querySelector(href);
-            if (el) el.scrollIntoView({ behavior: 'smooth' });
-          } else {
-            window.location.href = href;
-          }
+    <div className="min-h-screen bg-white text-gray-900 flex flex-col selection:bg-[#04564f] selection:text-white">
+      {/* 1. Hero Section (Header + Search input + Partner ticker) */}
+      <HeroSection
+        onAnalyze={handleAnalyze}
+        onBookCall={() => setIsBookCallOpen(true)}
+      />
+
+      {/* 2. 4 Pillars Row (Distribution, Marketing, Playlisting, Radio Promotion) */}
+      <PillarsSection />
+
+      {/* 3. Get Heard Where It Matters Most (4 Numbered Cards + Get Featured Banner) */}
+      <GetHeardSection
+        onGetFeatured={() => {
+          setSelectedPlan({ name: 'Premium Beat Plan', price: '₦30,000' });
         }}
       />
 
-      <main className="flex-1">
-        {/* 2. Hero Section with Floating Cassette Boombox & 3D Golden Clef */}
-        <HeroSection
-          onStartFree={handleStartFree}
-          onPricing={scrollToPricing}
-        />
-
-        {/* 3. Brand Logos Row */}
-        <BrandsRow />
-
-        {/* 4. Music Licensing Platform Checklist Section */}
-        <LicensingGrid onStartFree={handleStartFree} />
-
-        {/* 5. Interactive Music Library / Audio Player Table Section */}
-        <section id="library" className="py-16 lg:py-24 bg-white border-t border-gray-100">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex flex-col lg:flex-row gap-8 items-start">
-              {/* Left Filters Sidebar */}
-              <FilterSidebar
-                filters={filters}
-                onChange={(updated) => setFilters((prev) => ({ ...prev, ...updated }))}
-                onStartFree={handleStartFree}
-                onPricingClick={scrollToPricing}
-              />
-
-              {/* Main Track Table Container */}
-              <div className="flex-1 w-full space-y-4">
-                {/* Search & Results Bar */}
-                <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pb-2">
-                  <div className="w-full sm:w-80">
-                    <SearchInput
-                      value={filters.searchQuery}
-                      onChange={(e) =>
-                        setFilters((prev) => ({ ...prev, searchQuery: e.target.value }))
-                      }
-                      onClear={() => setFilters((prev) => ({ ...prev, searchQuery: '' }))}
-                      placeholder="Search songs, artists, genres..."
-                    />
-                  </div>
-                  <div className="flex items-center gap-2 text-xs text-gray-500 w-full sm:w-auto justify-between sm:justify-end">
-                    <span className="font-medium text-gray-700">
-                      Showing {filteredTracks.length} tracks
-                    </span>
-                    {isPlaying && (
-                      <span className="flex items-center gap-1.5 text-[#04564f] font-semibold bg-[#04564f]/10 px-2.5 py-1 rounded-full border border-[#04564f]/20">
-                        <Music className="h-3 w-3 animate-spin" />
-                        Now Playing Audio
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                {/* Track Rows matching the reference image */}
-                <div className="space-y-2 bg-white rounded-2xl border border-gray-100/90 p-3 sm:p-4 shadow-sm">
-                  {filteredTracks.map((track) => {
-                    const isCur = currentTrack?.id === track.id;
-                    return (
-                      <TrackRow
-                        key={track.id}
-                        track={track}
-                        isPlaying={isPlaying}
-                        isCurrent={isCur}
-                        currentTime={isCur ? currentTime : 0}
-                        isFavorited={favorites.includes(track.id)}
-                        onPlayToggle={handlePlayToggle}
-                        onSeek={handleSeek}
-                        onDownload={(t) => setLicenseModalTrack(t)}
-                        onFavoriteToggle={toggleFavorite}
-                        onShare={(t) => {
-                          navigator.clipboard?.writeText(window.location.href);
-                          alert(`Share link for "${t.title}" copied to clipboard!`);
-                        }}
-                      />
-                    );
-                  })}
-
-                  {filteredTracks.length === 0 && (
-                    <div className="text-center py-12 text-gray-500 space-y-2">
-                      <p className="text-sm font-semibold">No tracks match your current filters</p>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setFilters({
-                            searchQuery: '',
-                            selectedMoods: [],
-                            selectedThemes: [],
-                            selectedGenres: [],
-                            selectedInstruments: [],
-                            spotlightOnly: false,
-                            sortBy: 'popular'
-                          })
-                        }
-                        className="text-xs text-[#04564f] font-semibold underline hover:no-underline"
-                      >
-                        Reset all filters
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* 6. Client Testimonials Section */}
-        <TestimonialsSection />
-
-        {/* 7. Frequently Asked Questions Section */}
-        <div id="faq-section">
-          <FAQSection />
-        </div>
-
-        {/* 8. Bottom CTA Banner */}
-        <CtaBanner onStartFree={handleStartFree} />
-      </main>
-
-      {/* 9. Dark Mega Footer */}
-      <Footer brandName="Caution Studio" />
-
-      {/* 10. Sticky Bottom Audio Player Bar */}
-      <AudioPlayer
-        currentTrack={currentTrack}
-        isPlaying={isPlaying}
-        currentTime={currentTime}
-        onPlayToggle={handlePlayerPlayToggle}
-        onSeek={handleSeek}
-        onNext={handleNextTrack}
-        onPrev={handlePrevTrack}
-        onDownload={(t) => setLicenseModalTrack(t)}
-        onFavoriteToggle={toggleFavorite}
-        isFavorited={currentTrack ? favorites.includes(currentTrack.id) : false}
+      {/* 4. Turning Passion into Milestones (500M+ Streams, 100k+ Playlists, 300% Growth) */}
+      <TurningPassionSection
+        onQualify={() => setIsAssessmentOpen(true)}
+        onLearnMore={() => {
+          const el = document.getElementById('process');
+          if (el) el.scrollIntoView({ behavior: 'smooth' });
+        }}
       />
 
-      {/* 11. Commercial License Certificate & Download Modal */}
-      <LicenseCertificateModal
-        isOpen={!!licenseModalTrack}
-        onClose={() => setLicenseModalTrack(null)}
-        track={licenseModalTrack}
+      {/* 5. Plans for Every Artist (Starter ₦3k, Premium Beat ₦30k, Exclusive ₦100k) */}
+      <PricingSection
+        onSelectPlan={handleSelectPlan}
+      />
+
+      {/* 6. How We Make It Happen? (01 Submit, 02 Precision Playlisting, 03 Growth + Mockup Cards) */}
+      <HowWeMakeItHappenSection />
+
+      {/* 7. Fresh from the Studio (4 Interactive Track Cards with Audio Synth Playback) */}
+      <FreshFromStudioSection
+        currentTrack={currentTrack}
+        isPlaying={isPlaying}
+        onPlayTrack={handlePlayToggle}
+      />
+
+      {/* 8. Let's Talk About Your Music (Direct A&R Call + Interactive Calendar Widget) */}
+      <LetsTalkSection
+        onBookCall={() => setIsBookCallOpen(true)}
+      />
+
+      {/* 9. Footer (Brand info, Explore, Insights, Follow, and Navigation Pill Bar) */}
+      <LandingFooter
+        onOpenAssessment={() => setIsAssessmentOpen(true)}
+        onBookCall={() => setIsBookCallOpen(true)}
+      />
+
+      {/* Sticky Audio Player (appears whenever a track is selected/playing) */}
+      {currentTrack && (
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 w-[95%] max-w-4xl animate-in slide-in-from-bottom-6 duration-300">
+          <AudioPlayer
+            currentTrack={currentTrack}
+            isPlaying={isPlaying}
+            currentTime={currentTime}
+            onPlayToggle={handlePlayerPlayToggle}
+            onSeek={handleSeek}
+            onNext={handleNextTrack}
+            onPrev={handlePrevTrack}
+            onClose={() => {
+              audioSynth.stop();
+              setIsPlaying(false);
+              setCurrentTrack(null);
+            }}
+          />
+        </div>
+      )}
+
+      {/* Interactive Modals */}
+      <ArtistAssessmentModal
+        isOpen={isAssessmentOpen}
+        onClose={() => setIsAssessmentOpen(false)}
+        spotifyLink={assessmentLink}
+        onSelectPlan={handleSelectPlan}
+      />
+
+      <BookCallModal
+        isOpen={isBookCallOpen}
+        onClose={() => setIsBookCallOpen(false)}
+      />
+
+      <CheckoutPlanModal
+        isOpen={!!selectedPlan}
+        onClose={() => setSelectedPlan(null)}
+        plan={selectedPlan}
       />
     </div>
   );
