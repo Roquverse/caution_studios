@@ -191,6 +191,17 @@ export const FreshFromStudioSection: React.FC<FreshFromStudioProps> = ({
             );
           })}
         </div>
+
+        {/* Explore all marketplace CTA */}
+        <div className="mt-12 text-center">
+          <a
+            href="/beats"
+            className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-gray-950 hover:bg-[#04564f] text-white text-xs font-bold uppercase tracking-wider transition-all shadow-md group"
+          >
+            <span>Explore All 12,000+ Beats &amp; Stems in Marketplace</span>
+            <span className="text-[#2dd4bf] group-hover:translate-x-0.5 transition-transform">→</span>
+          </a>
+        </div>
       </div>
     </section>
   );

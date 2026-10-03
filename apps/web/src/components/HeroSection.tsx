@@ -14,7 +14,8 @@ import {
   X,
   Layers,
   Calendar,
-  Music
+  Music,
+  ShoppingBag
 } from 'lucide-react';
 
 interface HeroSectionProps {
@@ -22,13 +23,17 @@ interface HeroSectionProps {
   onBookCall: () => void;
   onSignIn?: () => void;
   onOpenAssessment?: () => void;
+  cartCount?: number;
+  onOpenCart?: () => void;
 }
 
 export const HeroSection: React.FC<HeroSectionProps> = ({
   onAnalyze,
   onBookCall,
   onSignIn,
-  onOpenAssessment
+  onOpenAssessment,
+  cartCount = 0,
+  onOpenCart
 }) => {
   const [profileLink, setProfileLink] = useState('');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -136,6 +141,22 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
 
           {/* Right Action & Mobile Menu Toggle */}
           <div className="flex items-center gap-3">
+            {onOpenCart && (
+              <button
+                type="button"
+                onClick={onOpenCart}
+                className="relative p-2 rounded-xl bg-white/10 hover:bg-white/20 border border-white/15 text-white transition-colors"
+                aria-label="View Cart"
+              >
+                <ShoppingBag className="h-4 w-4" />
+                {cartCount > 0 && (
+                  <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-[#2dd4bf] text-black font-bold text-[10px] flex items-center justify-center">
+                    {cartCount}
+                  </span>
+                )}
+              </button>
+            )}
+
             {onSignIn && (
               <button
                 type="button"
