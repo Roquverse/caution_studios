@@ -285,15 +285,15 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
 
         {/* Main Headline */}
         <h1 className="text-4xl sm:text-6xl lg:text-7xl font-black tracking-tight leading-[1.08] text-white">
-          Stream Beats Like Spotify. <br />
+          Stream Quality Beats. <br />
           <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 via-[#2dd4bf] to-teal-200">
             Buy Premium &amp; Exclusive Rights.
           </span>
         </h1>
 
         {/* Subtitle */}
-        <p className="mt-6 text-sm sm:text-base text-gray-300 max-w-2xl mx-auto leading-relaxed">
-          The music platform built for recording artists. Subscribe for ₦3,000 monthly to stream untagged beats and receive commercial lease credits, buy studio-ready premium beats with WAV stems, or lock down 100% exclusive beats so no one else can ever use your sound.
+        <p className="mt-6 text-sm sm:text-base text-gray-300 max-w-3xl mx-auto leading-relaxed">
+          The ultimate beat streaming and licensing marketplace for recording artists. Stream thousands of untagged beats on demand with our monthly subscription, or download industry-grade 24-bit WAV masters and full trackout stems. Mixed with pristine vocal headroom and balanced dynamics, our production lets you arrange, record, and mix billboard-quality tracks ready for commercial release on all major streaming platforms.
         </p>
 
         {/* Beat Discovery Search Form */}
