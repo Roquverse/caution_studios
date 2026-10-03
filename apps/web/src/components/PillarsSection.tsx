@@ -1,29 +1,29 @@
 'use client';
 
 import React from 'react';
-import { Layers, Megaphone, ListMusic, Radio } from 'lucide-react';
+import { Headphones, Sparkles, Layers, Lock } from 'lucide-react';
 
 export const PillarsSection: React.FC = () => {
   const pillars = [
     {
+      icon: <Headphones className="h-6 w-6 text-[#04564f]" />,
+      title: 'Beat Streaming',
+      description: 'Stream unlimited untagged beats like Spotify'
+    },
+    {
+      icon: <Sparkles className="h-6 w-6 text-[#04564f]" />,
+      title: 'Monthly Subscriptions',
+      description: '₦3,000/mo for regular commercial lease credits'
+    },
+    {
       icon: <Layers className="h-6 w-6 text-[#04564f]" />,
-      title: 'Distribution',
-      description: 'Releasing your music on all major platforms'
+      title: 'Master WAV & Stems',
+      description: '24-bit studio stems ready for pro mixing & DSPs'
     },
     {
-      icon: <Megaphone className="h-6 w-6 text-[#04564f]" />,
-      title: 'Marketing',
-      description: 'Grow your fanbase and audience'
-    },
-    {
-      icon: <ListMusic className="h-6 w-6 text-[#04564f]" />,
-      title: 'Playlisting',
-      description: 'Get your tracks on top playlists'
-    },
-    {
-      icon: <Radio className="h-6 w-6 text-[#04564f]" />,
-      title: 'Radio Promotion',
-      description: 'Get airplay on top stations'
+      icon: <Lock className="h-6 w-6 text-[#04564f]" />,
+      title: 'Exclusive Buyouts',
+      description: 'Sole ownership — beat is permanently retired'
     }
   ];
 

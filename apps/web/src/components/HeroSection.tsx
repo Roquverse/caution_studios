@@ -15,11 +15,16 @@ import {
   Layers,
   Calendar,
   Music,
-  ShoppingBag
+  ShoppingBag,
+  ShieldCheck,
+  Lock,
+  Headphones,
+  Check
 } from 'lucide-react';
 
 interface HeroSectionProps {
-  onAnalyze: (link: string) => void;
+  onAnalyze?: (link: string) => void;
+  onSearch?: (query: string) => void;
   onBookCall?: () => void;
   onSignIn?: () => void;
   onGetStarted?: () => void;
@@ -30,6 +35,7 @@ interface HeroSectionProps {
 
 export const HeroSection: React.FC<HeroSectionProps> = ({
   onAnalyze,
+  onSearch,
   onBookCall,
   onSignIn,
   onGetStarted,
@@ -37,13 +43,19 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
   cartCount = 0,
   onOpenCart
 }) => {
-  const [profileLink, setProfileLink] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (profileLink.trim()) {
-      onAnalyze(profileLink.trim());
+    if (searchQuery.trim()) {
+      if (onSearch) {
+        onSearch(searchQuery.trim());
+      } else {
+        window.location.href = `/beats?q=${encodeURIComponent(searchQuery.trim())}`;
+      }
+    } else {
+      window.location.href = '/beats';
     }
   };
 
@@ -88,15 +100,13 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
     setMobileMenuOpen(false);
   };
 
-  const partnerLogos = [
-    { name: 'Vevo', label: 'VEVO' },
-    { name: 'Genius', label: 'GENIUS' },
-    { name: 'Smidi', label: 'smidi' },
-    { name: 'FC', label: 'fc' },
-    { name: 'Anthem', label: 'anthem' },
-    { name: 'iHeart', label: 'iHeart' },
-    { name: 'RCA', label: 'RCA' },
-    { name: 'Spotify', label: 'Spotify' }
+  const featureBadges = [
+    'SPOTIFY-STYLE BEAT STREAMING',
+    'MONTHLY ₦3,000 SUBSCRIPTIONS',
+    'PREMIUM MASTER WAV & STEMS',
+    '100% EXCLUSIVE ATOMIC LOCK',
+    'ZERO EGRESS CLOUDFLARE R2',
+    'PAYSTACK VERIFIED CHECKOUT'
   ];
 
   return (
@@ -266,34 +276,39 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
       </header>
 
       {/* Hero Main Content */}
-      <div className="relative z-10 max-w-4xl mx-auto px-4 sm:px-6 pt-12 pb-20 sm:pt-16 sm:pb-24 text-center">
+      <div className="relative z-10 max-w-5xl mx-auto px-4 sm:px-6 pt-10 pb-20 sm:pt-14 sm:pb-24 text-center">
+        {/* Top Feature Pill */}
+        <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/10 backdrop-blur-md border border-white/15 text-xs font-semibold text-gray-200 mb-6">
+          <span className="h-2 w-2 rounded-full bg-[#2dd4bf] animate-pulse" />
+          <span>The Beat Streaming &amp; Licensing Marketplace</span>
+        </div>
+
         {/* Main Headline */}
         <h1 className="text-4xl sm:text-6xl lg:text-7xl font-black tracking-tight leading-[1.08] text-white">
-          Get your music in <br />
-          front of billions.
+          Stream Beats Like Spotify. <br />
+          <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 via-[#2dd4bf] to-teal-200">
+            Buy Premium &amp; Exclusive Rights.
+          </span>
         </h1>
 
         {/* Subtitle */}
         <p className="mt-6 text-sm sm:text-base text-gray-300 max-w-2xl mx-auto leading-relaxed">
-          Industry-promising A&amp;R team to the stars. Through expert distribution,
-          marketing, playlisting and radio promotion, we amplify your sound and
-          connect you with the right audience. Join us to make your mark in the
-          industry.
+          The music platform built for recording artists. Subscribe for ₦3,000 monthly to stream untagged beats and receive commercial lease credits, buy studio-ready premium beats with WAV stems, or lock down 100% exclusive beats so no one else can ever use your sound.
         </p>
 
-        {/* Spotify / Profile Link Input Pill */}
+        {/* Beat Discovery Search Form */}
         <form
-          onSubmit={handleSubmit}
-          className="mt-8 max-w-xl mx-auto relative flex items-center bg-white rounded-full p-1.5 shadow-2xl shadow-black/60 border border-white/20"
+          onSubmit={handleSearchSubmit}
+          className="mt-8 max-w-2xl mx-auto relative flex items-center bg-white rounded-full p-1.5 shadow-2xl shadow-black/80 border border-white/20"
         >
           <div className="pl-4 text-gray-400 pointer-events-none">
-            <Search className="h-4 w-4" />
+            <Search className="h-5 w-5" />
           </div>
           <input
             type="text"
-            value={profileLink}
-            onChange={(e) => setProfileLink(e.target.value)}
-            placeholder="Enter your Spotify profile link..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search beats by genre, mood, tempo, producer (e.g. Afrobeats, 105 BPM)..."
             className="w-full bg-transparent px-3 py-2 text-xs sm:text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none"
           />
           <Button
@@ -303,22 +318,29 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
             pill
             className="shrink-0 text-xs uppercase font-bold tracking-wider px-6 py-2.5 bg-[#04564f] hover:bg-[#03453f] shadow-md text-white"
           >
-            Analyze My Stats
+            Find Beats
           </Button>
         </form>
 
-        {/* Partner Logos Bar */}
-        <div className="mt-16 pt-8 border-t border-white/10">
-          <div className="flex flex-wrap items-center justify-center gap-6 sm:gap-10 opacity-70">
-            {partnerLogos.map((partner, idx) => (
-              <span
-                key={idx}
-                className="text-xs sm:text-sm font-black uppercase tracking-widest text-gray-400 hover:text-white transition-colors select-none"
-              >
-                {partner.label}
-              </span>
-            ))}
-          </div>
+        {/* Trending Genre Quick Filters */}
+        <div className="mt-4 flex flex-wrap items-center justify-center gap-2 text-xs">
+          <span className="text-gray-400 font-medium mr-1">Trending:</span>
+          {[
+            { label: '🔥 Afrobeats', genre: 'Afrobeats' },
+            { label: '🎹 Amapiano', genre: 'Amapiano' },
+            { label: '🥁 Trap', genre: 'Trap' },
+            { label: '🎷 R&B', genre: 'R&B' },
+            { label: '⚡ Drill', genre: 'Drill' },
+            { label: '🔒 Exclusive Only', genre: 'Exclusive' }
+          ].map((tag) => (
+            <a
+              key={tag.label}
+              href={tag.genre === 'Exclusive' ? '/beats?genre=Exclusive' : `/beats?genre=${encodeURIComponent(tag.genre)}`}
+              className="px-3 py-1 rounded-full bg-white/10 hover:bg-white/20 border border-white/10 text-gray-300 hover:text-white transition-all backdrop-blur-sm"
+            >
+              {tag.label}
+            </a>
+          ))}
         </div>
       </div>
     </section>

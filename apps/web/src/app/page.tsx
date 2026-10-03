@@ -126,6 +126,7 @@ export default function LandingPage() {
     <div className="min-h-screen bg-white text-gray-900 flex flex-col selection:bg-[#04564f] selection:text-white">
       {/* 1. Hero Section (Billboard night concert atmosphere + header + search + partner tickers) */}
       <HeroSection
+        onSearch={(q) => (window.location.href = `/beats?q=${encodeURIComponent(q)}`)}
         onAnalyze={handleAnalyze}
         onBookCall={() => setIsBookCallOpen(true)}
         onOpenAssessment={() => setIsAssessmentOpen(true)}

@@ -52,10 +52,10 @@ export const TurningPassionSection: React.FC<TurningPassionSectionProps> = ({
               variant="primary"
               size="lg"
               pill
-              onClick={onQualify}
+              onClick={() => (window.location.href = '/beats')}
               className="text-xs uppercase font-bold tracking-wider px-8 py-3.5 bg-[#04564f] hover:bg-[#03453f] shadow-lg shadow-[#04564f]/30"
             >
-              Qualify for Reach
+              Explore Beat Marketplace
             </Button>
             <Button
               variant="outline"
@@ -64,7 +64,7 @@ export const TurningPassionSection: React.FC<TurningPassionSectionProps> = ({
               onClick={onLearnMore}
               className="text-xs uppercase font-bold tracking-wider px-8 py-3.5 border-white/20 text-white hover:bg-white hover:text-black hover:border-white shadow-sm"
             >
-              Learn More
+              View Pricing Plans
             </Button>
           </div>
         </div>
