@@ -61,7 +61,8 @@ export const PricingSection: React.FC<PricingSectionProps> = ({ onSelectPlan }) 
   ];
 
   return (
-    <section id="pricing" className="bg-white py-20 border-t border-gray-100">
+    <section id="pricing" className="bg-white py-20 border-t border-gray-100 relative">
+      <div id="credits" className="absolute -top-12" />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Section Header */}
         <div className="flex items-center justify-between mb-12">

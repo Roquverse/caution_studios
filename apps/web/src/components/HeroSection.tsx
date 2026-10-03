@@ -46,21 +46,44 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
   };
 
   const navLinks = [
-    { label: 'Services', href: '#pillars' },
-    { label: 'How It Works', href: '#process' },
-    { label: 'Plans', href: '#pricing' },
-    { label: 'Fresh Beats', href: '#tracks' },
-    { label: 'Contact', href: '#contact' }
+    { label: 'Home', href: '/' },
+    { label: 'Pricing', href: '/pricing' },
+    { label: 'FAQ', href: '/faq' },
+    { label: 'Credit', href: '/#credits' },
+    { label: 'Contact Us', href: '/contact' }
   ];
 
   const handleNavClick = (e: React.MouseEvent<HTMLAnchorElement>, href: string) => {
-    e.preventDefault();
-    setMobileMenuOpen(false);
-    const id = href.replace('#', '');
-    const element = document.getElementById(id);
-    if (element) {
-      element.scrollIntoView({ behavior: 'smooth' });
+    if (href === '/') {
+      e.preventDefault();
+      setMobileMenuOpen(false);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
     }
+
+    if (href.startsWith('/#')) {
+      const id = href.replace('/#', '');
+      const element = document.getElementById(id);
+      if (element) {
+        e.preventDefault();
+        setMobileMenuOpen(false);
+        element.scrollIntoView({ behavior: 'smooth' });
+        return;
+      }
+    }
+
+    if (href.startsWith('#')) {
+      e.preventDefault();
+      setMobileMenuOpen(false);
+      const id = href.replace('#', '');
+      const element = document.getElementById(id);
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth' });
+      }
+      return;
+    }
+
+    setMobileMenuOpen(false);
   };
 
   const partnerLogos = [

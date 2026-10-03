@@ -25,12 +25,10 @@ export interface NavbarProps {
 
 const DEFAULT_ITEMS: NavItem[] = [
   { label: 'Home', href: '/' },
-  { label: 'Services', href: '/#pillars' },
-  { label: 'How It Works', href: '/#process' },
-  { label: 'Plans', href: '/#pricing' },
-  { label: 'Fresh Beats', href: '/#tracks' },
+  { label: 'Pricing', href: '/pricing' },
   { label: 'FAQ', href: '/faq' },
-  { label: 'Contact', href: '/#contact' }
+  { label: 'Credit', href: '/#credits' },
+  { label: 'Contact Us', href: '/contact' }
 ];
 
 export const Navbar: React.FC<NavbarProps> = ({

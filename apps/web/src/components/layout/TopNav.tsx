@@ -12,11 +12,11 @@ export const TopNav: React.FC = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const navLinks = [
-    { label: 'Browse beats', href: '/beats' },
-    { label: 'How it works', href: '/#process' },
+    { label: 'Home', href: '/' },
     { label: 'Pricing', href: '/pricing' },
-    { label: 'For producers', href: '/studio' },
-    { label: 'FAQ', href: '/#faq' }
+    { label: 'FAQ', href: '/faq' },
+    { label: 'Credit', href: '/#credits' },
+    { label: 'Contact Us', href: '/contact' }
   ];
 
   return (
@@ -36,9 +36,9 @@ export const TopNav: React.FC = () => {
         <nav className="hidden md:flex items-center gap-1 p-1 rounded-pill bg-surface border border-border">
           {navLinks.map((link) => {
             const isActive =
-              link.href === '/beats'
-                ? pathname === '/beats'
-                : pathname === link.href;
+              link.href === '/'
+                ? pathname === '/'
+                : pathname === link.href || (link.href !== '/' && !link.href.startsWith('/#') && pathname.startsWith(link.href));
 
             return (
               <Link
