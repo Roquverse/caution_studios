@@ -113,6 +113,7 @@ export default function LandingPage() {
       <HeroSection
         onAnalyze={handleAnalyze}
         onBookCall={() => setIsBookCallOpen(true)}
+        onOpenAssessment={() => setIsAssessmentOpen(true)}
       />
 
       {/* 2. 4 Pillars Row (Distribution, Marketing, Playlisting, Radio Promotion) */}
