@@ -2,30 +2,44 @@
 
 import React, { useState } from 'react';
 import { Button } from '@caution/ui';
-import { ArrowRight, Lock, Mail, ArrowUpRight, Play, Disc3, ShieldCheck, Check } from 'lucide-react';
+import { ArrowRight, Lock, Mail, ArrowUpRight, Play, Disc3, ShieldCheck, Check, AlertCircle } from 'lucide-react';
+import { supabase } from '../../lib/supabaseClient';
+
+const USER_PORTAL_URL = process.env.NEXT_PUBLIC_USER_URL || 'https://app.cautionstudioz.com';
+const ADMIN_PORTAL_URL = process.env.NEXT_PUBLIC_ADMIN_URL || 'https://admin.cautionstudioz.com';
+const WEB_URL = process.env.NEXT_PUBLIC_WEB_URL || 'https://cautionstudioz.com';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    setTimeout(() => {
-      if (email.includes('admin')) {
-        window.location.href = 'http://localhost:3003';
-      } else {
-        window.location.href = 'http://localhost:3002';
-      }
-    }, 600);
-  };
+    setErrorMessage('');
 
-  const handleDemoLogin = (role: 'user' | 'admin') => {
-    if (role === 'admin') {
-      window.location.href = 'http://localhost:3003';
-    } else {
-      window.location.href = 'http://localhost:3002';
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password
+      });
+
+      if (error) {
+        setErrorMessage(error.message);
+        setIsLoading(false);
+        return;
+      }
+
+      const targetUrl = email.toLowerCase().includes('admin')
+        ? ADMIN_PORTAL_URL
+        : USER_PORTAL_URL;
+
+      window.location.href = targetUrl;
+    } catch (err: any) {
+      setErrorMessage(err?.message || 'Failed to sign in. Please try again.');
+      setIsLoading(false);
     }
   };
 
@@ -36,7 +50,7 @@ export default function LoginPage() {
         <div>
           {/* Top Bar with Brand & Telemetry Badge */}
           <div className="flex items-center justify-between">
-            <a href="http://localhost:3000" className="inline-block">
+            <a href={WEB_URL} className="inline-block">
               <img
                 src="/logo.png"
                 alt="Caution Studio"
@@ -164,7 +178,7 @@ export default function LoginPage() {
         {/* Bottom Social Proof */}
         <div className="mt-8 pt-5 border-t border-white/[0.08] flex items-center justify-between text-xs text-gray-500">
           <span>Used by 40,000+ creators worldwide</span>
-          <a href="http://localhost:3000" className="text-gray-400 hover:text-white flex items-center gap-1 transition-colors">
+          <a href={WEB_URL} className="text-gray-400 hover:text-white flex items-center gap-1 transition-colors">
             Back to website <ArrowUpRight className="h-3 w-3" />
           </a>
         </div>
@@ -182,28 +196,12 @@ export default function LoginPage() {
             </p>
           </div>
 
-          {/* Quick Demo Access Bar */}
-          <div className="p-3 bg-[#0F131C] rounded-[6px] border border-white/[0.08] mb-6 space-y-2">
-            <span className="text-[10px] font-mono text-gray-400 uppercase tracking-widest block">
-              Quick One-Click Demo Access
-            </span>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => handleDemoLogin('user')}
-                className="flex-1 py-1.5 px-2.5 text-xs font-semibold rounded-[4px] bg-white/[0.05] hover:bg-[#04564f] hover:text-white border border-white/10 text-gray-200 transition-colors"
-              >
-                Creator Portal
-              </button>
-              <button
-                type="button"
-                onClick={() => handleDemoLogin('admin')}
-                className="flex-1 py-1.5 px-2.5 text-xs font-semibold rounded-[4px] bg-white/[0.05] hover:bg-[#04564f] hover:text-white border border-white/10 text-gray-200 transition-colors"
-              >
-                Admin Panel
-              </button>
+          {errorMessage && (
+            <div className="mb-6 p-3.5 rounded-[6px] bg-red-500/10 border border-red-500/20 text-red-400 text-xs flex items-center gap-2">
+              <AlertCircle className="h-4 w-4 shrink-0" />
+              <span>{errorMessage}</span>
             </div>
-          </div>
+          )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>

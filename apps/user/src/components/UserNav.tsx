@@ -53,7 +53,7 @@ export function UserNav({ activePath = '/' }: { activePath?: string }) {
         {/* Right: User Profile & Portals */}
         <div className="flex items-center gap-3">
           <a
-            href="http://localhost:3000"
+            href={process.env.NEXT_PUBLIC_WEB_URL || 'https://cautionstudioz.com'}
             className="hidden sm:flex items-center gap-1 text-xs text-gray-500 hover:text-black"
           >
             <span>Landing Page</span>
@@ -71,7 +71,7 @@ export function UserNav({ activePath = '/' }: { activePath?: string }) {
           </div>
 
           <a
-            href="http://localhost:3001/login"
+            href={process.env.NEXT_PUBLIC_AUTH_URL ? `${process.env.NEXT_PUBLIC_AUTH_URL}/login` : 'https://auth.cautionstudioz.com/login'}
             title="Sign Out"
             className="p-1.5 text-gray-400 hover:text-rose-600 rounded-lg transition-colors ml-1"
           >

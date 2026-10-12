@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { AUTH_SIGNUP_URL } from '../lib/urls';
 
 interface JoinCreatorsSectionProps {
   onStartFree?: () => void;
@@ -79,7 +80,7 @@ export const JoinCreatorsSection: React.FC<JoinCreatorsSectionProps> = ({
           <div className="flex justify-center">
             <button
               type="button"
-              onClick={onStartFree ? onStartFree : () => (window.location.href = '/sign-up')}
+              onClick={onStartFree ? onStartFree : () => (window.location.href = AUTH_SIGNUP_URL)}
               className="bg-[#04564f] hover:bg-[#03453f] text-white font-bold text-xs uppercase tracking-wider px-9 py-3.5 rounded-md shadow-lg shadow-[#04564f]/25 transition-all duration-200 active:scale-95"
             >
               START FREE NOW

@@ -21,6 +21,7 @@ import {
   Headphones,
   Check
 } from 'lucide-react';
+import { AUTH_LOGIN_URL, AUTH_SIGNUP_URL } from '../lib/urls';
 
 interface HeroSectionProps {
   onAnalyze?: (link: string) => void;
@@ -175,7 +176,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
             )}
 
             <a
-              href="/sign-in"
+              href={AUTH_LOGIN_URL}
               onClick={(e) => {
                 if (onSignIn) {
                   e.preventDefault();
@@ -195,7 +196,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                 if (onGetStarted) {
                   onGetStarted();
                 } else {
-                  window.location.href = '/sign-up';
+                  window.location.href = AUTH_SIGNUP_URL;
                 }
               }}
               className="hidden md:inline-flex text-xs font-bold uppercase tracking-wider px-4 sm:px-5 py-2 sm:py-2.5 bg-[#04564f] hover:bg-[#03453f] text-white transition-all shadow-md shadow-[#04564f]/30"
@@ -245,7 +246,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                     if (onGetStarted) {
                       onGetStarted();
                     } else {
-                      window.location.href = '/sign-up';
+                      window.location.href = AUTH_SIGNUP_URL;
                     }
                   }}
                   className="w-full text-xs font-bold uppercase tracking-wider py-3 bg-[#04564f] hover:bg-[#03453f] text-white"
@@ -262,7 +263,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                     if (onSignIn) {
                       onSignIn();
                     } else {
-                      window.location.href = '/sign-in';
+                      window.location.href = AUTH_LOGIN_URL;
                     }
                   }}
                   className="w-full text-xs font-bold uppercase tracking-wider py-3 border-white/20 text-white hover:bg-white hover:text-black"

@@ -25,6 +25,7 @@ import { useAudio } from './audio/AudioProvider';
 import { useUserSubscription, FREE_PREVIEW_LIMIT_SECONDS } from '../lib/subscription';
 import { SEEDED_BEATS } from '../lib/seedBeats';
 import { supabase } from '../lib/supabaseClient';
+import { AUTH_LOGIN_URL, AUTH_SIGNUP_URL } from '../lib/urls';
 
 export interface CatalogTrack {
   id: string;
@@ -356,7 +357,7 @@ export const MusicLicensingSection: React.FC<MusicLicensingSectionProps> = ({
         <div className="flex justify-center mb-16">
           <button
             type="button"
-            onClick={onStartFree ? onStartFree : () => (window.location.href = '/sign-up')}
+            onClick={onStartFree ? onStartFree : () => (window.location.href = AUTH_SIGNUP_URL)}
             className="bg-[#04564f] hover:bg-[#03453f] text-white font-bold text-xs uppercase tracking-wider px-8 py-3.5 rounded-md shadow-md shadow-[#04564f]/20 transition-all duration-200 active:scale-95"
           >
             START FREE NOW
@@ -447,7 +448,7 @@ export const MusicLicensingSection: React.FC<MusicLicensingSectionProps> = ({
               <div className="pt-6 mt-4 border-t border-gray-100 space-y-2">
                 <button
                   type="button"
-                  onClick={onStartFree ? onStartFree : () => (window.location.href = '/sign-up')}
+                  onClick={onStartFree ? onStartFree : () => (window.location.href = AUTH_SIGNUP_URL)}
                   className="w-full bg-[#04564f] hover:bg-[#03453f] text-white text-[11px] font-bold uppercase tracking-wider py-2.5 rounded shadow-sm transition-colors text-center block"
                 >
                   START FREE NOW
@@ -699,7 +700,7 @@ export const MusicLicensingSection: React.FC<MusicLicensingSectionProps> = ({
             <div className="pt-2 space-y-2.5">
               <button
                 type="button"
-                onClick={() => (window.location.href = '/sign-up')}
+                onClick={() => (window.location.href = AUTH_SIGNUP_URL)}
                 className="w-full py-3 rounded-xl bg-[#04564f] hover:bg-[#03453f] text-white font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg shadow-[#04564f]/30 transition-all hover:scale-[1.01] active:scale-[0.99] cursor-pointer border-0"
               >
                 <span>Create Free Account</span>
@@ -708,7 +709,7 @@ export const MusicLicensingSection: React.FC<MusicLicensingSectionProps> = ({
 
               <button
                 type="button"
-                onClick={() => (window.location.href = '/sign-in')}
+                onClick={() => (window.location.href = AUTH_LOGIN_URL)}
                 className="w-full py-2 text-xs text-gray-400 hover:text-white transition-colors cursor-pointer"
               >
                 Already have an account? <span className="text-[#2dd4bf] font-semibold underline">Sign In</span>

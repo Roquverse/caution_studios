@@ -23,6 +23,7 @@ import { useAudio } from '../components/audio/AudioProvider';
 import { AudioPlayer, audioSynth, MOCK_TRACKS } from '@caution/ui';
 import { Track } from '@caution/types';
 import { useUserSubscription, FREE_PREVIEW_LIMIT_SECONDS } from '../lib/subscription';
+import { AUTH_LOGIN_URL, AUTH_SIGNUP_URL } from '../lib/urls';
 
 export default function LandingPage() {
   const { isSubscribed } = useUserSubscription();
@@ -147,15 +148,15 @@ export default function LandingPage() {
         onAnalyze={handleAnalyze}
         onBookCall={() => setIsBookCallOpen(true)}
         onOpenAssessment={() => setIsAssessmentOpen(true)}
-        onSignIn={() => (window.location.href = '/sign-in')}
-        onGetStarted={() => (window.location.href = '/sign-up')}
+        onSignIn={() => (window.location.href = AUTH_LOGIN_URL)}
+        onGetStarted={() => (window.location.href = AUTH_SIGNUP_URL)}
         cartCount={cart.length}
         onOpenCart={() => setIsCartOpen(true)}
       />
 
       {/* 7. Music Licensing & Interactive Beat Catalog (Matching Reference Design) */}
       <MusicLicensingSection
-        onStartFree={() => (window.location.href = '/sign-up')}
+        onStartFree={() => (window.location.href = AUTH_SIGNUP_URL)}
       />
 
       <PricingSection
@@ -172,7 +173,7 @@ export default function LandingPage() {
 
       {/* 10. Join 40,000 Creators CTA Banner */}
       <JoinCreatorsSection
-        onStartFree={() => (window.location.href = '/sign-up')}
+        onStartFree={() => (window.location.href = AUTH_SIGNUP_URL)}
       />
 
       {/* 11. Footer (Brand info, Explore, Insights, Follow) */}

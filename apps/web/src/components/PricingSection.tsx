@@ -3,6 +3,7 @@
 import React from 'react';
 import { Button } from '@caution/ui';
 import { Check, Disc3 } from 'lucide-react';
+import { AUTH_SIGNUP_URL } from '../lib/urls';
 
 interface PricingSectionProps {
   onSelectPlan?: (planName: string, price: string) => void;
@@ -139,7 +140,7 @@ export const PricingSection: React.FC<PricingSectionProps> = ({ onSelectPlan }) 
                   onClick={() =>
                     onSelectPlan
                       ? onSelectPlan(plan.name, plan.price)
-                      : (window.location.href = 'http://localhost:3001/register')
+                      : (window.location.href = AUTH_SIGNUP_URL)
                   }
                   className={`w-full text-xs font-bold uppercase tracking-wider py-3 ${
                     plan.isRecommended

@@ -7,6 +7,7 @@ import { HomeFooter } from '../../components/home/HomeFooter';
 import { CartDrawer } from '../../components/cart/CartDrawer';
 import { NowPlayingPanel } from '../../components/audio/NowPlayingPanel';
 import { formatNaira } from '../../lib/paystack';
+import { AUTH_SIGNUP_URL } from '../../lib/urls';
 import { Check, Sparkles, ArrowRight, ShieldCheck } from 'lucide-react';
 
 export default function PricingPage() {
@@ -154,12 +155,12 @@ export default function PricingPage() {
               </div>
 
               <div className="pt-8">
-                <Link
-                  href="/sign-up"
+                <a
+                  href={AUTH_SIGNUP_URL}
                   className="w-full h-10 rounded-pill bg-accent hover:bg-[#135d56] text-text font-semibold text-xs flex items-center justify-center border border-accent shadow-sm"
                 >
                   Subscribe to Plus for {formatNaira(3000)}/mo
-                </Link>
+                </a>
               </div>
             </div>
           </div>

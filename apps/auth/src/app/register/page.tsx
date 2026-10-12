@@ -5,6 +5,9 @@ import { Button } from '@caution/ui';
 import { ArrowRight, User, Mail, Lock, Check, ArrowUpRight, Mic2, ShieldCheck, ArrowLeft, RefreshCw, CheckCircle2, AlertCircle } from 'lucide-react';
 import { supabase } from '../../lib/supabaseClient';
 
+const USER_PORTAL_URL = process.env.NEXT_PUBLIC_USER_URL || 'https://app.cautionstudioz.com';
+const WEB_URL = process.env.NEXT_PUBLIC_WEB_URL || 'https://cautionstudioz.com';
+
 export default function RegisterPage() {
   const [step, setStep] = useState<'form' | 'otp' | 'success'>('form');
   const [name, setName] = useState('');
@@ -54,7 +57,7 @@ export default function RegisterPage() {
       }
 
       if (data?.session) {
-        window.location.href = 'http://localhost:3002';
+        window.location.href = USER_PORTAL_URL;
         return;
       }
 
@@ -173,7 +176,7 @@ export default function RegisterPage() {
 
       setStep('success');
       setTimeout(() => {
-        window.location.href = 'http://localhost:3002';
+        window.location.href = USER_PORTAL_URL;
       }, 1000);
     } catch (err: any) {
       setErrorMessage(err?.message || 'Verification failed. Please try again.');
@@ -222,7 +225,7 @@ export default function RegisterPage() {
         <div>
           {/* Top Bar with Brand & Telemetry Badge */}
           <div className="flex items-center justify-between">
-            <a href="http://localhost:3000" className="inline-block">
+            <a href={WEB_URL} className="inline-block">
               <img
                 src="/logo.png"
                 alt="Caution Studio"
@@ -344,7 +347,7 @@ export default function RegisterPage() {
         {/* Bottom Status */}
         <div className="mt-8 pt-5 border-t border-white/[0.08] flex items-center justify-between text-xs text-gray-500">
           <span>Trusted by 40,000+ creators worldwide</span>
-          <a href="http://localhost:3000" className="text-gray-400 hover:text-white flex items-center gap-1 transition-colors">
+          <a href={WEB_URL} className="text-gray-400 hover:text-white flex items-center gap-1 transition-colors">
             Back to website <ArrowUpRight className="h-3 w-3" />
           </a>
         </div>

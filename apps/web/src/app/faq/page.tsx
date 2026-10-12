@@ -3,6 +3,7 @@
 import React from 'react';
 import { Navbar, Footer, FAQSection, Button } from '@caution/ui';
 import { HelpCircle, Mail } from 'lucide-react';
+import { AUTH_LOGIN_URL, AUTH_SIGNUP_URL, APP_URL, ADMIN_URL } from '../../lib/urls';
 
 export default function FAQPage() {
   return (
@@ -10,10 +11,10 @@ export default function FAQPage() {
       <Navbar
         brandName="Caution Studio"
         currentPath="/faq"
-        onStartFree={() => (window.location.href = 'http://localhost:3001/register')}
-        onSignIn={() => (window.location.href = 'http://localhost:3001/login')}
-        userPortalUrl="http://localhost:3002"
-        adminPortalUrl="http://localhost:3003"
+        onStartFree={() => (window.location.href = AUTH_SIGNUP_URL)}
+        onSignIn={() => (window.location.href = AUTH_LOGIN_URL)}
+        userPortalUrl={APP_URL}
+        adminPortalUrl={ADMIN_URL}
         onNavigate={(href) => (window.location.href = href)}
       />
 

@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAudio } from '../audio/AudioProvider';
 import { ShoppingBag, Menu, X } from 'lucide-react';
+import { AUTH_LOGIN_URL, AUTH_SIGNUP_URL } from '../../lib/urls';
 
 export const TopNav: React.FC = () => {
   const pathname = usePathname();
@@ -73,19 +74,19 @@ export const TopNav: React.FC = () => {
             )}
           </button>
 
-          <Link
-            href="/sign-in"
+          <a
+            href={AUTH_LOGIN_URL}
             className="hidden md:inline-flex text-xs font-semibold text-text-muted hover:text-text px-3 py-1.5 transition-colors"
           >
             Sign in
-          </Link>
+          </a>
 
-          <Link
-            href="/sign-up"
+          <a
+            href={AUTH_SIGNUP_URL}
             className="hidden md:inline-flex h-8 px-4 rounded-pill border border-border hover:border-text-faint text-text text-xs font-semibold items-center justify-center transition-colors"
           >
             Get started
-          </Link>
+          </a>
 
           {/* Mobile hamburger */}
           <button
@@ -113,20 +114,20 @@ export const TopNav: React.FC = () => {
             </Link>
           ))}
           <div className="pt-3 border-t border-border flex gap-2">
-            <Link
-              href="/sign-in"
+            <a
+              href={AUTH_LOGIN_URL}
               onClick={() => setMobileMenuOpen(false)}
               className="flex-1 h-9 rounded-sm border border-border text-center text-xs font-medium text-text flex items-center justify-center"
             >
               Sign in
-            </Link>
-            <Link
-              href="/sign-up"
+            </a>
+            <a
+              href={AUTH_SIGNUP_URL}
               onClick={() => setMobileMenuOpen(false)}
               className="flex-1 h-9 rounded-sm bg-accent text-center text-xs font-medium text-text flex items-center justify-center"
             >
               Get started
-            </Link>
+            </a>
           </div>
         </div>
       )}

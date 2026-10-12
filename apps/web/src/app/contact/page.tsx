@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { Navbar, Footer, Button, Input } from '@caution/ui';
 import { Mail, MessageSquare, Send, CheckCircle2 } from 'lucide-react';
+import { AUTH_LOGIN_URL, AUTH_SIGNUP_URL, APP_URL, ADMIN_URL } from '../../lib/urls';
 
 export default function ContactPage() {
   const [submitted, setSubmitted] = useState(false);
@@ -20,10 +21,10 @@ export default function ContactPage() {
       <Navbar
         brandName="Caution Studio"
         currentPath="/contact"
-        onStartFree={() => (window.location.href = 'http://localhost:3001/register')}
-        onSignIn={() => (window.location.href = 'http://localhost:3001/login')}
-        userPortalUrl="http://localhost:3002"
-        adminPortalUrl="http://localhost:3003"
+        onStartFree={() => (window.location.href = AUTH_SIGNUP_URL)}
+        onSignIn={() => (window.location.href = AUTH_LOGIN_URL)}
+        userPortalUrl={APP_URL}
+        adminPortalUrl={ADMIN_URL}
         onNavigate={(href) => (window.location.href = href)}
       />
 

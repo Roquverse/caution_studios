@@ -54,7 +54,7 @@ export function AdminNav({ activePath = '/' }: { activePath?: string }) {
         {/* Right: Portals & Admin Profile */}
         <div className="flex items-center gap-3">
           <a
-            href="http://localhost:3000"
+            href={process.env.NEXT_PUBLIC_WEB_URL || 'https://cautionstudioz.com'}
             className="hidden sm:flex items-center gap-1 text-xs text-gray-400 hover:text-white"
           >
             <span>Landing Site</span>
@@ -62,7 +62,7 @@ export function AdminNav({ activePath = '/' }: { activePath?: string }) {
           </a>
 
           <a
-            href="http://localhost:3002"
+            href={process.env.NEXT_PUBLIC_USER_URL || 'https://app.cautionstudioz.com'}
             className="hidden sm:flex items-center gap-1 text-xs text-gray-400 hover:text-white"
           >
             <span>User Portal</span>
@@ -80,7 +80,7 @@ export function AdminNav({ activePath = '/' }: { activePath?: string }) {
           </div>
 
           <a
-            href="http://localhost:3001/login"
+            href={process.env.NEXT_PUBLIC_AUTH_URL ? `${process.env.NEXT_PUBLIC_AUTH_URL}/login` : 'https://auth.cautionstudioz.com/login'}
             title="Sign Out"
             className="p-1.5 text-gray-400 hover:text-rose-400 rounded-lg transition-colors ml-1"
           >

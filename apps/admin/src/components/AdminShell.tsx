@@ -317,7 +317,7 @@ export function AdminShell({ children, activePath, onOpenUpload }: AdminShellPro
           {/* Right Header Actions */}
           <div className="flex items-center gap-2.5">
             <a
-              href="http://localhost:3000"
+              href={process.env.NEXT_PUBLIC_WEB_URL || 'https://cautionstudioz.com'}
               target="_blank"
               rel="noreferrer"
               className="hidden sm:inline-flex items-center gap-1 text-xs text-zinc-400 hover:text-white px-2 py-1 rounded transition-colors"
@@ -327,7 +327,7 @@ export function AdminShell({ children, activePath, onOpenUpload }: AdminShellPro
             </a>
 
             <a
-              href="http://localhost:3002"
+              href={process.env.NEXT_PUBLIC_USER_URL || 'https://app.cautionstudioz.com'}
               target="_blank"
               rel="noreferrer"
               className="hidden sm:inline-flex items-center gap-1 text-xs text-zinc-400 hover:text-white px-2 py-1 rounded transition-colors"

@@ -4,6 +4,8 @@ import React, { useState } from 'react';
 import { Button } from '@caution/ui';
 import { ArrowLeft, Mail, CheckCircle2, ArrowUpRight, ShieldCheck, KeyRound } from 'lucide-react';
 
+const WEB_URL = process.env.NEXT_PUBLIC_WEB_URL || 'https://cautionstudioz.com';
+
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState('');
   const [submitted, setSubmitted] = useState(false);
@@ -20,7 +22,7 @@ export default function ForgotPasswordPage() {
         <div>
           {/* Top Bar with Brand & Telemetry Badge */}
           <div className="flex items-center justify-between">
-            <a href="http://localhost:3000" className="inline-block">
+            <a href={WEB_URL} className="inline-block">
               <img
                 src="/logo.png"
                 alt="Caution Studio"
@@ -110,7 +112,7 @@ export default function ForgotPasswordPage() {
         {/* Bottom Social Proof */}
         <div className="mt-8 pt-5 border-t border-white/[0.08] flex items-center justify-between text-xs text-gray-500">
           <span>Caution Studio Support</span>
-          <a href="http://localhost:3000" className="text-gray-400 hover:text-white flex items-center gap-1 transition-colors">
+          <a href={WEB_URL} className="text-gray-400 hover:text-white flex items-center gap-1 transition-colors">
             Back to website <ArrowUpRight className="h-3 w-3" />
           </a>
         </div>
