@@ -71,20 +71,20 @@ export default function AdminTracksPage() {
 
   // Upload Form Fields
   const [title, setTitle] = useState('');
-  const [artist, setArtist] = useState('Caution Studio');
+  const [artist, setArtist] = useState('');
   const [genre, setGenre] = useState('Cinematic');
   const [mood, setMood] = useState('Epic');
-  const [bpm, setBpm] = useState(120);
-  const [musicalKey, setMusicalKey] = useState('C Minor');
-  const [durationSeconds, setDurationSeconds] = useState(180);
-  const [tags, setTags] = useState('Commercial, Soundtrack, Trailer');
+  const [bpm, setBpm] = useState<number | ''>('');
+  const [musicalKey, setMusicalKey] = useState('');
+  const [durationSeconds, setDurationSeconds] = useState(0);
+  const [tags, setTags] = useState('');
   const [description, setDescription] = useState('');
   const [status, setStatus] = useState<'live' | 'draft' | 'unlisted'>('live');
 
   // License Pricing in Naira (NGN ₦)
-  const [basicPrice, setBasicPrice] = useState(15000);
-  const [premiumPrice, setPremiumPrice] = useState(45000);
-  const [exclusivePrice, setExclusivePrice] = useState(250000);
+  const [basicPrice, setBasicPrice] = useState<number | ''>('');
+  const [premiumPrice, setPremiumPrice] = useState<number | ''>('');
+  const [exclusivePrice, setExclusivePrice] = useState<number | ''>('');
 
   // Files
   const [audioFile, setAudioFile] = useState<File | null>(null);
@@ -197,17 +197,21 @@ export default function AdminTracksPage() {
       formData.append('title', title.trim());
       formData.append('artist', artist.trim() || 'Caution Studio');
       formData.append('genre', genre);
-      formData.append('bpm', bpm.toString());
-      formData.append('musicalKey', musicalKey);
+      formData.append('bpm', bpm ? bpm.toString() : '120');
+      formData.append('musicalKey', musicalKey.trim() || 'C Minor');
       formData.append('durationSeconds', durationSeconds.toString());
-      formData.append('description', description);
+      formData.append('description', description.trim());
       formData.append('status', status);
       formData.append('moods', mood);
-      formData.append('tags', tags);
+      formData.append('tags', tags.trim());
 
-      formData.append('basicPrice', Math.round(basicPrice * 100).toString());
-      formData.append('premiumPrice', Math.round(premiumPrice * 100).toString());
-      formData.append('exclusivePrice', Math.round(exclusivePrice * 100).toString());
+      const finalBasic = typeof basicPrice === 'number' && basicPrice > 0 ? basicPrice : 15000;
+      const finalPremium = typeof premiumPrice === 'number' && premiumPrice > 0 ? premiumPrice : 45000;
+      const finalExclusive = typeof exclusivePrice === 'number' && exclusivePrice > 0 ? exclusivePrice : 250000;
+
+      formData.append('basicPrice', Math.round(finalBasic * 100).toString());
+      formData.append('premiumPrice', Math.round(finalPremium * 100).toString());
+      formData.append('exclusivePrice', Math.round(finalExclusive * 100).toString());
 
       formData.append('audio', audioFile);
       if (coverFile) formData.append('cover', coverFile);
@@ -239,18 +243,18 @@ export default function AdminTracksPage() {
 
   const resetUploadForm = () => {
     setTitle('');
-    setArtist('Caution Studio');
+    setArtist('');
     setGenre('Cinematic');
     setMood('Epic');
-    setBpm(120);
-    setMusicalKey('C Minor');
-    setDurationSeconds(180);
-    setTags('Commercial, Soundtrack, Trailer');
+    setBpm('');
+    setMusicalKey('');
+    setDurationSeconds(0);
+    setTags('');
     setDescription('');
     setStatus('live');
-    setBasicPrice(15000);
-    setPremiumPrice(45000);
-    setExclusivePrice(250000);
+    setBasicPrice('');
+    setPremiumPrice('');
+    setExclusivePrice('');
     setAudioFile(null);
     setCoverFile(null);
     setCoverPreviewUrl(null);
@@ -475,8 +479,18 @@ export default function AdminTracksPage() {
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Filter by title, genre, key..."
-                className="w-full bg-zinc-900 border border-zinc-800 rounded-md py-1.5 pl-8 pr-3 text-xs text-white placeholder:text-zinc-500 focus:outline-none focus:border-zinc-700"
+                className="w-full bg-zinc-900 border border-zinc-800 rounded-md py-1.5 pl-8 pr-7 text-xs text-white placeholder:text-zinc-500 focus:outline-none focus:border-zinc-700"
               />
+              {search && (
+                <button
+                  type="button"
+                  onClick={() => setSearch('')}
+                  className="absolute right-2 top-2 text-zinc-500 hover:text-zinc-300"
+                  title="Clear search"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              )}
             </div>
 
             {/* Genre Select */}
@@ -918,8 +932,9 @@ export default function AdminTracksPage() {
                   <input
                     type="number"
                     value={bpm}
-                    onChange={(e) => setBpm(Number(e.target.value))}
-                    className="w-full text-xs rounded-md border border-zinc-800 p-2 bg-zinc-900 text-white focus:outline-none focus:border-[#2dd4bf]"
+                    onChange={(e) => setBpm(e.target.value === '' ? '' : Number(e.target.value))}
+                    placeholder="120"
+                    className="w-full text-xs rounded-md border border-zinc-800 p-2 bg-zinc-900 text-white placeholder:text-zinc-600 focus:outline-none focus:border-[#2dd4bf]"
                   />
                 </div>
 
@@ -929,8 +944,8 @@ export default function AdminTracksPage() {
                     type="text"
                     value={musicalKey}
                     onChange={(e) => setMusicalKey(e.target.value)}
-                    placeholder="C Minor"
-                    className="w-full text-xs rounded-md border border-zinc-800 p-2 bg-zinc-900 text-white focus:outline-none focus:border-[#2dd4bf]"
+                    placeholder="e.g. C Minor"
+                    className="w-full text-xs rounded-md border border-zinc-800 p-2 bg-zinc-900 text-white placeholder:text-zinc-600 focus:outline-none focus:border-[#2dd4bf]"
                   />
                 </div>
               </div>
@@ -947,8 +962,9 @@ export default function AdminTracksPage() {
                       type="number"
                       step="1000"
                       value={basicPrice}
-                      onChange={(e) => setBasicPrice(parseFloat(e.target.value) || 0)}
-                      className="w-full text-xs rounded-md border border-zinc-800 p-1.5 bg-zinc-900 text-white focus:outline-none focus:border-[#2dd4bf]"
+                      onChange={(e) => setBasicPrice(e.target.value === '' ? '' : parseFloat(e.target.value))}
+                      placeholder="15000"
+                      className="w-full text-xs rounded-md border border-zinc-800 p-1.5 bg-zinc-900 text-white placeholder:text-zinc-600 focus:outline-none focus:border-[#2dd4bf]"
                     />
                   </div>
                   <div>
@@ -957,8 +973,9 @@ export default function AdminTracksPage() {
                       type="number"
                       step="1000"
                       value={premiumPrice}
-                      onChange={(e) => setPremiumPrice(parseFloat(e.target.value) || 0)}
-                      className="w-full text-xs rounded-md border border-zinc-800 p-1.5 bg-zinc-900 text-white focus:outline-none focus:border-[#2dd4bf]"
+                      onChange={(e) => setPremiumPrice(e.target.value === '' ? '' : parseFloat(e.target.value))}
+                      placeholder="45000"
+                      className="w-full text-xs rounded-md border border-zinc-800 p-1.5 bg-zinc-900 text-white placeholder:text-zinc-600 focus:outline-none focus:border-[#2dd4bf]"
                     />
                   </div>
                   <div>
@@ -967,8 +984,9 @@ export default function AdminTracksPage() {
                       type="number"
                       step="5000"
                       value={exclusivePrice}
-                      onChange={(e) => setExclusivePrice(parseFloat(e.target.value) || 0)}
-                      className="w-full text-xs rounded-md border border-zinc-800 p-1.5 bg-zinc-900 text-white focus:outline-none focus:border-[#2dd4bf]"
+                      onChange={(e) => setExclusivePrice(e.target.value === '' ? '' : parseFloat(e.target.value))}
+                      placeholder="250000"
+                      className="w-full text-xs rounded-md border border-zinc-800 p-1.5 bg-zinc-900 text-white placeholder:text-zinc-600 focus:outline-none focus:border-[#2dd4bf]"
                     />
                   </div>
                 </div>
@@ -1108,9 +1126,10 @@ export default function AdminTracksPage() {
                   <label className="block text-xs font-medium text-zinc-300 mb-1">BPM</label>
                   <input
                     type="number"
-                    value={editingTrack.bpm || 120}
-                    onChange={(e) => setEditingTrack({ ...editingTrack, bpm: Number(e.target.value) })}
-                    className="w-full text-xs rounded-md border border-zinc-800 p-2 bg-zinc-900 text-white focus:outline-none focus:border-[#2dd4bf]"
+                    value={editingTrack.bpm || ''}
+                    onChange={(e) => setEditingTrack({ ...editingTrack, bpm: e.target.value === '' ? 0 : Number(e.target.value) })}
+                    placeholder="120"
+                    className="w-full text-xs rounded-md border border-zinc-800 p-2 bg-zinc-900 text-white placeholder:text-zinc-600 focus:outline-none focus:border-[#2dd4bf]"
                   />
                 </div>
                 <div>
@@ -1119,7 +1138,8 @@ export default function AdminTracksPage() {
                     type="text"
                     value={editingTrack.musical_key || ''}
                     onChange={(e) => setEditingTrack({ ...editingTrack, musical_key: e.target.value })}
-                    className="w-full text-xs rounded-md border border-zinc-800 p-2 bg-zinc-900 text-white focus:outline-none focus:border-[#2dd4bf]"
+                    placeholder="e.g. C Minor"
+                    className="w-full text-xs rounded-md border border-zinc-800 p-2 bg-zinc-900 text-white placeholder:text-zinc-600 focus:outline-none focus:border-[#2dd4bf]"
                   />
                 </div>
               </div>

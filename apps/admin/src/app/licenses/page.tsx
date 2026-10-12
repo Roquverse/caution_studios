@@ -8,7 +8,8 @@ import {
   AlertTriangle,
   RefreshCw,
   Search,
-  ExternalLink
+  ExternalLink,
+  X
 } from 'lucide-react';
 
 export default function AdminLicensesPage() {
@@ -91,8 +92,18 @@ export default function AdminLicensesPage() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search claims by channel, track, ID..."
-              className="w-full bg-zinc-900 border border-zinc-800 rounded-md py-1.5 pl-8 pr-3 text-xs text-white placeholder:text-zinc-500 focus:outline-none focus:border-zinc-700"
+              className="w-full bg-zinc-900 border border-zinc-800 rounded-md py-1.5 pl-8 pr-7 text-xs text-white placeholder:text-zinc-500 focus:outline-none focus:border-zinc-700"
             />
+            {search && (
+              <button
+                type="button"
+                onClick={() => setSearch('')}
+                className="absolute right-2 top-2 text-zinc-500 hover:text-zinc-300"
+                title="Clear search"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
           </div>
 
           <span className="text-xs text-zinc-500 font-medium">

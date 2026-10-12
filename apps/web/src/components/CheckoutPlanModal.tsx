@@ -22,6 +22,14 @@ export const CheckoutPlanModal: React.FC<CheckoutPlanModalProps> = ({
   const [email, setEmail] = useState('');
   const [name, setName] = useState('');
 
+  React.useEffect(() => {
+    if (!isOpen) {
+      setEmail('');
+      setName('');
+      setIsSuccess(false);
+    }
+  }, [isOpen]);
+
   if (!plan) return null;
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -103,7 +111,7 @@ export const CheckoutPlanModal: React.FC<CheckoutPlanModalProps> = ({
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="artist@cautionstudio.com"
+              placeholder="artist@example.com"
               className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm text-gray-900 focus:border-[#04564f] focus:outline-none focus:ring-1 focus:ring-[#04564f]"
             />
           </div>

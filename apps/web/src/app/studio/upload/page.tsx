@@ -28,11 +28,11 @@ export default function StudioUploadPage() {
   const [formData, setFormData] = useState({
     title: '',
     genre: 'Afrobeats',
-    bpm: '106',
-    key: 'C Minor',
-    moods: ['Energetic', 'Vibrant'],
+    bpm: '',
+    key: '',
+    moods: [] as string[],
     description: '',
-    tags: 'Afrobeat, Lagos, Burna, Horns',
+    tags: '',
     basicPrice: 3000,
     premiumPrice: 30000,
     exclusivePrice: 100000,
@@ -121,10 +121,22 @@ export default function StudioUploadPage() {
                   setIsSuccess(false);
                   setStep(1);
                   setFormData({
-                    ...formData,
                     title: '',
+                    genre: 'Afrobeats',
+                    bpm: '',
+                    key: '',
+                    moods: [],
+                    description: '',
+                    tags: '',
+                    basicPrice: 3000,
+                    premiumPrice: 30000,
+                    exclusivePrice: 100000,
+                    basicEnabled: true,
+                    premiumEnabled: true,
+                    exclusiveEnabled: true,
                     wavFileName: '',
-                    stemsFileName: ''
+                    stemsFileName: '',
+                    coverFileName: ''
                   });
                 }}
                 className="h-10 px-6 rounded-pill bg-surface hover:bg-surface-2 text-text font-bold text-xs uppercase tracking-wider border border-border"
@@ -257,7 +269,8 @@ export default function StudioUploadPage() {
                       type="number"
                       value={formData.bpm}
                       onChange={(e) => setFormData({ ...formData, bpm: e.target.value })}
-                      className="w-full h-10 px-3 rounded-sm bg-surface border border-border text-xs text-text focus:outline-none focus:border-accent-live font-mono"
+                      placeholder="e.g. 106"
+                      className="w-full h-10 px-3 rounded-sm bg-surface border border-border text-xs text-text placeholder:text-text-faint focus:outline-none focus:border-accent-live font-mono"
                     />
                   </div>
 
@@ -269,7 +282,8 @@ export default function StudioUploadPage() {
                       type="text"
                       value={formData.key}
                       onChange={(e) => setFormData({ ...formData, key: e.target.value })}
-                      className="w-full h-10 px-3 rounded-sm bg-surface border border-border text-xs text-text focus:outline-none focus:border-accent-live font-mono"
+                      placeholder="e.g. C Minor"
+                      className="w-full h-10 px-3 rounded-sm bg-surface border border-border text-xs text-text placeholder:text-text-faint focus:outline-none focus:border-accent-live font-mono"
                     />
                   </div>
                 </div>
@@ -282,8 +296,8 @@ export default function StudioUploadPage() {
                     type="text"
                     value={formData.tags}
                     onChange={(e) => setFormData({ ...formData, tags: e.target.value })}
-                    placeholder="Burna Boy, Asake, Guitar, Fast 808"
-                    className="w-full h-10 px-3 rounded-sm bg-surface border border-border text-xs text-text focus:outline-none focus:border-accent-live"
+                    placeholder="e.g. Burna Boy, Asake, Guitar, Fast 808"
+                    className="w-full h-10 px-3 rounded-sm bg-surface border border-border text-xs text-text placeholder:text-text-faint focus:outline-none focus:border-accent-live"
                   />
                 </div>
               </div>

@@ -240,8 +240,18 @@ export default function AdminGenresPage() {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search genres by name or description..."
-              className="w-full h-9 pl-9 pr-4 rounded-lg bg-zinc-900 border border-zinc-800 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-[#2dd4bf] transition-colors"
+              className="w-full h-9 pl-9 pr-8 rounded-lg bg-zinc-900 border border-zinc-800 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-[#2dd4bf] transition-colors"
             />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery('')}
+                className="absolute right-2.5 top-2.5 text-zinc-500 hover:text-zinc-300"
+                title="Clear search"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
           </div>
           <span className="text-xs font-mono text-zinc-500">
             {filteredGenres.length} {filteredGenres.length === 1 ? 'genre' : 'genres'}

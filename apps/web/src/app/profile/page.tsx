@@ -69,24 +69,18 @@ export default function ProfilePage() {
 
         if (publicProfile) {
           setProfile(publicProfile);
-          setEmail('arakunrincole@cautionstudio.com');
-          setDisplayName(publicProfile.display_name || 'Arakunrin Cole');
-          setHandle(publicProfile.handle || 'arakunrincole');
-          setBio(publicProfile.bio || 'Producer & Sound Designer at Caution Studio');
+          setEmail(publicProfile.email || '');
+          setDisplayName(publicProfile.display_name || '');
+          setHandle(publicProfile.handle || '');
+          setBio(publicProfile.bio || '');
           setRoles(publicProfile.roles || ['artist']);
         } else {
-          setProfile({
-            id: 'demo-user',
-            handle: 'arakunrincole',
-            display_name: 'Arakunrin Cole',
-            avatar_url: '/images/artist_studio_mic.jpg',
-            plan: 'plus',
-            bio: 'Producer & Sound Designer at Caution Studio'
-          });
-          setEmail('cole@cautionstudio.com');
-          setDisplayName('Arakunrin Cole');
-          setHandle('arakunrincole');
-          setBio('Producer & Sound Designer at Caution Studio');
+          setProfile(null);
+          setEmail('');
+          setDisplayName('');
+          setHandle('');
+          setBio('');
+          setRoles(['artist']);
         }
       } catch (err) {
         console.error('Error fetching profile:', err);
