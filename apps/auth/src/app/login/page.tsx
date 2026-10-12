@@ -45,8 +45,8 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen flex flex-col lg:flex-row bg-[#07090D] text-white selection:bg-[#04564f] selection:text-white">
-      {/* Left Column: Rich Multi-Image Studio Showcase */}
-      <div className="w-full lg:w-1/2 bg-[#0A0D14] p-6 sm:p-10 lg:p-14 flex flex-col justify-between border-b lg:border-b-0 lg:border-r border-white/[0.08]">
+      {/* Left Column: Rich Multi-Image Studio Showcase (Desktop Only) */}
+      <div className="hidden lg:flex lg:w-1/2 bg-[#0A0D14] p-6 sm:p-10 lg:p-14 flex-col justify-between border-r border-white/[0.08]">
         <div>
           {/* Top Bar with Brand & Telemetry Badge */}
           <div className="flex items-center justify-between">
@@ -185,8 +185,25 @@ export default function LoginPage() {
       </div>
 
       {/* Right Column: Clean Flat Form (Zero Shadows) */}
-      <div className="w-full lg:w-1/2 flex flex-col justify-center p-8 sm:p-12 lg:p-16 bg-[#07090D]">
-        <div className="max-w-md w-full mx-auto">
+      <div className="w-full lg:w-1/2 min-h-screen flex flex-col justify-between p-6 sm:p-10 lg:p-16 bg-[#07090D]">
+        {/* Mobile-Only Top Brand Bar */}
+        <div className="lg:hidden flex items-center justify-between mb-8 pt-2">
+          <a href={WEB_URL} className="inline-block">
+            <img
+              src="/logo.png"
+              alt="Caution Studio"
+              className="h-8 w-auto object-contain brightness-0 invert"
+              style={{ width: 140 }}
+            />
+          </a>
+
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-[4px] bg-white/[0.04] border border-white/[0.08] text-[11px] font-mono text-gray-400 uppercase tracking-widest">
+            <span className="h-1.5 w-1.5 rounded-full bg-[#2dd4bf] animate-pulse" />
+            <span>Studio Clearance</span>
+          </div>
+        </div>
+
+        <div className="max-w-md w-full mx-auto my-auto">
           <div className="mb-8">
             <h1 className="text-2xl font-black text-white tracking-[-0.02em]">
               Welcome back
@@ -256,6 +273,14 @@ export default function LoginPage() {
               Start Free Now
             </a>
           </p>
+        </div>
+
+        {/* Mobile-Only Bottom Social Proof Bar */}
+        <div className="lg:hidden mt-10 pt-5 border-t border-white/[0.08] flex items-center justify-between text-xs text-gray-500">
+          <span>Used by 40,000+ creators worldwide</span>
+          <a href={WEB_URL} className="text-gray-400 hover:text-white flex items-center gap-1 transition-colors">
+            Back to website <ArrowUpRight className="h-3 w-3" />
+          </a>
         </div>
       </div>
     </div>
