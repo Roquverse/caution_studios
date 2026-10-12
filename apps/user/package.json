@@ -9,6 +9,7 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1146.0",
     "@caution/tailwind-config": "*",
     "@caution/types": "*",
     "@caution/ui": "*",

@@ -139,7 +139,7 @@ export default function StudioUploadPage() {
             {step === 1 && (
               <div className="space-y-5">
                 <div className="text-xs font-semibold uppercase tracking-wider text-text-muted">
-                  Step 1: Direct Cloudflare R2 Uploads
+                  Step 1: Direct Audio Master Uploads
                 </div>
 
                 {/* Master WAV Dropzone */}

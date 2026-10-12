@@ -1,13 +1,14 @@
 'use client';
 
 import React from 'react';
-import { Music2, LayoutDashboard, Sliders, ShieldCheck, Users, ExternalLink, LogOut } from 'lucide-react';
+import { Music2, LayoutDashboard, Sliders, ShieldCheck, Users, ExternalLink, LogOut, Tag } from 'lucide-react';
 import { Avatar, Badge } from '@caution/ui';
 
 export function AdminNav({ activePath = '/' }: { activePath?: string }) {
   const links = [
     { label: 'Dashboard', href: '/', icon: <LayoutDashboard className="h-4 w-4" /> },
     { label: 'Catalog Manager', href: '/tracks', icon: <Sliders className="h-4 w-4" /> },
+    { label: 'Genres', href: '/genres', icon: <Tag className="h-4 w-4" /> },
     { label: 'Content ID & Licenses', href: '/licenses', icon: <ShieldCheck className="h-4 w-4" /> },
     { label: 'Subscribers', href: '/users', icon: <Users className="h-4 w-4" /> }
   ];
@@ -23,7 +24,7 @@ export function AdminNav({ activePath = '/' }: { activePath?: string }) {
               alt="Caution Studio"
               className="h-9 w-auto max-w-[150px] object-contain brightness-0 invert transition-transform duration-200 group-hover:scale-105"
             />
-            <span className="bg-red-500/20 text-red-400 border border-red-500/40 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">
+            <span className="bg-[#2dd4bf]/20 text-[#2dd4bf] border border-[#2dd4bf]/40 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">
               Admin
             </span>
           </a>

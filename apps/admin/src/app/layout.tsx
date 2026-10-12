@@ -2,8 +2,8 @@ import type { Metadata } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'Admin Control Center | Caution Studio',
-  description: 'Manage audio catalog, metadata, licenses, and creator subscribers.'
+  title: 'Caution Studio | Admin Dashboard',
+  description: 'Executive audio management, catalog distribution, and subscriber telemetry.'
 };
 
 export default function RootLayout({
@@ -12,7 +12,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
+    <html lang="en" className="dark">
       <head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
@@ -21,7 +21,7 @@ export default function RootLayout({
           rel="stylesheet"
         />
       </head>
-      <body className="min-h-screen bg-slate-50 text-slate-900 selection:bg-black selection:text-white">
+      <body className="min-h-screen bg-[#09090b] text-zinc-100 selection:bg-[#2dd4bf] selection:text-black antialiased">
         {children}
       </body>
     </html>

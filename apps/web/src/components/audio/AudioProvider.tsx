@@ -5,6 +5,7 @@ import { Beat, LicenseType, CartItem } from '@caution/types';
 import { audioSynth } from '@caution/ui';
 import { SEEDED_BEATS } from '../../lib/seedBeats';
 import { LICENSE_DEFINITIONS } from '@caution/licenses';
+import { useUserSubscription, FREE_PREVIEW_LIMIT_SECONDS } from '../../lib/subscription';
 
 interface AudioContextValue {
   currentBeat: Beat | null;
@@ -15,6 +16,7 @@ interface AudioContextValue {
   queue: Beat[];
   play: (beat: Beat) => void;
   pause: () => void;
+  closePlayer: () => void;
   togglePlay: (beat?: Beat) => void;
   seek: (ratio: number) => void;
   setVolume: (v: number) => void;
@@ -34,12 +36,18 @@ interface AudioContextValue {
   // Likes
   likes: string[];
   toggleLike: (beatId: string) => void;
+
+  // Subscription state
+  isSubscribed: boolean;
+  previewLimitSeconds: number;
+  showUpgradePrompt: boolean;
+  setShowUpgradePrompt: (show: boolean) => void;
 }
 
 const AudioContext = createContext<AudioContextValue | null>(null);
 
 export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [currentBeat, setCurrentBeat] = useState<Beat | null>(SEEDED_BEATS[0]);
+  const [currentBeat, setCurrentBeat] = useState<Beat | null>(null);
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const [currentTime, setCurrentTime] = useState<number>(0);
   const [volume, setVolumeState] = useState<number>(0.8);
@@ -50,6 +58,9 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [cart, setCart] = useState<CartItem[]>([]);
   const [isCartOpen, setIsCartOpen] = useState<boolean>(false);
   const [likes, setLikes] = useState<string[]>(['beat-1', 'beat-2']);
+
+  const { isSubscribed } = useUserSubscription();
+  const [showUpgradePrompt, setShowUpgradePrompt] = useState<boolean>(false);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const synthTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -64,7 +75,16 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
       const handleTimeUpdate = () => {
         if (audioRef.current) {
-          setCurrentTime(audioRef.current.currentTime);
+          const t = audioRef.current.currentTime;
+          if (!isSubscribed && t >= FREE_PREVIEW_LIMIT_SECONDS) {
+            audioRef.current.pause();
+            audioRef.current.currentTime = FREE_PREVIEW_LIMIT_SECONDS;
+            setIsPlaying(false);
+            setShowUpgradePrompt(true);
+            setCurrentTime(FREE_PREVIEW_LIMIT_SECONDS);
+          } else {
+            setCurrentTime(t);
+          }
         }
       };
 
@@ -95,17 +115,26 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     if (synthTimerRef.current) clearInterval(synthTimerRef.current);
     audioSynth.stop();
 
+    const limit = isSubscribed ? (beat.duration_seconds || 180) : Math.min(FREE_PREVIEW_LIMIT_SECONDS, beat.duration_seconds || 180);
+
+    if (!isSubscribed && currentTime >= FREE_PREVIEW_LIMIT_SECONDS) {
+      setCurrentTime(0);
+    }
+
     // Play with synthetic Web Audio engine or audio element
     audioSynth.playTrack(beat.id, () => {
       setCurrentTime((prev) => {
-        if (prev >= (beat.duration_seconds || 180)) {
+        if (prev >= limit) {
           audioSynth.stop();
           setIsPlaying(false);
-          return 0;
+          if (!isSubscribed) {
+            setShowUpgradePrompt(true);
+          }
+          return limit;
         }
         return prev + 0.25;
       });
-    });
+    }, isSubscribed ? undefined : FREE_PREVIEW_LIMIT_SECONDS);
   };
 
   const pause = () => {
@@ -114,6 +143,13 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     if (audioRef.current) {
       audioRef.current.pause();
     }
+  };
+
+  const closePlayer = () => {
+    pause();
+    setCurrentBeat(null);
+    setCurrentTime(0);
+    setIsNowPlayingPanelOpen(false);
   };
 
   const togglePlay = (beat?: Beat) => {
@@ -128,10 +164,20 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   const seek = (ratio: number) => {
-    const targetTime = Math.max(0, Math.min(1, ratio)) * duration;
-    setCurrentTime(targetTime);
+    const rawTarget = Math.max(0, Math.min(1, ratio)) * duration;
+    if (!isSubscribed && rawTarget > FREE_PREVIEW_LIMIT_SECONDS) {
+      setCurrentTime(FREE_PREVIEW_LIMIT_SECONDS);
+      if (audioRef.current) {
+        audioRef.current.currentTime = FREE_PREVIEW_LIMIT_SECONDS;
+      }
+      audioSynth.stop();
+      setIsPlaying(false);
+      setShowUpgradePrompt(true);
+      return;
+    }
+    setCurrentTime(rawTarget);
     if (audioRef.current) {
-      audioRef.current.currentTime = targetTime;
+      audioRef.current.currentTime = rawTarget;
     }
   };
 
@@ -191,6 +237,7 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         queue,
         play,
         pause,
+        closePlayer,
         togglePlay,
         seek,
         setVolume,
@@ -205,7 +252,11 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         isCartOpen,
         setIsCartOpen,
         likes,
-        toggleLike
+        toggleLike,
+        isSubscribed,
+        previewLimitSeconds: FREE_PREVIEW_LIMIT_SECONDS,
+        showUpgradePrompt,
+        setShowUpgradePrompt
       }}
     >
       {children}

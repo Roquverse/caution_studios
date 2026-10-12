@@ -15,6 +15,7 @@ import {
   ChevronRight
 } from 'lucide-react';
 import { audioSynth } from '@caution/ui';
+import { useUserSubscription, FREE_PREVIEW_LIMIT_SECONDS } from '../lib/subscription';
 
 interface CatalogTrack {
   id: string;
@@ -171,10 +172,10 @@ export const MusicLicensingSection: React.FC<MusicLicensingSectionProps> = ({
   onStartFree,
   onSelectTrack
 }) => {
-  // Pre-set track-2 as active playing or selected track matching the screenshot!
+  const { isSubscribed } = useUserSubscription();
   const [activeTrackId, setActiveTrackId] = useState<string>('track-2');
-  const [isPlaying, setIsPlaying] = useState<boolean>(true);
-  const [currentTime, setCurrentTime] = useState<number>(80); // 1:20 matching "1:20 / 1:31" in screenshot
+  const [isPlaying, setIsPlaying] = useState<boolean>(false);
+  const [currentTime, setCurrentTime] = useState<number>(0);
   const [favorites, setFavorites] = useState<Record<string, boolean>>({ 'track-2': true });
   const [stars, setStars] = useState<Record<string, boolean>>({ 'track-2': true });
 
@@ -190,9 +191,12 @@ export const MusicLicensingSection: React.FC<MusicLicensingSectionProps> = ({
       interval = setInterval(() => {
         setCurrentTime((prev) => {
           const current = CATALOG_TRACKS.find((t) => t.id === activeTrackId);
-          const maxDur = current ? current.duration : 91;
-          if (prev >= maxDur) {
-            return 0;
+          const fullDur = current ? current.duration : 91;
+          const limit = isSubscribed ? fullDur : Math.min(FREE_PREVIEW_LIMIT_SECONDS, fullDur);
+          if (prev >= limit) {
+            audioSynth.stop();
+            setIsPlaying(false);
+            return limit;
           }
           return prev + 1;
         });
@@ -201,7 +205,7 @@ export const MusicLicensingSection: React.FC<MusicLicensingSectionProps> = ({
     return () => {
       if (interval) clearInterval(interval);
     };
-  }, [isPlaying, activeTrackId]);
+  }, [isPlaying, activeTrackId, isSubscribed]);
 
   const handlePlayToggle = (track: CatalogTrack) => {
     if (activeTrackId === track.id) {
@@ -209,15 +213,18 @@ export const MusicLicensingSection: React.FC<MusicLicensingSectionProps> = ({
         audioSynth.stop();
         setIsPlaying(false);
       } else {
+        if (!isSubscribed && currentTime >= FREE_PREVIEW_LIMIT_SECONDS) {
+          setCurrentTime(0);
+        }
         setIsPlaying(true);
-        audioSynth.playTrack(track.id, () => {});
+        audioSynth.playTrack(track.id, () => {}, isSubscribed ? undefined : FREE_PREVIEW_LIMIT_SECONDS);
       }
     } else {
       audioSynth.stop();
       setActiveTrackId(track.id);
       setIsPlaying(true);
       setCurrentTime(0);
-      audioSynth.playTrack(track.id, () => {});
+      audioSynth.playTrack(track.id, () => {}, isSubscribed ? undefined : FREE_PREVIEW_LIMIT_SECONDS);
     }
     if (onSelectTrack) onSelectTrack(track);
   };

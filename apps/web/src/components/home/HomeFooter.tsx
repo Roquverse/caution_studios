@@ -20,7 +20,7 @@ export const HomeFooter: React.FC = () => {
               Beat streaming and licensing marketplace connecting independent producers and recording artists worldwide.
             </p>
             <div className="text-[11px] font-mono text-text-faint">
-              Zero egress audio storage via Cloudflare R2 · Direct Paystack clearance.
+              High-fidelity lossless audio storage · Direct Paystack clearance.
             </div>
           </div>
 

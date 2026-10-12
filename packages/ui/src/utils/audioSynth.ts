@@ -59,7 +59,7 @@ class WebAudioSynth {
     }
   }
 
-  playTrack(trackId: string, onTick?: (currentTime: number) => void) {
+  playTrack(trackId: string, onTick?: (currentTime: number) => void, maxDurationSeconds?: number) {
     if (typeof window === 'undefined') return;
     this.stop();
     this.initContext();
@@ -73,6 +73,12 @@ class WebAudioSynth {
 
     const playStep = () => {
       if (!this.isPlaying || !this.ctx || !this.masterGain) return;
+
+      if (maxDurationSeconds && secondsElapsed >= maxDurationSeconds) {
+        this.stop();
+        if (onTick) onTick(maxDurationSeconds);
+        return;
+      }
 
       const chordIdx = Math.floor(this.step / 4) % chords.length;
       const chord = chords[chordIdx];

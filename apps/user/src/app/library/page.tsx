@@ -12,8 +12,10 @@ import {
   MOCK_TRACKS
 } from '@caution/ui';
 import { Track, FilterState } from '@caution/types';
+import { useUserSubscription, FREE_PREVIEW_LIMIT_SECONDS } from '../../lib/subscription';
 
 export default function UserLibraryPage() {
+  const { isSubscribed } = useUserSubscription();
   const [tracks] = useState<Track[]>(MOCK_TRACKS);
   const [currentTrack, setCurrentTrack] = useState<Track | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -36,19 +38,25 @@ export default function UserLibraryPage() {
       audioSynth.stop();
       setIsPlaying(false);
     } else {
+      if (!isSubscribed && currentTrack?.id === track.id && currentTime >= FREE_PREVIEW_LIMIT_SECONDS) {
+        setCurrentTime(0);
+      }
       setCurrentTrack(track);
       setIsPlaying(true);
-      setCurrentTime(0);
+      if (currentTrack?.id !== track.id) {
+        setCurrentTime(0);
+      }
+      const limit = isSubscribed ? track.duration : Math.min(FREE_PREVIEW_LIMIT_SECONDS, track.duration);
       audioSynth.playTrack(track.id, (secs) => {
         setCurrentTime((prev) => {
-          if (prev >= track.duration) {
+          if (prev >= limit) {
             audioSynth.stop();
             setIsPlaying(false);
-            return 0;
+            return limit;
           }
           return prev + 0.25;
         });
-      });
+      }, isSubscribed ? undefined : FREE_PREVIEW_LIMIT_SECONDS);
     }
   };
 
@@ -136,7 +144,11 @@ export default function UserLibraryPage() {
           handlePlayToggle(currentTrack);
         }}
         onSeek={(r) => {
-          if (currentTrack) setCurrentTime(r * currentTrack.duration);
+          if (currentTrack) {
+            const raw = r * currentTrack.duration;
+            const targetSec = !isSubscribed ? Math.min(FREE_PREVIEW_LIMIT_SECONDS, raw) : raw;
+            setCurrentTime(targetSec);
+          }
         }}
         onDownload={(t) => setLicenseModalTrack(t)}
       />

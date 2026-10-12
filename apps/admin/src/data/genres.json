@@ -1,0 +1,62 @@
+[
+  {
+    "id": "afrobeats",
+    "name": "Afrobeats",
+    "slug": "afrobeats",
+    "description": "West African pop, dancehall rhythms, percussion and groove."
+  },
+  {
+    "id": "amapiano",
+    "name": "Amapiano",
+    "slug": "amapiano",
+    "description": "Deep house, jazz and lounge music with log-drum basslines."
+  },
+  {
+    "id": "hip-hop",
+    "name": "Hip Hop",
+    "slug": "hip-hop",
+    "description": "808 beats, trap drums, boom-bap, modern rap instrumentals."
+  },
+  {
+    "id": "cinematic",
+    "name": "Cinematic",
+    "slug": "cinematic",
+    "description": "Orchestral, trailer, score, and ambient dramatic compositions."
+  },
+  {
+    "id": "electronic",
+    "name": "Electronic",
+    "slug": "electronic",
+    "description": "EDM, house, techno, future bass, synthwave and club productions."
+  },
+  {
+    "id": "r-and-b",
+    "name": "R&B",
+    "slug": "r-and-b",
+    "description": "Soulful chord progressions, smooth vocal chops, mellow bounce."
+  },
+  {
+    "id": "funk",
+    "name": "Funk",
+    "slug": "funk",
+    "description": "Groovy basslines, syncopated guitars, retro and neo-funk vibes."
+  },
+  {
+    "id": "lofi",
+    "name": "Lofi",
+    "slug": "lofi",
+    "description": "Chill, vintage, jazzy beats with vinyl crackle and relaxed tempos."
+  },
+  {
+    "id": "pop",
+    "name": "Pop",
+    "slug": "pop",
+    "description": "Catchy melodies, commercial radio ready hooks and modern arrangements."
+  },
+  {
+    "id": "rock",
+    "name": "Rock",
+    "slug": "rock",
+    "description": "Electric guitars, live acoustic drums, alternative and indie energies."
+  }
+]

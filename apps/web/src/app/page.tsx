@@ -22,8 +22,10 @@ import { NowPlayingPanel } from '../components/audio/NowPlayingPanel';
 import { useAudio } from '../components/audio/AudioProvider';
 import { AudioPlayer, audioSynth, MOCK_TRACKS } from '@caution/ui';
 import { Track } from '@caution/types';
+import { useUserSubscription, FREE_PREVIEW_LIMIT_SECONDS } from '../lib/subscription';
 
 export default function LandingPage() {
+  const { isSubscribed } = useUserSubscription();
   // Modal states
   const [isAssessmentOpen, setIsAssessmentOpen] = useState(false);
   const [assessmentLink, setAssessmentLink] = useState('');
@@ -53,19 +55,25 @@ export default function LandingPage() {
       audioSynth.stop();
       setIsPlaying(false);
     } else {
+      if (!isSubscribed && currentTrack?.id === track.id && currentTime >= FREE_PREVIEW_LIMIT_SECONDS) {
+        setCurrentTime(0);
+      }
       setCurrentTrack(track);
       setIsPlaying(true);
-      setCurrentTime(0);
+      if (currentTrack?.id !== track.id) {
+        setCurrentTime(0);
+      }
+      const limit = isSubscribed ? track.duration : Math.min(FREE_PREVIEW_LIMIT_SECONDS, track.duration);
       audioSynth.playTrack(track.id, () => {
         setCurrentTime((prev) => {
-          if (prev >= track.duration) {
+          if (prev >= limit) {
             audioSynth.stop();
             setIsPlaying(false);
-            return 0;
+            return limit;
           }
           return prev + 0.25;
         });
-      });
+      }, isSubscribed ? undefined : FREE_PREVIEW_LIMIT_SECONDS);
     }
   };
 
@@ -75,24 +83,29 @@ export default function LandingPage() {
       audioSynth.stop();
       setIsPlaying(false);
     } else {
+      if (!isSubscribed && currentTime >= FREE_PREVIEW_LIMIT_SECONDS) {
+        setCurrentTime(0);
+      }
       setIsPlaying(true);
+      const limit = isSubscribed ? currentTrack.duration : Math.min(FREE_PREVIEW_LIMIT_SECONDS, currentTrack.duration);
       audioSynth.playTrack(currentTrack.id, () => {
         setCurrentTime((prev) => {
-          if (prev >= currentTrack.duration) {
+          if (prev >= limit) {
             audioSynth.stop();
             setIsPlaying(false);
-            return 0;
+            return limit;
           }
           return prev + 0.25;
         });
-      });
+      }, isSubscribed ? undefined : FREE_PREVIEW_LIMIT_SECONDS);
     }
   };
 
   const handleSeek = (ratio: number) => {
     if (!currentTrack) return;
-    const newTime = ratio * currentTrack.duration;
-    setCurrentTime(newTime);
+    const rawTime = ratio * currentTrack.duration;
+    const targetSec = !isSubscribed ? Math.min(FREE_PREVIEW_LIMIT_SECONDS, rawTime) : rawTime;
+    setCurrentTime(targetSec);
   };
 
   const handleNextTrack = () => {
@@ -140,20 +153,6 @@ export default function LandingPage() {
         onOpenCart={() => setIsCartOpen(true)}
       />
 
-      {/* 5. Turning Passion into Milestones (500M+ Streams, 100k+ Playlists, 300% Growth) */}
-      <TurningPassionSection
-        onQualify={() => setIsAssessmentOpen(true)}
-        onLearnMore={() => {
-          const el = document.getElementById('process');
-          if (el) el.scrollIntoView({ behavior: 'smooth' });
-        }}
-      />
-
-      {/* 6. Plans for Every Artist (Starter ₦3,000, Premium Beat ₦30,000, Exclusive ₦100,000) */}
-      <PricingSection
-        onSelectPlan={handleSelectPlan}
-      />
-
       {/* 7. Music Licensing & Interactive Beat Catalog (Matching Reference Design) */}
       <MusicLicensingSection
         onStartFree={() => (window.location.href = '/sign-up')}
@@ -178,11 +177,17 @@ export default function LandingPage() {
         }}
       />
 
+      <PricingSection
+        onSelectPlan={handleSelectPlan}
+      />
+
       {/* 8. Client Testimonials Carousel */}
       <ClientTestimonialsSection />
 
       {/* 9. Frequently Asked Questions Accordion */}
       <FaqSection />
+
+
 
       {/* 10. Join 40,000 Creators CTA Banner */}
       <JoinCreatorsSection

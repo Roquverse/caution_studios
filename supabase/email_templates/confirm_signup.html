@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Caution Studio Verification Code</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      background-color: #f5f5f7;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      -webkit-font-smoothing: antialiased;
+      color: #1d1d1f;
+    }
+    .wrapper {
+      width: 100%;
+      table-layout: fixed;
+      background-color: #f5f5f7;
+      padding: 48px 0;
+    }
+    .main-table {
+      max-width: 520px;
+      margin: 0 auto;
+      background-color: #ffffff;
+      border: 1px solid #e5e5ea;
+      border-radius: 12px;
+      overflow: hidden;
+    }
+    .content {
+      padding: 40px 36px;
+    }
+    .brand {
+      font-size: 13px;
+      font-weight: 800;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: #04564f;
+      text-decoration: none;
+    }
+    .h1 {
+      margin: 28px 0 12px 0;
+      font-size: 24px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      color: #111827;
+      line-height: 1.25;
+    }
+    .text {
+      margin: 0 0 24px 0;
+      font-size: 14px;
+      line-height: 1.6;
+      color: #4b5563;
+    }
+    .code-card {
+      margin: 28px 0;
+      padding: 24px 16px;
+      background-color: #07090D;
+      border: 1px solid #1f2937;
+      border-radius: 8px;
+      text-align: center;
+    }
+    .code-label {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #9ca3af;
+      margin-bottom: 8px;
+      font-family: "SF Mono", Menlo, Consolas, Monaco, monospace;
+    }
+    .code-value {
+      font-family: "SF Mono", Menlo, Consolas, Monaco, monospace;
+      font-size: 34px;
+      font-weight: 700;
+      letter-spacing: 8px;
+      color: #2dd4bf;
+      margin: 0;
+      padding-left: 8px;
+    }
+    .notice {
+      margin: 24px 0 0 0;
+      font-size: 12px;
+      color: #6b7280;
+      line-height: 1.5;
+    }
+    .divider {
+      height: 1px;
+      background-color: #f3f4f6;
+      margin: 32px 0 24px 0;
+    }
+    .footer {
+      padding: 0 36px 36px 36px;
+      font-size: 11px;
+      line-height: 1.6;
+      color: #9ca3af;
+    }
+    .footer-link {
+      color: #6b7280;
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrapper">
+    <table class="main-table" cellpadding="0" cellspacing="0" border="0" width="100%">
+      <tr>
+        <td class="content">
+          <!-- Brand Wordmark -->
+          <table cellpadding="0" cellspacing="0" border="0">
+            <tr>
+              <td>
+                <span class="brand">Caution Studio</span>
+              </td>
+            </tr>
+          </table>
+
+          <h1 class="h1">Verify your email address</h1>
+          <p class="text">
+            Use the 6-digit confirmation code below to complete registration for your Caution Studio creator account.
+          </p>
+
+          <!-- OTP Code Box -->
+          <div class="code-card">
+            <div class="code-label">Verification Code</div>
+            <div class="code-value">{{ .Token }}</div>
+          </div>
+
+          <p class="text">
+            Enter this code in your open browser window. This code expires in <strong>10 minutes</strong>.
+          </p>
+
+          <div class="divider"></div>
+
+          <p class="notice">
+            If you did not attempt to create an account with Caution Studio, you can safely ignore this email. No account has been created without this verification code.
+          </p>
+        </td>
+      </tr>
+      <tr>
+        <td class="footer">
+          <table cellpadding="0" cellspacing="0" border="0" width="100%">
+            <tr>
+              <td>
+                Caution Studio Inc. • Sound & Master Audio Licensing<br>
+                This email was sent to {{ .Email }} regarding security verification.
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </div>
+</body>
+</html>

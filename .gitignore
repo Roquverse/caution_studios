@@ -27,3 +27,6 @@ yarn-error.log*
 # Local Env Files
 .env*.local
 .env
+
+# TypeScript
+*.tsbuildinfo
