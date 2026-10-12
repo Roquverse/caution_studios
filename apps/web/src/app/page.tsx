@@ -156,25 +156,6 @@ export default function LandingPage() {
       {/* 7. Music Licensing & Interactive Beat Catalog (Matching Reference Design) */}
       <MusicLicensingSection
         onStartFree={() => (window.location.href = '/sign-up')}
-        onSelectTrack={(track) => {
-          handlePlayToggle({
-            id: track.id,
-            title: track.title,
-            artist: track.artist,
-            duration: track.duration,
-            formattedDuration: track.formattedDuration,
-            genre: [track.genre],
-            mood: [track.mood],
-            theme: [track.theme],
-            instruments: [track.instrument],
-            bpm: 120,
-            coverUrl: track.coverUrl,
-            audioUrl: '',
-            waveform: track.waveform,
-            downloadsCount: 1200,
-            playsCount: 8400
-          });
-        }}
       />
 
       <PricingSection

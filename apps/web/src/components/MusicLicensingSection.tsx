@@ -21,6 +21,7 @@ import {
   Headphones
 } from 'lucide-react';
 import { audioSynth } from '@caution/ui';
+import { useAudio } from './audio/AudioProvider';
 import { useUserSubscription, FREE_PREVIEW_LIMIT_SECONDS } from '../lib/subscription';
 import { SEEDED_BEATS } from '../lib/seedBeats';
 import { supabase } from '../lib/supabaseClient';
@@ -86,6 +87,7 @@ export const MusicLicensingSection: React.FC<MusicLicensingSectionProps> = ({
   onSelectTrack
 }) => {
   const { isSubscribed } = useUserSubscription();
+  const { pause: pauseGlobalAudio, isPlaying: isGlobalPlaying } = useAudio();
   const [tracks, setTracks] = useState<CatalogTrack[]>(FALLBACK_CATALOG_TRACKS);
   const [activeTrackId, setActiveTrackId] = useState<string>(FALLBACK_CATALOG_TRACKS[0]?.id || 'beat-1');
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
@@ -103,6 +105,14 @@ export const MusicLicensingSection: React.FC<MusicLicensingSectionProps> = ({
   const [spotlightOnly, setSpotlightOnly] = useState<boolean>(false);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  const stopAllAudio = () => {
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.src = '';
+    }
+    audioSynth.stop();
+  };
 
   // Fetch real songs from Supabase
   useEffect(() => {
@@ -182,8 +192,8 @@ export const MusicLicensingSection: React.FC<MusicLicensingSectionProps> = ({
 
       audioRef.current.addEventListener('ended', handleEnded);
       return () => {
+        stopAllAudio();
         if (audioRef.current) {
-          audioRef.current.pause();
           audioRef.current.removeEventListener('ended', handleEnded);
         }
       };
@@ -202,8 +212,7 @@ export const MusicLicensingSection: React.FC<MusicLicensingSectionProps> = ({
 
           if (prev >= limit) {
             // Cutoff reached!
-            if (audioRef.current) audioRef.current.pause();
-            audioSynth.stop();
+            stopAllAudio();
             setIsPlaying(false);
 
             if (!isSubscribed) {
@@ -231,24 +240,28 @@ export const MusicLicensingSection: React.FC<MusicLicensingSectionProps> = ({
 
     if (activeTrackId === track.id) {
       if (isPlaying) {
-        if (audioRef.current) audioRef.current.pause();
-        audioSynth.stop();
+        stopAllAudio();
         setIsPlaying(false);
       } else {
         setIsPlaying(true);
+        if (isGlobalPlaying) pauseGlobalAudio();
+        audioSynth.stop();
+
         if (track.audioUrl && audioRef.current) {
           audioRef.current.src = track.audioUrl;
           audioRef.current.currentTime = currentTime;
-          audioRef.current.play().catch(() => {
-            audioSynth.playTrack(track.id, () => {}, isSubscribed ? undefined : FREE_PREVIEW_LIMIT_SECONDS);
+          audioRef.current.play().catch((err: any) => {
+            if (err.name !== 'AbortError') {
+              audioSynth.playTrack(track.id, () => {}, isSubscribed ? undefined : FREE_PREVIEW_LIMIT_SECONDS);
+            }
           });
         } else {
           audioSynth.playTrack(track.id, () => {}, isSubscribed ? undefined : FREE_PREVIEW_LIMIT_SECONDS);
         }
       }
     } else {
-      if (audioRef.current) audioRef.current.pause();
-      audioSynth.stop();
+      stopAllAudio();
+      if (isGlobalPlaying) pauseGlobalAudio();
 
       setActiveTrackId(track.id);
       setIsPlaying(true);
@@ -257,8 +270,10 @@ export const MusicLicensingSection: React.FC<MusicLicensingSectionProps> = ({
       if (track.audioUrl && audioRef.current) {
         audioRef.current.src = track.audioUrl;
         audioRef.current.currentTime = 0;
-        audioRef.current.play().catch(() => {
-          audioSynth.playTrack(track.id, () => {}, isSubscribed ? undefined : FREE_PREVIEW_LIMIT_SECONDS);
+        audioRef.current.play().catch((err: any) => {
+          if (err.name !== 'AbortError') {
+            audioSynth.playTrack(track.id, () => {}, isSubscribed ? undefined : FREE_PREVIEW_LIMIT_SECONDS);
+          }
         });
       } else {
         audioSynth.playTrack(track.id, () => {}, isSubscribed ? undefined : FREE_PREVIEW_LIMIT_SECONDS);
