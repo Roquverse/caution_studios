@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Check,
   Play,
@@ -12,12 +12,20 @@ import {
   Volume2,
   Sparkles,
   ChevronDown,
-  ChevronRight
+  ChevronRight,
+  X,
+  Lock,
+  ArrowRight,
+  ShieldCheck,
+  Music2,
+  Headphones
 } from 'lucide-react';
 import { audioSynth } from '@caution/ui';
 import { useUserSubscription, FREE_PREVIEW_LIMIT_SECONDS } from '../lib/subscription';
+import { SEEDED_BEATS } from '../lib/seedBeats';
+import { supabase } from '../lib/supabaseClient';
 
-interface CatalogTrack {
+export interface CatalogTrack {
   id: string;
   title: string;
   artist: string;
@@ -29,133 +37,38 @@ interface CatalogTrack {
   mood: string;
   theme: string;
   instrument: string;
+  audioUrl?: string;
   isSpotlight?: boolean;
 }
 
-const CATALOG_TRACKS: CatalogTrack[] = [
-  {
-    id: 'track-1',
-    title: 'The Warming Sunrise',
-    artist: 'Maximilian Vance',
-    genre: 'Cinematic',
-    duration: 238,
-    formattedDuration: '3:58',
-    coverUrl: '/images/album_sunrise.jpg',
-    mood: 'Epic',
-    theme: 'Cinematic',
-    instrument: 'Piano',
-    waveform: [
-      0.2, 0.35, 0.5, 0.7, 0.85, 0.9, 0.75, 0.6, 0.45, 0.55, 0.7, 0.85, 0.95,
-      0.8, 0.65, 0.5, 0.4, 0.6, 0.75, 0.85, 0.9, 0.7, 0.55, 0.4, 0.6, 0.75, 0.6,
-      0.45, 0.3, 0.45, 0.6, 0.4, 0.25, 0.15
-    ]
-  },
-  {
-    id: 'track-2',
-    title: 'Beat Blitz',
-    artist: 'Kroma Sound',
-    genre: 'Electronic, Funk',
-    duration: 91,
-    formattedDuration: '1:31',
-    coverUrl: '/images/album_neon_dj.jpg',
-    mood: 'Energetic',
-    theme: 'Gaming',
-    instrument: 'Synthesizer',
-    isSpotlight: true,
-    waveform: [
-      0.4, 0.7, 0.85, 0.95, 0.8, 0.65, 0.85, 1.0, 0.85, 0.7, 0.9, 0.8, 0.95,
-      1.0, 0.75, 0.6, 0.8, 0.9, 0.75, 0.85, 0.9, 0.7, 0.8, 0.95, 0.85, 0.65,
-      0.8, 0.9, 0.75, 0.6, 0.75, 0.55, 0.4, 0.25
-    ]
-  },
-  {
-    id: 'track-3',
-    title: 'Open Air Kiss',
-    artist: 'Luna Horizon',
-    genre: 'Electronic, Hip Hop, Lofi...',
-    duration: 159,
-    formattedDuration: '2:39',
-    coverUrl: '/images/golden_clef.jpg',
-    mood: 'Chill',
-    theme: 'Vlog',
-    instrument: 'Guitar',
-    waveform: [
-      0.2, 0.3, 0.45, 0.6, 0.7, 0.65, 0.5, 0.4, 0.55, 0.65, 0.75, 0.7, 0.6,
-      0.45, 0.35, 0.5, 0.65, 0.75, 0.7, 0.55, 0.4, 0.55, 0.7, 0.65, 0.5, 0.4,
-      0.35, 0.5, 0.4, 0.3, 0.25, 0.2, 0.15
-    ]
-  },
-  {
-    id: 'track-4',
-    title: 'Mystery Box - Instrume',
-    artist: 'Solstice Project',
-    genre: 'Cinematic',
-    duration: 80,
-    formattedDuration: '1:20',
-    coverUrl: '/images/album_sunrise.jpg',
-    mood: 'Dramatic',
-    theme: 'Cinematic',
-    instrument: 'Strings',
-    isSpotlight: true,
-    waveform: [
-      0.2, 0.35, 0.5, 0.65, 0.75, 0.8, 0.65, 0.5, 0.4, 0.55, 0.7, 0.85, 0.9,
-      0.8, 0.65, 0.5, 0.4, 0.55, 0.7, 0.8, 0.7, 0.55, 0.4, 0.55, 0.7, 0.6,
-      0.45, 0.35, 0.3, 0.4, 0.3, 0.2, 0.15
-    ]
-  },
-  {
-    id: 'track-5',
-    title: 'Soothe My Mind',
-    artist: 'Elysian Beats',
-    genre: 'Electronic, Hip Hop, Lofi...',
-    duration: 270,
-    formattedDuration: '4:30',
-    coverUrl: '/images/golden_clef.jpg',
-    mood: 'Chill',
-    theme: 'Podcast',
-    instrument: 'Piano',
-    waveform: [
-      0.15, 0.25, 0.35, 0.5, 0.6, 0.55, 0.65, 0.5, 0.4, 0.45, 0.55, 0.65, 0.7,
-      0.6, 0.45, 0.35, 0.3, 0.45, 0.55, 0.65, 0.6, 0.5, 0.4, 0.3, 0.45, 0.55,
-      0.5, 0.4, 0.35, 0.3, 0.25, 0.2, 0.15
-    ]
-  },
-  {
-    id: 'track-6',
-    title: 'Hoodie Season',
-    artist: 'Metro Boom',
-    genre: 'Hip Hop',
-    duration: 195,
-    formattedDuration: '3:15',
-    coverUrl: '/images/hero_boombox.jpg',
-    mood: 'Energetic',
-    theme: 'Fashion',
-    instrument: 'Drums',
-    waveform: [
-      0.3, 0.5, 0.7, 0.85, 0.95, 0.8, 0.7, 0.8, 0.9, 0.75, 0.85, 0.95, 1.0,
-      0.85, 0.7, 0.6, 0.75, 0.9, 0.85, 0.75, 0.85, 0.95, 0.8, 0.7, 0.8, 0.9,
-      0.75, 0.65, 0.7, 0.6, 0.5, 0.35, 0.2
-    ]
-  },
-  {
-    id: 'track-7',
-    title: 'Galaxy Groove',
-    artist: 'Astral Flow',
-    genre: 'Pop, Funk',
-    duration: 115,
-    formattedDuration: '1:55',
-    coverUrl: '/images/album_neon_dj.jpg',
-    mood: 'Uplifting',
-    theme: 'Commercial',
-    instrument: 'Bass',
-    isSpotlight: true,
-    waveform: [
-      0.25, 0.4, 0.6, 0.75, 0.9, 0.8, 0.7, 0.85, 0.95, 0.85, 0.7, 0.8, 0.9,
-      0.85, 0.75, 0.6, 0.7, 0.85, 0.9, 0.8, 0.75, 0.9, 0.85, 0.7, 0.8, 0.75,
-      0.65, 0.55, 0.6, 0.45, 0.35, 0.25, 0.15
-    ]
-  }
-];
+// Transform seeded beats into initial catalog items
+const FALLBACK_CATALOG_TRACKS: CatalogTrack[] = SEEDED_BEATS.slice(0, 10).map((b, idx) => {
+  const dur = b.duration_seconds || 180;
+  const mins = Math.floor(dur / 60);
+  const secs = dur % 60;
+  const audioKey = b.preview_clean_key || b.preview_tagged_key;
+  return {
+    id: b.id,
+    title: b.title,
+    artist: b.producer?.display_name || 'Caution Studio',
+    genre: b.genre || 'Afrobeats',
+    duration: dur,
+    formattedDuration: `${mins}:${secs.toString().padStart(2, '0')}`,
+    coverUrl: b.cover_url || '/images/album_neon_dj.jpg',
+    waveform:
+      b.waveform_peaks && b.waveform_peaks.length > 0
+        ? b.waveform_peaks.slice(0, 34)
+        : [0.2, 0.4, 0.6, 0.75, 0.85, 0.95, 0.8, 0.7, 0.6, 0.75, 0.9, 0.85, 0.95, 1.0, 0.8, 0.65, 0.5, 0.6, 0.75, 0.9, 0.85, 0.7, 0.8, 0.95, 0.85, 0.65, 0.5, 0.6, 0.4, 0.3, 0.2, 0.15],
+    mood: (b.moods && b.moods[0]) || 'Vibrant',
+    theme: (b.tags && b.tags[0]) || 'Commercial',
+    instrument:
+      b.tags.find((t) =>
+        ['Guitar', 'Piano', 'Synthesizer', 'Strings', 'Drums', 'Bass', 'Log Drum'].includes(t)
+      ) || 'Synthesizer',
+    audioUrl: audioKey ? `/api/media/${audioKey}` : '',
+    isSpotlight: idx % 3 === 0
+  };
+});
 
 const PLATFORMS_GRID = [
   'YouTube', 'TikTok', 'Twitch', 'Websites', 'Applications', 'Film/festivals & cinema',
@@ -173,29 +86,130 @@ export const MusicLicensingSection: React.FC<MusicLicensingSectionProps> = ({
   onSelectTrack
 }) => {
   const { isSubscribed } = useUserSubscription();
-  const [activeTrackId, setActiveTrackId] = useState<string>('track-2');
+  const [tracks, setTracks] = useState<CatalogTrack[]>(FALLBACK_CATALOG_TRACKS);
+  const [activeTrackId, setActiveTrackId] = useState<string>(FALLBACK_CATALOG_TRACKS[0]?.id || 'beat-1');
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const [currentTime, setCurrentTime] = useState<number>(0);
-  const [favorites, setFavorites] = useState<Record<string, boolean>>({ 'track-2': true });
-  const [stars, setStars] = useState<Record<string, boolean>>({ 'track-2': true });
+  const [favorites, setFavorites] = useState<Record<string, boolean>>({ 'beat-1': true });
+  const [stars, setStars] = useState<Record<string, boolean>>({ 'beat-1': true });
+
+  // 15-second sign-up prompt modal state
+  const [showSignUpPrompt, setShowSignUpPrompt] = useState<boolean>(false);
+  const [promptTrack, setPromptTrack] = useState<CatalogTrack | null>(null);
 
   // Sidebar filter category states
   const [activeFilterCategory, setActiveFilterCategory] = useState<string | null>(null);
   const [selectedFilterValue, setSelectedFilterValue] = useState<string>('All');
   const [spotlightOnly, setSpotlightOnly] = useState<boolean>(false);
 
-  // Audio playback ticker
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  // Fetch real songs from Supabase
+  useEffect(() => {
+    async function fetchRealTracks() {
+      try {
+        const { data: dbBeats, error } = await supabase
+          .from('beats')
+          .select(`
+            id,
+            title,
+            bpm,
+            genre,
+            musical_key,
+            duration_seconds,
+            cover_url,
+            master_wav_key,
+            preview_clean_key,
+            preview_tagged_key,
+            moods,
+            tags,
+            producer:producer_id (
+              display_name,
+              handle
+            )
+          `)
+          .eq('status', 'live')
+          .order('created_at', { ascending: false })
+          .limit(15);
+
+        if (!error && dbBeats && dbBeats.length > 0) {
+          const mapped: CatalogTrack[] = dbBeats.map((b: any, idx: number) => {
+            const dur = b.duration_seconds || 180;
+            const mins = Math.floor(dur / 60);
+            const secs = dur % 60;
+            const audioKey = b.preview_clean_key || b.preview_tagged_key || b.master_wav_key;
+            return {
+              id: b.id,
+              title: b.title,
+              artist: b.producer?.display_name || 'Caution Studio',
+              genre: b.genre || 'Afrobeats',
+              duration: dur,
+              formattedDuration: `${mins}:${secs.toString().padStart(2, '0')}`,
+              coverUrl: b.cover_url || '/images/album_neon_dj.jpg',
+              waveform: [
+                0.2, 0.4, 0.6, 0.75, 0.85, 0.95, 0.8, 0.7, 0.6, 0.75, 0.9, 0.85,
+                0.95, 1.0, 0.8, 0.65, 0.5, 0.6, 0.75, 0.9, 0.85, 0.7, 0.8, 0.95,
+                0.85, 0.65, 0.5, 0.6, 0.4, 0.3, 0.2, 0.15
+              ],
+              mood: (b.moods && b.moods[0]) || 'Vibrant',
+              theme: (b.tags && b.tags[0]) || 'Commercial',
+              instrument: 'Synthesizer',
+              audioUrl: audioKey ? `/api/media/${audioKey}` : '',
+              isSpotlight: idx % 3 === 0
+            };
+          });
+          setTracks(mapped);
+          if (mapped[0]) setActiveTrackId(mapped[0].id);
+        }
+      } catch (err) {
+        console.warn('Real track fetch fallback:', err);
+      }
+    }
+
+    fetchRealTracks();
+  }, []);
+
+  // HTML5 audio setup
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      audioRef.current = new Audio();
+      audioRef.current.volume = 0.85;
+
+      const handleEnded = () => {
+        setIsPlaying(false);
+        setCurrentTime(0);
+      };
+
+      audioRef.current.addEventListener('ended', handleEnded);
+      return () => {
+        if (audioRef.current) {
+          audioRef.current.pause();
+          audioRef.current.removeEventListener('ended', handleEnded);
+        }
+      };
+    }
+  }, []);
+
+  // 15-second limiter ticker
   useEffect(() => {
     let interval: NodeJS.Timeout | null = null;
     if (isPlaying) {
       interval = setInterval(() => {
         setCurrentTime((prev) => {
-          const current = CATALOG_TRACKS.find((t) => t.id === activeTrackId);
-          const fullDur = current ? current.duration : 91;
+          const current = tracks.find((t) => t.id === activeTrackId);
+          const fullDur = current ? current.duration : 180;
           const limit = isSubscribed ? fullDur : Math.min(FREE_PREVIEW_LIMIT_SECONDS, fullDur);
+
           if (prev >= limit) {
+            // Cutoff reached!
+            if (audioRef.current) audioRef.current.pause();
             audioSynth.stop();
             setIsPlaying(false);
+
+            if (!isSubscribed) {
+              setPromptTrack(current || null);
+              setShowSignUpPrompt(true);
+            }
             return limit;
           }
           return prev + 1;
@@ -205,28 +219,63 @@ export const MusicLicensingSection: React.FC<MusicLicensingSectionProps> = ({
     return () => {
       if (interval) clearInterval(interval);
     };
-  }, [isPlaying, activeTrackId, isSubscribed]);
+  }, [isPlaying, activeTrackId, isSubscribed, tracks]);
 
   const handlePlayToggle = (track: CatalogTrack) => {
+    // If not subscribed and preview already exhausted for this session, prompt to sign up
+    if (!isSubscribed && currentTime >= FREE_PREVIEW_LIMIT_SECONDS && activeTrackId === track.id) {
+      setPromptTrack(track);
+      setShowSignUpPrompt(true);
+      return;
+    }
+
     if (activeTrackId === track.id) {
       if (isPlaying) {
+        if (audioRef.current) audioRef.current.pause();
         audioSynth.stop();
         setIsPlaying(false);
       } else {
-        if (!isSubscribed && currentTime >= FREE_PREVIEW_LIMIT_SECONDS) {
-          setCurrentTime(0);
-        }
         setIsPlaying(true);
-        audioSynth.playTrack(track.id, () => {}, isSubscribed ? undefined : FREE_PREVIEW_LIMIT_SECONDS);
+        if (track.audioUrl && audioRef.current) {
+          audioRef.current.src = track.audioUrl;
+          audioRef.current.currentTime = currentTime;
+          audioRef.current.play().catch(() => {
+            audioSynth.playTrack(track.id, () => {}, isSubscribed ? undefined : FREE_PREVIEW_LIMIT_SECONDS);
+          });
+        } else {
+          audioSynth.playTrack(track.id, () => {}, isSubscribed ? undefined : FREE_PREVIEW_LIMIT_SECONDS);
+        }
       }
     } else {
+      if (audioRef.current) audioRef.current.pause();
       audioSynth.stop();
+
       setActiveTrackId(track.id);
       setIsPlaying(true);
       setCurrentTime(0);
-      audioSynth.playTrack(track.id, () => {}, isSubscribed ? undefined : FREE_PREVIEW_LIMIT_SECONDS);
+
+      if (track.audioUrl && audioRef.current) {
+        audioRef.current.src = track.audioUrl;
+        audioRef.current.currentTime = 0;
+        audioRef.current.play().catch(() => {
+          audioSynth.playTrack(track.id, () => {}, isSubscribed ? undefined : FREE_PREVIEW_LIMIT_SECONDS);
+        });
+      } else {
+        audioSynth.playTrack(track.id, () => {}, isSubscribed ? undefined : FREE_PREVIEW_LIMIT_SECONDS);
+      }
     }
+
     if (onSelectTrack) onSelectTrack(track);
+  };
+
+  const handleDownloadClick = (track: CatalogTrack, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!isSubscribed) {
+      setPromptTrack(track);
+      setShowSignUpPrompt(true);
+    } else if (onStartFree) {
+      onStartFree();
+    }
   };
 
   const toggleFavorite = (id: string, e: React.MouseEvent) => {
@@ -246,25 +295,25 @@ export const MusicLicensingSection: React.FC<MusicLicensingSectionProps> = ({
   };
 
   const filterOptions: Record<string, string[]> = {
-    Mood: ['All', 'Epic', 'Energetic', 'Chill', 'Dramatic', 'Uplifting'],
-    'Video Theme': ['All', 'Cinematic', 'Gaming', 'Vlog', 'Podcast', 'Fashion', 'Commercial'],
-    Genre: ['All', 'Cinematic', 'Electronic', 'Funk', 'Hip Hop', 'Pop'],
-    Instrument: ['All', 'Piano', 'Synthesizer', 'Guitar', 'Strings', 'Drums', 'Bass']
+    Mood: ['All', 'Vibrant', 'Energetic', 'Chill', 'Dark', 'Club', 'Uplifting'],
+    'Video Theme': ['All', 'Commercial', 'Gaming', 'Vlog', 'Podcast', 'Fashion', 'Cinematic'],
+    Genre: ['All', 'Afrobeats', 'Amapiano', 'Trap', 'R&B', 'Dancehall', 'Drill', 'Pop', 'Lofi'],
+    Instrument: ['All', 'Synthesizer', 'Piano', 'Guitar', 'Strings', 'Drums', 'Bass', 'Log Drum']
   };
 
-  const displayedTracks = CATALOG_TRACKS.filter((track) => {
+  const displayedTracks = tracks.filter((track) => {
     if (spotlightOnly && !track.isSpotlight) return false;
     if (selectedFilterValue !== 'All') {
       if (activeFilterCategory === 'Mood' && track.mood !== selectedFilterValue) return false;
       if (activeFilterCategory === 'Video Theme' && track.theme !== selectedFilterValue) return false;
-      if (activeFilterCategory === 'Genre' && !track.genre.includes(selectedFilterValue)) return false;
+      if (activeFilterCategory === 'Genre' && !track.genre.toLowerCase().includes(selectedFilterValue.toLowerCase())) return false;
       if (activeFilterCategory === 'Instrument' && track.instrument !== selectedFilterValue) return false;
     }
     return true;
   });
 
   return (
-    <section className="bg-white py-20 lg:py-28 border-t border-gray-100 text-gray-900">
+    <section className="bg-white py-20 lg:py-28 border-t border-gray-100 text-gray-900 relative">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Headline */}
         <div className="text-center max-w-4xl mx-auto mb-10">
@@ -447,13 +496,20 @@ export const MusicLicensingSection: React.FC<MusicLicensingSectionProps> = ({
                         )}
                       </button>
 
-                      {/* Title & Genre */}
+                      {/* Title & Artist/Genre */}
                       <div className="flex flex-col min-w-0 pr-2">
-                        <span className="text-xs sm:text-sm font-bold text-gray-900 truncate">
-                          {track.title}
-                        </span>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-xs sm:text-sm font-bold text-gray-900 truncate">
+                            {track.title}
+                          </span>
+                          {!isSubscribed && isCurrent && (
+                            <span className="text-[9px] font-mono font-bold px-1.5 py-0.2 rounded bg-amber-100 text-amber-800 border border-amber-200 shrink-0">
+                              15s
+                            </span>
+                          )}
+                        </div>
                         <span className="text-[11px] text-gray-400 truncate">
-                          {track.genre}
+                          {track.artist} • {track.genre}
                         </span>
                       </div>
                     </div>
@@ -479,7 +535,7 @@ export const MusicLicensingSection: React.FC<MusicLicensingSectionProps> = ({
                             })}
                           </div>
                           <span className="text-[11px] font-mono font-medium text-gray-600 shrink-0">
-                            {formatTime(currentTime)} / {track.formattedDuration}
+                            {formatTime(currentTime)} / {!isSubscribed ? '0:15' : track.formattedDuration}
                           </span>
                         </div>
                       ) : (
@@ -501,10 +557,7 @@ export const MusicLicensingSection: React.FC<MusicLicensingSectionProps> = ({
                       {/* Download */}
                       <button
                         type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          if (onStartFree) onStartFree();
-                        }}
+                        onClick={(e) => handleDownloadClick(track, e)}
                         title="Download / License"
                         className="p-1.5 rounded hover:text-black hover:bg-gray-100 transition-colors"
                       >
@@ -556,6 +609,99 @@ export const MusicLicensingSection: React.FC<MusicLicensingSectionProps> = ({
           </div>
         </div>
       </div>
+
+      {/* 15-SECOND SIGN-UP PROMPT MODAL */}
+      {showSignUpPrompt && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="relative w-full max-w-md rounded-2xl bg-[#0c0e14] border border-white/10 p-6 sm:p-7 shadow-2xl text-white text-center space-y-5">
+            {/* Close Button */}
+            <button
+              type="button"
+              onClick={() => setShowSignUpPrompt(false)}
+              className="absolute top-4 right-4 p-1.5 text-gray-400 hover:text-white rounded-full bg-white/[0.05] hover:bg-white/10 transition-colors"
+              aria-label="Close dialog"
+            >
+              <X className="h-4 w-4" />
+            </button>
+
+            {/* Glowing Accent Icon */}
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-[#04564f]/20 border border-[#2dd4bf]/40 text-[#2dd4bf] shadow-lg shadow-[#04564f]/30">
+              <Headphones className="h-7 w-7" />
+            </div>
+
+            {/* Modal Heading */}
+            <div className="space-y-1.5">
+              <span className="text-[10px] font-mono uppercase tracking-widest text-amber-400 font-bold px-2 py-0.5 rounded bg-amber-400/10 border border-amber-400/20 inline-block mb-1">
+                15-Second Free Preview Ended
+              </span>
+              <h3 className="text-xl sm:text-2xl font-black text-white tracking-tight">
+                Sign Up to Keep Listening
+              </h3>
+              <p className="text-xs text-gray-400 leading-relaxed max-w-sm mx-auto">
+                Create a free account to unlock uninterrupted full-length streaming, curate private playlists, and clear your social media channels for monetization.
+              </p>
+            </div>
+
+            {/* Track Card Snippet */}
+            {promptTrack && (
+              <div className="flex items-center gap-3 p-3 rounded-xl bg-white/[0.04] border border-white/[0.08] text-left">
+                <img
+                  src={promptTrack.coverUrl}
+                  alt={promptTrack.title}
+                  className="h-11 w-11 rounded-lg object-cover border border-white/10 shrink-0"
+                />
+                <div className="min-w-0 flex-1">
+                  <div className="text-xs font-bold text-white truncate">
+                    {promptTrack.title}
+                  </div>
+                  <div className="text-[11px] text-gray-400 truncate">
+                    {promptTrack.artist} • {promptTrack.genre}
+                  </div>
+                </div>
+                <div className="text-[10px] font-mono text-gray-400 shrink-0">
+                  {promptTrack.formattedDuration}
+                </div>
+              </div>
+            )}
+
+            {/* Value checklist */}
+            <div className="space-y-2 text-left pt-1">
+              <div className="flex items-center gap-2 text-xs text-gray-300">
+                <Check className="h-3.5 w-3.5 text-[#2dd4bf] shrink-0 stroke-[3]" />
+                <span>Full-length lossless audio on all devices</span>
+              </div>
+              <div className="flex items-center gap-2 text-xs text-gray-300">
+                <Check className="h-3.5 w-3.5 text-[#2dd4bf] shrink-0 stroke-[3]" />
+                <span>100% royalty-free monetization clearance</span>
+              </div>
+              <div className="flex items-center gap-2 text-xs text-gray-300">
+                <Check className="h-3.5 w-3.5 text-[#2dd4bf] shrink-0 stroke-[3]" />
+                <span>Download WAV stems and licensing certificates</span>
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="pt-2 space-y-2.5">
+              <button
+                type="button"
+                onClick={() => (window.location.href = '/sign-up')}
+                className="w-full py-3 rounded-xl bg-[#04564f] hover:bg-[#03453f] text-white font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg shadow-[#04564f]/30 transition-all hover:scale-[1.01] active:scale-[0.99] cursor-pointer border-0"
+              >
+                <span>Create Free Account</span>
+                <ArrowRight className="h-4 w-4" />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => (window.location.href = '/sign-in')}
+                className="w-full py-2 text-xs text-gray-400 hover:text-white transition-colors cursor-pointer"
+              >
+                Already have an account? <span className="text-[#2dd4bf] font-semibold underline">Sign In</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </section>
   );
 };
