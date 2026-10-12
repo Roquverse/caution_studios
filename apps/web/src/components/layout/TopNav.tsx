@@ -75,14 +75,14 @@ export const TopNav: React.FC = () => {
 
           <Link
             href="/sign-in"
-            className="hidden sm:inline-flex text-xs font-semibold text-text-muted hover:text-text px-3 py-1.5 transition-colors"
+            className="hidden md:inline-flex text-xs font-semibold text-text-muted hover:text-text px-3 py-1.5 transition-colors"
           >
             Sign in
           </Link>
 
           <Link
             href="/sign-up"
-            className="hidden sm:inline-flex h-8 px-4 rounded-pill border border-border hover:border-text-faint text-text text-xs font-semibold items-center justify-center transition-colors"
+            className="hidden md:inline-flex h-8 px-4 rounded-pill border border-border hover:border-text-faint text-text text-xs font-semibold items-center justify-center transition-colors"
           >
             Get started
           </Link>

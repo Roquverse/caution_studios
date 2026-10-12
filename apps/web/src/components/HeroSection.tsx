@@ -182,7 +182,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                   onSignIn();
                 }
               }}
-              className="text-xs sm:text-sm font-medium text-gray-300 hover:text-white px-2 sm:px-3 py-1.5 transition-colors"
+              className="hidden md:inline-flex text-xs sm:text-sm font-medium text-gray-300 hover:text-white px-2 sm:px-3 py-1.5 transition-colors"
             >
               Sign In
             </a>
@@ -198,7 +198,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                   window.location.href = '/sign-up';
                 }
               }}
-              className="text-xs font-bold uppercase tracking-wider px-4 sm:px-5 py-2 sm:py-2.5 bg-[#04564f] hover:bg-[#03453f] text-white transition-all shadow-md shadow-[#04564f]/30"
+              className="hidden md:inline-flex text-xs font-bold uppercase tracking-wider px-4 sm:px-5 py-2 sm:py-2.5 bg-[#04564f] hover:bg-[#03453f] text-white transition-all shadow-md shadow-[#04564f]/30"
             >
               Get Started
             </Button>
