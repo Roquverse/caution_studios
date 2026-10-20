@@ -131,6 +131,12 @@ export function AdminShell({ children, activePath, onOpenUpload }: AdminShellPro
       href: '/licenses',
       icon: ShieldCheck,
       badge: 'Live'
+    },
+    {
+      label: 'Settings',
+      href: '/settings',
+      icon: Sliders,
+      badge: null
     }
   ];
 
@@ -139,11 +145,12 @@ export function AdminShell({ children, activePath, onOpenUpload }: AdminShellPro
     if (pathname === '/genres') return 'Genre Management';
     if (pathname === '/users') return 'Subscribers & Users';
     if (pathname === '/licenses') return 'Content ID & Licenses';
+    if (pathname === '/settings') return 'Admin Settings';
     return 'Dashboard';
   };
 
   const displayName = adminUser?.user_metadata?.full_name || (adminUser?.email ? adminUser.email.split('@')[0] : 'Admin Master');
-  const displayEmail = adminUser?.email || 'admin@caution.studio';
+  const displayEmail = adminUser?.email || 'admin@cautionstudioz.com';
   const initials = displayName
     .split(' ')
     .filter(Boolean)
