@@ -127,7 +127,7 @@ export function AdminShell({ children, activePath, onOpenUpload }: AdminShellPro
       badge: null
     },
     {
-      label: 'Content ID & Claims',
+      label: 'Licenses',
       href: '/licenses',
       icon: ShieldCheck,
       badge: 'Live'
@@ -144,7 +144,7 @@ export function AdminShell({ children, activePath, onOpenUpload }: AdminShellPro
     if (pathname === '/tracks') return 'Master Catalog';
     if (pathname === '/genres') return 'Genre Management';
     if (pathname === '/users') return 'Subscribers & Users';
-    if (pathname === '/licenses') return 'Content ID & Licenses';
+    if (pathname === '/licenses') return 'Licenses';
     if (pathname === '/settings') return 'Admin Settings';
     return 'Dashboard';
   };

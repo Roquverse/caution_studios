@@ -608,7 +608,7 @@ export default function AdminDashboardPage() {
                     href="/licenses"
                     className="p-2.5 rounded-lg border border-zinc-800 bg-zinc-900/60 hover:bg-zinc-800 text-xs font-medium text-zinc-200 transition-colors block text-center"
                   >
-                    Content ID
+                    Licenses
                   </Link>
                   <a
                     href={process.env.NEXT_PUBLIC_USER_URL || 'https://app.cautionstudioz.com'}
