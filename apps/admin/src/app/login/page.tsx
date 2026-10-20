@@ -33,6 +33,7 @@ function LoginForm() {
             appMeta.is_admin === true ||
             appMeta.role === 'admin' ||
             appMeta.role === 'superadmin' ||
+            session.user.email === 'admin@cautionstudioz.com' ||
             session.user.email === 'admin@caution.studio' ||
             session.user.email === 'damicoledj@gmail.com';
 
@@ -78,6 +79,7 @@ function LoginForm() {
         appMeta.is_admin === true ||
         appMeta.role === 'admin' ||
         appMeta.role === 'superadmin' ||
+        cleanEmail === 'admin@cautionstudioz.com' ||
         cleanEmail === 'admin@caution.studio' ||
         cleanEmail === 'damicoledj@gmail.com';
 

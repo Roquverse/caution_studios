@@ -24,6 +24,7 @@ export async function GET(req: NextRequest) {
       appMeta.is_admin === true ||
       appMeta.role === 'admin' ||
       appMeta.role === 'superadmin' ||
+      user.email === 'admin@cautionstudioz.com' ||
       user.email === 'admin@caution.studio' ||
       user.email === 'damicoledj@gmail.com';
 

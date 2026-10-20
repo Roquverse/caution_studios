@@ -57,6 +57,7 @@ export function AdminShell({ children, activePath, onOpenUpload }: AdminShellPro
           appMeta.is_admin === true ||
           appMeta.role === 'admin' ||
           appMeta.role === 'superadmin' ||
+          session.user.email === 'admin@cautionstudioz.com' ||
           session.user.email === 'admin@caution.studio' ||
           session.user.email === 'damicoledj@gmail.com';
 

@@ -36,6 +36,7 @@ export async function POST(req: NextRequest) {
       appMeta.is_admin === true ||
       appMeta.role === 'admin' ||
       appMeta.role === 'superadmin' ||
+      cleanEmail === 'admin@cautionstudioz.com' ||
       cleanEmail === 'admin@caution.studio' ||
       cleanEmail === 'damicoledj@gmail.com';
 
