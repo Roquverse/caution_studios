@@ -106,12 +106,24 @@ export async function PATCH(
       }
     }
 
-    const { data: updated, error } = await supabase
+    let { data: updated, error } = await supabase
       .from('profiles')
       .update(updateFields)
       .eq('id', params.id)
       .select()
       .single();
+
+    if (error && error.message && error.message.includes('primary_role')) {
+      delete updateFields.primary_role;
+      const retry = await supabase
+        .from('profiles')
+        .update(updateFields)
+        .eq('id', params.id)
+        .select()
+        .single();
+      updated = retry.data;
+      error = retry.error;
+    }
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });

@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { AdminShell } from '../../components/AdminShell';
+import { supabase } from '../../lib/supabaseClient';
 import {
   Users,
   Crown,
@@ -47,7 +48,13 @@ export default function AdminUsersPage() {
   const fetchUsers = async () => {
     try {
       setLoading(true);
-      const res = await fetch('/api/users');
+      const { data: { session } } = await supabase.auth.getSession();
+      const headers: Record<string, string> = {};
+      if (session?.access_token) {
+        headers['Authorization'] = `Bearer ${session.access_token}`;
+      }
+
+      const res = await fetch('/api/users', { headers, cache: 'no-store' });
       if (res.ok) {
         const data = await res.json();
         setUsers(data.users || []);
@@ -63,9 +70,15 @@ export default function AdminUsersPage() {
     const nextPlan = user.plan === 'plus' ? 'free' : 'plus';
     try {
       setUpdatingId(user.id);
+      const { data: { session } } = await supabase.auth.getSession();
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (session?.access_token) {
+        headers['Authorization'] = `Bearer ${session.access_token}`;
+      }
+
       const res = await fetch(`/api/users/${user.id}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({ plan: nextPlan })
       });
 
@@ -87,9 +100,15 @@ export default function AdminUsersPage() {
   const handleUpdateRole = async (user: UserProfile, newRole: 'artist' | 'producer' | 'admin') => {
     try {
       setUpdatingId(user.id);
+      const { data: { session } } = await supabase.auth.getSession();
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (session?.access_token) {
+        headers['Authorization'] = `Bearer ${session.access_token}`;
+      }
+
       const res = await fetch(`/api/users/${user.id}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({ role: newRole })
       });
 

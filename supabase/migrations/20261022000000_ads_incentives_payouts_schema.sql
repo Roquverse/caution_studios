@@ -12,8 +12,9 @@ exception
   when undefined_object then null;
 end $$;
 
--- 1. Extend profiles with Paystack Banking and Balances
+-- 1. Extend profiles with Paystack Banking, Role and Balances
 alter table public.profiles
+  add column if not exists primary_role text default 'artist',
   add column if not exists paystack_bank_code text,
   add column if not exists paystack_bank_name text,
   add column if not exists paystack_account_number text,

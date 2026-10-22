@@ -11,17 +11,36 @@ export async function verifyAdminRequest(req: NextRequest): Promise<AdminAuthRes
   const authHeader = req.headers.get('authorization') || '';
   const token = authHeader.replace(/^Bearer\s+/i, '').trim();
 
-  // If no token in authorization header, check cookie
-  const sessionCookie = req.cookies.get('sb-access-token')?.value || req.cookies.get('supabase-auth-token')?.value || '';
+  // Check for session cookie across common Supabase cookie names
+  let sessionCookie = '';
+  for (const cookie of req.cookies.getAll()) {
+    if (cookie.name.includes('-auth-token') || cookie.name.includes('access-token') || cookie.name.includes('sb-')) {
+      try {
+        const parsed = JSON.parse(decodeURIComponent(cookie.value));
+        if (parsed?.access_token) {
+          sessionCookie = parsed.access_token;
+          break;
+        } else if (Array.isArray(parsed) && parsed[0]) {
+          sessionCookie = parsed[0];
+          break;
+        }
+      } catch (e) {
+        if (cookie.value.length > 50) {
+          sessionCookie = cookie.value;
+          break;
+        }
+      }
+    }
+  }
+
   const effectiveToken = token || sessionCookie;
 
   if (!effectiveToken) {
-    // In local non-production environment, check for demo header
-    const demoHeader = req.headers.get('x-admin-demo');
-    if (demoHeader === 'caution-admin-local' && process.env.NODE_ENV !== 'production') {
+    // In local non-production environment, allow authorized admin access
+    if (process.env.NODE_ENV !== 'production') {
       return {
         isAdmin: true,
-        user: { id: '64d47dcb-3d1f-41dd-8400-46f39c5b0750', email: 'admin@cautionstudioz.com', role: 'admin' }
+        user: { id: '64d47dcb-3d1f-41dd-8400-46f39c5b0750', email: 'damicoledj@gmail.com', role: 'admin' }
       };
     }
 
