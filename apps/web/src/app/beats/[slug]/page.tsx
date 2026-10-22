@@ -13,7 +13,7 @@ import { NowPlayingPanel } from '../../../components/audio/NowPlayingPanel';
 import { SEEDED_BEATS } from '../../../lib/seedBeats';
 import { LICENSE_DEFINITIONS } from '@caution/licenses';
 import { formatNaira } from '../../../lib/paystack';
-import { LicenseType } from '@caution/types';
+import { LicenseType, Beat } from '@caution/types';
 import {
   Heart,
   Share2,
@@ -33,7 +33,22 @@ export default function BeatDetailPage() {
   const params = useParams();
   const slug = params?.slug as string;
 
-  const beat = SEEDED_BEATS.find((b) => b.slug === slug) || SEEDED_BEATS[0];
+  const [beat, setBeat] = useState<Beat>(() => {
+    return SEEDED_BEATS.find((b) => b.slug === slug) || SEEDED_BEATS[0];
+  });
+
+  React.useEffect(() => {
+    if (!slug) return;
+    fetch('/api/beats')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data && Array.isArray(data.beats)) {
+          const found = data.beats.find((b: Beat) => b.slug === slug || b.id === slug);
+          if (found) setBeat(found);
+        }
+      })
+      .catch(() => {});
+  }, [slug]);
 
   const {
     currentBeat,
@@ -122,7 +137,7 @@ export default function BeatDetailPage() {
 
               {/* Tags */}
               <div className="flex flex-wrap gap-1.5 pt-1">
-                {beat.tags.map((tag) => (
+                {(beat.tags || []).map((tag: string) => (
                   <span
                     key={tag}
                     className="px-2 py-0.5 rounded-sm bg-surface-2 border border-border text-[11px] text-text-muted"

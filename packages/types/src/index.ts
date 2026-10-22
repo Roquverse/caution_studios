@@ -146,6 +146,7 @@ export interface Beat {
   stems_zip_key?: string | null;
   preview_tagged_key?: string | null;
   preview_clean_key?: string | null;
+  audio_url?: string | null;
   waveform_peaks?: number[] | null;
   duration_seconds?: number | null;
   play_count: number;

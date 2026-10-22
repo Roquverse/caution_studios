@@ -13,8 +13,20 @@ export const FeaturedBeatsSection: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'trending' | 'exclusive' | 'new'>('trending');
   const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
   const [selectedBeat, setSelectedBeat] = useState<Beat | null>(null);
+  const [allBeats, setAllBeats] = useState<Beat[]>(SEEDED_BEATS);
 
-  const beats = SEEDED_BEATS.filter((b) => {
+  React.useEffect(() => {
+    fetch('/api/beats')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data && Array.isArray(data.beats) && data.beats.length > 0) {
+          setAllBeats(data.beats);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  const beats = allBeats.filter((b) => {
     if (activeTab === 'exclusive') return b.status === 'sold' || b.licenses?.some((l) => l.type === 'exclusive');
     if (activeTab === 'new') return true;
     return true;

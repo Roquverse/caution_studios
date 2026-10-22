@@ -47,6 +47,7 @@ interface TrackItem {
   durationSeconds: number;
   date?: string;
   coverUrl: string;
+  audioUrl?: string;
   isLiked?: boolean;
   category?: string;
 }
@@ -84,6 +85,47 @@ export default function UserPortalPage() {
   const [isMuted, setIsMuted] = useState(false);
   const [isShuffle, setIsShuffle] = useState(false);
   const [isRepeat, setIsRepeat] = useState(false);
+
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      audioRef.current = new Audio();
+      audioRef.current.volume = volume;
+    }
+  }, []);
+
+  useEffect(() => {
+    fetch('/api/beats')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data && Array.isArray(data.beats) && data.beats.length > 0) {
+          const mapped: TrackItem[] = data.beats.map((b: any) => {
+            const dur = b.duration_seconds || 180;
+            const mins = Math.floor(dur / 60);
+            const secs = dur % 60;
+            return {
+              id: b.id,
+              title: b.title,
+              artist: b.producer?.display_name || 'Caution Producer',
+              subscribers: '@' + (b.producer?.handle || 'caution'),
+              tracksCount: `${b.bpm || 120} BPM • ${b.genre || 'Beat'}`,
+              duration: `${mins}:${secs.toString().padStart(2, '0')}`,
+              durationSeconds: dur,
+              date: new Date(b.created_at).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' }),
+              coverUrl: b.cover_url || '/images/album_neon_dj.jpg',
+              audioUrl: b.audio_url || (b.master_wav_key ? `/api/media/${b.master_wav_key}` : ''),
+              isLiked: false,
+              category: 'playlists'
+            };
+          });
+          setPlaylistRows(mapped);
+          setListenMoreOften(mapped.slice(0, 3));
+          setCurrentTrack(mapped[0]);
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   // Statistics State
   const [likesCount, setLikesCount] = useState(247);
@@ -240,6 +282,7 @@ export default function UserPortalPage() {
   const handlePlayToggle = (track: TrackItem) => {
     if (currentTrack.id === track.id) {
       if (isPlaying) {
+        if (audioRef.current) audioRef.current.pause();
         audioSynth.stop();
         setIsPlaying(false);
       } else {
@@ -247,7 +290,13 @@ export default function UserPortalPage() {
           setCurrentTime(0);
         }
         setIsPlaying(true);
-        audioSynth.playTrack(track.id, () => {}, isSubscribed ? undefined : FREE_PREVIEW_LIMIT_SECONDS);
+        if (track.audioUrl && audioRef.current) {
+          audioRef.current.play().catch(() => {
+            audioSynth.playTrack(track.id, () => {}, isSubscribed ? undefined : FREE_PREVIEW_LIMIT_SECONDS);
+          });
+        } else {
+          audioSynth.playTrack(track.id, () => {}, isSubscribed ? undefined : FREE_PREVIEW_LIMIT_SECONDS);
+        }
       }
     } else {
       setCurrentTrack(track);
@@ -255,7 +304,15 @@ export default function UserPortalPage() {
       setCurrentTime(0);
       setStreamsCount((prev) => prev + 1);
       audioSynth.stop();
-      audioSynth.playTrack(track.id, () => {}, isSubscribed ? undefined : FREE_PREVIEW_LIMIT_SECONDS);
+      if (track.audioUrl && audioRef.current) {
+        audioRef.current.src = track.audioUrl;
+        audioRef.current.currentTime = 0;
+        audioRef.current.play().catch(() => {
+          audioSynth.playTrack(track.id, () => {}, isSubscribed ? undefined : FREE_PREVIEW_LIMIT_SECONDS);
+        });
+      } else {
+        audioSynth.playTrack(track.id, () => {}, isSubscribed ? undefined : FREE_PREVIEW_LIMIT_SECONDS);
+      }
     }
   };
 

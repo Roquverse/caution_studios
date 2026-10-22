@@ -40,8 +40,6 @@ export default function BeatsPage() {
   );
 }
 
-const GENRE_LIST = ['All Genres', 'Afrobeats', 'Amapiano', 'Trap', 'Drill', 'R&B', 'Dancehall'];
-
 function BeatsContent() {
   const searchParams = useSearchParams();
   const initialGenre = searchParams.get('genre') || 'All Genres';
@@ -52,7 +50,7 @@ function BeatsContent() {
       ? initialSectionParam
       : 'all';
 
-  const [beatsList, setBeatsList] = useState<Beat[]>(SEEDED_BEATS);
+  const [beatsList, setBeatsList] = useState<Beat[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedSection, setSelectedSection] = useState<'all' | 'free' | 'premium' | 'exclusive'>(validSection);
   const [searchQuery, setSearchQuery] = useState(initialQuery);
@@ -71,10 +69,15 @@ function BeatsContent() {
           const data = await res.json();
           if (data && Array.isArray(data.beats) && data.beats.length > 0 && isMounted) {
             setBeatsList(data.beats);
+          } else if (isMounted) {
+            setBeatsList(SEEDED_BEATS);
           }
+        } else if (isMounted) {
+          setBeatsList(SEEDED_BEATS);
         }
       } catch (err) {
         console.warn('Failed to fetch real beats from database:', err);
+        if (isMounted) setBeatsList(SEEDED_BEATS);
       } finally {
         if (isMounted) setIsLoading(false);
       }
@@ -101,6 +104,18 @@ function BeatsContent() {
     const set = new Set<string>();
     beatsList.forEach((b) => b.tags?.forEach((t) => set.add(t)));
     return ['All', ...Array.from(set)];
+  }, [beatsList]);
+
+  // Extract all unique genres dynamically from loaded beats
+  const genreList = useMemo(() => {
+    const set = new Set<string>();
+    beatsList.forEach((b) => {
+      if (b.genre) set.add(b.genre);
+    });
+    if (set.size === 0) {
+      ['Afrobeats', 'Electronic', 'Amapiano', 'Trap', 'Drill', 'R&B'].forEach((g) => set.add(g));
+    }
+    return ['All Genres', ...Array.from(set)];
   }, [beatsList]);
 
   // Filter beats
@@ -531,7 +546,7 @@ function BeatsContent() {
 
         {/* 7. Organization by Genre Tabs */}
         <div className="mb-6 flex items-center gap-2 overflow-x-auto pb-2 no-scrollbar justify-start sm:justify-center">
-          {GENRE_LIST.map((genre) => {
+          {genreList.map((genre) => {
             const isSelected = selectedGenre.toLowerCase() === genre.toLowerCase();
             const count =
               genre === 'All Genres'
@@ -563,7 +578,23 @@ function BeatsContent() {
         </div>
 
         {/* 8. Beats Table Layout - Grouped by Genre or Filtered */}
-        {filteredBeats.length === 0 ? (
+        {isLoading && beatsList.length === 0 ? (
+          <div className="space-y-4 animate-pulse max-w-5xl mx-auto py-8">
+            <div className="h-6 bg-white/10 rounded w-44 mb-4" />
+            <div className="space-y-2">
+              {[1, 2, 3, 4].map((i) => (
+                <div key={i} className="h-16 rounded-xl bg-white/[0.03] border border-white/5 flex items-center px-4 gap-4">
+                  <div className="w-11 h-11 rounded-lg bg-white/10 shrink-0" />
+                  <div className="space-y-2 flex-1">
+                    <div className="h-4 bg-white/10 rounded w-1/3" />
+                    <div className="h-3 bg-white/5 rounded w-1/4" />
+                  </div>
+                  <div className="h-6 w-24 bg-white/10 rounded-full" />
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : filteredBeats.length === 0 ? (
           <div className="py-20 text-center space-y-3 rounded-2xl bg-[#0F131C] border border-white/10 max-w-lg mx-auto">
             <Music2 className="h-10 w-10 text-gray-600 mx-auto" />
             <h3 className="text-base font-bold text-white">No beats found</h3>

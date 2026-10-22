@@ -174,9 +174,12 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       setIsAdModalOpen(true);
     }
 
+    const isDifferentBeat = !currentBeat || currentBeat.id !== beat.id;
     setCurrentBeat(beat);
     setIsPlaying(true);
-    setCurrentTime(0);
+    if (isDifferentBeat) {
+      setCurrentTime(0);
+    }
 
     // Stop synthesizer or previous audio
     if (synthTimerRef.current) clearInterval(synthTimerRef.current);
@@ -186,24 +189,56 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
     if (!isSubscribed && currentTime >= FREE_PREVIEW_LIMIT_SECONDS) {
       setCurrentTime(0);
+      if (audioRef.current) audioRef.current.currentTime = 0;
     }
 
-    // Play with synthetic Web Audio engine or audio element
-    audioSynth.playTrack(beat.id, () => {
-      setCurrentTime((prev) => {
-        if (prev >= limit) {
-          audioSynth.stop();
-          setIsPlaying(false);
-          if (!isLoggedIn) {
-            setIsSignUpModalOpen(true);
-          } else if (!isSubscribed) {
-            setShowUpgradePrompt(true);
-          }
-          return limit;
-        }
-        return prev + 0.25;
+    // Determine audio URL from storage or beat properties
+    const audioKey = beat.audio_url || beat.preview_clean_key || beat.preview_tagged_key || beat.master_wav_key;
+    const resolvedUrl = audioKey ? (audioKey.startsWith('/') || audioKey.startsWith('http') ? audioKey : `/api/media/${audioKey}`) : null;
+
+    if (resolvedUrl && audioRef.current) {
+      if (audioRef.current.src !== resolvedUrl && !audioRef.current.src.endsWith(resolvedUrl)) {
+        audioRef.current.src = resolvedUrl;
+        audioRef.current.currentTime = 0;
+      }
+      audioRef.current.volume = volume;
+      audioRef.current.play().catch((err) => {
+        console.warn('Audio playback error, falling back to synth:', err);
+        // Fallback to synth if browser blocks autoplay or format error
+        audioSynth.playTrack(beat.id, () => {
+          setCurrentTime((prev) => {
+            if (prev >= limit) {
+              audioSynth.stop();
+              setIsPlaying(false);
+              if (!isLoggedIn) {
+                setIsSignUpModalOpen(true);
+              } else if (!isSubscribed) {
+                setShowUpgradePrompt(true);
+              }
+              return limit;
+            }
+            return prev + 0.25;
+          });
+        }, isSubscribed ? undefined : FREE_PREVIEW_LIMIT_SECONDS);
       });
-    }, isSubscribed ? undefined : FREE_PREVIEW_LIMIT_SECONDS);
+    } else {
+      // Play with synthetic Web Audio engine if no audio key exists
+      audioSynth.playTrack(beat.id, () => {
+        setCurrentTime((prev) => {
+          if (prev >= limit) {
+            audioSynth.stop();
+            setIsPlaying(false);
+            if (!isLoggedIn) {
+              setIsSignUpModalOpen(true);
+            } else if (!isSubscribed) {
+              setShowUpgradePrompt(true);
+            }
+            return limit;
+          }
+          return prev + 0.25;
+        });
+      }, isSubscribed ? undefined : FREE_PREVIEW_LIMIT_SECONDS);
+    }
   };
 
   const pause = () => {
@@ -225,8 +260,17 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const target = beat || currentBeat;
     if (!target) return;
 
-    if (currentBeat?.id === target.id && isPlaying) {
-      pause();
+    if (currentBeat?.id === target.id) {
+      if (isPlaying) {
+        pause();
+      } else {
+        setIsPlaying(true);
+        if (audioRef.current && audioRef.current.src) {
+          audioRef.current.play().catch(() => play(target));
+        } else {
+          play(target);
+        }
+      }
     } else {
       play(target);
     }

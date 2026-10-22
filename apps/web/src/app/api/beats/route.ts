@@ -49,23 +49,35 @@ export async function GET(req: NextRequest) {
       if (!hasPremium) fullLicenses.push({ beat_id: b.id, type: 'premium', price_cents: 3500000, enabled: true });
       if (!hasExclusive) fullLicenses.push({ beat_id: b.id, type: 'exclusive', price_cents: 10000000, enabled: true });
 
+      const normalizedGenre = (b.genre || 'Afrobeats').trim();
+      const genre = normalizedGenre.toLowerCase() === 'afrobeat' ? 'Afrobeats' : normalizedGenre;
+
+      let coverUrl = b.cover_url || '/images/studio_mixing_console.jpg';
+      if (coverUrl && !coverUrl.startsWith('http') && !coverUrl.startsWith('/')) {
+        coverUrl = `/api/media/${coverUrl}`;
+      }
+
+      const audioKey = b.preview_clean_key || b.preview_tagged_key || b.master_wav_key;
+      const audioUrl = audioKey ? `/api/media/${audioKey}` : null;
+
       return {
         id: b.id,
         producer_id: b.producer_id,
         slug: b.slug,
         title: b.title,
         description: b.description || 'Studio Master Track - 24-Bit WAV Stem Separation available.',
-        genre: b.genre || 'Afrobeats',
+        genre,
         moods: Array.isArray(b.moods) && b.moods.length ? b.moods : ['Energetic', 'Inspiring'],
-        tags: Array.isArray(b.tags) && b.tags.length ? b.tags : [b.genre || 'Afrobeats', 'Royalty-Free'],
+        tags: Array.isArray(b.tags) && b.tags.length ? b.tags : [genre, 'Royalty-Free'],
         bpm: b.bpm || 110,
         musical_key: b.musical_key || 'C Minor',
-        cover_url: b.cover_url || '/images/studio_mixing_console.jpg',
+        cover_url: coverUrl,
         status: b.status || 'live',
         master_wav_key: b.master_wav_key,
         stems_zip_key: b.stems_zip_key,
         preview_tagged_key: b.preview_tagged_key,
         preview_clean_key: b.preview_clean_key,
+        audio_url: audioUrl,
         waveform_peaks: b.waveform_peaks,
         duration_seconds: b.duration_seconds || 185,
         play_count: b.play_count || 1420,
@@ -91,15 +103,14 @@ export async function GET(req: NextRequest) {
       };
     });
 
-    // Merge real database beats with catalogue demonstration items
-    const realIds = new Set(formattedRealBeats.map((b) => b.id));
-    const catalogueComplement = SEEDED_BEATS.filter((s) => !realIds.has(s.id));
-    const allBeats = [...formattedRealBeats, ...catalogueComplement];
+    // If real database beats exist, serve the real beats catalog from storage
+    // Fall back to seeded demonstration beats only if the database has zero live beats yet
+    const beatsToReturn = formattedRealBeats.length > 0 ? formattedRealBeats : SEEDED_BEATS;
 
     return NextResponse.json({
-      beats: allBeats,
+      beats: beatsToReturn,
       realCount: formattedRealBeats.length,
-      totalCount: allBeats.length
+      totalCount: beatsToReturn.length
     });
   } catch (err: any) {
     console.error('Failed to retrieve beats:', err);
