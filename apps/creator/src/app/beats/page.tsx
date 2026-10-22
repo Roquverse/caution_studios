@@ -1,8 +1,9 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { CreatorShell } from '../../components/CreatorShell';
+import { supabase } from '../../lib/supabaseClient';
 import {
   Music2,
   Plus,
@@ -20,6 +21,33 @@ import {
   Layers,
   Sparkles
 } from 'lucide-react';
+
+function formatDbBeat(b: any) {
+  const licenses = b.licenses || [];
+  const basic = licenses.find((l: any) => l.type === 'basic');
+  const premium = licenses.find((l: any) => l.type === 'premium');
+  const exclusive = licenses.find((l: any) => l.type === 'exclusive');
+
+  const durM = Math.floor((b.duration_seconds || 180) / 60);
+  const durS = (b.duration_seconds || 180) % 60;
+
+  return {
+    id: b.id,
+    title: b.title,
+    genre: b.genre || 'Afrobeats',
+    bpm: b.bpm || 110,
+    key: b.musical_key || 'C Minor',
+    duration: `${durM}:${durS.toString().padStart(2, '0')}`,
+    stemsUploaded: Boolean(b.stems_zip_key),
+    priceBasicNgn: basic ? Math.round(basic.price_cents / 100) : 3000,
+    pricePremiumNgn: premium ? Math.round(premium.price_cents / 100) : 30000,
+    priceExclusiveNgn: exclusive ? Math.round(exclusive.price_cents / 100) : 100000,
+    streamsCount: b.play_count || 0,
+    salesCount: b.sales_count || (b.status === 'sold' ? 1 : 0),
+    status: b.status === 'sold' ? 'sold_exclusive' : (b.status || 'live'),
+    coverUrl: b.cover_url || '/images/studio_mixing_console.jpg'
+  };
+}
 
 export default function BeatsCatalogPage() {
   const [playingId, setPlayingId] = useState<string | null>(null);
@@ -109,7 +137,74 @@ export default function BeatsCatalogPage() {
     }
   ];
 
-  const filteredBeats = initialBeats.filter((b) => {
+  const [beatsList, setBeatsList] = useState<any[]>(initialBeats);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Fetch real beats from Supabase
+  useEffect(() => {
+    let isMounted = true;
+    async function loadRealBeats() {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        const userId = session?.user?.id;
+
+        if (userId) {
+          const { data: userBeats, error: userError } = await supabase
+            .from('beats')
+            .select(`
+              *,
+              licenses:beat_licenses (
+                type,
+                price_cents,
+                enabled
+              )
+            `)
+            .eq('producer_id', userId)
+            .order('created_at', { ascending: false });
+
+          if (!userError && userBeats && userBeats.length > 0) {
+            const formatted = userBeats.map(formatDbBeat);
+            if (isMounted) {
+              setBeatsList(formatted);
+              setIsLoading(false);
+            }
+            return;
+          }
+        }
+
+        // Otherwise load all live beats from database
+        const { data: allBeats, error } = await supabase
+          .from('beats')
+          .select(`
+            *,
+            licenses:beat_licenses (
+              type,
+              price_cents,
+              enabled
+            )
+          `)
+          .order('created_at', { ascending: false });
+
+        if (!error && allBeats && allBeats.length > 0) {
+          const formatted = allBeats.map(formatDbBeat);
+          const realIds = new Set(formatted.map((b: any) => b.id));
+          const merged = [...formatted, ...initialBeats.filter((b) => !realIds.has(b.id))];
+          if (isMounted) setBeatsList(merged);
+        }
+      } catch (err) {
+        console.warn('Failed to load real beats for creator catalog:', err);
+      } finally {
+        if (isMounted) setIsLoading(false);
+      }
+    }
+
+    loadRealBeats();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const filteredBeats = beatsList.filter((b) => {
     const matchesSearch = b.title.toLowerCase().includes(searchQuery.toLowerCase()) || b.genre.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesGenre = filterGenre === 'all' || b.genre.toLowerCase() === filterGenre.toLowerCase();
     return matchesSearch && matchesGenre;

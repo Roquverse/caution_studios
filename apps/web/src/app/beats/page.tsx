@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { TopNav } from '../../components/layout/TopNav';
@@ -52,12 +52,38 @@ function BeatsContent() {
       ? initialSectionParam
       : 'all';
 
+  const [beatsList, setBeatsList] = useState<Beat[]>(SEEDED_BEATS);
+  const [isLoading, setIsLoading] = useState(true);
   const [selectedSection, setSelectedSection] = useState<'all' | 'free' | 'premium' | 'exclusive'>(validSection);
   const [searchQuery, setSearchQuery] = useState(initialQuery);
   const [selectedGenre, setSelectedGenre] = useState(initialGenre);
   const [selectedBpmRange, setSelectedBpmRange] = useState<string>('All');
   const [selectedTag, setSelectedTag] = useState<string>('All');
   const [sortBy, setSortBy] = useState<'popular' | 'newest' | 'bpm'>('popular');
+
+  // Fetch real beats from /api/beats
+  useEffect(() => {
+    let isMounted = true;
+    async function fetchRealBeats() {
+      try {
+        const res = await fetch('/api/beats', { cache: 'no-store' });
+        if (res.ok) {
+          const data = await res.json();
+          if (data && Array.isArray(data.beats) && data.beats.length > 0 && isMounted) {
+            setBeatsList(data.beats);
+          }
+        }
+      } catch (err) {
+        console.warn('Failed to fetch real beats from database:', err);
+      } finally {
+        if (isMounted) setIsLoading(false);
+      }
+    }
+    fetchRealBeats();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   // Dropdown open states
   const [bpmDropdownOpen, setBpmDropdownOpen] = useState(false);
@@ -73,13 +99,13 @@ function BeatsContent() {
   // Extract all unique tags
   const allTags = useMemo(() => {
     const set = new Set<string>();
-    SEEDED_BEATS.forEach((b) => b.tags?.forEach((t) => set.add(t)));
+    beatsList.forEach((b) => b.tags?.forEach((t) => set.add(t)));
     return ['All', ...Array.from(set)];
-  }, []);
+  }, [beatsList]);
 
   // Filter beats
   const filteredBeats = useMemo(() => {
-    return SEEDED_BEATS.filter((beat) => {
+    return beatsList.filter((beat) => {
       // 0. Section Filter (Free vs Premium vs Exclusive vs All)
       if (selectedSection === 'free') {
         const hasBasic = beat.licenses?.some((l) => l.type === 'basic' && l.enabled !== false);
@@ -98,7 +124,7 @@ function BeatsContent() {
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
         const matchesTitle = beat.title.toLowerCase().includes(q);
-        const matchesProducer = beat.producer?.display_name.toLowerCase().includes(q);
+        const matchesProducer = beat.producer?.display_name?.toLowerCase().includes(q);
         const matchesGenre = beat.genre.toLowerCase().includes(q);
         const matchesTags = beat.tags?.some((t) => t.toLowerCase().includes(q));
         if (!matchesTitle && !matchesProducer && !matchesGenre && !matchesTags) return false;
@@ -133,7 +159,7 @@ function BeatsContent() {
       }
       return b.play_count - a.play_count;
     });
-  }, [selectedSection, searchQuery, selectedGenre, selectedBpmRange, selectedTag, sortBy]);
+  }, [beatsList, selectedSection, searchQuery, selectedGenre, selectedBpmRange, selectedTag, sortBy]);
 
   // Group beats by genre for organized presentation
   const groupedByGenre = useMemo(() => {
@@ -149,9 +175,9 @@ function BeatsContent() {
   const activeGenreKeys = Object.keys(groupedByGenre);
 
   // Counts per tier
-  const freeCount = SEEDED_BEATS.filter((b) => b.licenses?.some((l) => l.type === 'basic' && l.enabled !== false)).length;
-  const premiumCount = SEEDED_BEATS.filter((b) => b.licenses?.some((l) => l.type === 'premium' && l.enabled !== false)).length;
-  const exclusiveCount = SEEDED_BEATS.filter((b) => b.licenses?.some((l) => l.type === 'exclusive' && l.enabled !== false && b.status !== 'sold')).length;
+  const freeCount = beatsList.filter((b) => b.licenses?.some((l) => l.type === 'basic' && l.enabled !== false)).length;
+  const premiumCount = beatsList.filter((b) => b.licenses?.some((l) => l.type === 'premium' && l.enabled !== false)).length;
+  const exclusiveCount = beatsList.filter((b) => b.licenses?.some((l) => l.type === 'exclusive' && l.enabled !== false && b.status !== 'sold')).length;
 
   return (
     <div className="min-h-screen bg-[#07090E] text-white flex flex-col pb-28">
@@ -192,7 +218,7 @@ function BeatsContent() {
               <Layers className="h-3.5 w-3.5" />
               <span>All Beats</span>
               <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${selectedSection === 'all' ? 'bg-black/20 text-black' : 'bg-white/10 text-gray-400'}`}>
-                {SEEDED_BEATS.length}
+                {beatsList.length}
               </span>
             </button>
 
@@ -509,8 +535,8 @@ function BeatsContent() {
             const isSelected = selectedGenre.toLowerCase() === genre.toLowerCase();
             const count =
               genre === 'All Genres'
-                ? SEEDED_BEATS.length
-                : SEEDED_BEATS.filter((b) => b.genre.toLowerCase() === genre.toLowerCase()).length;
+                ? beatsList.length
+                : beatsList.filter((b) => b.genre?.toLowerCase() === genre.toLowerCase()).length;
 
             return (
               <button
