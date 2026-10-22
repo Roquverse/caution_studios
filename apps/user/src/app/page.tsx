@@ -59,19 +59,35 @@ export default async function UserPortalPage() {
       });
     }
 
+    const beatProducerIds = new Set((dbBeats || []).map((b: any) => b.producer_id).filter(Boolean));
+
     const { data: dbProfiles } = await supabase
       .from('profiles')
       .select('*')
       .order('created_at', { ascending: false });
 
     if (dbProfiles && dbProfiles.length > 0) {
-      initialProducers = dbProfiles.map((p, idx) => ({
-        rank: idx + 1,
-        name: p.display_name || p.handle || 'Caution Producer',
-        subscribers: `@${p.handle || 'caution'} • Verified Artist`,
-        coverUrl: p.avatar_url || '/images/artist_studio_mic.jpg',
-        handle: p.handle || 'caution'
-      }));
+      const producerProfiles = dbProfiles.filter((p: any) => {
+        const roles: string[] = Array.isArray(p.roles) ? p.roles : [];
+        const isExplicitProducer = roles.includes('producer');
+        const isAdminAccount =
+          p.handle?.toLowerCase().includes('admin') ||
+          p.display_name?.toLowerCase().includes('studio admin') ||
+          p.display_name?.toLowerCase().includes('master admin');
+        const hasUploadedBeats = beatProducerIds.has(p.id);
+
+        return (isExplicitProducer && !isAdminAccount) || hasUploadedBeats;
+      });
+
+      if (producerProfiles.length > 0) {
+        initialProducers = producerProfiles.map((p, idx) => ({
+          rank: idx + 1,
+          name: p.display_name || p.handle || 'Caution Producer',
+          subscribers: `@${p.handle || 'caution'} • Verified Producer`,
+          coverUrl: p.avatar_url || '/images/artist_studio_mic.jpg',
+          handle: p.handle || 'caution'
+        }));
+      }
     }
   } catch (err) {
     console.warn('Could not load database beats on server SSR:', err);

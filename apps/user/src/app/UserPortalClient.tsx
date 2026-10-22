@@ -112,16 +112,16 @@ export const FALLBACK_PRODUCERS: ProducerItem[] = [
   {
     rank: 1,
     name: 'Arakunrin Cole',
-    subscribers: '@arakunrincole • Verified Artist',
+    subscribers: '@arakunrincole • Verified Producer',
     coverUrl: '/api/media/avatars/64d47dcb-3d1f-41dd-8400-46f39c5b0750-1791132868902.jpg',
     handle: 'arakunrincole'
   },
   {
     rank: 2,
-    name: 'Caution Studio',
-    subscribers: '@caution • Official Curators',
+    name: 'Olajide Samuel Ojo',
+    subscribers: '@olajide_samuel_ojo • Verified Producer',
     coverUrl: '/images/artist_studio_mic.jpg',
-    handle: 'caution'
+    handle: 'olajide_samuel_ojo'
   }
 ];
 
@@ -170,7 +170,7 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
   // Table beats seeded from real database beats
   const [playlistRows, setPlaylistRows] = useState<TrackItem[]>(effectiveBeats);
   const [newReleases, setNewReleases] = useState<TrackItem[]>(effectiveBeats.slice(0, 4));
-  const [producers] = useState<ProducerItem[]>(effectiveProducers);
+  const [producers, setProducers] = useState<ProducerItem[]>(effectiveProducers);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const activeListenSessionRef = useRef<string | null>(null);
@@ -326,6 +326,39 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
 
           setPlaylistRows(mapped);
           setNewReleases(mapped.slice(0, 4));
+
+          // Also refresh verified producers (only producers)
+          const { data: dbProfiles } = await supabase
+            .from('profiles')
+            .select('*')
+            .order('created_at', { ascending: false });
+
+          if (dbProfiles && dbProfiles.length > 0) {
+            const beatProducerIds = new Set((dbBeats || []).map((b: any) => b.producer_id).filter(Boolean));
+            const producerProfiles = dbProfiles.filter((p: any) => {
+              const roles: string[] = Array.isArray(p.roles) ? p.roles : [];
+              const isExplicitProducer = roles.includes('producer');
+              const isAdminAccount =
+                p.handle?.toLowerCase().includes('admin') ||
+                p.display_name?.toLowerCase().includes('studio admin') ||
+                p.display_name?.toLowerCase().includes('master admin');
+              const hasUploadedBeats = beatProducerIds.has(p.id);
+
+              return (isExplicitProducer && !isAdminAccount) || hasUploadedBeats;
+            });
+
+            if (producerProfiles.length > 0) {
+              setProducers(
+                producerProfiles.map((p, idx) => ({
+                  rank: idx + 1,
+                  name: p.display_name || p.handle || 'Caution Producer',
+                  subscribers: `@${p.handle || 'caution'} • Verified Producer`,
+                  coverUrl: p.avatar_url || '/images/artist_studio_mic.jpg',
+                  handle: p.handle || 'caution'
+                }))
+              );
+            }
+          }
         }
       } catch (err) {
         console.warn('Could not refresh database beats:', err);
