@@ -25,6 +25,7 @@ export function setCachedUserPlan(plan: string) {
 export function useUserSubscription() {
   const [plan, setPlan] = useState<string>('free');
   const [isSubscribed, setIsSubscribed] = useState<boolean>(false);
+  const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
   useEffect(() => {
@@ -38,6 +39,7 @@ export function useUserSubscription() {
         const { data: { session } } = await supabase.auth.getSession();
         if (!session?.user) {
           if (isMounted) {
+            setIsLoggedIn(false);
             setPlan('free');
             setIsSubscribed(false);
             if (typeof window !== 'undefined') {
@@ -46,6 +48,10 @@ export function useUserSubscription() {
             setIsLoading(false);
           }
           return;
+        }
+
+        if (isMounted) {
+          setIsLoggedIn(true);
         }
 
         const { data: profile } = await supabase
@@ -83,12 +89,14 @@ export function useUserSubscription() {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (!session) {
+        setIsLoggedIn(false);
         setPlan('free');
         setIsSubscribed(false);
         if (typeof window !== 'undefined') {
           localStorage.setItem('caution:user-plan', 'free');
         }
       } else {
+        setIsLoggedIn(true);
         checkSubscription();
       }
     });
@@ -105,6 +113,8 @@ export function useUserSubscription() {
   return {
     plan,
     isSubscribed,
+    isLoggedIn,
+    isRegistered: isLoggedIn,
     isLoading,
     previewLimitSeconds: FREE_PREVIEW_LIMIT_SECONDS
   };

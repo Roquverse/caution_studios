@@ -9,6 +9,7 @@ import { useUserSubscription, FREE_PREVIEW_LIMIT_SECONDS } from '../../lib/subsc
 import { ArtistAdModal } from './ArtistAdModal';
 import { RewardedDownloadModal } from './RewardedDownloadModal';
 import { DailyDownloadLimitModal } from './DailyDownloadLimitModal';
+import { GuestSignUpPromptModal } from './GuestSignUpPromptModal';
 import {
   useDailyDownloadQuota,
   recordBeatDownload,
@@ -47,11 +48,14 @@ interface AudioContextValue {
   likes: string[];
   toggleLike: (beatId: string) => void;
 
-  // Subscription state
+  // Subscription & Registration state
   isSubscribed: boolean;
+  isLoggedIn: boolean;
   previewLimitSeconds: number;
   showUpgradePrompt: boolean;
   setShowUpgradePrompt: (show: boolean) => void;
+  isSignUpModalOpen: boolean;
+  setIsSignUpModalOpen: (open: boolean) => void;
 
   // Promoted Audio Ads & Rewarded Downloads
   beatsPlayedCount: number;
@@ -82,8 +86,9 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [isCartOpen, setIsCartOpen] = useState<boolean>(false);
   const [likes, setLikes] = useState<string[]>(['beat-1', 'beat-2']);
 
-  const { isSubscribed } = useUserSubscription();
+  const { isSubscribed, isLoggedIn } = useUserSubscription();
   const [showUpgradePrompt, setShowUpgradePrompt] = useState<boolean>(false);
+  const [isSignUpModalOpen, setIsSignUpModalOpen] = useState<boolean>(false);
 
   // Promoted Audio Ads & Rewarded Downloads
   const [beatsPlayedCount, setBeatsPlayedCount] = useState<number>(0);
@@ -119,7 +124,7 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const duration = currentBeat?.duration_seconds || 180;
 
-  // Initialize Audio element with Unlimited Beat Preview
+  // Initialize Audio element with preview limit handler
   useEffect(() => {
     if (typeof window !== 'undefined') {
       audioRef.current = new Audio();
@@ -128,7 +133,16 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       const handleTimeUpdate = () => {
         if (audioRef.current) {
           const t = audioRef.current.currentTime;
-          // Unlimited beat preview active: full length playback allowed
+          if (!isSubscribed && t >= FREE_PREVIEW_LIMIT_SECONDS) {
+            audioRef.current.pause();
+            setIsPlaying(false);
+            if (!isLoggedIn) {
+              setIsSignUpModalOpen(true);
+            } else {
+              setShowUpgradePrompt(true);
+            }
+            return;
+          }
           setCurrentTime(t);
         }
       };
@@ -147,7 +161,7 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         }
       };
     }
-  }, []);
+  }, [isSubscribed, isLoggedIn]);
 
   const play = (beat: Beat) => {
     if (beat.status === 'sold') return; // Cannot stream exclusive sold beat if locked
@@ -180,7 +194,9 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         if (prev >= limit) {
           audioSynth.stop();
           setIsPlaying(false);
-          if (!isSubscribed) {
+          if (!isLoggedIn) {
+            setIsSignUpModalOpen(true);
+          } else if (!isSubscribed) {
             setShowUpgradePrompt(true);
           }
           return limit;
@@ -225,7 +241,11 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       }
       audioSynth.stop();
       setIsPlaying(false);
-      setShowUpgradePrompt(true);
+      if (!isLoggedIn) {
+        setIsSignUpModalOpen(true);
+      } else {
+        setShowUpgradePrompt(true);
+      }
       return;
     }
     setCurrentTime(rawTarget);
@@ -307,9 +327,12 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         likes,
         toggleLike,
         isSubscribed,
+        isLoggedIn,
         previewLimitSeconds: FREE_PREVIEW_LIMIT_SECONDS,
         showUpgradePrompt,
         setShowUpgradePrompt,
+        isSignUpModalOpen,
+        setIsSignUpModalOpen,
         beatsPlayedCount,
         isAdModalOpen,
         setIsAdModalOpen,
@@ -322,6 +345,13 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       }}
     >
       {children}
+
+      {/* 15-Second Limit Sign Up Modal for Unregistered Guests */}
+      <GuestSignUpPromptModal
+        isOpen={isSignUpModalOpen}
+        onClose={() => setIsSignUpModalOpen(false)}
+        beat={currentBeat}
+      />
 
       {/* Promoted Artist Audio Ad Modal (Pops up every 5 beats) */}
       <ArtistAdModal

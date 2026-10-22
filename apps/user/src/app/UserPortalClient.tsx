@@ -25,11 +25,13 @@ import {
   Check,
   Download,
   Star,
-  Menu
+  Menu,
+  ShoppingBag
 } from 'lucide-react';
 import { audioSynth } from '@caution/ui';
 import { UserDropdown } from '../components/UserDropdown';
 import { UserAdModal } from '../components/UserAdModal';
+import { UserMarketplaceView } from '../components/UserMarketplaceView';
 import { useUserSubscription, FREE_PREVIEW_LIMIT_SECONDS } from '../lib/subscription';
 import { supabase } from '../lib/supabaseClient';
 
@@ -819,6 +821,27 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
                 <ListMusic className="h-4 w-4 text-gray-400" />
                 <span>Playlists</span>
               </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveNav('marketplace');
+                  setMobileMenuOpen(false);
+                }}
+                className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-medium transition-colors cursor-pointer ${
+                  activeNav === 'marketplace'
+                    ? 'text-[#E8B896] bg-[#E8B896]/10 font-bold'
+                    : 'text-gray-400 hover:text-white hover:bg-white/[0.03]'
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <ShoppingBag className={`h-4 w-4 ${activeNav === 'marketplace' ? 'text-[#E8B896]' : 'text-gray-400'}`} />
+                  <span className={activeNav === 'marketplace' ? 'text-[#E8B896]' : ''}>Beat Marketplace</span>
+                </div>
+                <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-[#E8B896]/20 text-[#E8B896] uppercase">
+                  Store
+                </span>
+              </button>
             </nav>
 
             {/* YOUR MUSIC */}
@@ -923,6 +946,24 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
               >
                 <ListMusic className="h-4 w-4 text-gray-400" />
                 <span>Playlists</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveNav('marketplace')}
+                className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
+                  activeNav === 'marketplace'
+                    ? 'text-[#E8B896] bg-[#E8B896]/10 font-bold'
+                    : 'text-gray-400 hover:text-white hover:bg-white/[0.02]'
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <ShoppingBag className={`h-4 w-4 ${activeNav === 'marketplace' ? 'text-[#E8B896]' : 'text-gray-400'}`} />
+                  <span className={activeNav === 'marketplace' ? 'text-[#E8B896]' : ''}>Beat Marketplace</span>
+                </div>
+                <span className="text-[9px] font-mono font-bold px-1.5 py-0.2 rounded bg-[#E8B896]/20 text-[#E8B896] uppercase">
+                  Store
+                </span>
               </button>
             </nav>
 
@@ -1524,6 +1565,19 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
                 ))}
               </div>
             </div>
+          ) : activeNav === 'marketplace' ? (
+            <UserMarketplaceView
+              tracks={playlistRows}
+              currentTrack={currentTrack}
+              isPlaying={isPlaying}
+              handlePlayToggle={handlePlayToggle}
+              likedTrackIds={likedTrackIds}
+              toggleLike={toggleLike}
+              listenLaterIds={listenLaterIds}
+              toggleListenLater={toggleListenLater}
+              handleDownload={handleDownload}
+              downloadingId={downloadingId}
+            />
           ) : (
             <>
               {/* TWO HERO CARDS */}
