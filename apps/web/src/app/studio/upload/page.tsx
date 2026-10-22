@@ -15,7 +15,8 @@ import {
   Image,
   ArrowRight,
   ArrowLeft,
-  Check
+  Check,
+  Sparkles
 } from 'lucide-react';
 
 export default function StudioUploadPage() {
@@ -341,8 +342,8 @@ export default function StudioUploadPage() {
                 {/* Tier 3: Exclusive */}
                 <div className="p-4 rounded-sm bg-surface border border-border flex items-center justify-between">
                   <div>
-                    <div className="text-sm font-bold text-text">Exclusive Rights</div>
-                    <div className="text-xs text-text-muted">Sole ownership · Beat retired permanently</div>
+                    <div className="text-sm font-bold text-text">Exclusive Rights (1-of-1 Ownership)</div>
+                    <div className="text-xs text-text-muted">Sole ownership · Full trackout stems · Beat retired permanently</div>
                   </div>
                   <div className="flex items-center gap-3">
                     <span className="font-mono text-sm font-bold text-accent-live">
@@ -350,6 +351,32 @@ export default function StudioUploadPage() {
                     </span>
                     <span className="text-xs text-text-muted">You earn: {formatNaira(formData.exclusivePrice * 0.8)}</span>
                   </div>
+                </div>
+
+                {/* Free Beat Option: Earn Monthly while Supporting Upcoming Artists */}
+                <div className="p-4 rounded-sm bg-gradient-to-r from-emerald-500/15 via-[#04564f]/20 to-surface border border-emerald-500/30 space-y-2.5">
+                  <div className="flex items-start gap-3">
+                    <div className="p-2 rounded-sm bg-emerald-500/20 text-emerald-300">
+                      <Sparkles className="h-4 w-4" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-bold text-white">Earn Monthly while Supporting Upcoming Artists</span>
+                        <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-[10px] font-mono font-bold">Free Beat Program</span>
+                      </div>
+                      <p className="text-xs text-text-muted mt-1 leading-relaxed">
+                        Allow upcoming artists to stream and record demos with your beat. You earn monthly streaming royalties from the Caution Studio listener ad pool (unskippable 3-song ads) & subscription pool, while progressing toward your ₦50,000 Verified Producer badge!
+                      </p>
+                    </div>
+                  </div>
+                  <label className="flex items-center gap-2 text-xs text-text font-semibold cursor-pointer pt-2 border-t border-border">
+                    <input
+                      type="checkbox"
+                      defaultChecked
+                      className="rounded border-border bg-surface text-accent-live focus:ring-accent-live"
+                    />
+                    <span>Post as Free Streaming Beat (Earn monthly royalties & support upcoming artists)</span>
+                  </label>
                 </div>
               </div>
             )}

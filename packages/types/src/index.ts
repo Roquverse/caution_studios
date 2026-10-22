@@ -1,6 +1,6 @@
 /**
  * Caution Studio Database & Application Types
- * Matching Supabase Schema (Spec Section 6)
+ * Matching Supabase Schema (Spec Section 6 & Latest 2026 Migrations)
  */
 
 export type AppRole = 'artist' | 'producer';
@@ -8,6 +8,10 @@ export type BeatStatus = 'draft' | 'processing' | 'live' | 'sold' | 'removed';
 export type LicenseType = 'basic' | 'premium' | 'exclusive';
 export type OrderStatus = 'pending' | 'paid' | 'failed' | 'refunded';
 export type PlanTier = 'free' | 'plus';
+export type AdPackage = 'starter' | 'pro' | 'studio_blast';
+export type AdStatus = 'pending_payment' | 'active' | 'completed' | 'paused';
+export type PayoutStatus = 'pending' | 'processing' | 'completed' | 'failed' | 'reversed';
+export type IncentiveStatus = 'pending' | 'verified' | 'paid' | 'withheld';
 
 export interface Profile {
   id: string;
@@ -29,6 +33,16 @@ export interface Profile {
   streaming_streams_count?: number;
   trial_ends_at?: string | null;
   promo_applied?: string | null;
+
+  // Paystack & Banking Additions (2026 Policy Update)
+  paystack_bank_code?: string | null;
+  paystack_bank_name?: string | null;
+  paystack_account_number?: string | null;
+  paystack_account_name?: string | null;
+  paystack_recipient_code?: string | null;
+  available_balance_ngn?: number;
+  pending_balance_ngn?: number;
+
   created_at: string;
 }
 
@@ -61,6 +75,60 @@ export interface PromotedSong {
   };
 }
 
+export interface AdCampaign {
+  id: string;
+  advertiser_id?: string | null;
+  campaign_name: string;
+  artist_name: string;
+  song_title: string;
+  package_name: AdPackage;
+  price_ngn: number;
+  target_plays: number;
+  delivered_plays: number;
+  clicks_count: number;
+  audio_url?: string | null;
+  cover_url?: string | null;
+  spotify_url?: string | null;
+  apple_music_url?: string | null;
+  audiomack_url?: string | null;
+  youtube_url?: string | null;
+  paystack_reference?: string | null;
+  status: AdStatus;
+  starts_at: string;
+  ends_at?: string | null;
+  created_at: string;
+}
+
+export interface ProducerDownloadIncentive {
+  id: string;
+  producer_id: string;
+  month_period: string; // YYYY-MM-01
+  qualifying_downloads: number;
+  rollover_downloads: number;
+  milestones_reached: number;
+  reward_amount_ngn: number;
+  payout_status: IncentiveStatus;
+  payout_reference?: string | null;
+  verified_at?: string | null;
+  created_at: string;
+}
+
+export interface PayoutRecord {
+  id: string;
+  producer_id: string;
+  amount_ngn: number;
+  fee_ngn: number;
+  net_ngn: number;
+  bank_name: string;
+  bank_code: string;
+  account_number: string;
+  account_name: string;
+  paystack_transfer_reference?: string | null;
+  status: PayoutStatus;
+  created_at: string;
+  completed_at?: string | null;
+}
+
 export interface Beat {
   id: string;
   producer_id: string;
@@ -84,6 +152,12 @@ export interface Beat {
   like_count: number;
   sold_at?: string | null;
   published_at?: string | null;
+
+  // Free Streaming & License Policy additions
+  is_free_stream_enabled?: boolean;
+  producer_tag_free?: boolean;
+  free_commercial_downloads_count?: number;
+
   created_at: string;
 
   // Joined fields for UI convenience
@@ -211,7 +285,7 @@ export interface Testimonial {
   id: string;
   name: string;
   role: string;
-  company: string;
+  company?: string;
   avatar: string;
   rating: number;
   quote: string;
@@ -220,16 +294,14 @@ export interface Testimonial {
 export interface SubscriptionPlan {
   id: string;
   name: string;
-  slug?: string;
-  priceMonthly?: number;
-  priceYearly?: number;
-  billingPeriod?: string;
+  slug: string;
+  priceMonthly: number;
+  priceYearly: number;
+  billingPeriod: 'monthly' | 'yearly';
+  description: string;
   badge?: string;
   popular?: boolean;
-  price?: string;
-  period?: string;
-  description: string;
-  isRecommended?: boolean;
   features: string[];
-  coverage?: string[];
+  coverage: string[];
 }
+

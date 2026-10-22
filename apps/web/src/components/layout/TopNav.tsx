@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAudio } from '../audio/AudioProvider';
 import { ShoppingBag, Menu, X } from 'lucide-react';
-import { AUTH_LOGIN_URL, AUTH_SIGNUP_URL } from '../../lib/urls';
+import { AUTH_LOGIN_URL, AUTH_SIGNUP_URL, CREATOR_LOGIN_URL } from '../../lib/urls';
 
 export const TopNav: React.FC = () => {
   const pathname = usePathname();
@@ -14,7 +14,9 @@ export const TopNav: React.FC = () => {
 
   const navLinks = [
     { label: 'Home', href: '/' },
+    { label: 'About Us', href: '/about' },
     { label: 'Beat Store', href: '/beats' },
+    { label: 'Free Beats', href: '/beats?section=free' },
     { label: 'Pricing', href: '/pricing' },
     { label: 'FAQ', href: '/faq' },
     { label: 'Credit', href: '/#credits' },
@@ -76,6 +78,13 @@ export const TopNav: React.FC = () => {
           </button>
 
           <a
+            href={CREATOR_LOGIN_URL}
+            className="hidden lg:inline-flex text-xs font-semibold text-teal-400 hover:text-teal-300 px-3 py-1.5 transition-colors border border-teal-500/30 rounded-pill bg-teal-500/10 hover:bg-teal-500/20"
+          >
+            Creator Portal
+          </a>
+
+          <a
             href={AUTH_LOGIN_URL}
             className="hidden md:inline-flex text-xs font-semibold text-text-muted hover:text-text px-3 py-1.5 transition-colors"
           >
@@ -114,6 +123,13 @@ export const TopNav: React.FC = () => {
               {link.label}
             </Link>
           ))}
+          <a
+            href={CREATOR_LOGIN_URL}
+            onClick={() => setMobileMenuOpen(false)}
+            className="block px-3 py-2 rounded-sm text-sm font-semibold text-teal-400 bg-teal-500/10 border border-teal-500/20"
+          >
+            Producer / Creator Dashboard →
+          </a>
           <div className="pt-3 border-t border-border flex gap-2">
             <a
               href={AUTH_LOGIN_URL}

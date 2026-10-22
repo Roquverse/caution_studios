@@ -222,6 +222,20 @@ export const GetBeatPriceModal: React.FC<GetBeatPriceModalProps> = ({
               </button>
             </div>
           )}
+
+          {/* Legal Agreement Footer Link */}
+          <div className="pt-2 text-center text-[11px] text-gray-500">
+            Protected under the{' '}
+            <a
+              href="/license-policies"
+              target="_blank"
+              rel="noreferrer"
+              className="text-teal-400 hover:text-teal-300 underline font-medium"
+            >
+              Commercial Royalty-Free Beat License Agreement
+            </a>
+            . 100% tag-free master delivery guaranteed.
+          </div>
         </div>
       </div>
     </div>

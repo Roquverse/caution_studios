@@ -29,6 +29,7 @@ import {
 } from 'lucide-react';
 import { audioSynth } from '@caution/ui';
 import { UserDropdown } from '../components/UserDropdown';
+import { UserAdModal } from '../components/UserAdModal';
 import { useUserSubscription, FREE_PREVIEW_LIMIT_SECONDS } from '../lib/subscription';
 import { supabase } from '../lib/supabaseClient';
 
@@ -161,6 +162,8 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
 
   const [likesCount, setLikesCount] = useState(0);
   const [streamsCount, setStreamsCount] = useState(0);
+  const [songsPlayedCount, setSongsPlayedCount] = useState(0);
+  const [isAdModalOpen, setIsAdModalOpen] = useState(false);
 
   // Table beats seeded from real database beats
   const [playlistRows, setPlaylistRows] = useState<TrackItem[]>(effectiveBeats);
@@ -411,6 +414,13 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
         }
       }
     } else {
+      // Check 3-song unskippable audio ad threshold (Audiomack / Spotify model)
+      const nextCount = songsPlayedCount + 1;
+      setSongsPlayedCount(nextCount);
+      if (!isSubscribed && nextCount > 0 && nextCount % 3 === 0) {
+        setIsAdModalOpen(true);
+      }
+
       setCurrentTrack(track);
       setIsPlaying(true);
       setCurrentTime(0);
@@ -2593,6 +2603,12 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
           </button>
         </div>
       )}
+
+      {/* 3-Song Unskippable Audio Ad (Audiomack / Spotify Model) */}
+      <UserAdModal
+        isOpen={isAdModalOpen}
+        onClose={() => setIsAdModalOpen(false)}
+      />
     </div>
   );
 }

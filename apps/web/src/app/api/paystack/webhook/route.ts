@@ -8,23 +8,47 @@ export async function POST(req: NextRequest) {
     const signature = req.headers.get('x-paystack-signature');
     const secret = process.env.PAYSTACK_SECRET_KEY;
 
-    // Verify HMAC SHA512 signature if secret key is present
-    if (secret && signature) {
+    // Fail-secure: If in production or live key exists, signature is strictly required
+    const isProd = process.env.NODE_ENV === 'production';
+    if (secret) {
+      if (!signature) {
+        return NextResponse.json({ error: 'Missing x-paystack-signature header' }, { status: 401 });
+      }
+
       const hash = crypto
         .createHmac('sha512', secret)
         .update(rawBody)
         .digest('hex');
 
-      if (hash !== signature) {
-        return NextResponse.json({ error: 'Invalid signature' }, { status: 400 });
+      const hashBuffer = Buffer.from(hash, 'hex');
+      const signatureBuffer = Buffer.from(signature, 'hex');
+
+      // Use constant-time comparison to prevent timing attacks
+      if (
+        hashBuffer.length !== signatureBuffer.length ||
+        !crypto.timingSafeEqual(hashBuffer, signatureBuffer)
+      ) {
+        return NextResponse.json({ error: 'Invalid webhook signature' }, { status: 401 });
       }
+    } else if (isProd) {
+      // In production without a secret key configured, reject webhook
+      return NextResponse.json(
+        { error: 'PAYSTACK_SECRET_KEY not configured on server' },
+        { status: 500 }
+      );
     }
 
-    const payload = JSON.parse(rawBody);
+    let payload: any;
+    try {
+      payload = JSON.parse(rawBody);
+    } catch {
+      return NextResponse.json({ error: 'Invalid JSON payload' }, { status: 400 });
+    }
+
     const event = payload.event;
     const data = payload.data;
 
-    if (event === 'charge.success') {
+    if (event === 'charge.success' && data) {
       const reference = data.reference;
       const metadata = data.metadata || {};
       const orderId = metadata.order_id;
@@ -45,7 +69,7 @@ export async function POST(req: NextRequest) {
 
       // Atomic lock for any exclusive items
       for (const item of items) {
-        if (item.license === 'exclusive') {
+        if (item.license === 'exclusive' && item.beat_id) {
           await supabase.rpc('acquire_exclusive_beat', {
             p_beat_id: item.beat_id
           });
@@ -57,6 +81,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ received: true });
   } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    console.error('Paystack webhook error:', err);
+    return NextResponse.json({ error: 'Internal server error processing webhook' }, { status: 500 });
   }
 }

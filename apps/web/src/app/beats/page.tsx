@@ -2,6 +2,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { useSearchParams } from 'next/navigation';
+import Link from 'next/link';
 import { TopNav } from '../../components/layout/TopNav';
 import { HomeFooter } from '../../components/home/HomeFooter';
 import { BeatStoreTable } from '../../components/marketplace/BeatStoreTable';
@@ -10,6 +11,7 @@ import { CartDrawer } from '../../components/cart/CartDrawer';
 import { NowPlayingPanel } from '../../components/audio/NowPlayingPanel';
 import { SEEDED_BEATS } from '../../lib/seedBeats';
 import { Beat } from '@caution/types';
+import { CREATOR_URL } from '../../lib/urls';
 import {
   Search,
   ChevronDown,
@@ -18,7 +20,16 @@ import {
   X,
   SlidersHorizontal,
   Flame,
-  ArrowUpDown
+  ArrowUpDown,
+  CheckCircle2,
+  ShieldCheck,
+  Headphones,
+  Upload,
+  Crown,
+  Zap,
+  Info,
+  Layers,
+  Radio
 } from 'lucide-react';
 
 export default function BeatsPage() {
@@ -35,7 +46,13 @@ function BeatsContent() {
   const searchParams = useSearchParams();
   const initialGenre = searchParams.get('genre') || 'All Genres';
   const initialQuery = searchParams.get('q') || '';
+  const initialSectionParam = searchParams.get('section');
+  const validSection =
+    initialSectionParam === 'free' || initialSectionParam === 'premium' || initialSectionParam === 'exclusive'
+      ? initialSectionParam
+      : 'all';
 
+  const [selectedSection, setSelectedSection] = useState<'all' | 'free' | 'premium' | 'exclusive'>(validSection);
   const [searchQuery, setSearchQuery] = useState(initialQuery);
   const [selectedGenre, setSelectedGenre] = useState(initialGenre);
   const [selectedBpmRange, setSelectedBpmRange] = useState<string>('All');
@@ -50,7 +67,7 @@ function BeatsContent() {
   // Price Tag Pop-Up state (Spec: "once they click get beat the price tag go pop up")
   const [priceModalBeat, setPriceModalBeat] = useState<Beat | null>(null);
 
-  // Visible items limit for "Charger plus"
+  // Visible items limit for "Load More"
   const [visibleCount, setVisibleCount] = useState<number>(15);
 
   // Extract all unique tags
@@ -63,6 +80,20 @@ function BeatsContent() {
   // Filter beats
   const filteredBeats = useMemo(() => {
     return SEEDED_BEATS.filter((beat) => {
+      // 0. Section Filter (Free vs Premium vs Exclusive vs All)
+      if (selectedSection === 'free') {
+        const hasBasic = beat.licenses?.some((l) => l.type === 'basic' && l.enabled !== false);
+        if (!hasBasic) return false;
+      }
+      if (selectedSection === 'premium') {
+        const hasPremium = beat.licenses?.some((l) => l.type === 'premium' && l.enabled !== false);
+        if (!hasPremium) return false;
+      }
+      if (selectedSection === 'exclusive') {
+        const hasExclusive = beat.licenses?.some((l) => l.type === 'exclusive' && l.enabled !== false);
+        if (!hasExclusive || beat.status === 'sold') return false;
+      }
+
       // 1. Search Query
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
@@ -102,7 +133,7 @@ function BeatsContent() {
       }
       return b.play_count - a.play_count;
     });
-  }, [searchQuery, selectedGenre, selectedBpmRange, selectedTag, sortBy]);
+  }, [selectedSection, searchQuery, selectedGenre, selectedBpmRange, selectedTag, sortBy]);
 
   // Group beats by genre for organized presentation
   const groupedByGenre = useMemo(() => {
@@ -117,29 +148,105 @@ function BeatsContent() {
 
   const activeGenreKeys = Object.keys(groupedByGenre);
 
+  // Counts per tier
+  const freeCount = SEEDED_BEATS.filter((b) => b.licenses?.some((l) => l.type === 'basic' && l.enabled !== false)).length;
+  const premiumCount = SEEDED_BEATS.filter((b) => b.licenses?.some((l) => l.type === 'premium' && l.enabled !== false)).length;
+  const exclusiveCount = SEEDED_BEATS.filter((b) => b.licenses?.some((l) => l.type === 'exclusive' && l.enabled !== false && b.status !== 'sold')).length;
+
   return (
     <div className="min-h-screen bg-[#07090E] text-white flex flex-col pb-28">
       <TopNav />
 
-      {/* 1. Top Promo Announcement Strip (Matching Reference Image) */}
+      {/* 1. Top Promo Announcement Strip */}
       <div className="w-full bg-[#E8B896] text-black py-2.5 px-4 text-center font-black tracking-wider text-xs uppercase flex items-center justify-center gap-2 shadow-sm">
         <Flame className="h-4 w-4 fill-black" />
-        <span>2 instrus achetées = 1 offerte · 2 beats purchased = 1 free promo active</span>
+        <span>Buy 2 Beats, Get 1 Free Promo Active · Limited Time Studio Offer</span>
         <Flame className="h-4 w-4 fill-black" />
       </div>
 
       <main className="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
         {/* 2. Main Title & Subtitle */}
-        <div className="text-center max-w-2xl mx-auto mb-8 sm:mb-10">
+        <div className="text-center max-w-3xl mx-auto mb-8 sm:mb-10">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 border border-white/10 text-xs font-semibold text-gray-300 mb-3">
+            <Radio className="h-3.5 w-3.5 text-teal-400 animate-pulse" />
+            <span>Official Caution Studio Beat Store</span>
+          </div>
           <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black text-[#E8B896] tracking-tight">
-            Mes instrus
+            Instrumental Beats Catalog
           </h1>
           <p className="mt-2 text-xs sm:text-sm text-gray-400 leading-relaxed">
-            La liste de tous les Type Beats disponibles sur Caution Studio · Organisés par genre, tempo BPM et tags.
+            Browse Afrobeats, Amapiano, Trap & Drill instrumentals. Stream free or license studio-grade WAV masters and exclusive rights.
           </p>
 
-          {/* 3. Filter Pill Dropdowns (Matching Reference Image) */}
-          <div className="mt-6 flex flex-wrap items-center justify-center gap-2.5">
+          {/* 3. Prominent Category Section Tabs (Free Beats vs Premium vs Exclusive vs All) */}
+          <div className="mt-6 flex flex-wrap items-center justify-center gap-2 p-1.5 rounded-2xl bg-[#0F131C] border border-white/10 max-w-2xl mx-auto">
+            <button
+              type="button"
+              onClick={() => setSelectedSection('all')}
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
+                selectedSection === 'all'
+                  ? 'bg-[#E8B896] text-black shadow-md shadow-[#E8B896]/20'
+                  : 'text-gray-400 hover:text-white hover:bg-white/5'
+              }`}
+            >
+              <Layers className="h-3.5 w-3.5" />
+              <span>All Beats</span>
+              <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${selectedSection === 'all' ? 'bg-black/20 text-black' : 'bg-white/10 text-gray-400'}`}>
+                {SEEDED_BEATS.length}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setSelectedSection('free')}
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
+                selectedSection === 'free'
+                  ? 'bg-teal-400 text-black shadow-md shadow-teal-400/20'
+                  : 'text-teal-400 hover:text-teal-300 hover:bg-teal-400/10'
+              }`}
+            >
+              <Headphones className="h-3.5 w-3.5" />
+              <span>Free Beats</span>
+              <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${selectedSection === 'free' ? 'bg-black/20 text-black' : 'bg-teal-400/20 text-teal-300'}`}>
+                {freeCount}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setSelectedSection('premium')}
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
+                selectedSection === 'premium'
+                  ? 'bg-amber-400 text-black shadow-md shadow-amber-400/20'
+                  : 'text-amber-400 hover:text-amber-300 hover:bg-amber-400/10'
+              }`}
+            >
+              <Zap className="h-3.5 w-3.5" />
+              <span>Premium (WAV+Stems)</span>
+              <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${selectedSection === 'premium' ? 'bg-black/20 text-black' : 'bg-amber-400/20 text-amber-300'}`}>
+                {premiumCount}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setSelectedSection('exclusive')}
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
+                selectedSection === 'exclusive'
+                  ? 'bg-purple-400 text-black shadow-md shadow-purple-400/20'
+                  : 'text-purple-400 hover:text-purple-300 hover:bg-purple-400/10'
+              }`}
+            >
+              <Crown className="h-3.5 w-3.5" />
+              <span>Exclusive (1-of-1)</span>
+              <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${selectedSection === 'exclusive' ? 'bg-black/20 text-black' : 'bg-purple-400/20 text-purple-300'}`}>
+                {exclusiveCount}
+              </span>
+            </button>
+          </div>
+
+          {/* 4. Filter Pill Dropdowns (BPM, Tag, Sort) */}
+          <div className="mt-5 flex flex-wrap items-center justify-center gap-2.5">
             {/* BPM Filter Pill */}
             <div className="relative">
               <button
@@ -152,10 +259,10 @@ function BeatsContent() {
                 className={`h-9 px-4 rounded-full text-xs font-semibold flex items-center gap-1.5 transition-colors ${
                   selectedBpmRange !== 'All'
                     ? 'bg-[#E8B896] text-black'
-                    : 'bg-[#E8B896]/90 hover:bg-[#E8B896] text-black'
+                    : 'bg-[#151A24] border border-white/10 hover:border-white/20 text-gray-300'
                 }`}
               >
-                <span>{selectedBpmRange === 'All' ? 'Tous les BPM' : `${selectedBpmRange} BPM`}</span>
+                <span>{selectedBpmRange === 'All' ? 'All BPMs' : `${selectedBpmRange} BPM`}</span>
                 <ChevronDown className="h-3.5 w-3.5" />
               </button>
 
@@ -175,7 +282,7 @@ function BeatsContent() {
                           : 'text-gray-300 hover:bg-white/5 hover:text-white'
                       }`}
                     >
-                      {range === 'All' ? 'Tous les BPM' : `${range} BPM`}
+                      {range === 'All' ? 'All BPMs' : `${range} BPM`}
                     </button>
                   ))}
                 </div>
@@ -194,10 +301,10 @@ function BeatsContent() {
                 className={`h-9 px-4 rounded-full text-xs font-semibold flex items-center gap-1.5 transition-colors ${
                   selectedTag !== 'All'
                     ? 'bg-[#E8B896] text-black'
-                    : 'bg-[#E8B896]/90 hover:bg-[#E8B896] text-black'
+                    : 'bg-[#151A24] border border-white/10 hover:border-white/20 text-gray-300'
                 }`}
               >
-                <span>{selectedTag === 'All' ? 'Tous les tags' : selectedTag}</span>
+                <span>{selectedTag === 'All' ? 'All Tags' : selectedTag}</span>
                 <ChevronDown className="h-3.5 w-3.5" />
               </button>
 
@@ -217,7 +324,7 @@ function BeatsContent() {
                           : 'text-gray-300 hover:bg-white/5 hover:text-white'
                       }`}
                     >
-                      {t === 'All' ? 'Tous les tags' : t}
+                      {t === 'All' ? 'All Tags' : t}
                     </button>
                   ))}
                 </div>
@@ -233,14 +340,14 @@ function BeatsContent() {
                   setBpmDropdownOpen(false);
                   setTagDropdownOpen(false);
                 }}
-                className="h-9 px-4 rounded-full bg-[#E8B896]/90 hover:bg-[#E8B896] text-black text-xs font-semibold flex items-center gap-1.5 transition-colors"
+                className="h-9 px-4 rounded-full bg-[#151A24] border border-white/10 hover:border-white/20 text-gray-300 text-xs font-semibold flex items-center gap-1.5 transition-colors"
               >
                 <span>
                   {sortBy === 'popular'
-                    ? 'Trier par: Popularité'
+                    ? 'Sort by: Most Popular'
                     : sortBy === 'newest'
-                    ? 'Trier par: Récents'
-                    : 'Trier par: Tempo (BPM)'}
+                    ? 'Sort by: Newest'
+                    : 'Sort by: BPM (High to Low)'}
                 </span>
                 <ChevronDown className="h-3.5 w-3.5" />
               </button>
@@ -259,7 +366,7 @@ function BeatsContent() {
                         : 'text-gray-300 hover:bg-white/5 hover:text-white'
                     }`}
                   >
-                    Popularité
+                    Most Popular
                   </button>
                   <button
                     type="button"
@@ -273,7 +380,7 @@ function BeatsContent() {
                         : 'text-gray-300 hover:bg-white/5 hover:text-white'
                     }`}
                   >
-                    Date récente
+                    Newest Releases
                   </button>
                   <button
                     type="button"
@@ -287,7 +394,7 @@ function BeatsContent() {
                         : 'text-gray-300 hover:bg-white/5 hover:text-white'
                     }`}
                   >
-                    Tempo BPM (Élevé à Bas)
+                    BPM (High to Low)
                   </button>
                 </div>
               )}
@@ -295,13 +402,91 @@ function BeatsContent() {
           </div>
         </div>
 
-        {/* 4. Full-Width Search Input (Matching Reference Image) */}
+        {/* 5. Dynamic Section Explanation Banner */}
+        {selectedSection === 'free' && (
+          <div className="mb-8 rounded-2xl bg-gradient-to-r from-teal-950/60 via-[#0F131C] to-teal-950/40 border border-teal-500/30 p-5 sm:p-6 shadow-xl relative overflow-hidden">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div className="space-y-1.5 max-w-2xl">
+                <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-teal-500/20 text-teal-300 text-[11px] font-bold uppercase tracking-wider">
+                  <Headphones className="h-3 w-3" />
+                  <span>Free Beat Section · Ad-Supported Streaming</span>
+                </div>
+                <h2 className="text-xl sm:text-2xl font-black text-white">
+                  Earn Monthly While Supporting Upcoming Artists
+                </h2>
+                <p className="text-xs sm:text-sm text-gray-300 leading-relaxed">
+                  Producers can make beats available for free streaming. Listeners and upcoming artists stream them for free with a short unskippable audio ad every 3 songs (Audiomack/Spotify model). Producers earn monthly royalties from the ad pool & subscription pool towards their <span className="text-teal-300 font-semibold">₦50,000 threshold</span> for the Verified Producer badge.
+                </p>
+              </div>
+
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 shrink-0">
+                <a
+                  href={`${CREATOR_URL}/beats/upload`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="px-4 py-2.5 rounded-xl bg-teal-400 hover:bg-teal-300 text-black text-xs font-black text-center flex items-center justify-center gap-1.5 shadow-lg shadow-teal-400/20 transition-all hover:scale-105"
+                >
+                  <Upload className="h-4 w-4" />
+                  <span>Upload Free Beat (Creator Portal)</span>
+                </a>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {selectedSection === 'premium' && (
+          <div className="mb-8 rounded-2xl bg-gradient-to-r from-amber-950/60 via-[#0F131C] to-amber-950/40 border border-amber-500/30 p-5 sm:p-6 shadow-xl">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div className="space-y-1.5 max-w-2xl">
+                <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 text-[11px] font-bold uppercase tracking-wider">
+                  <Zap className="h-3 w-3" />
+                  <span>Premium Beat Section · Commercial Licensing (₦30,000)</span>
+                </div>
+                <h2 className="text-xl sm:text-2xl font-black text-white">
+                  WAV Masters & Separated Trackout Stems (.ZIP)
+                </h2>
+                <p className="text-xs sm:text-sm text-gray-300 leading-relaxed">
+                  Non-exclusive commercial licenses designed for recording artists releasing on Spotify, Apple Music, radio, and music videos. Instant download includes uncompressed 24-bit studio WAV and individual instrument stem files for mixing and vocal arrangement.
+                </p>
+              </div>
+              <div className="text-right shrink-0">
+                <span className="text-xs text-gray-400 block">Standard License</span>
+                <span className="text-2xl font-black text-amber-400">₦30,000</span>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {selectedSection === 'exclusive' && (
+          <div className="mb-8 rounded-2xl bg-gradient-to-r from-purple-950/60 via-[#0F131C] to-purple-950/40 border border-purple-500/30 p-5 sm:p-6 shadow-xl">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div className="space-y-1.5 max-w-2xl">
+                <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-purple-500/20 text-purple-300 text-[11px] font-bold uppercase tracking-wider">
+                  <Crown className="h-3 w-3" />
+                  <span>Exclusive Beat Section · 100% Sole Ownership Buyout</span>
+                </div>
+                <h2 className="text-xl sm:text-2xl font-black text-white">
+                  1-of-1 Sole Master Ownership Rights (₦100,000+)
+                </h2>
+                <p className="text-xs sm:text-sm text-gray-300 leading-relaxed">
+                  When you buy an exclusive beat, you obtain 100% sole master and publishing rights. The beat is immediately marked <span className="text-red-400 font-bold uppercase">Sold</span> and permanently retired from Caution Studio. Nobody else can ever license or purchase it. Includes stamped transfer agreement.
+                </p>
+              </div>
+              <div className="text-right shrink-0">
+                <span className="text-xs text-gray-400 block">Exclusive Buyout</span>
+                <span className="text-2xl font-black text-purple-400">₦100,000+</span>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 6. Full-Width Search Input */}
         <div className="relative mb-8 max-w-4xl mx-auto">
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Rechercher une instru (titre, artiste, BPM, mood)..."
+            placeholder="Search beats by title, producer, BPM, genre, or mood..."
             className="w-full h-12 pl-5 pr-12 rounded-full bg-[#11141D] border border-white/10 text-xs sm:text-sm text-white placeholder-gray-500 focus:outline-none focus:border-[#E8B896] transition-colors"
           />
           <div className="absolute inset-y-0 right-0 pr-4 flex items-center pointer-events-none text-gray-400">
@@ -318,7 +503,7 @@ function BeatsContent() {
           )}
         </div>
 
-        {/* 5. Organization by Genre Tabs (Spec: "All beat has to be organized in there genre") */}
+        {/* 7. Organization by Genre Tabs */}
         <div className="mb-6 flex items-center gap-2 overflow-x-auto pb-2 no-scrollbar justify-start sm:justify-center">
           {GENRE_LIST.map((genre) => {
             const isSelected = selectedGenre.toLowerCase() === genre.toLowerCase();
@@ -351,17 +536,18 @@ function BeatsContent() {
           })}
         </div>
 
-        {/* 6. Beats Table Layout - Grouped by Genre or Filtered */}
+        {/* 8. Beats Table Layout - Grouped by Genre or Filtered */}
         {filteredBeats.length === 0 ? (
           <div className="py-20 text-center space-y-3 rounded-2xl bg-[#0F131C] border border-white/10 max-w-lg mx-auto">
             <Music2 className="h-10 w-10 text-gray-600 mx-auto" />
-            <h3 className="text-base font-bold text-white">Aucune instru trouvée</h3>
+            <h3 className="text-base font-bold text-white">No beats found</h3>
             <p className="text-xs text-gray-400 max-w-sm mx-auto">
-              Aucun beat ne correspond à vos filtres actuels. Réinitialisez les filtres pour voir tout le catalogue.
+              No beats match your current section or filters. Reset filters to see the full catalog.
             </p>
             <button
               type="button"
               onClick={() => {
+                setSelectedSection('all');
                 setSearchQuery('');
                 setSelectedGenre('All Genres');
                 setSelectedBpmRange('All');
@@ -369,7 +555,7 @@ function BeatsContent() {
               }}
               className="mt-2 h-9 px-4 rounded-full bg-[#E8B896] text-black text-xs font-bold"
             >
-              Réinitialiser les filtres
+              Reset Filters
             </button>
           </div>
         ) : selectedGenre === 'All Genres' && !searchQuery ? (
@@ -393,7 +579,7 @@ function BeatsContent() {
           />
         )}
 
-        {/* 7. "Charger plus" Load More Button (Matching Reference Image) */}
+        {/* 9. Load More Button */}
         {filteredBeats.length > visibleCount && selectedGenre !== 'All Genres' && (
           <div className="mt-8 flex justify-center">
             <button
@@ -401,7 +587,7 @@ function BeatsContent() {
               onClick={() => setVisibleCount((prev) => prev + 10)}
               className="px-6 py-2.5 rounded-full bg-[#E8B896] hover:bg-[#d8a886] text-black text-xs font-black transition-transform hover:scale-105 flex items-center gap-1.5 shadow-lg"
             >
-              <span>Charger plus</span>
+              <span>Load More Beats</span>
               <ChevronDown className="h-4 w-4" />
             </button>
           </div>
@@ -412,7 +598,7 @@ function BeatsContent() {
       <CartDrawer />
       <NowPlayingPanel />
 
-      {/* 8. Price Tag Pop-Up Modal (Spec: "once they click get beat the price tag go pop up") */}
+      {/* 10. Price Tag Pop-Up Modal (Spec: "once they click get beat the price tag go pop up") */}
       <GetBeatPriceModal
         beat={priceModalBeat}
         isOpen={Boolean(priceModalBeat)}

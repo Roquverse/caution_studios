@@ -4,9 +4,12 @@ import { getServiceRoleClient } from '../../../../lib/supabaseClient';
 
 export async function POST(req: NextRequest) {
   try {
+    const authHeader = req.headers.get('authorization') || '';
+    const token = authHeader.replace(/^Bearer\s+/i, '').trim();
+
     const formData = await req.formData();
     const file = formData.get('file') as File | null;
-    const userId = formData.get('userId') as string | null;
+    const requestedUserId = formData.get('userId') as string | null;
 
     if (!file) {
       return NextResponse.json({ error: 'No image file provided' }, { status: 400 });
@@ -29,9 +32,36 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Determine extension
+    const supabaseService = getServiceRoleClient();
+    let effectiveUserId = requestedUserId;
+
+    // Verify authentication if token provided
+    if (token) {
+      const { data: { user }, error: authErr } = await supabaseService.auth.getUser(token);
+      if (authErr || !user) {
+        return NextResponse.json({ error: 'Invalid or expired session token' }, { status: 401 });
+      }
+
+      // Check IDOR: If caller specifies a different userId than their authenticated ID
+      if (requestedUserId && requestedUserId !== user.id) {
+        const appMeta = user.app_metadata || {};
+        const isAdmin = appMeta.is_admin === true || appMeta.role === 'admin';
+        if (!isAdmin) {
+          return NextResponse.json(
+            { error: 'Forbidden: Cannot update avatar for another user' },
+            { status: 403 }
+          );
+        }
+      }
+      effectiveUserId = user.id;
+    }
+
+    const targetUserId = effectiveUserId && effectiveUserId !== 'demo-user'
+      ? effectiveUserId
+      : '64d47dcb-3d1f-41dd-8400-46f39c5b0750';
+
+    // Determine extension safely
     const ext = file.name.split('.').pop()?.toLowerCase() || 'jpg';
-    const targetUserId = userId && userId !== 'demo-user' ? userId : '64d47dcb-3d1f-41dd-8400-46f39c5b0750';
     const key = `avatars/${targetUserId}-${Date.now()}.${ext}`;
 
     const bytes = await file.arrayBuffer();
@@ -44,7 +74,6 @@ export async function POST(req: NextRequest) {
     const avatarUrl = `/api/media/${key}`;
 
     // 3. Sync directly into Supabase database (profiles table)
-    const supabaseService = getServiceRoleClient();
     const { data: updatedProfile, error: dbError } = await supabaseService
       .from('profiles')
       .update({ avatar_url: avatarUrl })

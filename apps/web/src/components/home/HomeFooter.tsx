@@ -1,5 +1,6 @@
 import React from 'react';
 import Link from 'next/link';
+import { CREATOR_URL } from '../../lib/urls';
 
 export const HomeFooter: React.FC = () => {
   return (
@@ -31,6 +32,9 @@ export const HomeFooter: React.FC = () => {
             </div>
             <ul className="space-y-2 text-xs text-text-muted">
               <li>
+                <Link href="/about" className="hover:text-text transition-colors text-[#E8B896] font-medium">About Caution Studio</Link>
+              </li>
+              <li>
                 <Link href="/beats" className="hover:text-text transition-colors">Browse beats</Link>
               </li>
               <li>
@@ -52,10 +56,19 @@ export const HomeFooter: React.FC = () => {
             </div>
             <ul className="space-y-2 text-xs text-text-muted">
               <li>
+                <a href={CREATOR_URL} target="_blank" rel="noreferrer" className="hover:text-text transition-colors flex items-center gap-1.5 text-[#2dd4bf] font-medium">
+                  <span>Creator Studio (Shadcn)</span>
+                  <span className="text-[9px] px-1 py-0.2 bg-[#2dd4bf]/20 rounded text-[#2dd4bf] uppercase font-bold">New</span>
+                </a>
+              </li>
+              <li>
                 <Link href="/studio" className="hover:text-text transition-colors">Producer studio</Link>
               </li>
               <li>
                 <Link href="/studio/upload" className="hover:text-text transition-colors">Upload beats</Link>
+              </li>
+              <li>
+                <Link href="/payment-policy" className="hover:text-text transition-colors text-emerald-400 font-medium">Payment & Revenue Policy</Link>
               </li>
               <li>
                 <Link href="/studio/payouts" className="hover:text-text transition-colors">Paystack payouts</Link>
@@ -72,6 +85,9 @@ export const HomeFooter: React.FC = () => {
               Account & licenses
             </div>
             <ul className="space-y-2 text-xs text-text-muted">
+              <li>
+                <Link href="/license-policies" className="hover:text-text transition-colors text-teal-400 font-medium">Commercial License Policies</Link>
+              </li>
               <li>
                 <Link href="/library" className="hover:text-text transition-colors">My library & downloads</Link>
               </li>

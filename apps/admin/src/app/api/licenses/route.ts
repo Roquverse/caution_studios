@@ -1,11 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServiceRoleClient } from '../../../lib/supabaseClient';
+import { verifyAdminRequest } from '../../../lib/adminAuth';
 
 export const dynamic = 'force-dynamic';
 
-// GET /api/licenses - Returns all songs with their uploaded producers, configured licenses, and all issued generated licenses
+// GET /api/licenses - Returns all songs with their uploaded producers, configured licenses, and all issued generated licenses (Executive Only)
 export async function GET(req: NextRequest) {
   try {
+    const authCheck = await verifyAdminRequest(req);
+    if (!authCheck.isAdmin) {
+      return authCheck.errorResponse!;
+    }
+
     const supabase = getServiceRoleClient();
 
     // 1. Fetch all songs/beats with their uploader/producer profile

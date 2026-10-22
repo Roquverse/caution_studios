@@ -82,16 +82,16 @@ export const BeatStoreTable: React.FC<BeatStoreTableProps> = ({
 
       {/* Table Structure */}
       <div className="w-full overflow-x-auto select-none no-scrollbar">
-        <table className="w-full text-left border-collapse min-w-[760px]">
+        <table className="w-full text-left border-collapse min-w-[800px]">
           {/* Table Headers */}
           <thead>
             <tr className="border-b border-white/10 text-[11px] font-mono uppercase tracking-wider text-gray-400">
-              <th className="py-3 px-4 font-semibold w-[42%]">Titre</th>
-              <th className="py-3 px-3 font-semibold text-center w-[10%]">Durée</th>
-              <th className="py-3 px-3 font-semibold text-center w-[10%]">BPM</th>
-              <th className="py-3 px-3 font-semibold w-[18%]">Tags</th>
-              <th className="py-3 px-3 font-semibold w-[10%]">Date</th>
-              <th className="py-3 px-4 font-semibold text-right w-[10%]"></th>
+              <th className="py-3 px-4 font-semibold w-[36%]">Track Title</th>
+              <th className="py-3 px-3 font-semibold text-center w-[8%]">Duration</th>
+              <th className="py-3 px-3 font-semibold text-center w-[10%]">BPM / Key</th>
+              <th className="py-3 px-3 font-semibold w-[22%]">Available Tiers</th>
+              <th className="py-3 px-3 font-semibold w-[14%]">Tags</th>
+              <th className="py-3 px-4 font-semibold text-right w-[10%]">License</th>
             </tr>
           </thead>
 
@@ -101,6 +101,10 @@ export const BeatStoreTable: React.FC<BeatStoreTableProps> = ({
               const isCurrent = currentBeat?.id === beat.id;
               const isThisPlaying = isCurrent && isPlaying;
               const isSold = beat.status === 'sold';
+
+              const basicLic = beat.licenses?.find((l) => l.type === 'basic');
+              const premiumLic = beat.licenses?.find((l) => l.type === 'premium');
+              const exclusiveLic = beat.licenses?.find((l) => l.type === 'exclusive');
 
               return (
                 <tr
@@ -114,7 +118,7 @@ export const BeatStoreTable: React.FC<BeatStoreTableProps> = ({
                       : 'hover:bg-white/[0.03]'
                   }`}
                 >
-                  {/* 1. TITRE (Artwork + Play button + Title + Producer/Type Beat) */}
+                  {/* 1. Track (Artwork + Play button + Title + Producer) */}
                   <td className="py-3.5 px-4">
                     <div className="flex items-center gap-3.5">
                       {/* Artwork thumbnail with play button overlay */}
@@ -159,23 +163,49 @@ export const BeatStoreTable: React.FC<BeatStoreTableProps> = ({
                     </div>
                   </td>
 
-                  {/* 2. DURÉE */}
+                  {/* 2. Duration */}
                   <td className="py-3.5 px-3 text-center text-xs font-mono text-gray-400">
                     {formatDuration(beat.duration_seconds)}
                   </td>
 
-                  {/* 3. BPM (Tempo) */}
-                  <td className="py-3.5 px-3 text-center text-xs font-mono font-bold text-gray-300">
-                    {beat.bpm || 120}
+                  {/* 3. BPM / Key */}
+                  <td className="py-3.5 px-3 text-center text-xs font-mono text-gray-300">
+                    <div className="font-bold">{beat.bpm || 120} BPM</div>
+                    <div className="text-[10px] text-gray-500">{beat.musical_key || 'C Minor'}</div>
                   </td>
 
-                  {/* 4. TAGS (Pill tags) */}
+                  {/* 4. Available Tiers Badges (Free, Premium, Exclusive) */}
                   <td className="py-3.5 px-3">
-                    <div className="flex flex-wrap items-center gap-1.5 max-w-[200px]">
-                      {beat.tags.slice(0, 3).map((tag) => (
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      {/* Free Stream Badge */}
+                      <span className="px-2 py-0.5 rounded-[4px] bg-emerald-500/15 border border-emerald-500/30 text-[10px] text-emerald-400 font-semibold font-mono flex items-center gap-1">
+                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                        <span>Free Stream</span>
+                      </span>
+
+                      {/* Premium Lease Badge */}
+                      {premiumLic?.enabled !== false && (
+                        <span className="px-2 py-0.5 rounded-[4px] bg-amber-500/15 border border-amber-500/30 text-[10px] text-amber-300 font-semibold font-mono">
+                          Premium (WAV+Stems)
+                        </span>
+                      )}
+
+                      {/* Exclusive Buyout Badge */}
+                      {exclusiveLic?.enabled !== false && !isSold && (
+                        <span className="px-2 py-0.5 rounded-[4px] bg-purple-500/15 border border-purple-500/30 text-[10px] text-purple-300 font-semibold font-mono">
+                          100% Exclusive
+                        </span>
+                      )}
+                    </div>
+                  </td>
+
+                  {/* 5. Tags */}
+                  <td className="py-3.5 px-3">
+                    <div className="flex flex-wrap items-center gap-1 max-w-[160px]">
+                      {beat.tags?.slice(0, 2).map((tag) => (
                         <span
                           key={tag}
-                          className="px-2 py-0.5 rounded-[4px] bg-white/[0.05] border border-white/[0.08] text-[10px] text-gray-300 font-mono lowercase truncate max-w-[90px]"
+                          className="px-1.5 py-0.5 rounded-[4px] bg-white/[0.05] border border-white/[0.08] text-[10px] text-gray-400 font-mono lowercase truncate"
                         >
                           {tag.replace(/\s+/g, '-')}
                         </span>

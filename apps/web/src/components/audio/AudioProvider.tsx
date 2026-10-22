@@ -152,11 +152,11 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const play = (beat: Beat) => {
     if (beat.status === 'sold') return; // Cannot stream exclusive sold beat if locked
 
-    // Check 5-beat audio ad threshold (Spec: After listening to 5 beats, advert will pop up)
+    // Check 3-song unskippable audio ad threshold (Audiomack / Spotify model: after listening to 3 songs an ad comes in and can't be skipped)
     const nextPlayed = beatsPlayedCount + 1;
     setBeatsPlayedCount(nextPlayed);
 
-    if (!isSubscribed && nextPlayed > 0 && nextPlayed % 5 === 0) {
+    if (!isSubscribed && nextPlayed > 0 && nextPlayed % 3 === 0) {
       setIsAdModalOpen(true);
     }
 

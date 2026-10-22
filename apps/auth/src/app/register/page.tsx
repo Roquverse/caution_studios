@@ -6,6 +6,7 @@ import { ArrowRight, User, Mail, Lock, Check, ArrowUpRight, Mic2, ShieldCheck, A
 import { supabase } from '../../lib/supabaseClient';
 
 const USER_PORTAL_URL = process.env.NEXT_PUBLIC_USER_URL || 'https://app.cautionstudioz.com';
+const CREATOR_PORTAL_URL = process.env.NEXT_PUBLIC_CREATOR_URL || 'https://creator.cautionstudioz.com';
 const WEB_URL = process.env.NEXT_PUBLIC_WEB_URL || 'https://cautionstudioz.com';
 
 export default function RegisterPage() {
@@ -18,6 +19,17 @@ export default function RegisterPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
+
+  // Check query params for role preselection
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const roleParam = params.get('role');
+      if (roleParam === 'producer' || roleParam === 'artist') {
+        setPrimaryRole(roleParam);
+      }
+    }
+  }, []);
 
   // OTP State
   const [otp, setOtp] = useState<string[]>(['', '', '', '', '', '']);
@@ -69,8 +81,12 @@ export default function RegisterPage() {
         return;
       }
 
+      const destinationUrl = isProducer
+        ? `${CREATOR_PORTAL_URL}/login?registered=true&email=${encodeURIComponent(email)}`
+        : USER_PORTAL_URL;
+
       if (data?.session) {
-        window.location.href = USER_PORTAL_URL;
+        window.location.href = destinationUrl;
         return;
       }
 
@@ -188,9 +204,14 @@ export default function RegisterPage() {
       }
 
       setStep('success');
+      const isProducer = primaryRole === 'producer';
+      const destinationUrl = isProducer
+        ? `${CREATOR_PORTAL_URL}/login?registered=true&email=${encodeURIComponent(email)}`
+        : USER_PORTAL_URL;
+
       setTimeout(() => {
-        window.location.href = USER_PORTAL_URL;
-      }, 1000);
+        window.location.href = destinationUrl;
+      }, 1200);
     } catch (err: any) {
       setErrorMessage(err?.message || 'Verification failed. Please try again.');
     } finally {
@@ -691,9 +712,13 @@ export default function RegisterPage() {
               <div className="w-14 h-14 rounded-full bg-[#04564f]/30 border border-[#2dd4bf]/40 flex items-center justify-center mx-auto text-[#2dd4bf]">
                 <CheckCircle2 className="h-8 w-8" />
               </div>
-              <h2 className="text-2xl font-black text-white">Email Verified!</h2>
+              <h2 className="text-2xl font-black text-white">
+                {primaryRole === 'producer' ? 'Producer Account Ready!' : 'Email Verified!'}
+              </h2>
               <p className="text-xs text-gray-400 max-w-xs mx-auto">
-                Your creator credentials have been verified. Connecting you to Caution Studio...
+                {primaryRole === 'producer'
+                  ? 'Your producer account is ready. Redirecting you to Creator Studio to log in...'
+                  : 'Your account has been verified. Connecting you to Caution Studio...'}
               </p>
             </div>
           )}

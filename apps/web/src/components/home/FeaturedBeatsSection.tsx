@@ -112,15 +112,37 @@ export const FeaturedBeatsSection: React.FC = () => {
           </div>
         )}
 
-        {/* View All Beats CTA */}
-        <div className="mt-8 text-center">
+        {/* View All Beats CTA & Section Links */}
+        <div className="mt-8 flex flex-col items-center gap-3 text-center">
           <Link
             href="/beats"
-            className="inline-flex items-center gap-2 px-6 py-2.5 rounded-pill bg-surface hover:bg-surface-2 text-text text-xs font-semibold border border-border transition-colors"
+            className="inline-flex items-center gap-2 px-6 py-2.5 rounded-pill bg-[#E8B896] hover:bg-[#d8a886] text-black text-xs font-black shadow-lg transition-transform hover:scale-105"
           >
             <span>Explore all 12,000+ beats</span>
             <ArrowRight className="h-3.5 w-3.5" />
           </Link>
+
+          <div className="flex flex-wrap items-center justify-center gap-2 text-xs">
+            <span className="text-gray-400 text-[11px]">Quick Jump:</span>
+            <Link
+              href="/beats?section=free"
+              className="px-3 py-1 rounded-full bg-teal-500/10 text-teal-300 border border-teal-500/20 hover:bg-teal-500/20 font-semibold transition-colors"
+            >
+              🎧 Free Beats (Stream & Earn)
+            </Link>
+            <Link
+              href="/beats?section=premium"
+              className="px-3 py-1 rounded-full bg-amber-500/10 text-amber-300 border border-amber-500/20 hover:bg-amber-500/20 font-semibold transition-colors"
+            >
+              ⚡ Premium Beats (WAV+Stems)
+            </Link>
+            <Link
+              href="/beats?section=exclusive"
+              className="px-3 py-1 rounded-full bg-purple-500/10 text-purple-300 border border-purple-500/20 hover:bg-purple-500/20 font-semibold transition-colors"
+            >
+              👑 Exclusive (1-of-1 Buyout)
+            </Link>
+          </div>
         </div>
       </div>
 

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServiceRoleClient } from '../../../lib/supabaseClient';
 import { uploadToR2 } from '../../../lib/r2Server';
+import { verifyAdminRequest } from '../../../lib/adminAuth';
 
 export const dynamic = 'force-dynamic';
 
@@ -54,6 +55,11 @@ export async function GET(req: NextRequest) {
 // POST /api/tracks - Admin uploads audio, cover artwork, and registers beat in DB
 export async function POST(req: NextRequest) {
   try {
+    const authCheck = await verifyAdminRequest(req);
+    if (!authCheck.isAdmin) {
+      return authCheck.errorResponse!;
+    }
+
     const supabase = getServiceRoleClient();
     const formData = await req.formData();
 

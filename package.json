@@ -13,11 +13,13 @@
     "dev:auth": "npm run dev --workspace=apps/auth",
     "dev:user": "npm run dev --workspace=apps/user",
     "dev:admin": "npm run dev --workspace=apps/admin",
+    "dev:creator": "npm run dev --workspace=apps/creator",
     "build": "turbo run build",
     "build:web": "npm run build --workspace=apps/web",
     "build:auth": "npm run build --workspace=apps/auth",
     "build:user": "npm run build --workspace=apps/user",
     "build:admin": "npm run build --workspace=apps/admin",
+    "build:creator": "npm run build --workspace=apps/creator",
     "lint": "turbo run lint"
   },
   "devDependencies": {

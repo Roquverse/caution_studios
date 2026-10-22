@@ -52,10 +52,6 @@ export const ArtistAdModal: React.FC<ArtistAdModalProps> = ({
             setCanSkip(true);
             return 0;
           }
-          if (prev <= 11) {
-            // Can skip after 5 seconds
-            setCanSkip(true);
-          }
           return prev - 1;
         });
       }, 1000);
@@ -73,6 +69,7 @@ export const ArtistAdModal: React.FC<ArtistAdModalProps> = ({
   if (!isOpen) return null;
 
   const handleClose = () => {
+    if (!canSkip && secondsRemaining > 0) return; // Cannot be skipped while ad is active
     if (timerRef.current) clearInterval(timerRef.current);
     audioSynth.stop();
     onClose();
@@ -91,13 +88,13 @@ export const ArtistAdModal: React.FC<ArtistAdModalProps> = ({
   const progressPct = ((15 - secondsRemaining) / 15) * 100;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-fade-in">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90 backdrop-blur-md animate-fade-in">
       <div className="w-full max-w-md bg-[#0B0E14] border border-white/10 rounded-xl overflow-hidden shadow-2xl relative">
         {/* Top Header Tag */}
         <div className="px-4 py-2.5 bg-[#0F131C] border-b border-white/10 flex items-center justify-between text-xs">
           <div className="flex items-center gap-1.5 text-amber-300 font-semibold">
             <Sparkles className="h-3.5 w-3.5" />
-            <span>Caution Artist Spotlight · Sponsored</span>
+            <span>Caution Ad Spotlight · 3-Song Interstitial</span>
           </div>
 
           <div className="flex items-center gap-2">
@@ -105,14 +102,15 @@ export const ArtistAdModal: React.FC<ArtistAdModalProps> = ({
               <button
                 type="button"
                 onClick={handleClose}
-                className="px-2.5 py-0.5 rounded-full bg-white/10 hover:bg-white/20 text-white text-[11px] font-semibold transition-colors flex items-center gap-1"
+                className="px-2.5 py-0.5 rounded-full bg-[#2dd4bf] hover:bg-[#20b8a4] text-zinc-950 text-[11px] font-bold transition-colors flex items-center gap-1 cursor-pointer"
               >
-                <span>Skip Ad</span>
-                <X className="h-3 w-3" />
+                <span>Continue</span>
+                <X className="h-3 w-3 stroke-[2.5]" />
               </button>
             ) : (
-              <span className="text-[11px] text-gray-400 font-mono">
-                Skip in {Math.max(0, secondsRemaining - 10)}s
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-[11px] text-amber-300 font-mono font-bold">
+                <span>Ad: 0:{secondsRemaining.toString().padStart(2, '0')}</span>
+                <span className="text-[10px] text-amber-400/80 font-sans">· Cannot skip</span>
               </span>
             )}
           </div>
@@ -208,15 +206,19 @@ export const ArtistAdModal: React.FC<ArtistAdModalProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="p-3 bg-[#0F131C] border-t border-white/10 flex items-center justify-between text-[11px] text-gray-500">
-          <span>Plays every 5 free beat streams</span>
-          {canSkip && (
+        <div className="p-3 bg-[#0F131C] border-t border-white/10 flex items-center justify-between text-[11px] text-gray-400">
+          <span className="font-mono text-[10px]">Plays every 3 songs · Cannot be skipped</span>
+          {canSkip ? (
             <button
               onClick={handleClose}
-              className="text-[#2dd4bf] hover:underline font-semibold"
+              className="text-[#2dd4bf] hover:underline font-bold"
             >
-              Continue to Beat →
+              Resume Music →
             </button>
+          ) : (
+            <span className="text-[10px] text-zinc-500">
+              Caution Plus users get 100% ad-free
+            </span>
           )}
         </div>
       </div>

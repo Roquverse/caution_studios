@@ -16,7 +16,9 @@ import {
   Sliders,
   Activity,
   Mic,
-  Disc3
+  Disc3,
+  ShieldCheck,
+  CheckCircle2
 } from 'lucide-react';
 import { AUTH_LOGIN_URL, AUTH_SIGNUP_URL } from '../lib/urls';
 
@@ -84,6 +86,8 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
 
   const navLinks = [
     { label: 'Home', href: '/' },
+    { label: 'About Us', href: '/about' },
+    { label: 'Beat Store', href: '/beats' },
     { label: 'Pricing', href: '/pricing' },
     { label: 'FAQ', href: '/faq' },
     { label: 'Credit', href: '/#credits' },
@@ -309,6 +313,20 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
       {/* Main Redesigned Hero Container */}
       <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 sm:pt-10 pb-20 sm:pb-28">
         
+        {/* Top Eyebrow Badge with Commercial Royalty-Free License info */}
+        <div className="mb-6 flex justify-center lg:justify-start">
+          <a
+            href="/beats"
+            className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/5 hover:bg-white/10 border border-[#2dd4bf]/30 text-xs text-neutral-200 backdrop-blur-xl shadow-lg transition-all hover:scale-105"
+          >
+            <ShieldCheck className="w-3.5 h-3.5 text-[#2dd4bf]" />
+            <span className="font-semibold text-white">Commercial Royalty-Free License</span>
+            <span className="hidden sm:inline text-neutral-400">·</span>
+            <span className="hidden sm:inline text-neutral-300">Download, record, monetize &amp; distribute worldwide</span>
+            <ArrowRight className="w-3 h-3 text-[#2dd4bf]" />
+          </a>
+        </div>
+
         {/* Desktop 3-Column Split Layout / Mobile Responsive Stack */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-4 items-center">
           
@@ -326,8 +344,32 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
               Bring your music ideas to life. Caution Studio connects recording artists with premium, industry-ready beats crafted by top music producers.
             </p>
 
+            {/* Commercial Royalty-Free License Highlight Card (User Requested Specification) */}
+            <div className="mt-5 p-4 rounded-2xl bg-gradient-to-br from-[#0B1E1C]/90 via-[#0B1516]/90 to-[#121418]/90 border border-[#2dd4bf]/40 backdrop-blur-xl shadow-xl max-w-md mx-auto lg:mx-0 text-left relative overflow-hidden group">
+              <div className="absolute top-0 right-0 w-24 h-24 bg-[#2dd4bf]/10 rounded-full blur-2xl pointer-events-none" />
+              <div className="flex items-center gap-2 text-xs font-bold text-[#2dd4bf] uppercase tracking-wider mb-1.5">
+                <div className="p-1 rounded-md bg-[#2dd4bf]/20 text-[#2dd4bf]">
+                  <ShieldCheck className="w-3.5 h-3.5" />
+                </div>
+                <span>Commercial Royalty-Free License</span>
+              </div>
+              <p className="text-xs sm:text-[13px] text-neutral-200 leading-relaxed font-normal">
+                Commercial Royalty-Free License that allows upcoming artists to download beats, record their songs, monetize their music, and distribute their releases worldwide without unnecessary complications.
+              </p>
+              <div className="mt-3 flex items-center gap-2.5 text-[11px] font-semibold text-neutral-300 pt-2 border-t border-white/5">
+                <span className="flex items-center gap-1 text-teal-300">
+                  <CheckCircle2 className="w-3 h-3 text-teal-400" />
+                  100% Monetization
+                </span>
+                <span>•</span>
+                <span>Worldwide DSP Clearance</span>
+                <span>•</span>
+                <span>Keep Your Rights</span>
+              </div>
+            </div>
+
             {/* Stacked Glassmorphic Feature Cards */}
-            <div className="mt-8 sm:mt-10 space-y-3.5 max-w-md mx-auto lg:mx-0 w-full">
+            <div className="mt-6 sm:mt-8 space-y-3.5 max-w-md mx-auto lg:mx-0 w-full">
               
               {/* Feature Card 1: Top Producer Beats */}
               <a

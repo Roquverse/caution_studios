@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServiceRoleClient } from '../../../lib/supabaseClient';
+import { verifyAdminRequest } from '../../../lib/adminAuth';
 
 export const dynamic = 'force-dynamic';
 
@@ -20,9 +21,14 @@ let platformConfig = {
   emailOnSale: true
 };
 
-// GET /api/settings - Fetch platform settings & admin directory
+// GET /api/settings - Fetch platform settings & admin directory (Executive Only)
 export async function GET(req: NextRequest) {
   try {
+    const authCheck = await verifyAdminRequest(req);
+    if (!authCheck.isAdmin) {
+      return authCheck.errorResponse!;
+    }
+
     const supabase = getServiceRoleClient();
 
     // 1. Fetch active admin team from public.admin_users
@@ -58,9 +64,14 @@ export async function GET(req: NextRequest) {
   }
 }
 
-// POST /api/settings - Update platform settings, admin credentials or add admins
+// POST /api/settings - Update platform settings, admin credentials or add admins (Executive Only)
 export async function POST(req: NextRequest) {
   try {
+    const authCheck = await verifyAdminRequest(req);
+    if (!authCheck.isAdmin) {
+      return authCheck.errorResponse!;
+    }
+
     const body = await req.json().catch(() => ({}));
     const { action, payload } = body;
     const supabase = getServiceRoleClient();

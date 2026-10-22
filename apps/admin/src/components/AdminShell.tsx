@@ -24,7 +24,8 @@ import {
   Sliders,
   Flame,
   Radio,
-  Tag
+  Tag,
+  Megaphone
 } from 'lucide-react';
 import { Avatar } from '@caution/ui';
 
@@ -133,6 +134,12 @@ export function AdminShell({ children, activePath, onOpenUpload }: AdminShellPro
       badge: 'Live'
     },
     {
+      label: 'Ads Manager',
+      href: '/ads',
+      icon: Megaphone,
+      badge: 'Revenue'
+    },
+    {
       label: 'Settings',
       href: '/settings',
       icon: Sliders,
@@ -145,6 +152,7 @@ export function AdminShell({ children, activePath, onOpenUpload }: AdminShellPro
     if (pathname === '/genres') return 'Genre Management';
     if (pathname === '/users') return 'Subscribers & Users';
     if (pathname === '/licenses') return 'Licenses';
+    if (pathname === '/ads') return 'Ads Manager & Sponsored Music';
     if (pathname === '/settings') return 'Admin Settings';
     return 'Dashboard';
   };
@@ -341,6 +349,16 @@ export function AdminShell({ children, activePath, onOpenUpload }: AdminShellPro
               className="hidden sm:inline-flex items-center gap-1 text-xs text-zinc-400 hover:text-white px-2 py-1 rounded transition-colors"
             >
               <span>User Portal</span>
+              <ExternalLink className="h-3 w-3" />
+            </a>
+
+            <a
+              href={process.env.NEXT_PUBLIC_CREATOR_URL || 'https://creator.cautionstudioz.com'}
+              target="_blank"
+              rel="noreferrer"
+              className="hidden sm:inline-flex items-center gap-1 text-xs text-zinc-400 hover:text-white px-2 py-1 rounded transition-colors"
+            >
+              <span>Creator Studio</span>
               <ExternalLink className="h-3 w-3" />
             </a>
 

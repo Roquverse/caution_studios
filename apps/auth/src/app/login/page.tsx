@@ -7,6 +7,7 @@ import { supabase } from '../../lib/supabaseClient';
 
 const USER_PORTAL_URL = process.env.NEXT_PUBLIC_USER_URL || 'https://app.cautionstudioz.com';
 const ADMIN_PORTAL_URL = process.env.NEXT_PUBLIC_ADMIN_URL || 'https://admin.cautionstudioz.com';
+const CREATOR_PORTAL_URL = process.env.NEXT_PUBLIC_CREATOR_URL || 'https://creator.cautionstudioz.com';
 const WEB_URL = process.env.NEXT_PUBLIC_WEB_URL || 'https://cautionstudioz.com';
 
 export default function LoginPage() {
@@ -32,8 +33,17 @@ export default function LoginPage() {
         return;
       }
 
+      const role = data?.user?.user_metadata?.primary_role || data?.user?.user_metadata?.role;
+      const isProducer =
+        role === 'producer' ||
+        (data?.user?.user_metadata?.roles || []).includes('producer') ||
+        email.toLowerCase().includes('producer') ||
+        email.toLowerCase().includes('creator');
+
       const targetUrl = email.toLowerCase().includes('admin')
         ? ADMIN_PORTAL_URL
+        : isProducer
+        ? CREATOR_PORTAL_URL
         : USER_PORTAL_URL;
 
       window.location.href = targetUrl;
@@ -273,6 +283,16 @@ export default function LoginPage() {
               Start Free Now
             </a>
           </p>
+
+          <div className="mt-4 pt-4 border-t border-white/[0.08] text-center">
+            <a
+              href={`${CREATOR_PORTAL_URL}/login`}
+              className="text-xs text-gray-400 hover:text-[#2dd4bf] transition-colors inline-flex items-center gap-1"
+            >
+              <span>Producer / Creator Studio Login</span>
+              <ArrowUpRight className="h-3 w-3" />
+            </a>
+          </div>
         </div>
 
         {/* Mobile-Only Bottom Social Proof Bar */}
