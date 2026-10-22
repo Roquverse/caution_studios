@@ -8,7 +8,7 @@ import { PlayButton } from '../audio/PlayButton';
 import { Waveform } from '../audio/Waveform';
 import { PriceTag } from './PriceTag';
 import { SoldOverlay } from './SoldOverlay';
-import { Heart, ShoppingBag, MoreHorizontal } from 'lucide-react';
+import { Heart, ShoppingBag, MoreHorizontal, Download, Sparkles } from 'lucide-react';
 import { formatNaira } from '../../lib/paystack';
 
 interface BeatRowProps {
@@ -17,7 +17,18 @@ interface BeatRowProps {
 }
 
 export const BeatRow: React.FC<BeatRowProps> = ({ beat, onOpenLicenseSelector }) => {
-  const { currentBeat, isPlaying, togglePlay, currentTime, duration, seek, likes, toggleLike, addToCart } = useAudio();
+  const {
+    currentBeat,
+    isPlaying,
+    togglePlay,
+    currentTime,
+    duration,
+    seek,
+    likes,
+    toggleLike,
+    addToCart,
+    openRewardedDownload
+  } = useAudio();
 
   const isCurrent = currentBeat?.id === beat.id;
   const isThisPlaying = isCurrent && isPlaying;
@@ -112,6 +123,19 @@ export const BeatRow: React.FC<BeatRowProps> = ({ beat, onOpenLicenseSelector })
           <ShoppingBag className="h-3 w-3" />
           <span className="hidden sm:inline">{isSold ? 'Sold' : 'Lease'}</span>
         </button>
+
+        {/* Ad-supported Free Download Option */}
+        {!isSold && (
+          <button
+            type="button"
+            onClick={() => openRewardedDownload(beat)}
+            title="Listen to 2 promoted songs to download free"
+            className="hidden md:flex h-8 px-2.5 rounded-pill bg-surface hover:bg-surface-2 text-amber-300 hover:text-amber-200 border border-amber-500/30 text-xs font-medium items-center gap-1 transition-colors"
+          >
+            <Download className="h-3 w-3" />
+            <span className="text-[10px] font-mono">Free</span>
+          </button>
+        )}
 
         <button
           type="button"

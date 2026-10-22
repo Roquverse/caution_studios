@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { Button } from '@caution/ui';
-import { ArrowRight, User, Mail, Lock, Check, ArrowUpRight, Mic2, ShieldCheck, ArrowLeft, RefreshCw, CheckCircle2, AlertCircle } from 'lucide-react';
+import { ArrowRight, User, Mail, Lock, Check, ArrowUpRight, Mic2, ShieldCheck, ArrowLeft, RefreshCw, CheckCircle2, AlertCircle, Gift, Sparkles, Sliders } from 'lucide-react';
 import { supabase } from '../../lib/supabaseClient';
 
 const USER_PORTAL_URL = process.env.NEXT_PUBLIC_USER_URL || 'https://app.cautionstudioz.com';
@@ -10,6 +10,7 @@ const WEB_URL = process.env.NEXT_PUBLIC_WEB_URL || 'https://cautionstudioz.com';
 
 export default function RegisterPage() {
   const [step, setStep] = useState<'form' | 'otp' | 'success'>('form');
+  const [primaryRole, setPrimaryRole] = useState<'artist' | 'producer'>('artist');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -38,6 +39,13 @@ export default function RegisterPage() {
     setIsLoading(true);
     setErrorMessage('');
 
+    const isProducer = primaryRole === 'producer';
+    const trialEndsAt = isProducer
+      ? new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString()
+      : null;
+    const promoCode = isProducer ? 'producer_3mo_free_launch' : null;
+    const initialPlan = isProducer ? 'plus' : 'free';
+
     try {
       const { data, error } = await supabase.auth.signUp({
         email,
@@ -46,7 +54,12 @@ export default function RegisterPage() {
           data: {
             full_name: name,
             handle: name.toLowerCase().replace(/\s+/g, '_'),
-            social_channel: channel
+            social_channel: channel,
+            primary_role: primaryRole,
+            roles: [primaryRole],
+            plan: initialPlan,
+            trial_ends_at: trialEndsAt,
+            promo_applied: promoCode
           }
         }
       });
@@ -392,6 +405,92 @@ export default function RegisterPage() {
               )}
 
               <form onSubmit={handleSubmit} className="space-y-4">
+                {/* Role Specification & Producer Promo Card */}
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="block text-[11px] font-mono uppercase tracking-wider text-gray-400">
+                      I am signing up as:
+                    </label>
+                    <span className="text-[10px] text-amber-400 font-semibold flex items-center gap-1">
+                      <Sparkles className="h-3 w-3" />
+                      <span>Producer Promo Active</span>
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2.5">
+                    <button
+                      type="button"
+                      onClick={() => setPrimaryRole('artist')}
+                      className={`p-3 rounded-[6px] text-left transition-all border flex flex-col justify-between ${
+                        primaryRole === 'artist'
+                          ? 'bg-[#04564f]/25 border-[#2dd4bf] ring-1 ring-[#2dd4bf]'
+                          : 'bg-[#0F131C] border-white/[0.08] hover:border-white/20'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between w-full mb-1">
+                        <div className="flex items-center gap-1.5">
+                          <Mic2 className={`h-4 w-4 ${primaryRole === 'artist' ? 'text-[#2dd4bf]' : 'text-gray-400'}`} />
+                          <span className="text-xs font-bold text-white">Artist</span>
+                        </div>
+                        {primaryRole === 'artist' && (
+                          <span className="h-4 w-4 rounded-full bg-[#2dd4bf] text-black flex items-center justify-center">
+                            <Check className="h-3 w-3 stroke-[3]" />
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[10px] text-gray-400 leading-snug">
+                        Discover beats, record music & book verified producers.
+                      </p>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setPrimaryRole('producer')}
+                      className={`p-3 rounded-[6px] text-left transition-all border flex flex-col justify-between relative ${
+                        primaryRole === 'producer'
+                          ? 'bg-[#04564f]/25 border-[#2dd4bf] ring-1 ring-[#2dd4bf]'
+                          : 'bg-[#0F131C] border-white/[0.08] hover:border-white/20'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between w-full mb-1">
+                        <div className="flex items-center gap-1.5">
+                          <Sliders className={`h-4 w-4 ${primaryRole === 'producer' ? 'text-amber-400' : 'text-gray-400'}`} />
+                          <span className="text-xs font-bold text-white">Producer</span>
+                        </div>
+                        {primaryRole === 'producer' ? (
+                          <span className="h-4 w-4 rounded-full bg-[#2dd4bf] text-black flex items-center justify-center">
+                            <Check className="h-3 w-3 stroke-[3]" />
+                          </span>
+                        ) : (
+                          <span className="text-[9px] px-1 py-0.2 rounded bg-amber-500/20 text-amber-300 font-bold">
+                            Free
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[10px] text-gray-400 leading-snug">
+                        Upload beats, sell licenses & earn streaming royalties.
+                      </p>
+                    </button>
+                  </div>
+
+                  {primaryRole === 'producer' && (
+                    <div className="mt-2.5 p-3 rounded-[6px] bg-gradient-to-r from-amber-500/10 via-[#04564f]/20 to-transparent border border-amber-500/30 text-amber-200">
+                      <div className="flex items-start gap-2">
+                        <Gift className="h-4 w-4 text-amber-400 shrink-0 mt-0.5" />
+                        <div className="text-[11px] leading-relaxed">
+                          <strong className="text-amber-300 font-bold block text-xs mb-0.5">
+                            Producer Launch Promo: 3 Months Free Subscription!
+                          </strong>
+                          Subscription for beat producers is 100% free for your first 3 months. Upload unlimited beats and keep 80% payout.
+                          <div className="mt-1 text-[10px] text-gray-400 font-mono">
+                            ⚡ Verification note: Qualification requires earning royalties from free beat streaming.
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
                 <div>
                   <label className="block text-[11px] font-mono uppercase tracking-wider text-gray-400 mb-1.5">
                     Full Name

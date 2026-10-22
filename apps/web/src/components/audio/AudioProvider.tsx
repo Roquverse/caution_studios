@@ -6,6 +6,16 @@ import { audioSynth } from '@caution/ui';
 import { SEEDED_BEATS } from '../../lib/seedBeats';
 import { LICENSE_DEFINITIONS } from '@caution/licenses';
 import { useUserSubscription, FREE_PREVIEW_LIMIT_SECONDS } from '../../lib/subscription';
+import { ArtistAdModal } from './ArtistAdModal';
+import { RewardedDownloadModal } from './RewardedDownloadModal';
+import { DailyDownloadLimitModal } from './DailyDownloadLimitModal';
+import {
+  useDailyDownloadQuota,
+  recordBeatDownload,
+  DailyDownloadState,
+  DAILY_DOWNLOAD_LIMIT,
+  MONTHLY_BEAT_ACCESS_LIMIT
+} from '../../lib/subscription';
 
 interface AudioContextValue {
   currentBeat: Beat | null;
@@ -42,6 +52,19 @@ interface AudioContextValue {
   previewLimitSeconds: number;
   showUpgradePrompt: boolean;
   setShowUpgradePrompt: (show: boolean) => void;
+
+  // Promoted Audio Ads & Rewarded Downloads
+  beatsPlayedCount: number;
+  isAdModalOpen: boolean;
+  setIsAdModalOpen: (open: boolean) => void;
+  openRewardedDownload: (beat: Beat) => void;
+
+  // Daily Download Quota & 24h Cooldown
+  downloadState: DailyDownloadState;
+  isDownloadLimitModalOpen: boolean;
+  setIsDownloadLimitModalOpen: (open: boolean) => void;
+  openDownloadLimitModal: () => void;
+  triggerBeatDownload: (beat: Beat, onApproved?: () => void) => boolean;
 }
 
 const AudioContext = createContext<AudioContextValue | null>(null);
@@ -62,12 +85,41 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const { isSubscribed } = useUserSubscription();
   const [showUpgradePrompt, setShowUpgradePrompt] = useState<boolean>(false);
 
+  // Promoted Audio Ads & Rewarded Downloads
+  const [beatsPlayedCount, setBeatsPlayedCount] = useState<number>(0);
+  const [isAdModalOpen, setIsAdModalOpen] = useState<boolean>(false);
+  const [rewardedDownloadBeat, setRewardedDownloadBeat] = useState<Beat | null>(null);
+
+  const openRewardedDownload = (beat: Beat) => {
+    setRewardedDownloadBeat(beat);
+  };
+
+  // Daily Download Quota & 24h Cooldown
+  const downloadState = useDailyDownloadQuota();
+  const [isDownloadLimitModalOpen, setIsDownloadLimitModalOpen] = useState<boolean>(false);
+
+  const openDownloadLimitModal = () => {
+    setIsDownloadLimitModalOpen(true);
+  };
+
+  const triggerBeatDownload = (beat: Beat, onApproved?: () => void): boolean => {
+    if (!downloadState.canDownload) {
+      setIsDownloadLimitModalOpen(true);
+      return false;
+    }
+    recordBeatDownload(beat.id, beat.title);
+    if (onApproved) {
+      onApproved();
+    }
+    return true;
+  };
+
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const synthTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const duration = currentBeat?.duration_seconds || 180;
 
-  // Initialize Audio element
+  // Initialize Audio element with Unlimited Beat Preview
   useEffect(() => {
     if (typeof window !== 'undefined') {
       audioRef.current = new Audio();
@@ -76,15 +128,8 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       const handleTimeUpdate = () => {
         if (audioRef.current) {
           const t = audioRef.current.currentTime;
-          if (!isSubscribed && t >= FREE_PREVIEW_LIMIT_SECONDS) {
-            audioRef.current.pause();
-            audioRef.current.currentTime = FREE_PREVIEW_LIMIT_SECONDS;
-            setIsPlaying(false);
-            setShowUpgradePrompt(true);
-            setCurrentTime(FREE_PREVIEW_LIMIT_SECONDS);
-          } else {
-            setCurrentTime(t);
-          }
+          // Unlimited beat preview active: full length playback allowed
+          setCurrentTime(t);
         }
       };
 
@@ -106,6 +151,14 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const play = (beat: Beat) => {
     if (beat.status === 'sold') return; // Cannot stream exclusive sold beat if locked
+
+    // Check 5-beat audio ad threshold (Spec: After listening to 5 beats, advert will pop up)
+    const nextPlayed = beatsPlayedCount + 1;
+    setBeatsPlayedCount(nextPlayed);
+
+    if (!isSubscribed && nextPlayed > 0 && nextPlayed % 5 === 0) {
+      setIsAdModalOpen(true);
+    }
 
     setCurrentBeat(beat);
     setIsPlaying(true);
@@ -256,10 +309,41 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         isSubscribed,
         previewLimitSeconds: FREE_PREVIEW_LIMIT_SECONDS,
         showUpgradePrompt,
-        setShowUpgradePrompt
+        setShowUpgradePrompt,
+        beatsPlayedCount,
+        isAdModalOpen,
+        setIsAdModalOpen,
+        openRewardedDownload,
+        downloadState,
+        isDownloadLimitModalOpen,
+        setIsDownloadLimitModalOpen,
+        openDownloadLimitModal,
+        triggerBeatDownload
       }}
     >
       {children}
+
+      {/* Promoted Artist Audio Ad Modal (Pops up every 5 beats) */}
+      <ArtistAdModal
+        isOpen={isAdModalOpen}
+        onClose={() => setIsAdModalOpen(false)}
+      />
+
+      {/* Rewarded Ad-Supported Beat Download Modal (Stream 2 songs to download 1 beat) */}
+      {rewardedDownloadBeat && (
+        <RewardedDownloadModal
+          beat={rewardedDownloadBeat}
+          isOpen={Boolean(rewardedDownloadBeat)}
+          onClose={() => setRewardedDownloadBeat(null)}
+        />
+      )}
+
+      {/* Daily 2-Beat Download Limit & 24hr Cooldown Modal */}
+      <DailyDownloadLimitModal
+        isOpen={isDownloadLimitModalOpen}
+        onClose={() => setIsDownloadLimitModalOpen(false)}
+        downloadState={downloadState}
+      />
     </AudioContext.Provider>
   );
 };

@@ -18,6 +18,7 @@ import {
   Disc3
 } from 'lucide-react';
 import { formatNaira } from '../../lib/paystack';
+import { GetBeatPriceModal } from '../marketplace/GetBeatPriceModal';
 
 interface MiniPlayerProps {
   variant?: 'persistent' | 'hero-strip';
@@ -32,6 +33,7 @@ function formatTime(seconds: number): string {
 export const MiniPlayer: React.FC<MiniPlayerProps> = ({ variant = 'persistent' }) => {
   const pathname = usePathname();
   const [isDismissed, setIsDismissed] = useState(false);
+  const [isPriceModalOpen, setIsPriceModalOpen] = useState(false);
 
   const {
     currentBeat,
@@ -284,15 +286,14 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({ variant = 'persistent' }
             />
           </div>
 
-          {/* Quick License CTA */}
+          {/* Get Beat Button (matching reference image dock) */}
           <button
             type="button"
-            onClick={() => addToCart(currentBeat, 'basic')}
-            className="h-7 sm:h-8 px-2.5 sm:px-3.5 rounded-full bg-[#04564f] hover:bg-[#03453f] text-white text-[11px] font-bold uppercase tracking-wider flex items-center gap-1 transition-colors cursor-pointer border-0 shadow-none shrink-0"
+            onClick={() => setIsPriceModalOpen(true)}
+            className="h-7 sm:h-8 px-3 sm:px-4 rounded-full bg-[#E8B896] hover:bg-[#d8a886] text-black text-[11px] font-black uppercase tracking-wider flex items-center gap-1.5 transition-all cursor-pointer border border-[#E8B896] shadow-sm shrink-0"
           >
-            <ShoppingBag className="h-3 w-3" />
-            <span className="hidden xs:inline">Lease</span>
-            <span>{formatNaira(3000)}</span>
+            <ShoppingBag className="h-3 w-3 stroke-[2.5]" />
+            <span>Get Beat</span>
           </button>
 
           {/* Expand Details Modal */}
@@ -317,6 +318,13 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({ variant = 'persistent' }
           </button>
         </div>
       </div>
+
+      {/* Price Tag Pop-up Modal */}
+      <GetBeatPriceModal
+        beat={currentBeat}
+        isOpen={isPriceModalOpen}
+        onClose={() => setIsPriceModalOpen(false)}
+      />
     </aside>
   );
 };

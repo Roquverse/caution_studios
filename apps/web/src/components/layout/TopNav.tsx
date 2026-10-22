@@ -14,6 +14,7 @@ export const TopNav: React.FC = () => {
 
   const navLinks = [
     { label: 'Home', href: '/' },
+    { label: 'Beat Store', href: '/beats' },
     { label: 'Pricing', href: '/pricing' },
     { label: 'FAQ', href: '/faq' },
     { label: 'Credit', href: '/#credits' },

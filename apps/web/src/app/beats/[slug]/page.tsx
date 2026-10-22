@@ -23,7 +23,10 @@ import {
   Calendar,
   Layers,
   ShoppingBag,
-  ArrowLeft
+  ArrowLeft,
+  Gift,
+  Sparkles,
+  Download
 } from 'lucide-react';
 
 export default function BeatDetailPage() {
@@ -41,7 +44,10 @@ export default function BeatDetailPage() {
     seek,
     addToCart,
     likes,
-    toggleLike
+    toggleLike,
+    openRewardedDownload,
+    downloadState,
+    openDownloadLimitModal
   } = useAudio();
 
   const [selectedLicense, setSelectedLicense] = useState<LicenseType>('premium');
@@ -266,6 +272,52 @@ export default function BeatDetailPage() {
               );
             })}
           </div>
+
+          {/* Free Option: Stream 2 Promoted Songs to Unlock 1 Free Beat */}
+          {!isSold && (
+            <div className="mt-8 p-6 rounded-sm bg-gradient-to-r from-[#04564f]/20 via-surface to-surface-2 border border-[#2dd4bf]/30 flex flex-col sm:flex-row sm:items-center justify-between gap-6">
+              <div className="flex items-start gap-3.5">
+                <div className="p-2.5 rounded-sm bg-[#04564f]/30 border border-[#2dd4bf]/40 text-[#2dd4bf] shrink-0">
+                  <Gift className="h-6 w-6" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-mono uppercase tracking-wider text-amber-300 font-bold">
+                      Free Option // Ad-Supported
+                    </span>
+                    <span className="px-2 py-0.5 rounded-full bg-[#04564f]/40 text-[#2dd4bf] text-[10px] font-mono font-bold border border-[#2dd4bf]/30">
+                      {downloadState.canDownload ? `${downloadState.remaining}/2 Daily Downloads Left` : '24h Cooldown Active'}
+                    </span>
+                  </div>
+                  <h3 className="text-base font-bold text-white mt-1">
+                    Listen to 2 Songs to Download This Beat Free
+                  </h3>
+                  <p className="text-xs text-text-muted mt-1 max-w-xl leading-relaxed">
+                    {downloadState.canDownload
+                      ? `Support emerging artists by streaming 2 promoted songs. Once finished, you can download "${beat.title}" free (2 beats/day limit, resets every 24h, 62 beats/mo).`
+                      : 'You have downloaded your 2 beats for today. You can download again after 24 hours. Enjoy unlimited beat preview streaming anytime!'}
+                  </p>
+                </div>
+              </div>
+
+              <div className="shrink-0">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!downloadState.canDownload) {
+                      openDownloadLimitModal();
+                      return;
+                    }
+                    openRewardedDownload(beat);
+                  }}
+                  className="h-11 px-5 rounded-pill bg-[#04564f] hover:bg-[#135d56] text-white text-xs font-bold flex items-center gap-2 border border-[#2dd4bf]/40 transition-colors shadow-lg shadow-[#04564f]/25"
+                >
+                  <Download className="h-4 w-4" />
+                  <span>{downloadState.canDownload ? 'Stream 2 Songs & Download Free' : 'Daily Limit (24h Cooldown)'}</span>
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </main>
 

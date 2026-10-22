@@ -131,17 +131,21 @@ export default function PricingPage() {
                   <span className="text-xs text-text-muted">/ month</span>
                 </div>
                 <p className="text-xs text-text-muted mt-2">
-                  Untagged preview streaming and 2 free Starter leases every month.
+                  Have access to 62 beats in a month with unlimited beat preview.
                 </p>
 
                 <ul className="mt-6 pt-5 border-t border-border space-y-2.5 text-xs text-text-muted">
                   <li className="flex items-center gap-2 text-text font-medium">
                     <Check className="h-4 w-4 text-accent-live" />
-                    <span>2 Starter leases included monthly (₦6,000 value)</span>
+                    <span>Access to 62 beats every month (2 beats daily)</span>
+                  </li>
+                  <li className="flex items-center gap-2 text-text font-medium">
+                    <Check className="h-4 w-4 text-accent-live" />
+                    <span>Unlimited beat preview streaming (100% clean &amp; untagged)</span>
                   </li>
                   <li className="flex items-center gap-2">
                     <Check className="h-4 w-4 text-accent-live" />
-                    <span>Clean 128kbps MP3 preview streaming (zero voice tags)</span>
+                    <span>Daily 2-beat download quota (resets after 24 hours)</span>
                   </li>
                   <li className="flex items-center gap-2">
                     <Check className="h-4 w-4 text-accent-live" />

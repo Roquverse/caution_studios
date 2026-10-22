@@ -13,16 +13,17 @@ export const PricingSection: React.FC<PricingSectionProps> = ({ onSelectPlan }) 
   const plans = [
     {
       id: 'starter',
-      name: 'Starter Plan',
+      name: 'Caution Plus',
       price: '₦3,000',
       period: '/ month',
-      description: 'Perfect for artists starting playlisting & streaming',
+      description: 'Have access to 62 beats in a month with unlimited beat preview',
       isRecommended: false,
       features: [
-        'Unlimited streaming & beat previewing',
+        'Access to 62 beats in a month (2 beats daily)',
+        'Unlimited beat preview streaming',
+        'Daily 2-beat download quota (resets after 24 hours)',
         'High quality MP3 audio downloads',
         'Non-exclusive release rights',
-        'Content ID clearance for 1 channel',
         'Community curator pitching support'
       ]
     },

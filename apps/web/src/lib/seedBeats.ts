@@ -21,9 +21,14 @@ export const SEEDED_PRODUCERS = [
     handle: 'kelp_vibes',
     display_name: 'Kelp Vibes',
     avatar_url: '/images/album_neon_dj.jpg',
-    bio: 'Multi-platinum Afrobeats & Amapiano architect based in Lagos.',
+    bio: 'Multi-platinum Afrobeats & Amapiano architect based in Lagos. Pioneer of the Caution sound.',
     roles: ['producer'] as any,
+    primary_role: 'producer' as any,
     plan: 'plus' as any,
+    is_verified: true, // Qualified via free beat streaming revenue payout!
+    verification_reason: 'Qualified partner: Earned over ₦140,000 in free beat streaming royalties.',
+    streaming_earnings_cents: 14000000,
+    streaming_streams_count: 128400,
     stripe_payouts_enabled: true,
     basic_leases_used_this_period: 0,
     created_at: new Date().toISOString()
@@ -35,7 +40,12 @@ export const SEEDED_PRODUCERS = [
     avatar_url: '/images/album_sunrise.jpg',
     bio: 'Heavy 808s, hypnotic log drums, and melodic vocal chops.',
     roles: ['producer'] as any,
+    primary_role: 'producer' as any,
     plan: 'plus' as any,
+    is_verified: true, // Qualified via free beat streaming revenue payout!
+    verification_reason: 'Qualified partner: Earned over ₦95,000 in free beat streaming royalties.',
+    streaming_earnings_cents: 9500000,
+    streaming_streams_count: 88200,
     stripe_payouts_enabled: true,
     basic_leases_used_this_period: 0,
     created_at: new Date().toISOString()
@@ -45,9 +55,14 @@ export const SEEDED_PRODUCERS = [
     handle: 'dr_sound',
     display_name: 'Dr. Sound Lab',
     avatar_url: '/images/hero_boombox.jpg',
-    bio: 'Grammy-nominated trap and UK drill beatmaker.',
+    bio: 'Grammy-nominated trap and UK drill beatmaker. High volume beat marketplace seller.',
     roles: ['producer'] as any,
+    primary_role: 'producer' as any,
     plan: 'plus' as any,
+    is_verified: false, // Has beat sales, but NOT YET verified because streaming earnings < ₦50,000 threshold
+    verification_reason: 'Unverified Beat Seller: Has sold 42 licenses, but pending ₦50,000 milestone from free streaming plays.',
+    streaming_earnings_cents: 1420000, // ₦14,200 (under ₦50,000 threshold)
+    streaming_streams_count: 12300,
     stripe_payouts_enabled: true,
     basic_leases_used_this_period: 0,
     created_at: new Date().toISOString()
@@ -57,12 +72,89 @@ export const SEEDED_PRODUCERS = [
     handle: 'luna_beats',
     display_name: 'Luna Audio',
     avatar_url: '/images/golden_clef.jpg',
-    bio: 'Lush R&B guitars, nostalgic chords, and neo-soul grooves.',
+    bio: 'Lush R&B guitars, nostalgic chords, and neo-soul grooves for filmmakers and vocalists.',
     roles: ['producer'] as any,
+    primary_role: 'producer' as any,
     plan: 'plus' as any,
+    is_verified: false, // Beat seller, not yet qualified from free streaming earnings
+    verification_reason: 'Unverified Beat Seller: Free beat streaming royalties under ₦50,000 verification minimum.',
+    streaming_earnings_cents: 850000, // ₦8,500
+    streaming_streams_count: 7400,
     stripe_payouts_enabled: true,
     basic_leases_used_this_period: 0,
     created_at: new Date().toISOString()
+  }
+];
+
+export interface PromotedArtistSong {
+  id: string;
+  title: string;
+  artist_name: string;
+  artist_handle: string;
+  cover_url: string;
+  duration_seconds: number;
+  snippet_seconds: number;
+  genre: string;
+  tagline: string;
+  streaming_links: {
+    spotify: string;
+    apple_music: string;
+    audiomack: string;
+    youtube: string;
+  };
+}
+
+export const SEEDED_PROMOTED_SONGS: PromotedArtistSong[] = [
+  {
+    id: 'promo-song-1',
+    title: 'Midnight Lagos',
+    artist_name: 'Teniola Sound',
+    artist_handle: 'teniola_snd',
+    cover_url: '/images/artist_studio_mic.jpg',
+    duration_seconds: 165,
+    snippet_seconds: 15,
+    genre: 'Afro-Soul',
+    tagline: 'Stream the new breakout single "Midnight Lagos" out everywhere now!',
+    streaming_links: {
+      spotify: 'https://open.spotify.com/search/Teniola%20Sound%20Midnight%20Lagos',
+      apple_music: 'https://music.apple.com/search?term=Teniola%20Sound',
+      audiomack: 'https://audiomack.com/search?q=Teniola%20Sound',
+      youtube: 'https://youtube.com/results?search_query=Teniola+Sound+Midnight+Lagos'
+    }
+  },
+  {
+    id: 'promo-song-2',
+    title: 'Golden Horizon',
+    artist_name: 'Zino Waves ft. Caution',
+    artist_handle: 'zinowaves',
+    cover_url: '/images/album_sunrise.jpg',
+    duration_seconds: 180,
+    snippet_seconds: 15,
+    genre: 'Amapiano Fusion',
+    tagline: 'Catch the infectious groove on all streaming DSPs & support independent artists.',
+    streaming_links: {
+      spotify: 'https://open.spotify.com/search/Zino%20Waves',
+      apple_music: 'https://music.apple.com/search?term=Zino%20Waves',
+      audiomack: 'https://audiomack.com/search?q=Zino%20Waves',
+      youtube: 'https://youtube.com/results?search_query=Zino+Waves+Golden+Horizon'
+    }
+  },
+  {
+    id: 'promo-song-3',
+    title: 'Eko Nights (Live Acoustics)',
+    artist_name: 'Damian Cross',
+    artist_handle: 'damiancross',
+    cover_url: '/images/cinematic_hero_tunnel.jpg',
+    duration_seconds: 195,
+    snippet_seconds: 15,
+    genre: 'Afrobeats Alté',
+    tagline: 'Recorded at Caution Soundstage. Add to your favourite Spotify & Apple playlists.',
+    streaming_links: {
+      spotify: 'https://open.spotify.com/search/Damian%20Cross',
+      apple_music: 'https://music.apple.com/search?term=Damian%20Cross',
+      audiomack: 'https://audiomack.com/search?q=Damian%20Cross',
+      youtube: 'https://youtube.com/results?search_query=Damian+Cross+Eko+Nights'
+    }
   }
 ];
 

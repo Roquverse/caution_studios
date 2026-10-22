@@ -9,9 +9,15 @@ import { EarningsChart } from '../../components/studio/EarningsChart';
 import { CartDrawer } from '../../components/cart/CartDrawer';
 import { NowPlayingPanel } from '../../components/audio/NowPlayingPanel';
 import { formatNaira } from '../../lib/paystack';
-import { Upload, Music, DollarSign, Layers, ArrowRight } from 'lucide-react';
+import { Upload, Music, DollarSign, Layers, ArrowRight, ShieldCheck, Gift, MessageSquare, AlertCircle, Sparkles, CheckCircle2 } from 'lucide-react';
 
 export default function StudioDashboardPage() {
+  // Free beat streaming payout progress (Spec: Must earn from free beat streaming before verification)
+  const streamingThresholdNgn = 50000;
+  const currentStreamingEarningsNgn = 38500;
+  const streamingProgressPct = Math.min(100, Math.round((currentStreamingEarningsNgn / streamingThresholdNgn) * 100));
+  const isVerified = currentStreamingEarningsNgn >= streamingThresholdNgn;
+
   const recentSales = [
     {
       id: 'ord-101',
@@ -77,6 +83,92 @@ export default function StudioDashboardPage() {
               <Upload className="h-3.5 w-3.5" />
               <span>Upload new beat</span>
             </Link>
+          </div>
+        </div>
+
+        {/* 1. Producer 3-Month Free Promo Status Banner */}
+        <div className="mt-6 p-4 rounded-sm bg-gradient-to-r from-amber-500/15 via-[#04564f]/20 to-surface border border-amber-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-start gap-3">
+            <div className="p-2 rounded-sm bg-amber-500/20 text-amber-300">
+              <Gift className="h-5 w-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-sm font-bold text-white">Producer Launch Promo Active</h3>
+                <span className="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 text-[10px] font-mono font-bold">
+                  3 Months Free
+                </span>
+              </div>
+              <p className="text-xs text-text-muted mt-0.5">
+                Zero subscription fees applied. You keep 80% on all sales and qualify for streaming royalties. 78 days remaining.
+              </p>
+            </div>
+          </div>
+          <div className="shrink-0 text-right sm:text-left">
+            <span className="text-[11px] font-mono text-amber-300">PROMO: PRODUCER_3MO_FREE</span>
+          </div>
+        </div>
+
+        {/* 2. Producer Verification Status Card (Streaming Royalties Requirement) */}
+        <div className="mt-4 p-5 rounded-sm bg-surface border border-border">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-border">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-mono uppercase tracking-wider text-text-muted">
+                  Partner Status // Differentiation
+                </span>
+                {isVerified ? (
+                  <span className="px-2 py-0.5 rounded-full bg-[#04564f]/30 border border-[#2dd4bf]/40 text-[10px] font-bold text-[#2dd4bf] flex items-center gap-1">
+                    <ShieldCheck className="h-3 w-3" />
+                    <span>Verified Producer</span>
+                  </span>
+                ) : (
+                  <span className="px-2 py-0.5 rounded-full bg-surface-2 border border-border text-[10px] font-bold text-amber-300 flex items-center gap-1">
+                    <Sparkles className="h-3 w-3" />
+                    <span>Beat Seller (Verification In-Progress)</span>
+                  </span>
+                )}
+              </div>
+              <h2 className="text-base sm:text-lg font-bold text-white mt-1">
+                {isVerified ? 'Caution Verified Streaming Partner' : 'Free Beat Streaming Verification Progress'}
+              </h2>
+              <p className="text-xs text-text-muted mt-0.5 max-w-2xl leading-relaxed">
+                Verification differentiates beat sellers from streaming producers. You only qualify for the Verified Producer badge and direct artist recording chat once you earn payouts from free beat streaming.
+              </p>
+            </div>
+
+            <div className="shrink-0 p-3 rounded-sm bg-surface-2 border border-border text-right md:text-left">
+              <span className="text-[11px] font-mono text-text-muted block">Free Stream Royalties</span>
+              <span className="text-lg font-black font-mono text-accent-live">
+                {formatNaira(currentStreamingEarningsNgn)}
+              </span>
+              <span className="text-[10px] text-text-muted block font-mono">
+                Goal: {formatNaira(streamingThresholdNgn)}
+              </span>
+            </div>
+          </div>
+
+          <div className="mt-4 space-y-2">
+            <div className="flex justify-between text-xs font-mono">
+              <span className="text-text-muted">Progress to Verified Producer Status</span>
+              <span className="text-text font-bold">{streamingProgressPct}%</span>
+            </div>
+            <div className="w-full h-2 rounded-full bg-surface-2 overflow-hidden border border-border">
+              <div
+                className="h-full bg-gradient-to-r from-accent to-accent-live transition-all duration-500 rounded-full"
+                style={{ width: `${streamingProgressPct}%` }}
+              />
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 text-xs text-text-muted">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="h-4 w-4 text-accent-live shrink-0" />
+                <span>Upload beats for free streaming to drive plays</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <MessageSquare className="h-4 w-4 text-accent-live shrink-0" />
+                <span>Unlocks Direct Artist-to-Producer Studio Chat upon completion</span>
+              </div>
+            </div>
           </div>
         </div>
 

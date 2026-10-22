@@ -16,13 +16,49 @@ export interface Profile {
   avatar_url?: string | null;
   bio?: string | null;
   roles: AppRole[];
+  primary_role?: AppRole;
   plan: PlanTier;
   stripe_customer_id?: string | null;
   stripe_account_id?: string | null;
   stripe_payouts_enabled: boolean;
   basic_leases_used_this_period: number;
   period_resets_at?: string | null;
+  is_verified?: boolean;
+  verification_reason?: string;
+  streaming_earnings_cents?: number;
+  streaming_streams_count?: number;
+  trial_ends_at?: string | null;
+  promo_applied?: string | null;
   created_at: string;
+}
+
+export interface ChatMessage {
+  id: string;
+  sender_id: string;
+  recipient_id: string;
+  content: string;
+  is_encrypted: boolean;
+  has_contact_info: boolean;
+  contact_audit_note?: string;
+  read_at?: string | null;
+  created_at: string;
+}
+
+export interface PromotedSong {
+  id: string;
+  artist_id?: string;
+  title: string;
+  artist_name: string;
+  cover_url: string;
+  duration_seconds: number;
+  snippet_seconds: number;
+  genre: string;
+  streaming_links: {
+    spotify?: string;
+    apple_music?: string;
+    audiomack?: string;
+    youtube?: string;
+  };
 }
 
 export interface Beat {

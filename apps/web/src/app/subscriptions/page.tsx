@@ -16,9 +16,10 @@ import {
 } from 'lucide-react';
 import { supabase } from '../../lib/supabaseClient';
 import { UserDropdown, UserProfileData } from '../../components/UserDropdown';
-import { setCachedUserPlan } from '../../lib/subscription';
+import { setCachedUserPlan, useDailyDownloadQuota } from '../../lib/subscription';
 
 export default function SubscriptionsPage() {
+  const downloadQuota = useDailyDownloadQuota();
   const [profile, setProfile] = useState<UserProfileData | null>(null);
   const [currentPlan, setCurrentPlan] = useState<'free' | 'plus'>('free');
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('monthly');
@@ -195,9 +196,26 @@ export default function SubscriptionsPage() {
             </div>
             <p className="text-xs text-gray-400 leading-relaxed max-w-xl">
               {isPlus
-                ? 'Your plan includes unlimited 24-bit lossless streaming, stems (.ZIP) downloads, and 1 monthly lease credit. Renews on Nov 15, 2026.'
-                : 'You are on the free tier with 128kbps tagged previews. Upgrade to Caution Plus for lossless streaming and WAV stems.'}
+                ? 'Your Caution Plus plan gives you access to 62 beats in a month with unlimited beat preview. You can download up to 2 beats every day (resets every 24 hours).'
+                : 'Enjoy unlimited beat preview streaming on Caution Studio! Upgrade to Caution Plus to download 2 beats daily (62 beats per month) with commercial release rights.'}
             </p>
+
+            {/* Daily Download Quota Status Pill */}
+            <div className="pt-2 flex flex-wrap items-center gap-2 text-xs">
+              <span className="px-3 py-1 rounded-full bg-white/5 border border-white/10 text-gray-300 flex items-center gap-1.5 font-mono text-[11px]">
+                <Download className="w-3.5 h-3.5 text-[#2dd4bf]" />
+                <span>Today’s Downloads: <strong>{downloadQuota.downloadsCount}/2 Beats</strong></span>
+              </span>
+              <span className="px-3 py-1 rounded-full bg-[#04564f]/30 border border-[#2dd4bf]/30 text-[#2dd4bf] font-mono text-[11px] flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-[#2dd4bf] animate-ping" />
+                <span>Unlimited Beat Preview Active</span>
+              </span>
+              {!downloadQuota.canDownload && (
+                <span className="px-2.5 py-1 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-300 font-mono text-[11px]">
+                  Next download resets in {downloadQuota.hoursRemaining}h {downloadQuota.minutesRemaining}m
+                </span>
+              )}
+            </div>
           </div>
 
           <div className="shrink-0 flex items-center gap-3">
@@ -346,13 +364,21 @@ export default function SubscriptionsPage() {
                   </span>
                 </div>
                 <p className="text-xs text-gray-400 leading-relaxed">
-                  Full studio clearance for active recording artists, labels, and commercial creators.
+                  Have access to 62 beats in a month with unlimited beat preview.
                 </p>
 
                 <div className="space-y-2.5 pt-2 text-xs text-gray-300">
+                  <div className="flex items-center gap-2 text-white font-medium">
+                    <Check className="h-4 w-4 text-[#2dd4bf] shrink-0" />
+                    <span>Access to 62 beats every month (2 beats daily)</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-white font-medium">
+                    <Check className="h-4 w-4 text-[#2dd4bf] shrink-0" />
+                    <span>Unlimited beat preview streaming (100% clean &amp; untagged)</span>
+                  </div>
                   <div className="flex items-center gap-2">
                     <Check className="h-4 w-4 text-[#2dd4bf] shrink-0" />
-                    <span>Unlimited 24-bit lossless FLAC streaming</span>
+                    <span>Daily 2-beat download quota (resets after 24 hours)</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <Check className="h-4 w-4 text-[#2dd4bf] shrink-0" />
@@ -361,10 +387,6 @@ export default function SubscriptionsPage() {
                   <div className="flex items-center gap-2">
                     <Check className="h-4 w-4 text-[#2dd4bf] shrink-0" />
                     <span>Commercial synchronization rights (YouTube, DSPs)</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Check className="h-4 w-4 text-[#2dd4bf] shrink-0" />
-                    <span>1 Free Basic Lease credit every month</span>
                   </div>
                 </div>
               </div>
