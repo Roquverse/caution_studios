@@ -23,7 +23,8 @@ import {
   Check,
   ExternalLink,
   Flame,
-  CheckCircle2
+  CheckCircle2,
+  Mic
 } from 'lucide-react';
 
 interface UserMarketplaceViewProps {
@@ -37,6 +38,7 @@ interface UserMarketplaceViewProps {
   toggleListenLater: (track: TrackItem) => void;
   handleDownload: (track: TrackItem, e: React.MouseEvent) => void;
   downloadingId?: string | null;
+  onOpenSoundstage?: (track: TrackItem) => void;
 }
 
 const GENRE_LIST = ['All Genres', 'Afrobeats', 'Amapiano', 'Trap', 'Drill', 'R&B', 'Electronic', 'Cinematic'];
@@ -51,7 +53,8 @@ export function UserMarketplaceView({
   listenLaterIds,
   toggleListenLater,
   handleDownload,
-  downloadingId
+  downloadingId,
+  onOpenSoundstage
 }: UserMarketplaceViewProps) {
   const [selectedSection, setSelectedSection] = useState<'all' | 'free' | 'premium' | 'exclusive'>('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -444,6 +447,22 @@ export function UserMarketplaceView({
                     >
                       <Download className="h-3.5 w-3.5" />
                     </button>
+
+                    {/* Record Vocal / Soundstage */}
+                    {onOpenSoundstage && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onOpenSoundstage(row);
+                        }}
+                        title="Record your vocals directly over this beat"
+                        className="px-2.5 py-1.5 rounded-lg bg-teal-500/15 hover:bg-teal-500/25 border border-teal-500/30 text-teal-300 text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 transition-colors cursor-pointer"
+                      >
+                        <Mic className="h-3 w-3 text-teal-400" />
+                        <span className="hidden sm:inline">Record</span>
+                      </button>
+                    )}
 
                     {/* "Get Beat" CTA Button */}
                     <button

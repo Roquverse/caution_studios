@@ -26,12 +26,14 @@ import {
   Download,
   Star,
   Menu,
-  ShoppingBag
+  ShoppingBag,
+  Mic
 } from 'lucide-react';
 import { audioSynth } from '@caution/ui';
 import { UserDropdown } from '../components/UserDropdown';
 import { UserAdModal } from '../components/UserAdModal';
 import { UserMarketplaceView } from '../components/UserMarketplaceView';
+import { UserSoundstageModal } from '../components/UserSoundstageModal';
 import { useUserSubscription, FREE_PREVIEW_LIMIT_SECONDS } from '../lib/subscription';
 import { supabase } from '../lib/supabaseClient';
 
@@ -166,6 +168,14 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
   const [streamsCount, setStreamsCount] = useState(0);
   const [songsPlayedCount, setSongsPlayedCount] = useState(0);
   const [isAdModalOpen, setIsAdModalOpen] = useState(false);
+  const [isSoundstageOpen, setIsSoundstageOpen] = useState(false);
+  const [soundstageTrack, setSoundstageTrack] = useState<TrackItem | null>(null);
+
+  const handleOpenSoundstage = (track?: TrackItem) => {
+    if (track) setSoundstageTrack(track);
+    else if (currentTrack) setSoundstageTrack(currentTrack);
+    setIsSoundstageOpen(true);
+  };
 
   // Table beats seeded from real database beats
   const [playlistRows, setPlaylistRows] = useState<TrackItem[]>(effectiveBeats);
@@ -888,6 +898,23 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
                   Store
                 </span>
               </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  handleOpenSoundstage();
+                }}
+                className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold text-teal-300 bg-teal-500/10 hover:bg-teal-500/20 border border-teal-500/20 transition-all cursor-pointer"
+              >
+                <div className="flex items-center gap-3">
+                  <Mic className="h-4 w-4 text-teal-400" />
+                  <span>Record Vocal (Studio)</span>
+                </div>
+                <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-teal-500/30 text-teal-300 uppercase">
+                  Studio
+                </span>
+              </button>
             </nav>
 
             {/* YOUR MUSIC */}
@@ -1009,6 +1036,21 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
                 </div>
                 <span className="text-[9px] font-mono font-bold px-1.5 py-0.2 rounded bg-[#E8B896]/20 text-[#E8B896] uppercase">
                   Store
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleOpenSoundstage()}
+                className="w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-semibold text-teal-300 bg-teal-500/10 hover:bg-teal-500/20 border border-teal-500/20 transition-all cursor-pointer mt-1"
+                title="Open Studio Vocal Recorder"
+              >
+                <div className="flex items-center gap-3">
+                  <Mic className="h-4 w-4 text-teal-400" />
+                  <span>Record Vocal</span>
+                </div>
+                <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-teal-500/30 text-teal-300 uppercase">
+                  Studio
                 </span>
               </button>
             </nav>
@@ -1623,6 +1665,7 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
               toggleListenLater={toggleListenLater}
               handleDownload={handleDownload}
               downloadingId={downloadingId}
+              onOpenSoundstage={handleOpenSoundstage}
             />
           ) : (
             <>
@@ -2366,6 +2409,16 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
 
             <button
               type="button"
+              onClick={() => handleOpenSoundstage(currentTrack)}
+              className="p-1.5 text-teal-400 hover:text-teal-300 transition-colors cursor-pointer"
+              aria-label="Record song over beat"
+              title="Record Song"
+            >
+              <Mic className="h-4 w-4 text-teal-400" />
+            </button>
+
+            <button
+              type="button"
               onClick={() => toggleLike(currentTrack.id)}
               className="p-1.5 text-gray-400 hover:text-red-500 transition-colors cursor-pointer"
               aria-label="Favorite"
@@ -2484,6 +2537,16 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
                 title="Download Current Song (WAV)"
               >
                 <Download className="h-3.5 w-3.5" />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleOpenSoundstage(currentTrack)}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-teal-500/15 hover:bg-teal-500/25 border border-teal-500/30 text-teal-300 text-xs font-semibold transition-colors cursor-pointer ml-1"
+                title="Record your vocals or song idea directly over this beat"
+              >
+                <Mic className="h-3 w-3 text-teal-400" />
+                <span className="hidden lg:inline text-[11px]">Record Vocal</span>
               </button>
             </div>
 
@@ -2708,6 +2771,14 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
       <UserAdModal
         isOpen={isAdModalOpen}
         onClose={() => setIsAdModalOpen(false)}
+      />
+
+      {/* Soundstage In-Browser Vocal & Song Recorder */}
+      <UserSoundstageModal
+        isOpen={isSoundstageOpen}
+        onClose={() => setIsSoundstageOpen(false)}
+        preselectedTrack={soundstageTrack}
+        availableTracks={effectiveBeats}
       />
     </div>
   );
