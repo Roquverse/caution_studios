@@ -23,7 +23,7 @@ import {
   ArrowRight,
   ExternalLink
 } from 'lucide-react';
-import { TrackItem } from '../app/UserPortalClient';
+import { TrackItem } from '../types/tracks';
 import { useUserSubscription } from '../lib/subscription';
 
 interface UserSoundstageModalProps {

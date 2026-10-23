@@ -1,5 +1,6 @@
 import { supabase } from '../lib/supabaseClient';
-import UserPortalClient, { TrackItem, ProducerItem, FALLBACK_BEATS, FALLBACK_PRODUCERS } from './UserPortalClient';
+import UserPortalClient from './UserPortalClient';
+import { TrackItem, ProducerItem, FALLBACK_BEATS, FALLBACK_PRODUCERS } from '../types/tracks';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
