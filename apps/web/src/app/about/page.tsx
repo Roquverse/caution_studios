@@ -53,6 +53,10 @@ export default function AboutPage() {
             At Caution Studio, we believe that every talented artist deserves the opportunity to bring their musical vision to life, regardless of their budget or level of experience.
           </p>
 
+          <p className="mt-4 text-base sm:text-lg font-bold text-[#E8B896] tracking-wide">
+            Stay creative.
+          </p>
+
           <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
             <Link
               href="/beats"
