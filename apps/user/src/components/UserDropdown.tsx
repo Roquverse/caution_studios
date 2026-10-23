@@ -76,6 +76,12 @@ export function UserDropdown() {
     // Listen to auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       if (session?.user) {
+        if (typeof document !== 'undefined') {
+          const isProd = window.location.hostname.includes('cautionstudioz.com');
+          const domainStr = isProd ? '; domain=.cautionstudioz.com' : '';
+          document.cookie = `sb-token=${session.access_token}; path=/; max-age=604800; SameSite=Lax${domainStr}`;
+          document.cookie = `sb-refresh=${session.refresh_token}; path=/; max-age=604800; SameSite=Lax${domainStr}`;
+        }
         setEmail(session.user.email || '');
         const { data } = await supabase
           .from('profiles')
@@ -121,6 +127,12 @@ export function UserDropdown() {
   const handleSignOut = async () => {
     try {
       await supabase.auth.signOut();
+      if (typeof document !== 'undefined') {
+        const isProd = window.location.hostname.includes('cautionstudioz.com');
+        const domainStr = isProd ? '; domain=.cautionstudioz.com' : '';
+        document.cookie = `sb-token=; path=/; max-age=0${domainStr}`;
+        document.cookie = `sb-refresh=; path=/; max-age=0${domainStr}`;
+      }
       setCachedUserPlan('free');
       router.push('/login');
     } catch (err) {

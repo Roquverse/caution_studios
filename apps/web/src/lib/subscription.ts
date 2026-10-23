@@ -66,7 +66,30 @@ export function useUserSubscription() {
           }
         }
 
-        const { data: { session } } = await supabase.auth.getSession();
+        let session = (await supabase.auth.getSession()).data.session;
+
+        // If not in localStorage, check shared root-domain/localhost cookies
+        if (!session?.user && typeof document !== 'undefined') {
+          const matchToken = document.cookie.match(/(?:^|;\s*)sb-token=([^;]*)/);
+          const matchRefresh = document.cookie.match(/(?:^|;\s*)sb-refresh=([^;]*)/);
+          const cookieToken = matchToken ? decodeURIComponent(matchToken[1]) : null;
+          const cookieRefresh = matchRefresh ? decodeURIComponent(matchRefresh[1]) : null;
+
+          if (cookieToken && cookieRefresh) {
+            try {
+              const { data: restored } = await supabase.auth.setSession({
+                access_token: cookieToken,
+                refresh_token: cookieRefresh
+              });
+              if (restored?.session?.user) {
+                session = restored.session;
+              }
+            } catch (e) {
+              console.warn('Failed restoring session from cookie in apps/web:', e);
+            }
+          }
+        }
+
         if (!session?.user) {
           if (isMounted) {
             setIsLoggedIn(false);
@@ -79,6 +102,14 @@ export function useUserSubscription() {
             setIsLoading(false);
           }
           return;
+        }
+
+        // Keep session cookie synchronized across domains
+        if (typeof document !== 'undefined' && session) {
+          const isProd = window.location.hostname.includes('cautionstudioz.com');
+          const domainStr = isProd ? '; domain=.cautionstudioz.com' : '';
+          document.cookie = `sb-token=${session.access_token}; path=/; max-age=604800; SameSite=Lax${domainStr}`;
+          document.cookie = `sb-refresh=${session.refresh_token}; path=/; max-age=604800; SameSite=Lax${domainStr}`;
         }
 
         const user = session.user;
