@@ -4,19 +4,23 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAudio } from '../audio/AudioProvider';
-import { ShoppingBag, Menu, X } from 'lucide-react';
-import { AUTH_LOGIN_URL, AUTH_SIGNUP_URL, CREATOR_LOGIN_URL } from '../../lib/urls';
+import { ShoppingBag, Menu, X, ArrowRight, LayoutDashboard } from 'lucide-react';
+import { APP_URL, AUTH_LOGIN_URL, AUTH_SIGNUP_URL, CREATOR_LOGIN_URL } from '../../lib/urls';
+import { useUserSubscription } from '../../lib/subscription';
+import { UserDropdown } from '../UserDropdown';
+import { supabase } from '../../lib/supabaseClient';
 
 export const TopNav: React.FC = () => {
   const pathname = usePathname();
   const { cart, setIsCartOpen } = useAudio();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const { isLoggedIn, userProfile } = useUserSubscription();
 
   const navLinks = [
     { label: 'Home', href: '/' },
     { label: 'About Us', href: '/about' },
-    { label: 'Beat Store', href: '/beats' },
-    { label: 'Free Beats', href: '/beats?section=free' },
+    { label: 'Beat Store', href: `${APP_URL}?tab=marketplace` },
+    { label: 'Free Beats', href: `${APP_URL}?tab=marketplace&filter=free` },
     { label: 'Pricing', href: '/pricing' },
     { label: 'FAQ', href: '/faq' },
     { label: 'Credit', href: '/#credits' },
@@ -84,19 +88,52 @@ export const TopNav: React.FC = () => {
             Creator Portal
           </a>
 
-          <a
-            href={AUTH_LOGIN_URL}
-            className="hidden md:inline-flex text-xs font-semibold text-text-muted hover:text-text px-3 py-1.5 transition-colors"
-          >
-            Sign in
-          </a>
+          {isLoggedIn && userProfile ? (
+            <div className="hidden md:flex items-center gap-3">
+              <a
+                href={APP_URL}
+                className="inline-flex items-center gap-2 px-3 py-1.5 rounded-pill bg-surface-2 hover:bg-surface border border-border text-text text-xs font-semibold transition-colors"
+                title="Go to App Dashboard"
+              >
+                <div className="w-5 h-5 rounded-full overflow-hidden bg-black border border-accent flex items-center justify-center shrink-0">
+                  {userProfile.avatar_url ? (
+                    <img src={userProfile.avatar_url} alt={userProfile.display_name} className="w-full h-full object-cover" />
+                  ) : (
+                    <span className="text-[10px] font-bold text-accent">
+                      {userProfile.display_name.charAt(0).toUpperCase()}
+                    </span>
+                  )}
+                </div>
+                <span className="max-w-[120px] truncate">{userProfile.display_name}</span>
+              </a>
 
-          <a
-            href={AUTH_SIGNUP_URL}
-            className="hidden md:inline-flex h-8 px-4 rounded-pill border border-border hover:border-text-faint text-text text-xs font-semibold items-center justify-center transition-colors"
-          >
-            Get started
-          </a>
+              <a
+                href={APP_URL}
+                className="inline-flex h-8 px-4 rounded-pill bg-accent hover:opacity-90 text-bg text-xs font-semibold items-center justify-center transition-colors gap-1"
+              >
+                <span>Dashboard</span>
+                <ArrowRight className="h-3.5 w-3.5" />
+              </a>
+
+              <UserDropdown initialProfile={userProfile as any} />
+            </div>
+          ) : (
+            <>
+              <a
+                href={AUTH_LOGIN_URL}
+                className="hidden md:inline-flex text-xs font-semibold text-text-muted hover:text-text px-3 py-1.5 transition-colors"
+              >
+                Sign in
+              </a>
+
+              <a
+                href={AUTH_SIGNUP_URL}
+                className="hidden md:inline-flex h-8 px-4 rounded-pill border border-border hover:border-text-faint text-text text-xs font-semibold items-center justify-center transition-colors"
+              >
+                Get started
+              </a>
+            </>
+          )}
 
           {/* Mobile hamburger */}
           <button
@@ -130,22 +167,70 @@ export const TopNav: React.FC = () => {
           >
             Producer / Creator Dashboard →
           </a>
-          <div className="pt-3 border-t border-border flex gap-2">
-            <a
-              href={AUTH_LOGIN_URL}
-              onClick={() => setMobileMenuOpen(false)}
-              className="flex-1 h-9 rounded-sm border border-border text-center text-xs font-medium text-text flex items-center justify-center"
-            >
-              Sign in
-            </a>
-            <a
-              href={AUTH_SIGNUP_URL}
-              onClick={() => setMobileMenuOpen(false)}
-              className="flex-1 h-9 rounded-sm bg-accent text-center text-xs font-medium text-text flex items-center justify-center"
-            >
-              Get started
-            </a>
-          </div>
+
+          {isLoggedIn && userProfile ? (
+            <div className="pt-3 border-t border-border space-y-2.5">
+              <div className="flex items-center gap-3 p-2.5 bg-surface-2 rounded-sm border border-border">
+                <div className="w-8 h-8 rounded-full overflow-hidden bg-black border border-accent flex items-center justify-center shrink-0">
+                  {userProfile.avatar_url ? (
+                    <img src={userProfile.avatar_url} alt={userProfile.display_name} className="w-full h-full object-cover" />
+                  ) : (
+                    <span className="text-xs font-bold text-accent">
+                      {userProfile.display_name.charAt(0).toUpperCase()}
+                    </span>
+                  )}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-bold text-text truncate">{userProfile.display_name}</p>
+                  <p className="text-[10px] text-accent truncate">@{userProfile.handle}</p>
+                </div>
+              </div>
+
+              <div className="flex gap-2">
+                <a
+                  href={APP_URL}
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="flex-1 h-9 rounded-sm bg-accent text-center text-xs font-bold text-bg flex items-center justify-center"
+                >
+                  Open Dashboard
+                </a>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    setMobileMenuOpen(false);
+                    await supabase.auth.signOut();
+                    if (typeof document !== 'undefined') {
+                      const isProd = window.location.hostname.includes('cautionstudioz.com');
+                      const domainStr = isProd ? '; domain=.cautionstudioz.com' : '';
+                      document.cookie = `sb-token=; path=/; max-age=0${domainStr}`;
+                      document.cookie = `sb-refresh=; path=/; max-age=0${domainStr}`;
+                    }
+                    window.location.href = '/';
+                  }}
+                  className="px-3 h-9 rounded-sm border border-border text-center text-xs font-medium text-red-400 hover:bg-surface-2 flex items-center justify-center cursor-pointer"
+                >
+                  Sign out
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="pt-3 border-t border-border flex gap-2">
+              <a
+                href={AUTH_LOGIN_URL}
+                onClick={() => setMobileMenuOpen(false)}
+                className="flex-1 h-9 rounded-sm border border-border text-center text-xs font-medium text-text flex items-center justify-center"
+              >
+                Sign in
+              </a>
+              <a
+                href={AUTH_SIGNUP_URL}
+                onClick={() => setMobileMenuOpen(false)}
+                className="flex-1 h-9 rounded-sm bg-accent text-center text-xs font-medium text-text flex items-center justify-center"
+              >
+                Get started
+              </a>
+            </div>
+          )}
         </div>
       )}
     </header>

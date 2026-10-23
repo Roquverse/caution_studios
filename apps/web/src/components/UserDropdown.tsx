@@ -7,6 +7,9 @@ import { User, Settings, CreditCard, LogOut, ChevronRight, Sparkles } from 'luci
 import { supabase } from '../lib/supabaseClient';
 import { setCachedUserPlan } from '../lib/subscription';
 
+import { LayoutDashboard, ShoppingBag } from 'lucide-react';
+import { APP_URL } from '../lib/urls';
+
 export interface UserProfileData {
   id: string;
   handle: string;
@@ -17,57 +20,61 @@ export interface UserProfileData {
   roles?: string[];
 }
 
-export function UserDropdown() {
+export function UserDropdown({ initialProfile }: { initialProfile?: UserProfileData | null }) {
   const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
-  const [profile, setProfile] = useState<UserProfileData | null>(null);
+  const [profile, setProfile] = useState<UserProfileData | null>(initialProfile || null);
   const [email, setEmail] = useState<string>('');
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    let isMounted = true;
+
     async function loadUser() {
       try {
         const { data: { session } } = await supabase.auth.getSession();
         if (session?.user) {
+          if (!isMounted) return;
           setEmail(session.user.email || '');
+
+          const user = session.user;
+          const meta = user.user_metadata || {};
+          const fallbackName = meta.full_name || meta.name || meta.display_name || user.email?.split('@')[0] || 'My Account';
+          const fallbackHandle = meta.handle || meta.username || user.email?.split('@')[0] || 'user';
+
           const { data, error } = await supabase
             .from('profiles')
             .select('*')
-            .eq('id', session.user.id)
+            .eq('id', user.id)
             .maybeSingle();
 
-          if (data) {
-            setProfile(data);
-            setCachedUserPlan(data.plan || 'free');
-            return;
+          if (isMounted) {
+            if (data) {
+              setProfile(data);
+              setCachedUserPlan(data.plan || 'free');
+            } else {
+              setProfile({
+                id: user.id,
+                handle: fallbackHandle,
+                display_name: fallbackName,
+                avatar_url: meta.avatar_url || null,
+                plan: 'free',
+                bio: null
+              });
+              setCachedUserPlan('free');
+            }
           }
+          return;
         }
 
-        // If no active session or record, fetch the primary profile or fallback gracefully
-        const { data: publicProfile } = await supabase
-          .from('profiles')
-          .select('*')
-          .limit(1)
-          .maybeSingle();
-
-        if (publicProfile) {
-          setProfile(publicProfile);
-          setCachedUserPlan(publicProfile.plan || 'free');
-          setEmail('arakunrincole@cautionstudio.com');
-        } else {
-          setProfile({
-            id: 'demo-user',
-            handle: 'arakunrincole',
-            display_name: 'Arakunrin Cole',
-            avatar_url: '/images/artist_studio_mic.jpg',
-            plan: 'free',
-            bio: 'Producer & Audio Engineer at Caution Studio'
-          });
-          setCachedUserPlan('free');
-          setEmail('cole@cautionstudio.com');
+        // If no active session, DO NOT fall back to dummy profile
+        if (isMounted) {
+          setProfile(null);
+          setEmail('');
         }
       } catch (err) {
         console.error('Error loading user profile:', err);
+        if (isMounted) setProfile(null);
       }
     }
 
@@ -75,6 +82,7 @@ export function UserDropdown() {
 
     // Listen to auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      if (!isMounted) return;
       if (session?.user) {
         setEmail(session.user.email || '');
         const { data } = await supabase
@@ -82,10 +90,13 @@ export function UserDropdown() {
           .select('*')
           .eq('id', session.user.id)
           .maybeSingle();
-        if (data) {
+        if (data && isMounted) {
           setProfile(data);
           setCachedUserPlan(data.plan || 'free');
         }
+      } else {
+        setProfile(null);
+        setEmail('');
       }
     });
 
@@ -98,6 +109,7 @@ export function UserDropdown() {
     window.addEventListener('caution:profile-updated', handleProfileUpdate);
 
     return () => {
+      isMounted = false;
       subscription.unsubscribe();
       window.removeEventListener('caution:profile-updated', handleProfileUpdate);
     };
@@ -122,13 +134,23 @@ export function UserDropdown() {
     try {
       await supabase.auth.signOut();
       setCachedUserPlan('free');
-      router.push('/sign-in');
+      if (typeof document !== 'undefined') {
+        const isProd = window.location.hostname.includes('cautionstudioz.com');
+        const domainStr = isProd ? '; domain=.cautionstudioz.com' : '';
+        document.cookie = `sb-token=; path=/; max-age=0${domainStr}`;
+        document.cookie = `sb-refresh=; path=/; max-age=0${domainStr}`;
+      }
+      setProfile(null);
+      window.location.href = '/';
     } catch (err) {
       console.error('Sign out error:', err);
-      setCachedUserPlan('free');
-      router.push('/sign-in');
+      window.location.href = '/';
     }
   };
+
+  if (!profile) {
+    return null;
+  }
 
   const isPlus = profile?.plan === 'plus';
 
@@ -195,6 +217,30 @@ export function UserDropdown() {
 
           {/* Navigation Links */}
           <div className="space-y-0.5">
+            <a
+              href={APP_URL}
+              onClick={() => setIsOpen(false)}
+              className="flex items-center justify-between p-2.5 rounded-lg text-xs font-semibold text-white bg-white/[0.04] hover:bg-white/[0.08] transition-colors group"
+            >
+              <div className="flex items-center gap-2.5">
+                <LayoutDashboard className="h-4 w-4 text-[#2dd4bf]" />
+                <span className="text-white">App Dashboard</span>
+              </div>
+              <ChevronRight className="h-3.5 w-3.5 text-gray-500 group-hover:text-white transition-colors" />
+            </a>
+
+            <a
+              href={`${APP_URL}?tab=marketplace`}
+              onClick={() => setIsOpen(false)}
+              className="flex items-center justify-between p-2.5 rounded-lg text-xs font-medium text-gray-300 hover:text-white hover:bg-white/[0.06] transition-colors group"
+            >
+              <div className="flex items-center gap-2.5">
+                <ShoppingBag className="h-4 w-4 text-[#E8B896] group-hover:text-[#E8B896] transition-colors" />
+                <span>Beat Marketplace</span>
+              </div>
+              <ChevronRight className="h-3.5 w-3.5 text-gray-600 group-hover:text-gray-400 transition-colors" />
+            </a>
+
             <Link
               href="/profile"
               onClick={() => setIsOpen(false)}

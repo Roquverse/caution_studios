@@ -205,9 +205,26 @@ export default function RegisterPage() {
 
       setStep('success');
       const isProducer = primaryRole === 'producer';
-      const destinationUrl = isProducer
+      let destinationUrl = isProducer
         ? `${CREATOR_PORTAL_URL}/login?registered=true&email=${encodeURIComponent(email)}`
         : USER_PORTAL_URL;
+
+      if (data?.session) {
+        const session = data.session;
+        if (typeof document !== 'undefined') {
+          const isProd = window.location.hostname.includes('cautionstudioz.com');
+          const domainStr = isProd ? '; domain=.cautionstudioz.com' : '';
+          document.cookie = `sb-token=${session.access_token}; path=/; max-age=604800; SameSite=Lax${domainStr}`;
+          document.cookie = `sb-refresh=${session.refresh_token}; path=/; max-age=604800; SameSite=Lax${domainStr}`;
+        }
+        try {
+          const targetOrigin = new URL(destinationUrl, window.location.href).origin;
+          if (targetOrigin !== window.location.origin) {
+            const separator = destinationUrl.includes('#') ? '&' : '#';
+            destinationUrl = `${destinationUrl}${separator}access_token=${session.access_token}&refresh_token=${session.refresh_token}&token_type=bearer`;
+          }
+        } catch (e) {}
+      }
 
       setTimeout(() => {
         window.location.href = destinationUrl;

@@ -20,7 +20,10 @@ import {
   ShieldCheck,
   CheckCircle2
 } from 'lucide-react';
-import { AUTH_LOGIN_URL, AUTH_SIGNUP_URL } from '../lib/urls';
+import { APP_URL, AUTH_LOGIN_URL, AUTH_SIGNUP_URL } from '../lib/urls';
+import { useUserSubscription } from '../lib/subscription';
+import { UserDropdown } from './UserDropdown';
+import { supabase } from '../lib/supabaseClient';
 
 interface HeroSectionProps {
   onAnalyze?: (link: string) => void;
@@ -45,6 +48,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
   onOpenCart,
   onOpenSoundstage
 }) => {
+  const { isLoggedIn, userProfile } = useUserSubscription();
   const [searchQuery, setSearchQuery] = useState('');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [activeWorkflow, setActiveWorkflow] = useState<'Discover Beats' | 'Bring Ideas To Life' | 'Direct Producer Chat' | 'Release & Distribute'>('Bring Ideas To Life');
@@ -79,17 +83,17 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
       if (onSearch) {
         onSearch(searchQuery.trim());
       } else {
-        window.location.href = `/beats?q=${encodeURIComponent(searchQuery.trim())}`;
+        window.location.href = `${APP_URL}?tab=marketplace&q=${encodeURIComponent(searchQuery.trim())}`;
       }
     } else {
-      window.location.href = '/beats';
+      window.location.href = `${APP_URL}?tab=marketplace`;
     }
   };
 
   const navLinks = [
     { label: 'Home', href: '/' },
     { label: 'About Us', href: '/about' },
-    { label: 'Beat Store', href: '/beats' },
+    { label: 'Beat Store', href: `${APP_URL}?tab=marketplace` },
     { label: 'Pricing', href: '/pricing' },
     { label: 'FAQ', href: '/faq' },
     { label: 'Credit', href: '/#credits' },
@@ -211,34 +215,69 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
               </button>
             )}
 
-            <a
-              href={AUTH_LOGIN_URL}
-              onClick={(e) => {
-                if (onSignIn) {
-                  e.preventDefault();
-                  onSignIn();
-                }
-              }}
-              className="hidden md:inline-flex text-xs sm:text-sm font-medium text-neutral-300 hover:text-white px-2 sm:px-3 py-1.5 transition-colors"
-            >
-              Sign In
-            </a>
+            {isLoggedIn && userProfile ? (
+              <div className="hidden md:flex items-center gap-3">
+                <a
+                  href={APP_URL}
+                  className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/[0.07] hover:bg-white/[0.12] border border-white/15 text-white text-xs font-semibold transition-all group"
+                  title="Open App Dashboard"
+                >
+                  <div className="w-5 h-5 rounded-full overflow-hidden bg-black border border-[#2dd4bf]/50 flex items-center justify-center shrink-0">
+                    {userProfile.avatar_url ? (
+                      <img src={userProfile.avatar_url} alt={userProfile.display_name} className="w-full h-full object-cover" />
+                    ) : (
+                      <span className="text-[10px] font-bold text-[#2dd4bf]">
+                        {userProfile.display_name.charAt(0).toUpperCase()}
+                      </span>
+                    )}
+                  </div>
+                  <span className="max-w-[130px] truncate text-neutral-200 group-hover:text-white">
+                    {userProfile.display_name}
+                  </span>
+                </a>
 
-            <Button
-              variant="primary"
-              size="sm"
-              pill
-              onClick={() => {
-                if (onGetStarted) {
-                  onGetStarted();
-                } else {
-                  window.location.href = AUTH_SIGNUP_URL;
-                }
-              }}
-              className="hidden md:inline-flex text-xs font-bold uppercase tracking-wider px-4 sm:px-5 py-2 sm:py-2.5 bg-[#04564f] hover:bg-[#03453f] text-white transition-all shadow-md shadow-[#04564f]/40 border border-[#2dd4bf]/20"
-            >
-              Get Started
-            </Button>
+                <a
+                  href={APP_URL}
+                  className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider px-4 py-2 rounded-full bg-[#04564f] hover:bg-[#03453f] text-white transition-all shadow-md shadow-[#04564f]/40 border border-[#2dd4bf]/30"
+                >
+                  <span>Dashboard</span>
+                  <ArrowRight className="h-3.5 w-3.5 text-[#2dd4bf]" />
+                </a>
+
+                <UserDropdown initialProfile={userProfile as any} />
+              </div>
+            ) : (
+              <>
+                <a
+                  href={AUTH_LOGIN_URL}
+                  onClick={(e) => {
+                    if (onSignIn) {
+                      e.preventDefault();
+                      onSignIn();
+                    }
+                  }}
+                  className="hidden md:inline-flex text-xs sm:text-sm font-medium text-neutral-300 hover:text-white px-2 sm:px-3 py-1.5 transition-colors"
+                >
+                  Sign In
+                </a>
+
+                <Button
+                  variant="primary"
+                  size="sm"
+                  pill
+                  onClick={() => {
+                    if (onGetStarted) {
+                      onGetStarted();
+                    } else {
+                      window.location.href = AUTH_SIGNUP_URL;
+                    }
+                  }}
+                  className="hidden md:inline-flex text-xs font-bold uppercase tracking-wider px-4 sm:px-5 py-2 sm:py-2.5 bg-[#04564f] hover:bg-[#03453f] text-white transition-all shadow-md shadow-[#04564f]/40 border border-[#2dd4bf]/20"
+                >
+                  Get Started
+                </Button>
+              </>
+            )}
 
             {/* Mobile Hamburger Button */}
             <button
@@ -272,41 +311,88 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                 </a>
               ))}
 
-              <div className="pt-4 border-t border-white/10 space-y-2.5">
-                <Button
-                  variant="primary"
-                  size="md"
-                  pill
-                  onClick={() => {
-                    setMobileMenuOpen(false);
-                    if (onGetStarted) {
-                      onGetStarted();
-                    } else {
-                      window.location.href = AUTH_SIGNUP_URL;
-                    }
-                  }}
-                  className="w-full text-xs font-bold uppercase tracking-wider py-3 bg-[#04564f] hover:bg-[#03453f] text-white font-semibold shadow-md shadow-[#04564f]/30"
-                >
-                  Get Started
-                </Button>
+              {isLoggedIn && userProfile ? (
+                <div className="pt-4 border-t border-white/10 space-y-3">
+                  <div className="flex items-center gap-3 p-3 bg-white/5 border border-white/10 rounded-2xl">
+                    <div className="w-10 h-10 rounded-full overflow-hidden bg-black border border-[#2dd4bf]/40 shrink-0 flex items-center justify-center">
+                      {userProfile.avatar_url ? (
+                        <img src={userProfile.avatar_url} alt={userProfile.display_name} className="w-full h-full object-cover" />
+                      ) : (
+                        <span className="text-sm font-bold text-[#2dd4bf]">
+                          {userProfile.display_name.charAt(0).toUpperCase()}
+                        </span>
+                      )}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs font-bold text-white truncate">{userProfile.display_name}</p>
+                      <p className="text-[11px] text-[#2dd4bf] truncate">@{userProfile.handle}</p>
+                    </div>
+                  </div>
 
-                <Button
-                  variant="outline"
-                  size="md"
-                  pill
-                  onClick={() => {
-                    setMobileMenuOpen(false);
-                    if (onSignIn) {
-                      onSignIn();
-                    } else {
-                      window.location.href = AUTH_LOGIN_URL;
-                    }
-                  }}
-                  className="w-full text-xs font-bold uppercase tracking-wider py-3 border-white/20 text-white hover:bg-white hover:text-black"
-                >
-                  Sign In
-                </Button>
-              </div>
+                  <a
+                    href={APP_URL}
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="w-full flex items-center justify-center gap-2 text-xs font-bold uppercase tracking-wider py-3 bg-[#04564f] hover:bg-[#03453f] text-white rounded-full shadow-md shadow-[#04564f]/30"
+                  >
+                    <span>Open App Dashboard</span>
+                    <ArrowRight className="h-4 w-4 text-[#2dd4bf]" />
+                  </a>
+
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      setMobileMenuOpen(false);
+                      await supabase.auth.signOut();
+                      if (typeof document !== 'undefined') {
+                        const isProd = window.location.hostname.includes('cautionstudioz.com');
+                        const domainStr = isProd ? '; domain=.cautionstudioz.com' : '';
+                        document.cookie = `sb-token=; path=/; max-age=0${domainStr}`;
+                        document.cookie = `sb-refresh=; path=/; max-age=0${domainStr}`;
+                      }
+                      window.location.href = '/';
+                    }}
+                    className="w-full flex items-center justify-center gap-2 text-xs font-semibold py-2.5 border border-white/15 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-full transition-colors cursor-pointer"
+                  >
+                    <span>Sign Out</span>
+                  </button>
+                </div>
+              ) : (
+                <div className="pt-4 border-t border-white/10 space-y-2.5">
+                  <Button
+                    variant="primary"
+                    size="md"
+                    pill
+                    onClick={() => {
+                      setMobileMenuOpen(false);
+                      if (onGetStarted) {
+                        onGetStarted();
+                      } else {
+                        window.location.href = AUTH_SIGNUP_URL;
+                      }
+                    }}
+                    className="w-full text-xs font-bold uppercase tracking-wider py-3 bg-[#04564f] hover:bg-[#03453f] text-white font-semibold shadow-md shadow-[#04564f]/30"
+                  >
+                    Get Started
+                  </Button>
+
+                  <Button
+                    variant="outline"
+                    size="md"
+                    pill
+                    onClick={() => {
+                      setMobileMenuOpen(false);
+                      if (onSignIn) {
+                        onSignIn();
+                      } else {
+                        window.location.href = AUTH_LOGIN_URL;
+                      }
+                    }}
+                    className="w-full text-xs font-bold uppercase tracking-wider py-3 border-white/20 text-white hover:bg-white hover:text-black"
+                  >
+                    Sign In
+                  </Button>
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -318,7 +404,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
         {/* Top Eyebrow Badge with Commercial Royalty-Free License info */}
         <div className="mb-6 flex justify-center lg:justify-start">
           <a
-            href="/beats"
+            href={`${APP_URL}?tab=marketplace`}
             className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/5 hover:bg-white/10 border border-[#2dd4bf]/30 text-xs text-neutral-200 backdrop-blur-xl shadow-lg transition-all hover:scale-105"
           >
             <ShieldCheck className="w-3.5 h-3.5 text-[#2dd4bf]" />
@@ -375,7 +461,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
               
               {/* Feature Card 1: Top Producer Beats */}
               <a
-                href="/beats"
+                href={`${APP_URL}?tab=marketplace`}
                 className="group relative flex items-center justify-between p-4 rounded-2xl bg-[#121418]/80 hover:bg-[#161a20]/90 border border-white/[0.08] hover:border-[#2dd4bf]/40 backdrop-blur-xl transition-all duration-300 shadow-lg shadow-black/40 hover:-translate-y-0.5"
               >
                 <div className="flex items-center gap-3.5">
@@ -590,7 +676,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                 onClick={() => {
                   if (onOpenSoundstage) onOpenSoundstage();
                   else if (onGetStarted) onGetStarted();
-                  else window.location.href = '/beats';
+                  else window.location.href = `${APP_URL}?tab=marketplace`;
                 }}
                 className="absolute top-[48%] -right-4 sm:-right-6 -translate-y-1/2 w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-gradient-to-br from-[#0F4F49] via-[#04564f] to-[#033430] border border-[#2dd4bf]/50 hover:border-[#2dd4bf] shadow-[0_10px_30px_rgba(0,0,0,0.8),0_0_30px_rgba(45,212,191,0.4)] flex flex-col items-center justify-center text-white transition-all duration-300 hover:scale-105 group z-30"
               >
@@ -724,7 +810,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
             ].map((tag) => (
               <a
                 key={tag.label}
-                href={tag.genre === 'Exclusive' ? '/beats?genre=Exclusive' : `/beats?genre=${encodeURIComponent(tag.genre)}`}
+                href={tag.genre === 'Exclusive' ? `${APP_URL}?tab=marketplace&filter=exclusive` : `${APP_URL}?tab=marketplace&genre=${encodeURIComponent(tag.genre)}`}
                 className="px-3 py-0.5 rounded-full bg-white/[0.05] hover:bg-white/10 border border-white/[0.06] hover:border-[#2dd4bf]/40 text-neutral-400 hover:text-white transition-all text-[11px]"
               >
                 {tag.label}

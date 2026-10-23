@@ -178,6 +178,19 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
   const [invoices, setInvoices] = useState<any[]>([]);
   const [loadingInvoices, setLoadingInvoices] = useState(false);
 
+  // Handle URL navigation tab parameter (e.g. ?tab=marketplace or ?tab=beats)
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const tab = params.get('tab');
+      if (tab === 'marketplace' || tab === 'beats') {
+        setActiveNav('marketplace');
+      } else if (tab === 'playlists' || tab === 'fav' || tab === 'later' || tab === 'history') {
+        setActiveNav(tab);
+      }
+    }
+  }, []);
+
   // Load billing invoices
   useEffect(() => {
     async function loadInvoices() {

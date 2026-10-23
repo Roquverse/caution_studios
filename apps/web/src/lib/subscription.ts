@@ -22,11 +22,23 @@ export function setCachedUserPlan(plan: string) {
   window.dispatchEvent(new CustomEvent('caution:plan-changed', { detail: { plan } }));
 }
 
+export interface CurrentUserProfile {
+  id: string;
+  email: string;
+  handle: string;
+  display_name: string;
+  avatar_url?: string | null;
+  bio?: string | null;
+  plan: string;
+  roles: string[];
+}
+
 export function useUserSubscription() {
   const [plan, setPlan] = useState<string>('free');
   const [isSubscribed, setIsSubscribed] = useState<boolean>(false);
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [userProfile, setUserProfile] = useState<CurrentUserProfile | null>(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -36,10 +48,29 @@ export function useUserSubscription() {
 
     async function checkSubscription() {
       try {
+        // If arrived with hash token from cross-origin auth
+        if (typeof window !== 'undefined' && window.location.hash.includes('access_token=')) {
+          const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+          const accessToken = hashParams.get('access_token');
+          const refreshToken = hashParams.get('refresh_token');
+          if (accessToken && refreshToken) {
+            try {
+              await supabase.auth.setSession({
+                access_token: accessToken,
+                refresh_token: refreshToken
+              });
+              window.history.replaceState(null, '', window.location.pathname + window.location.search);
+            } catch (e) {
+              console.warn('Failed to set session from URL hash:', e);
+            }
+          }
+        }
+
         const { data: { session } } = await supabase.auth.getSession();
         if (!session?.user) {
           if (isMounted) {
             setIsLoggedIn(false);
+            setUserProfile(null);
             setPlan('free');
             setIsSubscribed(false);
             if (typeof window !== 'undefined') {
@@ -50,18 +81,33 @@ export function useUserSubscription() {
           return;
         }
 
-        if (isMounted) {
-          setIsLoggedIn(true);
-        }
+        const user = session.user;
+        const meta = user.user_metadata || {};
+        const fallbackName =
+          meta.full_name || meta.name || meta.display_name || user.email?.split('@')[0] || 'My Account';
+        const fallbackHandle = meta.handle || meta.username || user.email?.split('@')[0] || 'user';
 
         const { data: profile } = await supabase
           .from('profiles')
-          .select('plan')
-          .eq('id', session.user.id)
+          .select('*')
+          .eq('id', user.id)
           .maybeSingle();
 
-        const currentPlan = profile?.plan || 'free';
+        const currentPlan = profile?.plan || meta.plan || 'free';
+        const profileObj: CurrentUserProfile = {
+          id: user.id,
+          email: user.email || '',
+          handle: profile?.handle || fallbackHandle,
+          display_name: profile?.display_name || fallbackName,
+          avatar_url: profile?.avatar_url || meta.avatar_url || null,
+          bio: profile?.bio || null,
+          plan: currentPlan,
+          roles: Array.isArray(profile?.roles) ? profile.roles : []
+        };
+
         if (isMounted) {
+          setIsLoggedIn(true);
+          setUserProfile(profileObj);
           setPlan(currentPlan);
           setIsSubscribed(isPlanSubscribed(currentPlan));
           if (typeof window !== 'undefined') {
@@ -90,13 +136,13 @@ export function useUserSubscription() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (!session) {
         setIsLoggedIn(false);
+        setUserProfile(null);
         setPlan('free');
         setIsSubscribed(false);
         if (typeof window !== 'undefined') {
           localStorage.setItem('caution:user-plan', 'free');
         }
       } else {
-        setIsLoggedIn(true);
         checkSubscription();
       }
     });
@@ -116,6 +162,7 @@ export function useUserSubscription() {
     isLoggedIn,
     isRegistered: isLoggedIn,
     isLoading,
+    userProfile,
     previewLimitSeconds: FREE_PREVIEW_LIMIT_SECONDS
   };
 }

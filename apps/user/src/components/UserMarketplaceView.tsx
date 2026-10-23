@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { TrackItem } from '../app/UserPortalClient';
 import {
   Search,
@@ -58,6 +58,21 @@ export function UserMarketplaceView({
   const [selectedGenre, setSelectedGenre] = useState('All Genres');
   const [selectedBpmRange, setSelectedBpmRange] = useState<string>('All');
   const [sortBy, setSortBy] = useState<'popular' | 'newest' | 'bpm'>('popular');
+
+  // Read URL query params on mount
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const q = params.get('q');
+      const filter = params.get('filter') || params.get('section');
+      const genre = params.get('genre');
+      if (q) setSearchQuery(q);
+      if (filter && ['free', 'premium', 'exclusive', 'all'].includes(filter.toLowerCase())) {
+        setSelectedSection(filter.toLowerCase() as any);
+      }
+      if (genre) setSelectedGenre(genre);
+    }
+  }, []);
 
   // License Modal State
   const [licenseModalTrack, setLicenseModalTrack] = useState<TrackItem | null>(null);

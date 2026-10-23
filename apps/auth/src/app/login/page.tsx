@@ -40,11 +40,33 @@ export default function LoginPage() {
         email.toLowerCase().includes('producer') ||
         email.toLowerCase().includes('creator');
 
-      const targetUrl = email.toLowerCase().includes('admin')
+      const urlParams = new URLSearchParams(window.location.search);
+      const redirectParam = urlParams.get('redirect');
+
+      const defaultTarget = email.toLowerCase().includes('admin')
         ? ADMIN_PORTAL_URL
         : isProducer
         ? CREATOR_PORTAL_URL
         : USER_PORTAL_URL;
+
+      let targetUrl = redirectParam || defaultTarget;
+
+      if (data?.session) {
+        const session = data.session;
+        if (typeof document !== 'undefined') {
+          const isProd = window.location.hostname.includes('cautionstudioz.com');
+          const domainStr = isProd ? '; domain=.cautionstudioz.com' : '';
+          document.cookie = `sb-token=${session.access_token}; path=/; max-age=604800; SameSite=Lax${domainStr}`;
+          document.cookie = `sb-refresh=${session.refresh_token}; path=/; max-age=604800; SameSite=Lax${domainStr}`;
+        }
+        try {
+          const targetOrigin = new URL(targetUrl, window.location.href).origin;
+          if (targetOrigin !== window.location.origin) {
+            const separator = targetUrl.includes('#') ? '&' : '#';
+            targetUrl = `${targetUrl}${separator}access_token=${session.access_token}&refresh_token=${session.refresh_token}&token_type=bearer`;
+          }
+        } catch (e) {}
+      }
 
       window.location.href = targetUrl;
     } catch (err: any) {
