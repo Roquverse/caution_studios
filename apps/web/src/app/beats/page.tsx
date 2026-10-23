@@ -29,8 +29,10 @@ import {
   Zap,
   Info,
   Layers,
-  Radio
+  Radio,
+  Mic
 } from 'lucide-react';
+import { SoundstageModal } from '../../components/studio/SoundstageModal';
 
 export default function BeatsPage() {
   return (
@@ -58,6 +60,8 @@ function BeatsContent() {
   const [selectedBpmRange, setSelectedBpmRange] = useState<string>('All');
   const [selectedTag, setSelectedTag] = useState<string>('All');
   const [sortBy, setSortBy] = useState<'popular' | 'newest' | 'bpm'>('popular');
+  const [isSoundstageOpen, setIsSoundstageOpen] = useState(false);
+  const [soundstageBeat, setSoundstageBeat] = useState<Beat | null>(null);
 
   // Fetch real beats from /api/beats
   useEffect(() => {
@@ -198,11 +202,21 @@ function BeatsContent() {
     <div className="min-h-screen bg-[#07090E] text-white flex flex-col pb-28">
       <TopNav />
 
-      {/* 1. Top Promo Announcement Strip */}
-      <div className="w-full bg-[#E8B896] text-black py-2.5 px-4 text-center font-black tracking-wider text-xs uppercase flex items-center justify-center gap-2 shadow-sm">
-        <Flame className="h-4 w-4 fill-black" />
-        <span>Buy 2 Beats, Get 1 Free Promo Active · Limited Time Studio Offer</span>
-        <Flame className="h-4 w-4 fill-black" />
+      {/* 1. Top Promo Announcement Strip: Royalties & Free Studio Support */}
+      <div className="w-full bg-gradient-to-r from-[#E8B896] via-[#f5d0b5] to-[#E8B896] text-black py-2.5 px-4 text-center font-black tracking-wider text-xs uppercase flex items-center justify-center gap-2 shadow-sm flex-wrap">
+        <Flame className="h-4 w-4 fill-black shrink-0 animate-pulse" />
+        <span className="font-extrabold tracking-tight sm:tracking-wider">
+          PRODUCERS: EARN ₦30,000 ROYALTIES PER 10,000 DOWNLOADS ON EACH BEAT
+        </span>
+        <span className="hidden md:inline opacity-40">•</span>
+        <span className="hidden md:inline font-bold">
+          ARTISTS: GET FREE STUDIO SESSIONS &amp; DEVELOPMENT SUPPORT FROM CAUTION STUDIOZ
+        </span>
+        <span className="hidden lg:inline opacity-40">•</span>
+        <span className="hidden lg:inline font-bold text-neutral-900">
+          BUY 2 BEATS, GET 1 FREE ACTIVE
+        </span>
+        <Flame className="h-4 w-4 fill-black shrink-0 animate-pulse" />
       </div>
 
       <main className="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
@@ -447,28 +461,42 @@ function BeatsContent() {
         {selectedSection === 'free' && (
           <div className="mb-8 rounded-2xl bg-gradient-to-r from-teal-950/60 via-[#0F131C] to-teal-950/40 border border-teal-500/30 p-5 sm:p-6 shadow-xl relative overflow-hidden">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-              <div className="space-y-1.5 max-w-2xl">
+              <div className="space-y-2 max-w-2xl">
                 <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-teal-500/20 text-teal-300 text-[11px] font-bold uppercase tracking-wider">
                   <Headphones className="h-3 w-3" />
-                  <span>Free Beat Section · Ad-Supported Streaming</span>
+                  <span>Free Beat Section · ₦30,000 Royalty Milestone &amp; Free Studio Sponsorship</span>
                 </div>
                 <h2 className="text-xl sm:text-2xl font-black text-white">
-                  Earn Monthly While Supporting Upcoming Artists
+                  Earn ₦30,000 Per 10k Downloads &amp; Get Free Studio Sponsorship
                 </h2>
                 <p className="text-xs sm:text-sm text-gray-300 leading-relaxed">
-                  Producers can make beats available for free streaming. Listeners and upcoming artists stream them for free with a short unskippable audio ad every 3 songs (Audiomack/Spotify model). Producers earn monthly royalties from the ad pool & subscription pool towards their <span className="text-teal-300 font-semibold">₦50,000 threshold</span> for the Verified Producer badge.
+                  <strong className="text-teal-300">For Producers:</strong> Make your beats available for free commercial streaming and downloads. Caution Studio pays an automated <span className="text-teal-300 font-bold">₦30,000 royalty payout per 10,000 qualifying downloads</span> for each beat in this section.
+                </p>
+                <p className="text-xs sm:text-sm text-gray-300 leading-relaxed">
+                  <strong className="text-teal-300">For Upcoming Artists:</strong> Stream any free beat and record your vocal ideas in our in-browser <span className="text-teal-300 font-bold">Caution Soundstage</span>. Export high-quality audio for TikTok and Instagram Reels, and submit your take directly to Caution Studioz. We pick talented artists to receive <span className="text-teal-300 font-bold">Free Full Studio Sessions, Vocal Mixing, and Artist Development Support</span>!
                 </p>
               </div>
 
               <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSoundstageBeat(beatsList.find((b) => b.is_free_stream_enabled !== false) || null);
+                    setIsSoundstageOpen(true);
+                  }}
+                  className="px-4 py-2.5 rounded-xl bg-teal-400 hover:bg-teal-300 text-black text-xs font-black text-center flex items-center justify-center gap-1.5 shadow-lg shadow-teal-400/20 transition-all hover:scale-105"
+                >
+                  <Mic className="h-4 w-4" />
+                  <span>Open Soundstage Recorder</span>
+                </button>
                 <a
                   href={`${CREATOR_URL}/beats/upload`}
                   target="_blank"
                   rel="noreferrer"
-                  className="px-4 py-2.5 rounded-xl bg-teal-400 hover:bg-teal-300 text-black text-xs font-black text-center flex items-center justify-center gap-1.5 shadow-lg shadow-teal-400/20 transition-all hover:scale-105"
+                  className="px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-bold text-center flex items-center justify-center gap-1.5 border border-white/10 transition-all"
                 >
                   <Upload className="h-4 w-4" />
-                  <span>Upload Free Beat (Creator Portal)</span>
+                  <span>Upload Free Beat</span>
                 </a>
               </div>
             </div>
@@ -660,6 +688,13 @@ function BeatsContent() {
         beat={priceModalBeat}
         isOpen={Boolean(priceModalBeat)}
         onClose={() => setPriceModalBeat(null)}
+      />
+
+      {/* 11. Caution Soundstage Studio Modal */}
+      <SoundstageModal
+        isOpen={isSoundstageOpen}
+        onClose={() => setIsSoundstageOpen(false)}
+        preselectedBeat={soundstageBeat}
       />
     </div>
   );

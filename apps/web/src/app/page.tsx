@@ -19,6 +19,7 @@ import { BookCallModal } from '../components/BookCallModal';
 import { CheckoutPlanModal } from '../components/CheckoutPlanModal';
 import { CartDrawer } from '../components/cart/CartDrawer';
 import { NowPlayingPanel } from '../components/audio/NowPlayingPanel';
+import { SoundstageModal } from '../components/studio/SoundstageModal';
 import { useAudio } from '../components/audio/AudioProvider';
 import { AudioPlayer, audioSynth, MOCK_TRACKS } from '@caution/ui';
 import { Track } from '@caution/types';
@@ -32,6 +33,7 @@ export default function LandingPage() {
   const [assessmentLink, setAssessmentLink] = useState('');
   const [isBookCallOpen, setIsBookCallOpen] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<{ name: string; price: string } | null>(null);
+  const [isSoundstageOpen, setIsSoundstageOpen] = useState(false);
 
   // Global Audio & Cart from AudioProvider
   const {
@@ -149,7 +151,8 @@ export default function LandingPage() {
         onBookCall={() => setIsBookCallOpen(true)}
         onOpenAssessment={() => setIsAssessmentOpen(true)}
         onSignIn={() => (window.location.href = AUTH_LOGIN_URL)}
-        onGetStarted={() => (window.location.href = AUTH_SIGNUP_URL)}
+        onGetStarted={() => setIsSoundstageOpen(true)}
+        onOpenSoundstage={() => setIsSoundstageOpen(true)}
         cartCount={cart.length}
         onOpenCart={() => setIsCartOpen(true)}
       />
@@ -203,6 +206,12 @@ export default function LandingPage() {
       )}
       <CartDrawer />
       <NowPlayingPanel />
+
+      {/* Caution Soundstage Modal */}
+      <SoundstageModal
+        isOpen={isSoundstageOpen}
+        onClose={() => setIsSoundstageOpen(false)}
+      />
     </div>
   );
 }

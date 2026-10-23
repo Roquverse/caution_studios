@@ -31,6 +31,7 @@ interface HeroSectionProps {
   onOpenAssessment?: () => void;
   cartCount?: number;
   onOpenCart?: () => void;
+  onOpenSoundstage?: () => void;
 }
 
 export const HeroSection: React.FC<HeroSectionProps> = ({
@@ -41,7 +42,8 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
   onGetStarted,
   onOpenAssessment,
   cartCount = 0,
-  onOpenCart
+  onOpenCart,
+  onOpenSoundstage
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -465,9 +467,12 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                     <div className="flex items-center justify-between px-1">
                       <button
                         type="button"
-                        onClick={() => setIsRecording(!isRecording)}
+                        onClick={() => {
+                          if (onOpenSoundstage) onOpenSoundstage();
+                          else setIsRecording(!isRecording);
+                        }}
                         className="flex items-center gap-2 group cursor-pointer focus:outline-none"
-                        title={isRecording ? 'Click to Pause Recording' : 'Click to Resume Recording'}
+                        title="Click to Open Soundstage Studio Recorder"
                       >
                         <span
                           className={`w-3 h-3 rounded-full ${
@@ -546,13 +551,16 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                       {/* Button 3: Musical Note */}
                       <button
                         type="button"
-                        onClick={() => setActiveTab('music')}
+                        onClick={() => {
+                          setActiveTab('music');
+                          if (onOpenSoundstage) onOpenSoundstage();
+                        }}
                         className={`h-14 rounded-xl flex items-center justify-center transition-all duration-200 border ${
                           activeTab === 'music'
                             ? 'bg-[#04564f]/35 border-[#2dd4bf]/50 text-[#2dd4bf] shadow-[0_0_15px_rgba(4,86,79,0.35)]'
                             : 'bg-[#14181c] border-white/[0.06] text-neutral-400 hover:text-white hover:bg-[#1a2026]'
                         }`}
-                        title="Beats & Melodies"
+                        title="Import Free Beat & Record Vocals in Soundstage"
                       >
                         <Music className="w-5 h-5" />
                       </button>
@@ -577,13 +585,12 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
               </div>
 
               {/* Floating Circular Action Button: "START ↗" in App Green */}
-              <a
-                href="/beats"
-                onClick={(e) => {
-                  if (onGetStarted) {
-                    e.preventDefault();
-                    onGetStarted();
-                  }
+              <button
+                type="button"
+                onClick={() => {
+                  if (onOpenSoundstage) onOpenSoundstage();
+                  else if (onGetStarted) onGetStarted();
+                  else window.location.href = '/beats';
                 }}
                 className="absolute top-[48%] -right-4 sm:-right-6 -translate-y-1/2 w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-gradient-to-br from-[#0F4F49] via-[#04564f] to-[#033430] border border-[#2dd4bf]/50 hover:border-[#2dd4bf] shadow-[0_10px_30px_rgba(0,0,0,0.8),0_0_30px_rgba(45,212,191,0.4)] flex flex-col items-center justify-center text-white transition-all duration-300 hover:scale-105 group z-30"
               >
@@ -591,7 +598,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                 <span className="text-[10px] sm:text-xs font-bold tracking-wider mt-0.5 text-white">
                   START
                 </span>
-              </a>
+              </button>
 
             </div>
           </div>
