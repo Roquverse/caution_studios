@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Mic,
   Square,
@@ -157,6 +157,36 @@ export const SoundstageModal: React.FC<SoundstageModalProps> = ({
     loadBeats();
   }, [isOpen]);
 
+  // Stop Recording Session
+  const stopRecordingSession = useCallback(() => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      try {
+        mediaRecorderRef.current.stop();
+      } catch (e) {
+        console.warn('Error stopping media recorder:', e);
+      }
+    }
+    if (micStreamRef.current) {
+      micStreamRef.current.getTracks().forEach((t) => t.stop());
+      micStreamRef.current = null;
+    }
+    if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
+      audioContextRef.current.close().catch(() => {});
+    }
+    if (beatAudioRef.current) {
+      beatAudioRef.current.pause();
+    }
+    if (timerIntervalRef.current) {
+      clearInterval(timerIntervalRef.current);
+      timerIntervalRef.current = null;
+    }
+    if (animationFrameRef.current) {
+      cancelAnimationFrame(animationFrameRef.current);
+      animationFrameRef.current = null;
+    }
+    setIsRecording(false);
+  }, []);
+
   // Clean up on unmount or close
   useEffect(() => {
     if (!isOpen) {
@@ -167,7 +197,7 @@ export const SoundstageModal: React.FC<SoundstageModalProps> = ({
       setIsPlayingPreview(false);
       setIsAuditioningBeatId(null);
     }
-  }, [isOpen]);
+  }, [isOpen, stopRecordingSession]);
 
   // Handle Beat Auditioning in the picker
   const toggleAuditionBeat = (beat: Beat, e: React.MouseEvent) => {
@@ -278,31 +308,6 @@ export const SoundstageModal: React.FC<SoundstageModalProps> = ({
     }
   };
 
-  // Stop Recording Session
-  const stopRecordingSession = () => {
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-      mediaRecorderRef.current.stop();
-    }
-    if (micStreamRef.current) {
-      micStreamRef.current.getTracks().forEach((t) => t.stop());
-      micStreamRef.current = null;
-    }
-    if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
-      audioContextRef.current.close().catch(() => {});
-    }
-    if (beatAudioRef.current) {
-      beatAudioRef.current.pause();
-    }
-    if (timerIntervalRef.current) {
-      clearInterval(timerIntervalRef.current);
-      timerIntervalRef.current = null;
-    }
-    if (animationFrameRef.current) {
-      cancelAnimationFrame(animationFrameRef.current);
-      animationFrameRef.current = null;
-    }
-    setIsRecording(false);
-  };
 
   // Synchronized Playback Preview (Vocal + Backing Beat)
   const togglePlayCombinedPreview = () => {

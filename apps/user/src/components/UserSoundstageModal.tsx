@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Mic,
   Square,
@@ -143,6 +143,36 @@ export const UserSoundstageModal: React.FC<UserSoundstageModalProps> = ({
     (t) => !t.priceNgn || t.priceNgn <= 5000 || t.category === 'playlists' || t.category === 'free'
   );
 
+  // Stop Recording Session
+  const stopRecordingSession = useCallback(() => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      try {
+        mediaRecorderRef.current.stop();
+      } catch (e) {
+        console.warn('Error stopping media recorder:', e);
+      }
+    }
+    if (micStreamRef.current) {
+      micStreamRef.current.getTracks().forEach((t) => t.stop());
+      micStreamRef.current = null;
+    }
+    if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
+      audioContextRef.current.close().catch(() => {});
+    }
+    if (beatAudioRef.current) {
+      beatAudioRef.current.pause();
+    }
+    if (timerIntervalRef.current) {
+      clearInterval(timerIntervalRef.current);
+      timerIntervalRef.current = null;
+    }
+    if (animationFrameRef.current) {
+      cancelAnimationFrame(animationFrameRef.current);
+      animationFrameRef.current = null;
+    }
+    setIsRecording(false);
+  }, []);
+
   // Update selected track if preselectedTrack changes
   useEffect(() => {
     if (preselectedTrack) {
@@ -162,9 +192,7 @@ export const UserSoundstageModal: React.FC<UserSoundstageModalProps> = ({
       setIsPlayingPreview(false);
       setIsAuditioningId(null);
     }
-  }, [isOpen]);
-
-  if (!isOpen) return null;
+  }, [isOpen, stopRecordingSession]);
 
   // Handle Auditioning in Beat Picker
   const handleAuditionToggle = (track: TrackItem) => {
@@ -293,31 +321,6 @@ export const UserSoundstageModal: React.FC<UserSoundstageModalProps> = ({
     }
   };
 
-  // Stop Recording Session
-  const stopRecordingSession = () => {
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-      mediaRecorderRef.current.stop();
-    }
-    if (micStreamRef.current) {
-      micStreamRef.current.getTracks().forEach((t) => t.stop());
-      micStreamRef.current = null;
-    }
-    if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
-      audioContextRef.current.close().catch(() => {});
-    }
-    if (beatAudioRef.current) {
-      beatAudioRef.current.pause();
-    }
-    if (timerIntervalRef.current) {
-      clearInterval(timerIntervalRef.current);
-      timerIntervalRef.current = null;
-    }
-    if (animationFrameRef.current) {
-      cancelAnimationFrame(animationFrameRef.current);
-      animationFrameRef.current = null;
-    }
-    setIsRecording(false);
-  };
 
   // Synchronized Playback Preview (Vocal + Backing Beat)
   const togglePlayCombinedPreview = () => {
@@ -477,6 +480,8 @@ export const UserSoundstageModal: React.FC<UserSoundstageModalProps> = ({
     const padS = s.toString().padStart(2, '0');
     return `${padM}:${padS}`;
   };
+
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-black/85 backdrop-blur-xl animate-in fade-in duration-200">
