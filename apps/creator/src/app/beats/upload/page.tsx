@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { CreatorShell } from '../../../components/CreatorShell';
+import { supabase } from '../../../lib/supabaseClient';
 import {
   Upload,
   Music2,
@@ -22,6 +23,7 @@ export default function BeatUploadPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
 
   // Form states
   const [title, setTitle] = useState('');
@@ -38,17 +40,73 @@ export default function BeatUploadPage() {
   const [audioFile, setAudioFile] = useState<string | null>(null);
   const [stemsFile, setStemsFile] = useState<string | null>(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
+    if (!title.trim()) {
+      alert('Please enter a beat title.');
+      return;
+    }
 
-    setTimeout(() => {
-      setLoading(false);
+    setLoading(true);
+    setErrorMessage('');
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const userId = session?.user?.id;
+
+      if (!userId) {
+        setErrorMessage('You must be signed in as a producer to upload beats.');
+        setLoading(false);
+        return;
+      }
+
+      const slug = `${title.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${Date.now().toString().slice(-4)}`;
+      const tagArray = tags.split(',').map((t) => t.trim()).filter(Boolean);
+
+      // 1. Insert beat row into beats table
+      const { data: newBeat, error: beatErr } = await supabase
+        .from('beats')
+        .insert({
+          producer_id: userId,
+          title: title.trim(),
+          slug,
+          genre,
+          bpm: parseInt(bpm, 10) || 110,
+          musical_key: musicalKey.trim(),
+          tags: tagArray,
+          status: 'live',
+          published_at: new Date().toISOString(),
+          is_free_stream_enabled: enableFreeStreaming,
+          producer_tag_free: true,
+          cover_url: '/images/studio_mixing_console.jpg'
+        })
+        .select()
+        .single();
+
+      if (beatErr || !newBeat) {
+        throw new Error(beatErr?.message || 'Could not save beat to database.');
+      }
+
+      // 2. Insert beat licenses
+      const basicCents = (parseInt(priceBasic, 10) || 3000) * 100;
+      const premCents = (parseInt(pricePremium, 10) || 30000) * 100;
+      const exclCents = (parseInt(priceExclusive, 10) || 100000) * 100;
+
+      await supabase.from('beat_licenses').insert([
+        { beat_id: newBeat.id, type: 'basic', price_cents: basicCents, enabled: true },
+        { beat_id: newBeat.id, type: 'premium', price_cents: premCents, enabled: true },
+        { beat_id: newBeat.id, type: 'exclusive', price_cents: exclCents, enabled: true }
+      ]);
+
       setSuccess(true);
       setTimeout(() => {
         router.push('/beats');
-      }, 1200);
-    }, 1500);
+      }, 1000);
+    } catch (err: any) {
+      console.error('Error uploading beat:', err);
+      setErrorMessage(err.message || 'Failed to upload beat. Please try again.');
+      setLoading(false);
+    }
   };
 
   return (
@@ -83,9 +141,16 @@ export default function BeatUploadPage() {
           <div>
             <span className="font-semibold block text-sm">Beat Uploaded Successfully!</span>
             <span className="text-xs text-emerald-300">
-              Your beat is being processed and will be available for streaming and commercial licensing. Redirecting...
+              Your beat is published to the live catalog and will be available for streaming and licensing. Redirecting...
             </span>
           </div>
+        </div>
+      )}
+
+      {errorMessage && (
+        <div className="rounded-md border border-red-500/20 bg-red-500/10 p-4 text-red-400 flex items-center gap-3">
+          <AlertCircle className="h-5 w-5 shrink-0" />
+          <span className="text-xs">{errorMessage}</span>
         </div>
       )}
 

@@ -35,7 +35,30 @@ function CreatorLoginForm() {
   useEffect(() => {
     async function checkExistingSession() {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
+        let session = (await supabase.auth.getSession()).data.session;
+
+        // Restore from cookie if needed
+        if (!session?.user && typeof document !== 'undefined') {
+          const matchToken = document.cookie.match(/(?:^|;\s*)sb-token=([^;]*)/);
+          const matchRefresh = document.cookie.match(/(?:^|;\s*)sb-refresh=([^;]*)/);
+          const cookieToken = matchToken ? decodeURIComponent(matchToken[1]) : null;
+          const cookieRefresh = matchRefresh ? decodeURIComponent(matchRefresh[1]) : null;
+
+          if (cookieToken && cookieRefresh) {
+            try {
+              const { data: restored } = await supabase.auth.setSession({
+                access_token: cookieToken,
+                refresh_token: cookieRefresh
+              });
+              if (restored?.session?.user) {
+                session = restored.session;
+              }
+            } catch (e) {
+              console.warn('Failed restoring creator session from cookie:', e);
+            }
+          }
+        }
+
         if (session?.user) {
           // Verify user role
           const meta = session.user.user_metadata || {};
@@ -100,32 +123,17 @@ function CreatorLoginForm() {
       });
 
       if (error || !data.user || !data.session) {
-        // Fallback for local demo or dev testing
-        if (cleanEmail.includes('creator') || cleanEmail.includes('producer') || cleanEmail === 'demo@caution.studio') {
-          if (typeof window !== 'undefined') {
-            localStorage.setItem(
-              'demo_creator_auth',
-              JSON.stringify({
-                id: 'demo-creator-1',
-                email: cleanEmail,
-                user_metadata: {
-                  full_name: 'Studio Producer',
-                  handle: 'studio_master',
-                  role: 'producer'
-                }
-              })
-            );
-          }
-          setSuccessMsg('Signed in with Demo Creator credentials. Redirecting...');
-          setTimeout(() => {
-            router.replace('/');
-          }, 400);
-          return;
-        }
-
         setErrorMsg(error?.message || 'Invalid email or password. Please verify your credentials.');
         setLoading(false);
         return;
+      }
+
+      // Synchronize session cookies across domains
+      if (typeof document !== 'undefined' && data.session) {
+        const isProd = window.location.hostname.includes('cautionstudioz.com');
+        const domainStr = isProd ? '; domain=.cautionstudioz.com' : '';
+        document.cookie = `sb-token=${data.session.access_token}; path=/; max-age=604800; SameSite=Lax${domainStr}`;
+        document.cookie = `sb-refresh=${data.session.refresh_token}; path=/; max-age=604800; SameSite=Lax${domainStr}`;
       }
 
       // Verify that user is not an Artist trying to enter Creator Studio
@@ -176,26 +184,6 @@ function CreatorLoginForm() {
     }
   };
 
-  const handleQuickDemo = () => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem(
-        'demo_creator_auth',
-        JSON.stringify({
-          id: 'demo-creator-arakunrin',
-          email: 'producer@cautionstudioz.com',
-          user_metadata: {
-            full_name: 'Arakunrin Cole (Producer)',
-            handle: 'arakunrincole',
-            role: 'producer'
-          }
-        })
-      );
-    }
-    setSuccessMsg('Verified producer session loaded. Entering studio...');
-    setTimeout(() => {
-      router.replace('/');
-    }, 300);
-  };
 
   if (checkingExisting) {
     return (
@@ -338,16 +326,7 @@ function CreatorLoginForm() {
           </button>
         </form>
 
-        <div className="mt-4 pt-4 border-t border-zinc-800/80">
-          <button
-            type="button"
-            onClick={handleQuickDemo}
-            className="w-full py-1.5 px-3 rounded-md border border-zinc-800 bg-zinc-900/60 hover:bg-zinc-800/80 text-zinc-300 hover:text-white text-xs font-medium flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
-          >
-            <Sparkles className="h-3.5 w-3.5 text-[#2dd4bf]" />
-            <span>Continue with Verified Demo Creator</span>
-          </button>
-        </div>
+
       </div>
 
       <div className="text-center space-y-2">

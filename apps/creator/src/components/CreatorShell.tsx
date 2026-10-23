@@ -36,13 +36,37 @@ export function CreatorShell({ children, activePath }: CreatorShellProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [checkingAuth, setCheckingAuth] = useState(true);
   const [creatorUser, setCreatorUser] = useState<any>(null);
+  const [producerProfile, setProducerProfile] = useState<any>(null);
 
   useEffect(() => {
     let isMounted = true;
 
     async function checkCreatorSession() {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
+        let session = (await supabase.auth.getSession()).data.session;
+
+        // Restore from cookie if needed
+        if (!session?.user && typeof document !== 'undefined') {
+          const matchToken = document.cookie.match(/(?:^|;\s*)sb-token=([^;]*)/);
+          const matchRefresh = document.cookie.match(/(?:^|;\s*)sb-refresh=([^;]*)/);
+          const cookieToken = matchToken ? decodeURIComponent(matchToken[1]) : null;
+          const cookieRefresh = matchRefresh ? decodeURIComponent(matchRefresh[1]) : null;
+
+          if (cookieToken && cookieRefresh) {
+            try {
+              const { data: restored } = await supabase.auth.setSession({
+                access_token: cookieToken,
+                refresh_token: cookieRefresh
+              });
+              if (restored?.session?.user) {
+                session = restored.session;
+              }
+            } catch (e) {
+              console.warn('Failed restoring creator session from cookie:', e);
+            }
+          }
+        }
+
         if (session?.user) {
           // Verify user role
           const meta = session.user.user_metadata || {};
@@ -56,13 +80,18 @@ export function CreatorShell({ children, activePath }: CreatorShellProps) {
             session.user.email?.toLowerCase().includes('admin') ||
             session.user.email?.toLowerCase().includes('producer');
 
-          if (!isAllowed) {
-            const { data: profile } = await supabase
-              .from('profiles')
-              .select('roles, primary_role')
-              .eq('id', session.user.id)
-              .single();
+          // Always fetch full profile from DB
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', session.user.id)
+            .maybeSingle();
 
+          if (profile && isMounted) {
+            setProducerProfile(profile);
+          }
+
+          if (!isAllowed) {
             const isDbAllowed =
               profile?.primary_role === 'producer' ||
               profile?.primary_role === 'admin' ||
@@ -77,18 +106,8 @@ export function CreatorShell({ children, activePath }: CreatorShellProps) {
 
           if (isMounted) setCreatorUser(session.user);
         } else {
-          // If no active session, check localStorage or allow demo creator mode
-          const demoCreator = typeof window !== 'undefined' ? localStorage.getItem('demo_creator_auth') : null;
-          if (demoCreator) {
-            try {
-              if (isMounted) setCreatorUser(JSON.parse(demoCreator));
-            } catch (e) {
-              // fallback
-            }
-          } else {
-            router.replace('/login');
-            return;
-          }
+          router.replace('/login');
+          return;
         }
       } catch (err) {
         console.error('Error verifying creator session:', err);
@@ -99,11 +118,18 @@ export function CreatorShell({ children, activePath }: CreatorShellProps) {
 
     checkCreatorSession();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (session?.user) {
         setCreatorUser(session.user);
+        const { data: p } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', session.user.id)
+          .maybeSingle();
+        if (p && isMounted) setProducerProfile(p);
       } else if (event === 'SIGNED_OUT') {
         setCreatorUser(null);
+        setProducerProfile(null);
       }
     });
 
@@ -115,8 +141,11 @@ export function CreatorShell({ children, activePath }: CreatorShellProps) {
 
   const handleSignOut = async () => {
     try {
-      if (typeof window !== 'undefined') {
-        localStorage.removeItem('demo_creator_auth');
+      if (typeof document !== 'undefined') {
+        const isProd = window.location.hostname.includes('cautionstudioz.com');
+        const domainStr = isProd ? '; domain=.cautionstudioz.com' : '';
+        document.cookie = `sb-token=; path=/; max-age=0${domainStr}`;
+        document.cookie = `sb-refresh=; path=/; max-age=0${domainStr}`;
       }
       await supabase.auth.signOut();
     } catch (err) {
@@ -181,10 +210,12 @@ export function CreatorShell({ children, activePath }: CreatorShellProps) {
     return 'Creator Dashboard';
   };
 
-  const displayName = creatorUser?.user_metadata?.full_name || 
+  const displayName = producerProfile?.display_name || 
+    creatorUser?.user_metadata?.full_name || 
     (creatorUser?.email ? creatorUser.email.split('@')[0] : 'Caution Producer');
-  const displayHandle = creatorUser?.user_metadata?.handle || 'producer_hub';
-  const displayEmail = creatorUser?.email || 'creator@cautionstudioz.com';
+  const displayHandle = producerProfile?.handle || creatorUser?.user_metadata?.handle || 'producer';
+  const avatarUrl = producerProfile?.avatar_url || creatorUser?.user_metadata?.avatar_url || null;
+  const isVerifiedProducer = Boolean(producerProfile?.is_verified);
   
   const initials = displayName
     .split(' ')
@@ -313,13 +344,22 @@ export function CreatorShell({ children, activePath }: CreatorShellProps) {
         <div className="p-3 border-t border-zinc-800 bg-[#0c0d10]">
           <div className="flex items-center justify-between p-2 rounded-lg bg-zinc-900/60 border border-zinc-800/80">
             <div className="flex items-center gap-2.5 min-w-0">
-              <div className="h-8 w-8 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center text-xs font-bold text-[#2dd4bf] shrink-0">
-                {initials}
+              <div className="h-8 w-8 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center text-xs font-bold text-[#2dd4bf] shrink-0 overflow-hidden">
+                {avatarUrl ? (
+                  <img src={avatarUrl} alt={displayName} className="h-full w-full object-cover" />
+                ) : (
+                  initials
+                )}
               </div>
               <div className="min-w-0">
-                <span className="text-xs font-semibold text-white block truncate leading-tight">
-                  {displayName}
-                </span>
+                <div className="flex items-center gap-1">
+                  <span className="text-xs font-semibold text-white block truncate leading-tight">
+                    {displayName}
+                  </span>
+                  {isVerifiedProducer && (
+                    <ShieldCheck className="h-3 w-3 text-[#2dd4bf] shrink-0" />
+                  )}
+                </div>
                 <span className="text-[10px] text-zinc-400 block truncate">
                   @{displayHandle}
                 </span>
