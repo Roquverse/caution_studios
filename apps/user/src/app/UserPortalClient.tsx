@@ -238,7 +238,12 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
 
           const mapped: TrackItem[] = dbBeats.map((b) => {
             const audioKey = b.master_wav_key || b.preview_clean_key || b.preview_tagged_key;
-            const audioUrl = audioKey ? `/api/media/${audioKey}` : '';
+            let audioUrl = '';
+            if (audioKey) {
+              audioUrl = audioKey.startsWith('http') || audioKey.startsWith('/') ? audioKey : `/api/media/${audioKey}`;
+            } else {
+              audioUrl = '/api/media/masters/alex-morgan-afrobeat-instrumental-summer-groove-573648-hubz_1791151618223.wav';
+            }
             const basicLic = b.licenses?.find((l: any) => l.type === 'basic');
             const priceNgn = basicLic?.price_cents ? basicLic.price_cents / 100 : 3000;
             const durationSec = b.duration_seconds || 180;
@@ -813,7 +818,7 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
               >
                 <div className="flex items-center gap-3">
                   <ShoppingBag className={`h-4 w-4 ${activeNav === 'marketplace' ? 'text-[#E8B896]' : 'text-gray-400'}`} />
-                  <span className={activeNav === 'marketplace' ? 'text-[#E8B896]' : ''}>Beat Marketplace</span>
+                  <span className={activeNav === 'marketplace' ? 'text-[#E8B896]' : ''}>Beat Store</span>
                 </div>
                 <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-[#E8B896]/20 text-[#E8B896] uppercase">
                   Store
@@ -953,7 +958,7 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
               >
                 <div className="flex items-center gap-3">
                   <ShoppingBag className={`h-4 w-4 ${activeNav === 'marketplace' ? 'text-[#E8B896]' : 'text-gray-400'}`} />
-                  <span className={activeNav === 'marketplace' ? 'text-[#E8B896]' : ''}>Beat Marketplace</span>
+                  <span className={activeNav === 'marketplace' ? 'text-[#E8B896]' : ''}>Beat Store</span>
                 </div>
                 <span className="text-[9px] font-mono font-bold px-1.5 py-0.2 rounded bg-[#E8B896]/20 text-[#E8B896] uppercase">
                   Store

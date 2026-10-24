@@ -67,12 +67,43 @@ export async function POST(req: NextRequest) {
           .eq('id', orderId);
       }
 
-      // Atomic lock for any exclusive items
+      // Atomic lock for any exclusive items and dispatch congratulations notifications to producers
       for (const item of items) {
         if (item.license === 'exclusive' && item.beat_id) {
           await supabase.rpc('acquire_exclusive_beat', {
             p_beat_id: item.beat_id
           });
+        }
+
+        // Notify producer
+        if (item.beat_id) {
+          try {
+            const { data: beat } = await supabase
+              .from('beats')
+              .select('id, title, producer_id, producer:producer_id(id, display_name, handle)')
+              .eq('id', item.beat_id)
+              .maybeSingle();
+
+            if (beat && beat.producer_id) {
+              const producerName = (beat.producer as any)?.display_name || 'Producer';
+              const beatTitle = beat.title;
+              const priceNgn = item.price ? Number(item.price) : 30000;
+              const earningsNgn = Math.round(priceNgn * 0.8).toLocaleString();
+
+              await supabase.from('chats').insert({
+                sender_id: beat.producer_id,
+                recipient_id: beat.producer_id,
+                beat_id: beat.id,
+                content: `🎉 CONGRATULATIONS ${producerName}! Your beat "${beatTitle}" has just been licensed on Caution Studio Beat Store for ₦${priceNgn.toLocaleString()}. Your 80% creator share (₦${earningsNgn}) has been credited to your royalty balance.`,
+                is_encrypted: false,
+                has_contact_info: false
+              });
+
+              console.log(`[PRODUCER EMAIL NOTIFICATION] 🎉 Congratulations ${producerName}! Beat "${beatTitle}" sold for ₦${priceNgn}. ₦${earningsNgn} credited.`);
+            }
+          } catch (notifErr) {
+            console.warn('Failed to send producer notification:', notifErr);
+          }
         }
       }
 

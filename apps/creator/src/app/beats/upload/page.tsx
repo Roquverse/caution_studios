@@ -36,9 +36,10 @@ export default function BeatUploadPage() {
   const [priceExclusive, setPriceExclusive] = useState('100000');
   const [enableFreeStreaming, setEnableFreeStreaming] = useState(true);
 
-  // File names for display
-  const [audioFile, setAudioFile] = useState<string | null>(null);
-  const [stemsFile, setStemsFile] = useState<string | null>(null);
+  // File objects
+  const [audioFileObj, setAudioFileObj] = useState<File | null>(null);
+  const [stemsFileObj, setStemsFileObj] = useState<File | null>(null);
+  const [coverFileObj, setCoverFileObj] = useState<File | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -51,57 +52,67 @@ export default function BeatUploadPage() {
     setErrorMessage('');
 
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      const userId = session?.user?.id;
+      let { data: { session } } = await supabase.auth.getSession();
+      
+      // Cookie fallback if local session empty
+      if (!session) {
+        const match = document.cookie.match(/sb-token=([^;]+)/);
+        const matchRefresh = document.cookie.match(/sb-refresh=([^;]+)/);
+        if (match && matchRefresh) {
+          const { data } = await supabase.auth.setSession({
+            access_token: match[1],
+            refresh_token: matchRefresh[1]
+          });
+          session = data.session;
+        }
+      }
 
+      const userId = session?.user?.id;
       if (!userId) {
         setErrorMessage('You must be signed in as a producer to upload beats.');
         setLoading(false);
         return;
       }
 
-      const slug = `${title.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${Date.now().toString().slice(-4)}`;
-      const tagArray = tags.split(',').map((t) => t.trim()).filter(Boolean);
+      const formPayload = new FormData();
+      formPayload.append('producerId', userId);
+      formPayload.append('title', title.trim());
+      formPayload.append('genre', genre);
+      formPayload.append('bpm', bpm);
+      formPayload.append('musicalKey', musicalKey);
+      formPayload.append('tags', tags);
+      formPayload.append('priceBasic', priceBasic);
+      formPayload.append('pricePremium', pricePremium);
+      formPayload.append('priceExclusive', priceExclusive);
+      formPayload.append('enableFreeStreaming', enableFreeStreaming ? 'true' : 'false');
 
-      // 1. Insert beat row into beats table
-      const { data: newBeat, error: beatErr } = await supabase
-        .from('beats')
-        .insert({
-          producer_id: userId,
-          title: title.trim(),
-          slug,
-          genre,
-          bpm: parseInt(bpm, 10) || 110,
-          musical_key: musicalKey.trim(),
-          tags: tagArray,
-          status: 'live',
-          published_at: new Date().toISOString(),
-          is_free_stream_enabled: enableFreeStreaming,
-          producer_tag_free: true,
-          cover_url: '/images/studio_mixing_console.jpg'
-        })
-        .select()
-        .single();
-
-      if (beatErr || !newBeat) {
-        throw new Error(beatErr?.message || 'Could not save beat to database.');
+      if (audioFileObj) {
+        formPayload.append('audio', audioFileObj);
+      }
+      if (coverFileObj) {
+        formPayload.append('cover', coverFileObj);
+      }
+      if (stemsFileObj) {
+        formPayload.append('stems', stemsFileObj);
       }
 
-      // 2. Insert beat licenses
-      const basicCents = (parseInt(priceBasic, 10) || 3000) * 100;
-      const premCents = (parseInt(pricePremium, 10) || 30000) * 100;
-      const exclCents = (parseInt(priceExclusive, 10) || 100000) * 100;
+      const res = await fetch('/api/beats/upload', {
+        method: 'POST',
+        body: formPayload,
+        headers: session?.access_token ? {
+          'Authorization': `Bearer ${session.access_token}`
+        } : undefined
+      });
 
-      await supabase.from('beat_licenses').insert([
-        { beat_id: newBeat.id, type: 'basic', price_cents: basicCents, enabled: true },
-        { beat_id: newBeat.id, type: 'premium', price_cents: premCents, enabled: true },
-        { beat_id: newBeat.id, type: 'exclusive', price_cents: exclCents, enabled: true }
-      ]);
+      const resJson = await res.json();
+      if (!res.ok || resJson.error) {
+        throw new Error(resJson.error || 'Failed to upload beat to catalog.');
+      }
 
       setSuccess(true);
       setTimeout(() => {
         router.push('/beats');
-      }, 1000);
+      }, 1200);
     } catch (err: any) {
       console.error('Error uploading beat:', err);
       setErrorMessage(err.message || 'Failed to upload beat. Please try again.');
@@ -169,7 +180,7 @@ export default function BeatUploadPage() {
               <div className="border border-dashed border-zinc-700 hover:border-[#2dd4bf] rounded-lg p-6 text-center cursor-pointer transition-colors bg-zinc-950/60">
                 <Upload className="h-6 w-6 text-zinc-500 mx-auto mb-2" />
                 <span className="text-xs font-medium text-zinc-200 block">
-                  {audioFile ? audioFile : 'Click to select or drag & drop master audio'}
+                  {audioFileObj ? audioFileObj.name : 'Click to select or drag & drop master audio'}
                 </span>
                 <span className="text-[10px] text-zinc-500 block mt-1">
                   Supports .wav, .mp3 up to 150MB
@@ -177,7 +188,7 @@ export default function BeatUploadPage() {
                 <input
                   type="file"
                   accept="audio/*"
-                  onChange={(e) => setAudioFile(e.target.files?.[0]?.name || 'master_audio.wav')}
+                  onChange={(e) => setAudioFileObj(e.target.files?.[0] || null)}
                   className="hidden"
                   id="master-audio-input"
                 />
@@ -198,7 +209,7 @@ export default function BeatUploadPage() {
               <div className="border border-dashed border-zinc-700 hover:border-[#2dd4bf] rounded-lg p-5 text-center cursor-pointer transition-colors bg-zinc-950/60">
                 <FileArchive className="h-6 w-6 text-zinc-500 mx-auto mb-2" />
                 <span className="text-xs font-medium text-zinc-200 block">
-                  {stemsFile ? stemsFile : 'Upload stems archive containing separated WAV tracks'}
+                  {stemsFileObj ? stemsFileObj.name : 'Upload stems archive containing separated WAV tracks'}
                 </span>
                 <span className="text-[10px] text-zinc-500 block mt-1">
                   Kick, Snare, Hi-Hats, Bass, Melodies (.zip up to 1GB)
@@ -206,7 +217,7 @@ export default function BeatUploadPage() {
                 <input
                   type="file"
                   accept=".zip,.rar,.tar"
-                  onChange={(e) => setStemsFile(e.target.files?.[0]?.name || 'beat_stems.zip')}
+                  onChange={(e) => setStemsFileObj(e.target.files?.[0] || null)}
                   className="hidden"
                   id="stems-zip-input"
                 />
@@ -215,6 +226,31 @@ export default function BeatUploadPage() {
                   className="mt-3 inline-block px-3 py-1 bg-zinc-800 hover:bg-zinc-700 text-xs font-medium text-zinc-200 rounded cursor-pointer"
                 >
                   Choose ZIP Archive
+                </label>
+              </div>
+            </div>
+
+            {/* Cover Artwork */}
+            <div>
+              <label className="text-xs font-medium text-zinc-300 mb-1.5 block">
+                Cover Artwork (Optional)
+              </label>
+              <div className="border border-dashed border-zinc-700 hover:border-[#2dd4bf] rounded-lg p-4 text-center cursor-pointer transition-colors bg-zinc-950/60">
+                <span className="text-xs font-medium text-zinc-200 block">
+                  {coverFileObj ? coverFileObj.name : 'Custom album art / square cover image (JPG, PNG)'}
+                </span>
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  onChange={(e) => setCoverFileObj(e.target.files?.[0] || null)}
+                  className="hidden"
+                  id="cover-art-input"
+                />
+                <label
+                  htmlFor="cover-art-input"
+                  className="mt-2 inline-block px-3 py-1 bg-zinc-800 hover:bg-zinc-700 text-xs font-medium text-zinc-200 rounded cursor-pointer"
+                >
+                  Choose Artwork
                 </label>
               </div>
             </div>

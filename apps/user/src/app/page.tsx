@@ -32,7 +32,12 @@ export default async function UserPortalPage() {
     if (dbBeats && dbBeats.length > 0) {
       initialBeats = dbBeats.map((b) => {
         const audioKey = b.master_wav_key || b.preview_clean_key || b.preview_tagged_key;
-        const audioUrl = audioKey ? `/api/media/${audioKey}` : '';
+        let audioUrl = '';
+        if (audioKey) {
+          audioUrl = audioKey.startsWith('http') || audioKey.startsWith('/') ? audioKey : `/api/media/${audioKey}`;
+        } else {
+          audioUrl = '/api/media/masters/alex-morgan-afrobeat-instrumental-summer-groove-573648-hubz_1791151618223.wav';
+        }
         const basicLic = b.licenses?.find((l: any) => l.type === 'basic');
         const priceNgn = basicLic?.price_cents ? basicLic.price_cents / 100 : 3000;
         const durationSec = b.duration_seconds || 180;

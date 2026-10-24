@@ -136,12 +136,26 @@ export function UserMarketplaceView({
   const totalCount = tracks.length;
   const freeCount = tracks.filter((t) => !t.priceNgn || t.priceNgn <= 5000).length;
 
-  const handleCheckout = () => {
-    setPurchaseSuccess(true);
-    setTimeout(() => {
+  const handleCheckout = async () => {
+    if (!licenseModalTrack) return;
+    try {
+      setPurchaseSuccess(true);
+      await fetch('/api/beats/license', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          beatId: licenseModalTrack.id,
+          tier: selectedTier
+        })
+      });
+      setTimeout(() => {
+        setPurchaseSuccess(false);
+        setLicenseModalTrack(null);
+      }, 2500);
+    } catch (e) {
+      console.error('License checkout failed:', e);
       setPurchaseSuccess(false);
-      setLicenseModalTrack(null);
-    }, 2000);
+    }
   };
 
   return (
@@ -151,13 +165,13 @@ export function UserMarketplaceView({
         <div>
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#E8B896]/10 border border-[#E8B896]/20 text-xs font-semibold text-[#E8B896] mb-2">
             <ShoppingBag className="h-3.5 w-3.5 text-[#E8B896]" />
-            <span>Official Caution Studio Marketplace</span>
+            <span>Official Caution Studio Beat Store</span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
-            Beat Store & Licensing Catalog
+            Caution Studio Beat Store
           </h1>
           <p className="text-xs text-gray-400 mt-1 max-w-2xl leading-relaxed">
-            Browse Afrobeats, Amapiano, Trap & Drill master recordings. As a registered artist, stream unlimited studio tracks, preview stems, and license instant commercial rights.
+            Browse Afrobeats, Amapiano, Trap & Drill master recordings. As a registered artist, stream free beats, audition stems, or license commercial master WAV rights and exclusive 1-of-1 buyouts.
           </p>
         </div>
 
@@ -214,8 +228,8 @@ export function UserMarketplaceView({
         >
           <Zap className="h-3.5 w-3.5" />
           <span>Premium (WAV + Stems)</span>
-          <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${selectedSection === 'premium' ? 'bg-black/20 text-black' : 'bg-amber-400/20 text-amber-300'}`}>
-            ₦30,000
+          <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${selectedSection === 'premium' ? 'bg-black/20 text-black' : 'bg-amber-400/20 text-amber-300 font-mono font-bold'}`}>
+            ₦30,000+
           </span>
         </button>
 
@@ -464,18 +478,20 @@ export function UserMarketplaceView({
                       </button>
                     )}
 
-                    {/* "Get Beat" CTA Button */}
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setLicenseModalTrack(row);
-                      }}
-                      className="px-3 py-1.5 rounded-lg bg-[#E8B896] hover:bg-[#d8a886] text-black text-xs font-black uppercase tracking-wider flex items-center gap-1.5 transition-transform hover:scale-105 shadow-sm"
-                    >
-                      <ShoppingBag className="h-3 w-3 stroke-[2.5]" />
-                      <span>Get Beat</span>
-                    </button>
+                    {/* "Get Beat" CTA Button - Hide on Free Beats section */}
+                    {selectedSection !== 'free' && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setLicenseModalTrack(row);
+                        }}
+                        className="px-3 py-1.5 rounded-lg bg-[#E8B896] hover:bg-[#d8a886] text-black text-xs font-black uppercase tracking-wider flex items-center gap-1.5 transition-transform hover:scale-105 shadow-sm"
+                      >
+                        <ShoppingBag className="h-3 w-3 stroke-[2.5]" />
+                        <span>Get Beat</span>
+                      </button>
+                    )}
                   </div>
                 </div>
               );
@@ -554,7 +570,7 @@ export function UserMarketplaceView({
                     </div>
                     <span className="text-[11px] text-gray-400">24-Bit WAV Master + Trackout ZIP Stems · 500,000 Streams</span>
                   </div>
-                  <span className="text-sm font-black text-amber-400">₦30,000</span>
+                  <span className="text-sm font-black text-amber-400">₦30,000+</span>
                 </div>
               </div>
 
@@ -603,7 +619,7 @@ export function UserMarketplaceView({
               {purchaseSuccess ? (
                 <div className="w-full py-3 rounded-xl bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 text-xs font-bold text-center flex items-center justify-center gap-2">
                   <CheckCircle2 className="h-4 w-4" />
-                  <span>License Initialized! Downloading files & clearance...</span>
+                  <span>License Initialized! Producer notified & files ready.</span>
                 </div>
               ) : (
                 <button
@@ -613,7 +629,7 @@ export function UserMarketplaceView({
                 >
                   <ShoppingBag className="h-4 w-4" />
                   <span>
-                    Confirm & License {selectedTier === 'basic' ? '₦3,000' : selectedTier === 'premium' ? '₦30,000' : '₦100,000'}
+                    Confirm & License {selectedTier === 'basic' ? '₦3,000' : selectedTier === 'premium' ? '₦30,000+' : '₦100,000+'}
                   </span>
                 </button>
               )}

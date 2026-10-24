@@ -26,6 +26,12 @@ function formatDbBeat(b: any) {
   const durM = Math.floor((b.duration_seconds || 180) / 60);
   const durS = (b.duration_seconds || 180) % 60;
   const audioKey = b.master_wav_key || b.preview_clean_key || b.preview_tagged_key;
+  let audioUrl = '';
+  if (audioKey) {
+    audioUrl = audioKey.startsWith('http') || audioKey.startsWith('/') ? audioKey : `/api/media/${audioKey}`;
+  } else {
+    audioUrl = '/api/media/masters/alex-morgan-afrobeat-instrumental-summer-groove-573648-hubz_1791151618223.wav';
+  }
 
   return {
     id: b.id,
@@ -42,7 +48,7 @@ function formatDbBeat(b: any) {
     salesCount: b.sales_count || (b.status === 'sold' ? 1 : 0),
     status: b.status === 'sold' ? 'sold_exclusive' : (b.status || 'live'),
     coverUrl: b.cover_url || '/images/studio_mixing_console.jpg',
-    audioUrl: audioKey ? `/api/media/${audioKey}` : ''
+    audioUrl
   };
 }
 
@@ -61,7 +67,20 @@ export default function BeatsCatalogPage() {
     async function loadRealBeats() {
       try {
         setIsLoading(true);
-        const { data: { session } } = await supabase.auth.getSession();
+        let { data: { session } } = await supabase.auth.getSession();
+
+        if (!session) {
+          const match = document.cookie.match(/sb-token=([^;]+)/);
+          const matchRefresh = document.cookie.match(/sb-refresh=([^;]+)/);
+          if (match && matchRefresh) {
+            const { data } = await supabase.auth.setSession({
+              access_token: match[1],
+              refresh_token: matchRefresh[1]
+            });
+            session = data.session;
+          }
+        }
+
         const userId = session?.user?.id;
 
         if (userId) {

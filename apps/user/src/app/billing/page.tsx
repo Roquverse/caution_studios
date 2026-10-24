@@ -165,7 +165,7 @@ export default function UserBillingPage() {
             <p className="text-xs text-gray-400 leading-relaxed max-w-lg">
               {isPlus
                 ? 'Full studio license clearance enabled with unlimited 24-bit lossless streaming, full trackout WAV stems, and automated synchronization clearance.'
-                : 'Free tier with standard listening previews and single-track marketplace checkout. Upgrade anytime to unlock stems and unlimited playback.'}
+                : 'Free tier with standard listening previews and single-track beat store checkout. Upgrade anytime to unlock stems and unlimited playback.'}
             </p>
             <div className="pt-2 flex items-center gap-3 font-mono text-xs">
               <span className="text-xl font-black text-white">
