@@ -15,30 +15,65 @@ export async function POST(req: NextRequest) {
     const lyrics = (formData.get('lyrics') as string) || '';
     const effectsConfig = (formData.get('effectsConfig') as string) || '{}';
 
-    const vocalFile = formData.get('vocalAudio') as File | null;
-    const masterMixFile = formData.get('masterMixAudio') as File | null;
-
-    let vocalR2Url = '';
-    let masterR2Url = '';
-
     const safeArtist = artistName.toLowerCase().replace(/[^a-z0-9]/g, '-').slice(0, 30) || 'artist';
     const timestamp = Date.now();
 
-    // 1. Upload Vocal Stem to Cloudflare R2
-    if (vocalFile && vocalFile.size > 0) {
-      const vocalBytes = await vocalFile.arrayBuffer();
-      const vocalBuffer = Buffer.from(vocalBytes);
-      const vocalKey = `recordings/vocals/${safeArtist}_vocal_${timestamp}.wav`;
+    // 1. Upload All Vocal Stems (Lead + Multiple Backup Vocals)
+    const vocalStemEntries: { name: string; url: string; pan?: number; volume?: number }[] = [];
 
-      try {
-        await uploadToR2(vocalKey, vocalBuffer, 'audio/wav');
-        vocalR2Url = `/api/media/${vocalKey}`;
-      } catch (uploadErr) {
-        console.warn('R2 vocal stem upload warning:', uploadErr);
+    // Support multiple vocal files: vocalAudio_0, vocalAudio_1, etc.
+    let trackIndex = 0;
+    while (formData.has(`vocalAudio_${trackIndex}`)) {
+      const file = formData.get(`vocalAudio_${trackIndex}`) as File | null;
+      const trackName = (formData.get(`vocalTrackName_${trackIndex}`) as string) || `Track ${trackIndex + 1}`;
+      const pan = parseFloat((formData.get(`vocalTrackPan_${trackIndex}`) as string) || '0');
+      const vol = parseFloat((formData.get(`vocalTrackVol_${trackIndex}`) as string) || '1');
+
+      if (file && file.size > 0) {
+        const bytes = await file.arrayBuffer();
+        const buf = Buffer.from(bytes);
+        const safeTrack = trackName.toLowerCase().replace(/[^a-z0-9]/g, '_').slice(0, 20);
+        const key = `recordings/vocals/${safeArtist}_${safeTrack}_${timestamp}_${trackIndex}.wav`;
+
+        try {
+          await uploadToR2(key, buf, 'audio/wav');
+          vocalStemEntries.push({
+            name: trackName,
+            url: `/api/media/${key}`,
+            pan,
+            volume: vol
+          });
+        } catch (uploadErr) {
+          console.warn(`R2 upload warning for ${trackName}:`, uploadErr);
+        }
+      }
+      trackIndex++;
+    }
+
+    // Fallback: single legacy vocalAudio field
+    if (vocalStemEntries.length === 0 && formData.has('vocalAudio')) {
+      const singleFile = formData.get('vocalAudio') as File | null;
+      if (singleFile && singleFile.size > 0) {
+        const bytes = await singleFile.arrayBuffer();
+        const buf = Buffer.from(bytes);
+        const key = `recordings/vocals/${safeArtist}_lead_vocal_${timestamp}.wav`;
+        try {
+          await uploadToR2(key, buf, 'audio/wav');
+          vocalStemEntries.push({
+            name: 'Lead Vocal',
+            url: `/api/media/${key}`,
+            pan: 0,
+            volume: 1
+          });
+        } catch (uploadErr) {
+          console.warn('R2 single vocal upload warning:', uploadErr);
+        }
       }
     }
 
-    // 2. Upload Mixed Master Demo to Cloudflare R2
+    // 2. Upload Master Mix Demo to Cloudflare R2
+    let masterR2Url = '';
+    const masterMixFile = formData.get('masterMixAudio') as File | null;
     if (masterMixFile && masterMixFile.size > 0) {
       const masterBytes = await masterMixFile.arrayBuffer();
       const masterBuffer = Buffer.from(masterBytes);
@@ -52,8 +87,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // If only one was uploaded, fallback to whichever URL is present
-    const primaryAudioUrl = masterR2Url || vocalR2Url || '';
+    const primaryAudioUrl = masterR2Url || (vocalStemEntries[0]?.url) || '';
 
     // 3. Save Session & Demo to Supabase Database
     const supabase = getServiceRoleClient();
@@ -68,7 +102,7 @@ export async function POST(req: NextRequest) {
       audio_url: primaryAudioUrl,
       notes: JSON.stringify({
         projectTitle,
-        vocalUrl: vocalR2Url,
+        vocalStems: vocalStemEntries,
         masterUrl: masterR2Url,
         notes: notes.trim(),
         lyrics: lyrics.trim(),
@@ -96,7 +130,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       success: true,
       message: 'Session successfully saved to Cloudflare R2 and database!',
-      vocalUrl: vocalR2Url,
+      vocalStems: vocalStemEntries,
       masterUrl: masterR2Url,
       primaryUrl: primaryAudioUrl,
       submission: submissionRecord
