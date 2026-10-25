@@ -22,7 +22,8 @@ import {
   Sparkles,
   Gift,
   CheckCircle2,
-  Upload
+  Upload,
+  Download
 } from 'lucide-react';
 
 interface CreatorShellProps {
@@ -175,10 +176,10 @@ export function CreatorShell({ children, activePath }: CreatorShellProps) {
       badge: 'Paystack'
     },
     {
-      label: 'Streaming & Verification',
+      label: 'Downloads & Rewards',
       href: '/streaming',
-      icon: Activity,
-      badge: 'Promo'
+      icon: Download,
+      badge: '10k Goal'
     },
     {
       label: 'Licenses & Sales',
@@ -203,7 +204,7 @@ export function CreatorShell({ children, activePath }: CreatorShellProps) {
   const getBreadcrumbTitle = () => {
     if (pathname === '/beats' || pathname.startsWith('/beats/')) return 'Beat Catalog';
     if (pathname === '/payouts') return 'Earnings & Paystack Payouts';
-    if (pathname === '/streaming') return 'Streaming Royalties & Verification';
+    if (pathname === '/streaming') return 'Downloads & Verification';
     if (pathname === '/licenses') return 'Licenses & Clearances';
     if (pathname === '/chat') return 'Studio Artist Collaboration Chat';
     if (pathname === '/settings') return 'Creator Studio Settings';

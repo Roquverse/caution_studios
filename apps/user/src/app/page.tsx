@@ -36,7 +36,7 @@ export default async function UserPortalPage() {
         if (audioKey) {
           audioUrl = audioKey.startsWith('http') || audioKey.startsWith('/') ? audioKey : `/api/media/${audioKey}`;
         } else {
-          audioUrl = '/api/media/masters/alex-morgan-afrobeat-instrumental-summer-groove-573648-hubz_1791151618223.wav';
+          audioUrl = '/api/media/masters/alex-morgan-afrobeat-instrumental-summer-groove-573648-hubz_1791151613114.mp3';
         }
         const basicLic = b.licenses?.find((l: any) => l.type === 'basic');
         const priceNgn = basicLic?.price_cents ? basicLic.price_cents / 100 : 3000;

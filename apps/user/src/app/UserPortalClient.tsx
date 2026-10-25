@@ -93,6 +93,9 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
   const [soundstageTrack, setSoundstageTrack] = useState<TrackItem | null>(null);
 
   const handleOpenSoundstage = (track?: TrackItem) => {
+    if (audioRef.current) audioRef.current.pause();
+    audioSynth.stop();
+    setIsPlaying(false);
     if (track) setSoundstageTrack(track);
     else if (currentTrack) setSoundstageTrack(currentTrack);
     setIsSoundstageOpen(true);
@@ -242,7 +245,7 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
             if (audioKey) {
               audioUrl = audioKey.startsWith('http') || audioKey.startsWith('/') ? audioKey : `/api/media/${audioKey}`;
             } else {
-              audioUrl = '/api/media/masters/alex-morgan-afrobeat-instrumental-summer-groove-573648-hubz_1791151618223.wav';
+              audioUrl = '/api/media/masters/alex-morgan-afrobeat-instrumental-summer-groove-573648-hubz_1791151613114.mp3';
             }
             const basicLic = b.licenses?.find((l: any) => l.type === 'basic');
             const priceNgn = basicLic?.price_cents ? basicLic.price_cents / 100 : 3000;
@@ -275,6 +278,12 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
 
           setPlaylistRows(mapped);
           setNewReleases(mapped.slice(0, 4));
+
+          // If user has not started playback, synchronize currentTrack to the real database track
+          setCurrentTrack((prev) => {
+            const matching = mapped.find((m) => m.id === prev.id);
+            return matching || mapped[0] || prev;
+          });
 
           // Also refresh verified producers (only producers)
           const { data: dbProfiles } = await supabase
@@ -370,10 +379,12 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
   };
 
   const handlePlayToggle = (track: TrackItem) => {
+    // 1. Immediately stop any active synth
+    audioSynth.stop();
+
     if (currentTrack.id === track.id) {
       if (isPlaying) {
         if (audioRef.current) audioRef.current.pause();
-        audioSynth.stop();
         setIsPlaying(false);
       } else {
         if (!isSubscribed && currentTime >= FREE_PREVIEW_LIMIT_SECONDS) {
@@ -390,14 +401,28 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
         }
 
         if (track.audioUrl && audioRef.current) {
-          audioRef.current.play().catch(() => {
-            audioSynth.playTrack(track.id, () => {}, isSubscribed ? undefined : FREE_PREVIEW_LIMIT_SECONDS);
+          if (audioRef.current.src !== track.audioUrl && !audioRef.current.src.endsWith(track.audioUrl)) {
+            audioRef.current.src = track.audioUrl;
+          }
+          audioRef.current.volume = isMuted ? 0 : volume;
+          audioRef.current.play().catch((err) => {
+            if (err.name !== 'AbortError') {
+              console.warn('Audio playback error:', err);
+              audioSynth.playTrack(track.id, () => {}, isSubscribed ? undefined : FREE_PREVIEW_LIMIT_SECONDS);
+            }
           });
         } else {
           audioSynth.playTrack(track.id, () => {}, isSubscribed ? undefined : FREE_PREVIEW_LIMIT_SECONDS);
         }
       }
     } else {
+      // 2. Switching to a completely different track: Stop previous audio immediately
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current.currentTime = 0;
+      }
+      audioSynth.stop();
+
       // Check 3-song unskippable audio ad threshold (Audiomack / Spotify model)
       const nextCount = songsPlayedCount + 1;
       setSongsPlayedCount(nextCount);
@@ -408,7 +433,6 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
       setCurrentTrack(track);
       setIsPlaying(true);
       setCurrentTime(0);
-      audioSynth.stop();
       recordListeningHistory(track);
 
       // Record play count for this newly started song
@@ -420,14 +444,17 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
           audioRef.current.src = track.audioUrl;
           audioRef.current.currentTime = 0;
           audioRef.current.volume = isMuted ? 0 : volume;
-          audioRef.current.play().catch(() => {
-            audioSynth.playTrack(track.id, () => {}, isSubscribed ? undefined : FREE_PREVIEW_LIMIT_SECONDS);
+          audioRef.current.play().catch((err) => {
+            if (err.name !== 'AbortError') {
+              console.warn('Audio playback error:', err);
+              audioSynth.playTrack(track.id, () => {}, isSubscribed ? undefined : FREE_PREVIEW_LIMIT_SECONDS);
+            }
           });
         } else {
           audioRef.current.pause();
           audioSynth.playTrack(track.id, () => {}, isSubscribed ? undefined : FREE_PREVIEW_LIMIT_SECONDS);
         }
-      } else {
+      } else if (!track.audioUrl) {
         audioSynth.playTrack(track.id, () => {}, isSubscribed ? undefined : FREE_PREVIEW_LIMIT_SECONDS);
       }
     }
@@ -636,8 +663,13 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
       {/* HTML5 Audio Element for Real Streaming from Cloudflare R2 & Database */}
       <audio
         ref={audioRef}
-        src={currentTrack.audioUrl || undefined}
         preload="metadata"
+        onPlay={() => {
+          audioSynth.stop();
+        }}
+        onPlaying={() => {
+          audioSynth.stop();
+        }}
         onTimeUpdate={(e) => {
           const sec = e.currentTarget.currentTime;
           const limit = isSubscribed
@@ -668,7 +700,9 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
           activeListenSessionRef.current = null;
         }}
         onError={(err) => {
-          console.warn('Real audio stream error, fallback available:', err);
+          const target = err.currentTarget;
+          if (target.error && target.error.code === 1) return; // Media aborted by user navigation
+          console.warn('Real audio stream error:', err);
         }}
       />
 

@@ -68,6 +68,10 @@ class WebAudioSynth {
     this.isPlaying = true;
     this.currentTrackId = trackId;
     this.step = 0;
+    try {
+      this.masterGain.gain.cancelScheduledValues(this.ctx.currentTime);
+      this.masterGain.gain.setValueAtTime(0.2, this.ctx.currentTime);
+    } catch (e) {}
     const chords = this.getTrackChords(trackId);
     let secondsElapsed = 0;
 
@@ -130,6 +134,12 @@ class WebAudioSynth {
     if (this.intervalId) {
       clearInterval(this.intervalId);
       this.intervalId = null;
+    }
+    if (this.masterGain && this.ctx) {
+      try {
+        this.masterGain.gain.cancelScheduledValues(this.ctx.currentTime);
+        this.masterGain.gain.setValueAtTime(0, this.ctx.currentTime);
+      } catch (e) {}
     }
   }
 

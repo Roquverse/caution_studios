@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { CreatorShell } from '../../../components/CreatorShell';
 import { supabase } from '../../../lib/supabaseClient';
+import { ArtworkUploader } from '../../../components/ArtworkUploader';
 import {
   Upload,
   Music2,
@@ -40,6 +41,7 @@ export default function BeatUploadPage() {
   const [audioFileObj, setAudioFileObj] = useState<File | null>(null);
   const [stemsFileObj, setStemsFileObj] = useState<File | null>(null);
   const [coverFileObj, setCoverFileObj] = useState<File | null>(null);
+  const [coverPresetUrl, setCoverPresetUrl] = useState<string | null>('/images/studio_mixing_console.jpg');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -91,6 +93,8 @@ export default function BeatUploadPage() {
       }
       if (coverFileObj) {
         formPayload.append('cover', coverFileObj);
+      } else if (coverPresetUrl) {
+        formPayload.append('coverUrl', coverPresetUrl);
       }
       if (stemsFileObj) {
         formPayload.append('stems', stemsFileObj);
@@ -231,28 +235,16 @@ export default function BeatUploadPage() {
             </div>
 
             {/* Cover Artwork */}
-            <div>
-              <label className="text-xs font-medium text-zinc-300 mb-1.5 block">
-                Cover Artwork (Optional)
-              </label>
-              <div className="border border-dashed border-zinc-700 hover:border-[#2dd4bf] rounded-lg p-4 text-center cursor-pointer transition-colors bg-zinc-950/60">
-                <span className="text-xs font-medium text-zinc-200 block">
-                  {coverFileObj ? coverFileObj.name : 'Custom album art / square cover image (JPG, PNG)'}
-                </span>
-                <input
-                  type="file"
-                  accept="image/jpeg,image/png,image/webp"
-                  onChange={(e) => setCoverFileObj(e.target.files?.[0] || null)}
-                  className="hidden"
-                  id="cover-art-input"
-                />
-                <label
-                  htmlFor="cover-art-input"
-                  className="mt-2 inline-block px-3 py-1 bg-zinc-800 hover:bg-zinc-700 text-xs font-medium text-zinc-200 rounded cursor-pointer"
-                >
-                  Choose Artwork
-                </label>
-              </div>
+            <div className="pt-2 border-t border-zinc-800/80">
+              <ArtworkUploader
+                initialArtworkUrl={coverPresetUrl}
+                onArtworkChange={(file, presetUrl) => {
+                  setCoverFileObj(file);
+                  setCoverPresetUrl(presetUrl);
+                }}
+                title="Cover Artwork"
+                description="Upload custom square artwork (PNG, JPG, WebP) or choose a Caution Studio preset cover."
+              />
             </div>
           </div>
 
@@ -395,13 +387,13 @@ export default function BeatUploadPage() {
               <Sparkles className="h-5 w-5 text-emerald-400 shrink-0 mt-0.5" />
               <div>
                 <span className="text-sm font-bold text-white block">
-                  Earn Monthly while Supporting Upcoming Artists
+                  Earn Rewards while Supporting Upcoming Artists
                 </span>
                 <span className="text-xs text-emerald-300 font-medium block mt-0.5">
-                  Post for Free Streaming & Royalties
+                  Post for Free Download &amp; 10k Rewards
                 </span>
                 <p className="text-[11px] text-zinc-300 block mt-1.5 leading-relaxed">
-                  Post this beat for free streaming so upcoming artists can rehearse, audition, and record demos. You earn <strong>monthly streaming royalties</strong> from unskippable audio ads & listener subscriptions, while progressing toward your <strong>₦50,000 Verified Producer badge</strong>!
+                  Post this beat for free download so upcoming artists can rehearse, audition, and record demos. You earn <strong>₦30,000 in royalties per 10,000 downloads</strong>, while progressing toward your <strong>Verified Producer badge</strong>!
                 </p>
               </div>
             </div>
@@ -414,7 +406,7 @@ export default function BeatUploadPage() {
                 className="h-4 w-4 rounded border-zinc-700 bg-zinc-950 text-[#2dd4bf] focus:ring-[#2dd4bf]"
               />
               <span className="text-xs text-white font-semibold">
-                Post as Free Beat Stream (Earn monthly royalties & support upcoming artists)
+                Post as Free Beat Download (Earn ₦30,000 per 10,000 downloads &amp; support upcoming artists)
               </span>
             </label>
           </div>

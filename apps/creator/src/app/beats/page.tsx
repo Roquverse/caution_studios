@@ -14,8 +14,10 @@ import {
   CheckCircle2,
   AlertCircle,
   UploadCloud,
-  Loader2
+  Loader2,
+  Image as ImageIcon
 } from 'lucide-react';
+import { UpdateArtworkModal } from '../../components/UpdateArtworkModal';
 
 function formatDbBeat(b: any) {
   const licenses = b.licenses || [];
@@ -30,7 +32,7 @@ function formatDbBeat(b: any) {
   if (audioKey) {
     audioUrl = audioKey.startsWith('http') || audioKey.startsWith('/') ? audioKey : `/api/media/${audioKey}`;
   } else {
-    audioUrl = '/api/media/masters/alex-morgan-afrobeat-instrumental-summer-groove-573648-hubz_1791151618223.wav';
+    audioUrl = '/api/media/masters/alex-morgan-afrobeat-instrumental-summer-groove-573648-hubz_1791151613114.mp3';
   }
 
   return {
@@ -60,6 +62,7 @@ export default function BeatsCatalogPage() {
   const [beatsList, setBeatsList] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [artworkModalBeat, setArtworkModalBeat] = useState<{ id: string; title: string; coverUrl?: string } | null>(null);
 
   // Fetch only this producer's real beats from Supabase
   useEffect(() => {
@@ -256,6 +259,23 @@ export default function BeatsCatalogPage() {
                             <Play className="h-3.5 w-3.5 fill-current ml-0.5" />
                           )}
                         </button>
+
+                        {/* Beat Artwork Thumbnail */}
+                        <div
+                          onClick={() => setArtworkModalBeat(beat)}
+                          className="relative h-10 w-10 rounded-lg overflow-hidden shrink-0 border border-zinc-700/80 bg-zinc-950 group cursor-pointer shadow-xs"
+                          title="Click to view/change artwork"
+                        >
+                          <img
+                            src={beat.coverUrl}
+                            alt={beat.title}
+                            className="w-full h-full object-cover transition-transform group-hover:scale-110"
+                          />
+                          <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-[#2dd4bf]">
+                            <ImageIcon className="h-4 w-4" />
+                          </div>
+                        </div>
+
                         <div className="min-w-0">
                           <span className="font-semibold text-white block truncate max-w-[200px]">
                             {beat.title}
@@ -329,6 +349,15 @@ export default function BeatsCatalogPage() {
                       <div className="flex items-center justify-end gap-1.5">
                         <button
                           type="button"
+                          onClick={() => setArtworkModalBeat(beat)}
+                          title="Change Artwork"
+                          className="inline-flex items-center gap-1 px-2.5 py-1 text-zinc-300 hover:text-[#2dd4bf] hover:bg-zinc-800 rounded transition-colors text-[11px] font-medium border border-zinc-800 hover:border-zinc-700"
+                        >
+                          <ImageIcon className="h-3.5 w-3.5 text-[#2dd4bf]" />
+                          <span className="hidden sm:inline">Artwork</span>
+                        </button>
+                        <button
+                          type="button"
                           onClick={() => handleDeleteBeat(beat.id, beat.title)}
                           disabled={deletingId === beat.id}
                           title="Delete Track"
@@ -362,6 +391,18 @@ export default function BeatsCatalogPage() {
           </div>
         )}
       </div>
+
+      {/* Modal for updating beat artwork */}
+      <UpdateArtworkModal
+        beat={artworkModalBeat}
+        isOpen={Boolean(artworkModalBeat)}
+        onClose={() => setArtworkModalBeat(null)}
+        onSuccess={(beatId, newCoverUrl) => {
+          setBeatsList((prev) =>
+            prev.map((b) => (b.id === beatId ? { ...b, coverUrl: newCoverUrl } : b))
+          );
+        }}
+      />
     </CreatorShell>
   );
 }

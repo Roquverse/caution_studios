@@ -80,12 +80,13 @@ export async function POST(req: NextRequest) {
       await uploadToR2(masterAudioKey, audioBuffer, audioFile.type || 'audio/wav');
     } else {
       // Fallback: Default caution studio master demo track if not provided
-      masterAudioKey = 'masters/alex-morgan-afrobeat-instrumental-summer-groove-573648-hubz_1791151618223.wav';
+      masterAudioKey = 'masters/alex-morgan-afrobeat-instrumental-summer-groove-573648-hubz_1791151613114.mp3';
     }
 
     // 4. Upload Cover Art (Optional)
-    const coverFile = formData.get('cover') as File | null;
-    let coverUrl = '/images/studio_mixing_console.jpg';
+    const coverFile = (formData.get('cover') || formData.get('artwork')) as File | null;
+    const requestedCoverUrl = formData.get('coverUrl') as string | null;
+    let coverUrl = requestedCoverUrl && requestedCoverUrl.trim() ? requestedCoverUrl.trim() : '/images/studio_mixing_console.jpg';
 
     if (coverFile && coverFile.size > 0) {
       const coverBuffer = Buffer.from(await coverFile.arrayBuffer());

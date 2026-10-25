@@ -33,6 +33,7 @@ export default function CreatorSettingsPage() {
 
   // Status & Notifications
   const [isVerified, setIsVerified] = useState(false);
+  const [totalDownloads, setTotalDownloads] = useState(0);
   const [streamingEarningsCents, setStreamingEarningsCents] = useState(0);
   const [notifySales, setNotifySales] = useState(true);
   const [notifyChats, setNotifyChats] = useState(true);
@@ -66,6 +67,16 @@ export default function CreatorSettingsPage() {
           setNotifySales(profile.notify_sales ?? true);
           setNotifyChats(profile.notify_chats ?? true);
           setNotifyPayouts(profile.notify_payouts ?? true);
+        }
+
+        const { data: beats } = await supabase
+          .from('beats')
+          .select('free_commercial_downloads_count, download_count')
+          .eq('producer_id', user.id);
+
+        if (beats) {
+          const sumDl = beats.reduce((acc, b) => acc + (b.free_commercial_downloads_count || b.download_count || 0), 0);
+          setTotalDownloads(sumDl);
         }
       } catch (err: any) {
         console.error('Error loading settings:', err);
@@ -279,7 +290,7 @@ export default function CreatorSettingsPage() {
                 <div className="flex items-center justify-between text-xs">
                   <span className="text-zinc-400">Verification:</span>
                   <span className={isVerified ? "text-emerald-400 font-bold" : "text-amber-300 font-semibold font-mono"}>
-                    {isVerified ? 'Verified Producer' : `₦${((streamingEarningsCents || 0) / 100).toLocaleString()} / ₦50,000`}
+                    {isVerified ? 'Verified Producer' : `${totalDownloads.toLocaleString()} / 10,000 downloads`}
                   </span>
                 </div>
               </div>

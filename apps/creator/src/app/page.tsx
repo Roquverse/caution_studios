@@ -19,7 +19,8 @@ import {
   CreditCard,
   Loader2,
   UploadCloud,
-  FileCheck2
+  FileCheck2,
+  Download
 } from 'lucide-react';
 
 interface RecentSaleItem {
@@ -38,7 +39,7 @@ interface TopBeatItem {
   title: string;
   bpm: number;
   genre: string;
-  streams: number;
+  downloads: number;
   earnedNgn: number;
   coverUrl: string;
   audioUrl?: string;
@@ -58,8 +59,8 @@ export default function CreatorDashboardPage() {
 
   // Producer real metrics
   const [totalEarningsNgn, setTotalEarningsNgn] = useState<number>(0);
-  const [streamingRoyaltiesNgn, setStreamingRoyaltiesNgn] = useState<number>(0);
-  const [totalStreamsCount, setTotalStreamsCount] = useState<number>(0);
+  const [downloadRewardNgn, setDownloadRewardNgn] = useState<number>(0);
+  const [totalDownloadsCount, setTotalDownloadsCount] = useState<number>(0);
   const [liveBeatsCount, setLiveBeatsCount] = useState<number>(0);
   const [licensesSoldCount, setLicensesSoldCount] = useState<number>(0);
   const [isVerified, setIsVerified] = useState<boolean>(false);
@@ -68,10 +69,10 @@ export default function CreatorDashboardPage() {
   const [topStreamingBeats, setTopStreamingBeats] = useState<TopBeatItem[]>([]);
   const [monthlyChart, setMonthlyChart] = useState<MonthData[]>([]);
 
-  const streamingThresholdNgn = 50000;
-  const streamingProgressPct = Math.min(
+  const downloadThreshold = 10000;
+  const downloadProgressPct = Math.min(
     100,
-    Math.round((streamingRoyaltiesNgn / streamingThresholdNgn) * 100)
+    Math.round((totalDownloadsCount / downloadThreshold) * 100)
   );
 
   useEffect(() => {
@@ -97,8 +98,6 @@ export default function CreatorDashboardPage() {
 
         if (profile && isMounted) {
           setIsVerified(Boolean(profile.is_verified));
-          const streamCents = profile.streaming_earnings_cents || 0;
-          setStreamingRoyaltiesNgn(Math.round(streamCents / 100));
 
           if (profile.trial_ends_at) {
             const ends = new Date(profile.trial_ends_at).getTime();
@@ -121,19 +120,37 @@ export default function CreatorDashboardPage() {
           const live = dbBeats.filter((b) => b.status === 'live');
           setLiveBeatsCount(live.length);
 
-          const totalPlays = dbBeats.reduce((acc, b) => acc + (b.play_count || 0), 0);
-          setTotalStreamsCount(totalPlays);
+          const totalDownloads = dbBeats.reduce(
+            (acc, b) => acc + (b.free_commercial_downloads_count || b.download_count || 0),
+            0
+          );
+          setTotalDownloadsCount(totalDownloads);
+          const computedReward = Math.floor(totalDownloads / 10000) * 30000;
+          setDownloadRewardNgn(computedReward);
+
+          // Check if producer has download incentives recorded
+          const { data: incentiveRows } = await supabase
+            .from('producer_download_incentives')
+            .select('reward_amount_ngn, qualifying_downloads')
+            .eq('producer_id', userId);
+
+          if (incentiveRows && incentiveRows.length > 0) {
+            const incReward = incentiveRows.reduce((acc, r) => acc + Number(r.reward_amount_ngn || 0), 0);
+            const incDownloads = incentiveRows.reduce((acc, r) => acc + Number(r.qualifying_downloads || 0), 0);
+            if (incReward > computedReward) setDownloadRewardNgn(incReward);
+            if (incDownloads > totalDownloads) setTotalDownloadsCount(incDownloads);
+          }
 
           const topBeats: TopBeatItem[] = dbBeats.slice(0, 4).map((b) => {
             const audioKey = b.master_wav_key || b.preview_clean_key || b.preview_tagged_key;
+            const dlCount = b.free_commercial_downloads_count || b.download_count || 0;
             return {
               id: b.id,
               title: b.title,
               bpm: b.bpm || 110,
               genre: b.genre || 'Afrobeats',
-              streams: b.play_count || 0,
-              // Royalties calculated at ₦3 per stream
-              earnedNgn: Math.round((b.play_count || 0) * 3),
+              downloads: dlCount,
+              earnedNgn: Math.floor(dlCount / 10000) * 30000,
               coverUrl: b.cover_url || '/images/studio_mixing_console.jpg',
               audioUrl: audioKey ? `/api/media/${audioKey}` : ''
             };
@@ -338,33 +355,33 @@ export default function CreatorDashboardPage() {
                     )}
                   </div>
                   <div className="text-right sm:text-right">
-                    <span className="text-xs font-mono text-zinc-400">Current Royalties: </span>
+                    <span className="text-xs font-mono text-zinc-400">Current Downloads: </span>
                     <span className="text-xs font-mono font-bold text-[#2dd4bf]">
-                      ₦{streamingRoyaltiesNgn.toLocaleString()} / ₦{streamingThresholdNgn.toLocaleString()}
+                      {totalDownloadsCount.toLocaleString()} / {downloadThreshold.toLocaleString()}
                     </span>
                   </div>
                 </div>
 
                 <p className="text-xs text-zinc-400 mt-2 leading-relaxed">
-                  Earn streaming royalties from free beat listening to qualify for the <strong className="text-zinc-200">Verified Producer</strong> checkmark and direct artist recording chat.
+                  Earn ₦30,000 in royalties per 10,000 qualifying beat downloads to qualify for the <strong className="text-zinc-200">Verified Producer</strong> checkmark and direct artist recording chat.
                 </p>
               </div>
 
               <div className="mt-4 space-y-2">
                 <div className="flex justify-between text-xs font-mono">
                   <span className="text-zinc-400">Milestone Progress</span>
-                  <span className="text-white font-bold">{streamingProgressPct}% Completed</span>
+                  <span className="text-white font-bold">{downloadProgressPct}% Completed</span>
                 </div>
                 <div className="w-full h-2 rounded-full bg-zinc-800 overflow-hidden">
                   <div
                     className="h-full bg-gradient-to-r from-[#2dd4bf] to-emerald-400 transition-all duration-500 rounded-full"
-                    style={{ width: `${streamingProgressPct}%` }}
+                    style={{ width: `${downloadProgressPct}%` }}
                   />
                 </div>
                 <div className="flex items-center justify-between text-[11px] text-zinc-500 pt-1">
-                  <span>Goal: ₦50,000 threshold</span>
+                  <span>Goal: 10,000 downloads threshold (₦30,000 reward)</span>
                   <Link href="/streaming" className="text-[#2dd4bf] hover:underline flex items-center gap-1">
-                    <span>View Stream Telemetry</span>
+                    <span>View Download Telemetry</span>
                     <ArrowRight className="h-3 w-3" />
                   </Link>
                 </div>
@@ -394,18 +411,23 @@ export default function CreatorDashboardPage() {
               <p className="text-[11px] text-zinc-500 mt-1">80% creator take-home pay</p>
             </div>
 
-            {/* Free Stream Royalties */}
+            {/* Beat Downloads / Download Incentives */}
             <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-4 shadow-sm">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-medium text-zinc-400">Streaming Royalties</span>
+                <span className="text-xs font-medium text-zinc-400">Beat Downloads</span>
                 <div className="p-1.5 rounded-md bg-amber-500/10 text-amber-300">
-                  <Activity className="h-4 w-4" />
+                  <Download className="h-4 w-4" />
                 </div>
               </div>
               <div className="mt-2 flex items-baseline gap-2">
-                <span className="text-2xl font-bold font-mono text-white">₦{streamingRoyaltiesNgn.toLocaleString()}</span>
+                <span className="text-2xl font-bold font-mono text-white">{totalDownloadsCount.toLocaleString()}</span>
+                <span className="text-xs font-mono text-zinc-500">downloads</span>
               </div>
-              <p className="text-[11px] text-zinc-500 mt-1">{totalStreamsCount.toLocaleString()} listener preview plays</p>
+              <p className="text-[11px] text-zinc-500 mt-1">
+                {downloadRewardNgn > 0
+                  ? `₦${downloadRewardNgn.toLocaleString()} reward earned (₦30k / 10k)`
+                  : `${totalDownloadsCount.toLocaleString()} beat downloads (Goal: 10,000)`}
+              </p>
             </div>
 
             {/* Live Uploads */}
@@ -549,12 +571,12 @@ export default function CreatorDashboardPage() {
               </div>
             </div>
 
-            {/* Top Streaming Beats */}
+            {/* Top Downloaded Beats */}
             <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-5 shadow-sm">
               <div className="flex items-center justify-between pb-3 border-b border-zinc-800">
                 <div>
-                  <h3 className="text-sm font-semibold text-white">Top Stream Earners</h3>
-                  <p className="text-xs text-zinc-400">Royalties from free preview listening</p>
+                  <h3 className="text-sm font-semibold text-white">Top Downloaded Beats</h3>
+                  <p className="text-xs text-zinc-400">Downloads towards ₦30,000 / 10k milestone</p>
                 </div>
                 <Link href="/streaming" className="text-xs text-[#2dd4bf] hover:underline">
                   Details
@@ -577,21 +599,28 @@ export default function CreatorDashboardPage() {
                             <Play className="h-3.5 w-3.5 fill-current ml-0.5" />
                           )}
                         </button>
+                        <div className="h-9 w-9 rounded-md overflow-hidden shrink-0 border border-zinc-700/80 bg-zinc-950">
+                          <img
+                            src={beat.coverUrl}
+                            alt={beat.title}
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
                         <div className="min-w-0">
                           <span className="text-xs font-medium text-white block truncate">
                             {beat.title}
                           </span>
                           <span className="text-[10px] text-zinc-500 block">
-                            {beat.bpm} BPM · {beat.genre} · {beat.streams.toLocaleString()} plays
+                            {beat.bpm} BPM · {beat.genre} · {beat.downloads.toLocaleString()} downloads
                           </span>
                         </div>
                       </div>
 
                       <div className="text-right shrink-0 font-mono">
                         <span className="text-xs font-bold text-[#2dd4bf] block">
-                          ₦{beat.earnedNgn.toLocaleString()}
+                          {beat.downloads.toLocaleString()}
                         </span>
-                        <span className="text-[10px] text-zinc-500 block">earned</span>
+                        <span className="text-[10px] text-zinc-500 block">/ 10,000</span>
                       </div>
                     </div>
                   ))}
