@@ -64,6 +64,7 @@ interface UserMarketplaceViewProps {
   toggleListenLater: (track: TrackItem) => void;
   handleDownload: (track: TrackItem, e: React.MouseEvent) => void;
   downloadingId?: string | null;
+  onOpenRecordStudio?: (track: TrackItem) => void;
   onOpenSoundstage?: (track: TrackItem) => void;
   onTriggerAd?: () => void;
   bonusDownloads?: number;
@@ -83,11 +84,13 @@ export function UserMarketplaceView({
   toggleListenLater,
   handleDownload,
   downloadingId,
+  onOpenRecordStudio,
   onOpenSoundstage,
   onTriggerAd,
   bonusDownloads = 0,
   remainingDownloads
 }: UserMarketplaceViewProps) {
+  const openStudioHandler = onOpenRecordStudio || onOpenSoundstage;
   const [selectedSection, setSelectedSection] = useState<'all' | 'free' | 'premium' | 'exclusive'>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedGenre, setSelectedGenre] = useState('All Genres');
@@ -635,19 +638,19 @@ export function UserMarketplaceView({
                       <Download className="h-3.5 w-3.5" />
                     </button>
 
-                    {/* Record Vocal / Soundstage */}
-                    {onOpenSoundstage && (
+                    {/* Record Studio DAW Trigger */}
+                    {openStudioHandler && (
                       <button
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation();
-                          onOpenSoundstage(row);
+                          openStudioHandler(row);
                         }}
-                        title="Record your vocals directly over this beat"
+                        title="Open Record Studio DAW to record vocals & mix over this beat"
                         className="px-2.5 py-1.5 rounded-lg bg-teal-500/15 hover:bg-teal-500/25 border border-teal-500/30 text-teal-300 text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 transition-colors cursor-pointer"
                       >
                         <Mic className="h-3 w-3 text-teal-400" />
-                        <span className="hidden sm:inline">Record</span>
+                        <span className="hidden sm:inline">Record Studio</span>
                       </button>
                     )}
 
