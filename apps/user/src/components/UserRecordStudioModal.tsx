@@ -38,7 +38,9 @@ import {
   Plus,
   Trash2,
   Maximize2,
-  Minimize2
+  Minimize2,
+  ChevronDown,
+  Search
 } from 'lucide-react';
 import { TrackItem } from '../types/tracks';
 import { useUserSubscription } from '../lib/subscription';
@@ -138,6 +140,8 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
   const [selectedTrack, setSelectedTrack] = useState<TrackItem | null>(preselectedTrack || null);
   const [projectTitle, setProjectTitle] = useState('New Vocal Session');
   const [beatPickerOpen, setBeatPickerOpen] = useState(false);
+  const [beatSearchQuery, setBeatSearchQuery] = useState('');
+  const [beatGenreFilter, setBeatGenreFilter] = useState('All');
   const [isAuditioningId, setIsAuditioningId] = useState<string | null>(null);
 
   // DAW State & Transport
@@ -257,14 +261,22 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
   const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const playheadIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Update selectedTrack on preselectedTrack change
+  // Track initial preselected track ID so modal initialization works,
+  // but user manual selections inside Track 01 are never forcibly overridden!
+  const lastPreselectedIdRef = useRef<string | null>(null);
+
   useEffect(() => {
-    if (preselectedTrack) {
-      setSelectedTrack(preselectedTrack);
-    } else if (!selectedTrack && availableTracks.length > 0) {
-      setSelectedTrack(availableTracks[0]);
+    if (isOpen) {
+      if (preselectedTrack && preselectedTrack.id !== lastPreselectedIdRef.current) {
+        lastPreselectedIdRef.current = preselectedTrack.id;
+        setSelectedTrack(preselectedTrack);
+      } else if (!selectedTrack && availableTracks.length > 0) {
+        setSelectedTrack(availableTracks[0]);
+      }
+    } else {
+      lastPreselectedIdRef.current = null;
     }
-  }, [preselectedTrack, availableTracks]);
+  }, [isOpen, preselectedTrack, availableTracks, selectedTrack]);
 
   // Metronome tick generator
   const playMetronomeTick = useCallback((accent: boolean = false) => {
@@ -329,6 +341,41 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
       }
     }
   };
+
+  // Select beat cleanly, updating audio source and timeline without wiping recorded vocal tracks
+  const handleSelectBeat = (track: TrackItem) => {
+    if (auditionAudioRef.current) {
+      auditionAudioRef.current.pause();
+      setIsAuditioningId(null);
+    }
+    if (isPlaying) {
+      if (beatAudioRef.current) beatAudioRef.current.pause();
+      vocalAudioRefs.current.forEach((el) => el.pause());
+      setIsPlaying(false);
+      if (playheadIntervalRef.current) clearInterval(playheadIntervalRef.current);
+    }
+    setSelectedTrack(track);
+    setPlayheadTime(0);
+    if (beatAudioRef.current) {
+      beatAudioRef.current.src = track.audioUrl || '';
+      beatAudioRef.current.currentTime = 0;
+    }
+    setBeatPickerOpen(false);
+  };
+
+  // Filtered beats for search & genre picker
+  const filteredBeats = availableTracks.filter((b) => {
+    const query = beatSearchQuery.trim().toLowerCase();
+    const matchesSearch =
+      query === '' ||
+      b.title.toLowerCase().includes(query) ||
+      (b.artist && b.artist.toLowerCase().includes(query)) ||
+      (b.genre && b.genre.toLowerCase().includes(query));
+    const matchesGenre =
+      beatGenreFilter === 'All' ||
+      (b.genre && b.genre.toLowerCase() === beatGenreFilter.toLowerCase());
+    return matchesSearch && matchesGenre;
+  });
 
   // Add a new Backup Vocal Track
   const handleAddBackupVocalTrack = () => {
@@ -1205,61 +1252,143 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
             type="button"
             onClick={() => setBeatPickerOpen(!beatPickerOpen)}
             className="px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-bold text-gray-300 hover:text-white flex items-center gap-1.5 transition-colors cursor-pointer"
+            title="Click to choose a backing beat"
           >
-            <Music className="h-3.5 w-3.5 text-[#E8B896]" />
+            <Music className="h-3.5 w-3.5 text-amber-400" />
             <span className="truncate max-w-[140px] sm:max-w-[200px]">
-              {selectedTrack ? selectedTrack.title : 'Select Beat'}
+              {selectedTrack ? selectedTrack.title : 'Choose Beat'}
             </span>
+            <ChevronDown className="h-3 w-3 text-gray-400" />
           </button>
         </div>
       </div>
 
-      {/* Dropdown Beat Selector Panel Overlay */}
+      {/* Dropdown / Modal Beat Selector Overlay */}
       {beatPickerOpen && (
-        <div className="p-3 bg-[#0B0D14] border-b border-white/10 flex flex-col gap-2 z-40 animate-in slide-in-from-top-2 duration-150 shrink-0">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
-              <Disc3 className="h-3.5 w-3.5 text-teal-400" />
-              <span>Select Backing Beat for Session:</span>
-            </span>
-            <button
-              type="button"
-              onClick={() => setBeatPickerOpen(false)}
-              className="text-gray-400 hover:text-white text-xs"
-            >
-              Done
-            </button>
+        <div className="p-4 bg-[#0B0D14] border-b border-amber-400/20 flex flex-col gap-3 z-40 animate-in slide-in-from-top-2 duration-150 shrink-0 shadow-2xl">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <Disc3 className="h-4 w-4 text-amber-400 animate-[spin_8s_linear_infinite]" />
+              <div>
+                <h3 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
+                  <span>Track 01 Beat Library · Choose Your Backing Beat</span>
+                </h3>
+                <p className="text-[10px] text-gray-400">
+                  Select any beat from your studio catalog. Your recorded vocal takes will be preserved.
+                </p>
+              </div>
+            </div>
+
+            {/* Search Input & Close */}
+            <div className="flex items-center gap-2">
+              <div className="relative">
+                <Search className="h-3.5 w-3.5 text-gray-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  placeholder="Search title, artist, genre..."
+                  value={beatSearchQuery}
+                  onChange={(e) => setBeatSearchQuery(e.target.value)}
+                  className="pl-8 pr-3 py-1 text-xs bg-black/60 border border-white/10 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-amber-400 w-44 sm:w-60"
+                />
+              </div>
+              <button
+                type="button"
+                onClick={() => setBeatPickerOpen(false)}
+                className="px-2.5 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-xs font-bold text-white cursor-pointer transition-colors"
+              >
+                Done
+              </button>
+            </div>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2 max-h-48 overflow-y-auto no-scrollbar">
-            {availableTracks.map((b) => (
-              <div
-                key={b.id}
-                onClick={() => {
-                  setSelectedTrack(b);
-                  setBeatPickerOpen(false);
-                }}
-                className={`p-2 rounded-lg border text-left cursor-pointer transition-colors flex items-center justify-between ${
-                  selectedTrack?.id === b.id
-                    ? 'bg-teal-500/15 border-teal-500/40 text-teal-300'
-                    : 'bg-white/[0.02] border-white/5 hover:bg-white/5 text-gray-300'
+
+          {/* Genre filter tags */}
+          <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
+            {['All', 'Afrobeat', 'Amapiano', 'Hip Hop', 'Trap', 'R&B', 'Pop'].map((genre) => (
+              <button
+                key={genre}
+                type="button"
+                onClick={() => setBeatGenreFilter(genre)}
+                className={`px-2.5 py-0.5 rounded-full text-[10px] font-mono whitespace-nowrap transition-colors cursor-pointer border ${
+                  beatGenreFilter === genre
+                    ? 'bg-amber-400 text-black border-amber-300 font-bold shadow-sm'
+                    : 'bg-white/5 border-white/10 text-gray-400 hover:text-white'
                 }`}
               >
-                <div className="min-w-0 pr-2">
-                  <p className="text-xs font-bold text-white truncate">{b.title}</p>
-                  <p className="text-[10px] text-gray-400">{b.bpm || 120} BPM · {b.genre}</p>
-                </div>
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleAuditionToggle(b);
-                  }}
-                  className="p-1 rounded bg-black/40 text-gray-300 hover:text-white"
-                >
-                  {isAuditioningId === b.id ? <Pause className="h-3 w-3" /> : <Play className="h-3 w-3" />}
-                </button>
-              </div>
+                {genre}
+              </button>
             ))}
+          </div>
+
+          {/* Beats Grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2.5 max-h-56 overflow-y-auto pr-1">
+            {filteredBeats.map((b) => {
+              const isCurrent = selectedTrack?.id === b.id;
+              const isAuditioning = isAuditioningId === b.id;
+
+              return (
+                <div
+                  key={b.id}
+                  onClick={() => handleSelectBeat(b)}
+                  className={`p-2.5 rounded-xl border text-left cursor-pointer transition-all flex items-center justify-between group ${
+                    isCurrent
+                      ? 'bg-amber-500/15 border-amber-400/50 text-amber-200 ring-1 ring-amber-400/30'
+                      : 'bg-[#111422] border-white/5 hover:border-amber-400/30 hover:bg-[#15192b] text-gray-300'
+                  }`}
+                >
+                  <div className="min-w-0 pr-2 flex-1">
+                    <div className="flex items-center gap-1">
+                      <p className="text-xs font-bold text-white truncate">{b.title}</p>
+                      {isCurrent && (
+                        <span className="text-[8px] font-mono px-1 py-0.2 rounded bg-amber-400 text-black font-bold shrink-0">
+                          LOADED
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[10px] text-gray-400 truncate">
+                      {b.artist || 'Caution'} · {b.bpm || 110} BPM
+                    </p>
+                    <span className="text-[9px] font-mono text-gray-500">{b.genre || 'Afrobeat'}</span>
+                  </div>
+
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <button
+                      type="button"
+                      title={isAuditioning ? 'Pause audition' : 'Audition preview'}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleAuditionToggle(b);
+                      }}
+                      className={`p-1.5 rounded-lg border transition-colors cursor-pointer ${
+                        isAuditioning
+                          ? 'bg-amber-400 text-black border-amber-300'
+                          : 'bg-black/50 border-white/10 text-gray-300 hover:text-white hover:border-white/20'
+                      }`}
+                    >
+                      {isAuditioning ? <Pause className="h-3 w-3" /> : <Play className="h-3 w-3" />}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleSelectBeat(b);
+                      }}
+                      className={`px-2 py-1 rounded-md text-[10px] font-mono font-bold transition-colors cursor-pointer ${
+                        isCurrent
+                          ? 'bg-amber-400/20 text-amber-300 border border-amber-400/30'
+                          : 'bg-white/10 hover:bg-amber-400 hover:text-black text-gray-200'
+                      }`}
+                    >
+                      {isCurrent ? 'Active' : 'Load'}
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+            {filteredBeats.length === 0 && (
+              <div className="col-span-full py-6 text-center text-gray-400 text-xs">
+                No beats found matching &quot;{beatSearchQuery}&quot;
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -1306,17 +1435,56 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
           <div className="w-full sm:w-64 p-3 bg-[#111422] border-b sm:border-b-0 sm:border-r border-white/10 flex flex-col justify-between text-xs shrink-0">
             <div>
               <div className="flex items-center justify-between">
-                <span className="font-mono text-[10px] font-bold text-amber-400 uppercase tracking-wider">
-                  TRK 01 · BEAT
+                <span className="font-mono text-[10px] font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
+                  <Disc3 className="h-3 w-3 text-amber-400 animate-[spin_8s_linear_infinite]" />
+                  <span>TRK 01 · BEAT</span>
                 </span>
                 <span className="text-[9px] font-mono px-1 rounded bg-white/5 text-gray-400">
                   STEREO WAV
                 </span>
               </div>
-              <h4 className="text-xs font-bold text-white truncate mt-0.5" title={selectedTrack?.title}>
-                {selectedTrack?.title || 'Backing Beat'}
-              </h4>
-              <p className="text-[10px] text-gray-400">{selectedTrack?.artist || 'Caution Studio'}</p>
+
+              {/* Beat Selection Dropdown in Track Options */}
+              <div className="mt-1.5 space-y-1">
+                <div className="relative">
+                  <select
+                    value={selectedTrack?.id || ''}
+                    onChange={(e) => {
+                      const found = availableTracks.find((b) => b.id === e.target.value);
+                      if (found) {
+                        handleSelectBeat(found);
+                      }
+                    }}
+                    aria-label="Choose beat in Track Options"
+                    className="w-full text-xs font-bold bg-[#080B12] hover:bg-[#0c101c] border border-amber-400/40 hover:border-amber-400 text-amber-200 rounded-lg py-1.5 pl-2 pr-6 appearance-none cursor-pointer focus:outline-none focus:ring-1 focus:ring-amber-400 truncate transition-colors shadow-inner"
+                  >
+                    {availableTracks.length === 0 ? (
+                      <option value="">{selectedTrack?.title || 'No beats available'}</option>
+                    ) : (
+                      availableTracks.map((b) => (
+                        <option key={b.id} value={b.id} className="bg-[#111422] text-white">
+                          {b.title} ({b.bpm || 110} BPM · {b.genre || 'Beat'})
+                        </option>
+                      ))
+                    )}
+                  </select>
+                  <ChevronDown className="h-3.5 w-3.5 text-amber-400 absolute right-1.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                </div>
+
+                <div className="flex items-center justify-between text-[10px] text-gray-400">
+                  <span className="truncate max-w-[130px] font-mono text-[9px] text-gray-400">
+                    {selectedTrack?.artist || 'Caution Studio'}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setBeatPickerOpen(true)}
+                    className="text-[9px] font-mono text-amber-400 hover:text-amber-300 flex items-center gap-0.5 underline cursor-pointer shrink-0"
+                  >
+                    <SlidersHorizontal className="h-2.5 w-2.5" />
+                    <span>Browse All</span>
+                  </button>
+                </div>
+              </div>
             </div>
 
             {/* Mute, Solo, Pan & Volume */}
