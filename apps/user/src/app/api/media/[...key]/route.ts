@@ -11,7 +11,8 @@ export async function GET(
       return NextResponse.json({ error: 'Missing object key' }, { status: 400 });
     }
 
-    const object = await getFromR2(fullKey);
+    const rangeHeader = req.headers.get('range');
+    const object = await getFromR2(fullKey, rangeHeader || undefined);
     if (!object.Body) {
       return NextResponse.json({ error: 'File not found' }, { status: 404 });
     }
@@ -24,23 +25,34 @@ export async function GET(
       else if (fullKey.endsWith('.mp3')) contentType = 'audio/mpeg';
       else if (fullKey.endsWith('.flac')) contentType = 'audio/flac';
       else if (fullKey.endsWith('.zip')) contentType = 'application/zip';
+      else if (fullKey.endsWith('.png')) contentType = 'image/png';
+      else if (fullKey.endsWith('.jpg') || fullKey.endsWith('.jpeg')) contentType = 'image/jpeg';
       else contentType = 'application/octet-stream';
     }
 
     const isDownload = req.nextUrl.searchParams.get('download') === '1' || req.nextUrl.searchParams.get('download') === 'true';
     const customFilename = req.nextUrl.searchParams.get('filename') || fullKey.split('/').pop() || 'caution-track.wav';
+    const isPartial = Boolean(rangeHeader && object.ContentRange);
 
     const responseHeaders: Record<string, string> = {
       'Content-Type': contentType,
       'Content-Length': object.ContentLength ? String(object.ContentLength) : '',
-      'Cache-Control': 'public, max-age=31536000, immutable'
+      'Accept-Ranges': 'bytes',
+      'Cache-Control': isDownload ? 'private, no-cache' : 'public, max-age=31536000, immutable'
     };
+
+    if (object.ContentRange) {
+      responseHeaders['Content-Range'] = object.ContentRange;
+    }
 
     if (isDownload) {
       responseHeaders['Content-Disposition'] = `attachment; filename="${customFilename}"`;
+    } else {
+      responseHeaders['Content-Disposition'] = 'inline';
     }
 
     return new NextResponse(stream, {
+      status: isPartial ? 206 : 200,
       headers: responseHeaders
     });
   } catch (err: any) {

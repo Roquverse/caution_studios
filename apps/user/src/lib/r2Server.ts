@@ -24,9 +24,10 @@ export async function uploadToR2(key: string, body: Buffer | Uint8Array, content
   return key;
 }
 
-export async function getFromR2(key: string) {
+export async function getFromR2(key: string, range?: string) {
   return await r2.send(new GetObjectCommand({
     Bucket: R2_BUCKET,
-    Key: key
+    Key: key,
+    Range: range || undefined
   }));
 }
