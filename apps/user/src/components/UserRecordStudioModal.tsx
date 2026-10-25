@@ -40,16 +40,18 @@ import {
   Maximize2,
   Minimize2,
   ChevronDown,
-  Search
+  Search,
+  ArrowLeft
 } from 'lucide-react';
 import { TrackItem } from '../types/tracks';
 import { useUserSubscription } from '../lib/subscription';
 
-interface UserRecordStudioModalProps {
-  isOpen: boolean;
-  onClose: () => void;
+export interface UserRecordStudioModalProps {
+  isOpen?: boolean;
+  onClose?: () => void;
   preselectedTrack?: TrackItem | null;
   availableTracks?: TrackItem[];
+  isStandalonePage?: boolean;
 }
 
 export interface StudioVocalTrack {
@@ -65,6 +67,7 @@ export interface StudioVocalTrack {
   vocalBlob: Blob | null;
   vocalUrl: string | null;
   durationSeconds: number;
+  latencyOffsetMs?: number; // Delay compensation in ms
 }
 
 const TRACK_PALETTE = [
@@ -129,10 +132,11 @@ function audioBufferToWav(buffer: AudioBuffer): Blob {
 }
 
 export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
-  isOpen,
+  isOpen = true,
   onClose,
   preselectedTrack,
-  availableTracks = []
+  availableTracks = [],
+  isStandalonePage = false
 }) => {
   const { isSubscribed } = useUserSubscription();
 
@@ -157,8 +161,11 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
   // Multi-Track State: Track 1 (Beat)
   const [beatMuted, setBeatMuted] = useState(false);
   const [beatSolo, setBeatSolo] = useState(false);
-  const [beatVolume, setBeatVolume] = useState(0.85); // 0 to 1
+  const [beatVolume, setBeatVolume] = useState(0.85); // 0 to 1.5
   const [beatPan, setBeatPan] = useState(0); // -100 to +100
+
+  // Audio Hardware Latency Compensation Offset (ms) - aligns mic delay with backing track
+  const [globalLatencyMs, setGlobalLatencyMs] = useState<number>(85);
 
   // Multi-Track State: Vocal Tracks (Lead Vocal + Multiple Backup Vocals)
   const [vocalTracks, setVocalTracks] = useState<StudioVocalTrack[]>([
@@ -174,7 +181,8 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
       pan: 0,
       vocalBlob: null,
       vocalUrl: null,
-      durationSeconds: 0
+      durationSeconds: 0,
+      latencyOffsetMs: 85
     },
     {
       id: 'trk_backup_1',
@@ -188,7 +196,8 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
       pan: -40, // Preset 40% Left for stereo depth
       vocalBlob: null,
       vocalUrl: null,
-      durationSeconds: 0
+      durationSeconds: 0,
+      latencyOffsetMs: 85
     },
     {
       id: 'trk_backup_2',
@@ -202,7 +211,8 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
       pan: 40, // Preset 40% Right
       vocalBlob: null,
       vocalUrl: null,
-      durationSeconds: 0
+      durationSeconds: 0,
+      latencyOffsetMs: 85
     }
   ]);
 
@@ -396,11 +406,48 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
       pan: autoPan,
       vocalBlob: null,
       vocalUrl: null,
-      durationSeconds: 0
+      durationSeconds: 0,
+      latencyOffsetMs: globalLatencyMs
     };
 
     setVocalTracks((prev) => [...prev, newTrack]);
   };
+
+  // Adjust vocal latency compensation offset in milliseconds (shifts vocal timing relative to beat)
+  const handleNudgeLatency = (trackId: string, deltaMs: number) => {
+    setVocalTracks((prev) =>
+      prev.map((t) => {
+        if (t.id === trackId) {
+          const current = t.latencyOffsetMs !== undefined ? t.latencyOffsetMs : globalLatencyMs;
+          const next = Math.max(0, Math.min(400, current + deltaMs));
+          return { ...t, latencyOffsetMs: next };
+        }
+        return t;
+      })
+    );
+  };
+
+  // Real-time audio volume & solo/mute sync: immediately updates audio element volumes while playing!
+  useEffect(() => {
+    const anySolo = vocalTracks.some((t) => t.isSolo) || beatSolo;
+
+    // 1. Backing Beat audio element
+    if (beatAudioRef.current) {
+      const beatShouldPlay = anySolo ? beatSolo : !beatMuted;
+      const targetVol = beatShouldPlay ? Math.max(0, Math.min(1, beatVolume * masterVolume)) : 0;
+      beatAudioRef.current.volume = targetVol;
+    }
+
+    // 2. All Vocal audio elements
+    vocalTracks.forEach((t) => {
+      const el = vocalAudioRefs.current.get(t.id);
+      if (el) {
+        const trackShouldPlay = anySolo ? t.isSolo : !t.isMuted;
+        const targetVol = trackShouldPlay ? Math.max(0, Math.min(1, t.volume * masterVolume)) : 0;
+        el.volume = targetVol;
+      }
+    });
+  }, [beatVolume, beatMuted, beatSolo, vocalTracks, masterVolume]);
 
   // Remove a Backup Vocal Track
   const handleRemoveTrack = (trackId: string) => {
@@ -551,7 +598,7 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
         });
         const objectUrl = URL.createObjectURL(fullBlob);
 
-        // Assign newly recorded take directly into the armed track
+        // Assign newly recorded take directly into the armed track with latency compensation
         setVocalTracks((prev) =>
           prev.map((t) =>
             t.id === armedTrack.id
@@ -559,7 +606,8 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
                   ...t,
                   vocalBlob: fullBlob,
                   vocalUrl: objectUrl,
-                  durationSeconds: recordingSeconds
+                  durationSeconds: recordingSeconds,
+                  latencyOffsetMs: t.latencyOffsetMs !== undefined ? t.latencyOffsetMs : globalLatencyMs
                 }
               : t
           )
@@ -656,10 +704,16 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
   const handleReturnToZero = () => {
     setPlayheadTime(0);
     if (beatAudioRef.current) beatAudioRef.current.currentTime = 0;
-    vocalAudioRefs.current.forEach((el) => (el.currentTime = 0));
+    vocalTracks.forEach((t) => {
+      const el = vocalAudioRefs.current.get(t.id);
+      if (el) {
+        const trackOffset = (t.latencyOffsetMs !== undefined ? t.latencyOffsetMs : globalLatencyMs) / 1000;
+        el.currentTime = Math.max(0, trackOffset);
+      }
+    });
   };
 
-  // Synchronized Multi-Track Playback (Beat + Lead + All Backup Vocals)
+  // Synchronized Multi-Track Playback (Beat + Lead + All Backup Vocals with Latency Compensation)
   const togglePlayCombinedPreview = () => {
     if (isPlaying) {
       if (beatAudioRef.current) beatAudioRef.current.pause();
@@ -675,7 +729,7 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
       if (beatAudioRef.current) {
         beatAudioRef.current.currentTime = currentTime;
         const beatShouldPlay = anySolo ? beatSolo : !beatMuted;
-        beatAudioRef.current.volume = beatShouldPlay ? beatVolume * masterVolume : 0;
+        beatAudioRef.current.volume = beatShouldPlay ? Math.max(0, Math.min(1, beatVolume * masterVolume)) : 0;
       }
 
       const promises: Promise<void>[] = [];
@@ -685,9 +739,12 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
         if (t.vocalUrl) {
           const el = vocalAudioRefs.current.get(t.id);
           if (el) {
-            el.currentTime = currentTime;
+            // Apply delay compensation: advance vocal audio slightly so it syncs on beat
+            const trackOffset = (t.latencyOffsetMs !== undefined ? t.latencyOffsetMs : globalLatencyMs) / 1000;
+            const targetTime = Math.max(0, currentTime + trackOffset);
+            el.currentTime = targetTime;
             const vocalShouldPlay = anySolo ? t.isSolo : !t.isMuted;
-            el.volume = vocalShouldPlay ? t.volume * masterVolume : 0;
+            el.volume = vocalShouldPlay ? Math.max(0, Math.min(1, t.volume * masterVolume)) : 0;
             promises.push(el.play());
           }
         }
@@ -725,7 +782,13 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
 
     setPlayheadTime(seekTime);
     if (beatAudioRef.current) beatAudioRef.current.currentTime = seekTime;
-    vocalAudioRefs.current.forEach((el) => (el.currentTime = seekTime));
+    vocalTracks.forEach((t) => {
+      const el = vocalAudioRefs.current.get(t.id);
+      if (el) {
+        const trackOffset = (t.latencyOffsetMs !== undefined ? t.latencyOffsetMs : globalLatencyMs) / 1000;
+        el.currentTime = Math.max(0, seekTime + trackOffset);
+      }
+    });
   };
 
   // Render Full Multi-Track Master Mix WAV (Beat + Lead + All Backup Vocals with Pan & Gain)
@@ -815,7 +878,9 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
       highFilter.connect(panner);
       panner.connect(vGain);
       vGain.connect(offlineCtx.destination);
-      vSource.start(0);
+      // Compensate for recording latency in master WAV mixdown
+      const offsetSeconds = (track.latencyOffsetMs !== undefined ? track.latencyOffsetMs : globalLatencyMs) / 1000;
+      vSource.start(0, Math.max(0, offsetSeconds));
     }
 
     // Render offline stereo master
@@ -969,7 +1034,7 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
     return `R${pan}`;
   };
 
-  if (!isOpen) return null;
+  if (!isStandalonePage && !isOpen) return null;
 
   const hasAnyRecordedTakes = vocalTracks.some((t) => t.vocalBlob !== null);
   const armedTrack = vocalTracks.find((t) => t.isArmed);
@@ -978,7 +1043,14 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
     /* =========================================================================
        FULL-WIDTH & FULL-SCREEN DAW WORKSTATION (Edge-to-Edge Desktop Layout)
        ========================================================================= */
-    <div className="fixed inset-0 z-50 w-screen h-screen bg-[#07090E] text-white flex flex-col font-sans select-none overflow-hidden animate-in fade-in duration-200">
+    <div
+      className={`${
+        isStandalonePage
+          ? 'w-full min-h-screen h-screen'
+          : 'fixed inset-0 z-50 w-screen h-screen'
+      } bg-[#07090E] text-white flex flex-col font-sans select-none overflow-hidden`}
+      style={{ backgroundColor: '#07090E', opacity: 1 }}
+    >
       {/* Hidden Playback Track Audio Elements */}
       {selectedTrack && (
         <audio
@@ -1013,8 +1085,19 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
           1. TOP DAW TITLE BAR (Audacity / Cubase Header Chassis)
          ========================================================================= */}
       <div className="w-full px-4 py-2 bg-[#0E1119] border-b border-white/10 flex items-center justify-between text-xs shrink-0">
-        {/* Left: DAW Branding & Project Name Input */}
+        {/* Left: DAW Branding & Back Button */}
         <div className="flex items-center gap-3 min-w-0">
+          {isStandalonePage && onClose && (
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-2.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-bold text-gray-300 hover:text-white flex items-center gap-1.5 transition-colors cursor-pointer mr-1"
+              title="Return to Caution Studio Portal"
+            >
+              <ArrowLeft className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Exit Studio</span>
+            </button>
+          )}
           <div className="flex items-center gap-2">
             <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse" />
             <span className="font-mono font-black text-white uppercase tracking-wider text-xs flex items-center gap-1.5">
@@ -1227,8 +1310,8 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
           </div>
         </div>
 
-        {/* Master Output VU Meter */}
-        <div className="hidden md:flex items-center gap-2 bg-black/40 border border-white/10 rounded-xl px-2.5 py-1.5">
+        {/* Master Output VU Meter & Master Volume Knob */}
+        <div className="hidden md:flex items-center gap-2.5 bg-black/40 border border-white/10 rounded-xl px-2.5 py-1.5">
           <div className="text-[9px] font-mono text-gray-400">MASTER</div>
           <div className="flex gap-1">
             <div className="w-2.5 h-7 bg-black rounded-sm overflow-hidden flex flex-col-reverse p-0.5 border border-white/10">
@@ -1244,6 +1327,19 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
               />
             </div>
           </div>
+          <input
+            type="range"
+            min="0"
+            max="1.5"
+            step="0.01"
+            value={masterVolume}
+            onChange={(e) => setMasterVolume(parseFloat(e.target.value))}
+            aria-label="Master Volume Fader"
+            className="w-16 accent-teal-400 h-1.5 bg-black/50 rounded cursor-pointer"
+          />
+          <span className="text-[9px] font-mono text-teal-300 w-7 text-right">
+            {Math.round(masterVolume * 100)}%
+          </span>
         </div>
 
         {/* Backing Beat Switcher Trigger */}
@@ -1715,6 +1811,35 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
                     <span className="text-[10px] font-mono text-gray-400 w-8 text-right">
                       {track.isMuted ? 'MUTE' : `${Math.round(track.volume * 100)}%`}
                     </span>
+                  </div>
+
+                  {/* Vocal Latency Sync Offset Nudge */}
+                  <div className="flex items-center justify-between text-[9px] font-mono bg-black/40 px-2 py-1 rounded border border-white/5 mt-1">
+                    <span className="text-gray-400 flex items-center gap-1 font-bold">
+                      <Clock className="h-2.5 w-2.5 text-teal-400" />
+                      <span>VOCAL SYNC</span>
+                    </span>
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => handleNudgeLatency(track.id, -10)}
+                        title="Nudge vocal earlier by 10ms (compensates for mic lag)"
+                        className="px-1 py-0.2 rounded bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white cursor-pointer"
+                      >
+                        -10ms
+                      </button>
+                      <span className="w-12 text-center font-bold text-teal-300">
+                        -{track.latencyOffsetMs !== undefined ? track.latencyOffsetMs : globalLatencyMs}ms
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => handleNudgeLatency(track.id, 10)}
+                        title="Nudge vocal later by 10ms"
+                        className="px-1 py-0.2 rounded bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white cursor-pointer"
+                      >
+                        +10ms
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>

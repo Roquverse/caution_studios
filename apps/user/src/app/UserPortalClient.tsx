@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import {
   Search,
   Cast,
@@ -97,23 +98,25 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
   const [isDownloadLimitModalOpen, setIsDownloadLimitModalOpen] = useState(false);
   const [rewardNotification, setRewardNotification] = useState<string | null>(null);
   const downloadQuota = useDailyDownloadQuota();
-  const [isRecordStudioOpen, setIsRecordStudioOpen] = useState(false);
-  const [recordStudioTrack, setRecordStudioTrack] = useState<TrackItem | null>(null);
+  const router = useRouter();
 
   const handleOpenRecordStudio = (track?: TrackItem) => {
     if (audioRef.current) audioRef.current.pause();
     audioSynth.stop();
     setIsPlaying(false);
-    if (track) setRecordStudioTrack(track);
-    else if (currentTrack) setRecordStudioTrack(currentTrack);
-    setIsRecordStudioOpen(true);
+    const targetBeat = track || currentTrack;
+    if (targetBeat?.id) {
+      router.push(`/studio?beatId=${encodeURIComponent(targetBeat.id)}`);
+    } else {
+      router.push('/studio');
+    }
   };
 
   // Backwards-compatible aliases
-  const isSoundstageOpen = isRecordStudioOpen;
-  const setIsSoundstageOpen = setIsRecordStudioOpen;
+  const isSoundstageOpen = false;
+  const setIsSoundstageOpen = (_val: boolean) => {};
   const handleOpenSoundstage = handleOpenRecordStudio;
-  const soundstageTrack = recordStudioTrack;
+  const soundstageTrack = null;
 
   // Table beats seeded from real database beats
   const [playlistRows, setPlaylistRows] = useState<TrackItem[]>(effectiveBeats);
@@ -2897,14 +2900,6 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
           );
           setTimeout(() => setRewardNotification(null), 6000);
         }}
-      />
-
-      {/* Record Studio Professional In-Browser DAW Interface */}
-      <UserRecordStudioModal
-        isOpen={isRecordStudioOpen}
-        onClose={() => setIsRecordStudioOpen(false)}
-        preselectedTrack={recordStudioTrack}
-        availableTracks={effectiveBeats}
       />
     </div>
   );
