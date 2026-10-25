@@ -24,8 +24,34 @@ import {
   ExternalLink,
   Flame,
   CheckCircle2,
-  Mic
+  Mic,
+  Gift
 } from 'lucide-react';
+
+export function isFreeBeat(track: TrackItem): boolean {
+  if (track.isFree) return true;
+  if (track.priceNgn === 0) return true;
+  if (track.category === 'free') return true;
+  if (
+    Array.isArray(track.tags) &&
+    track.tags.some((t) => t.toLowerCase() === 'free' || t.toLowerCase() === 'free download')
+  ) {
+    return true;
+  }
+  if (
+    track.title &&
+    (track.title.toLowerCase().includes('(free)') || track.title.toLowerCase().includes('[free]'))
+  ) {
+    return true;
+  }
+  return false;
+}
+
+function formatPriceBadge(val: number): string {
+  if (val >= 1000000) return `₦${(val / 1000000).toFixed(1)}m`;
+  if (val >= 1000) return `₦${Math.round(val / 1000)}k`;
+  return `₦${val}`;
+}
 
 interface UserMarketplaceViewProps {
   tracks: TrackItem[];
@@ -39,6 +65,9 @@ interface UserMarketplaceViewProps {
   handleDownload: (track: TrackItem, e: React.MouseEvent) => void;
   downloadingId?: string | null;
   onOpenSoundstage?: (track: TrackItem) => void;
+  onTriggerAd?: () => void;
+  bonusDownloads?: number;
+  remainingDownloads?: number;
 }
 
 const GENRE_LIST = ['All Genres', 'Afrobeats', 'Amapiano', 'Trap', 'Drill', 'R&B', 'Electronic', 'Cinematic'];
@@ -54,13 +83,20 @@ export function UserMarketplaceView({
   toggleListenLater,
   handleDownload,
   downloadingId,
-  onOpenSoundstage
+  onOpenSoundstage,
+  onTriggerAd,
+  bonusDownloads = 0,
+  remainingDownloads
 }: UserMarketplaceViewProps) {
   const [selectedSection, setSelectedSection] = useState<'all' | 'free' | 'premium' | 'exclusive'>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedGenre, setSelectedGenre] = useState('All Genres');
   const [selectedBpmRange, setSelectedBpmRange] = useState<string>('All');
   const [sortBy, setSortBy] = useState<'popular' | 'newest' | 'bpm'>('popular');
+
+  // License dropdown selection per beat: 'standard' vs 'exclusive'
+  const [selectedTiers, setSelectedTiers] = useState<Record<string, 'standard' | 'exclusive'>>({});
+  const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
 
   // Read URL query params on mount
   useEffect(() => {
@@ -79,22 +115,34 @@ export function UserMarketplaceView({
 
   // License Modal State
   const [licenseModalTrack, setLicenseModalTrack] = useState<TrackItem | null>(null);
-  const [selectedTier, setSelectedTier] = useState<'basic' | 'premium' | 'exclusive'>('premium');
+  const [selectedTier, setSelectedTier] = useState<'basic' | 'premium' | 'exclusive'>('basic');
   const [purchaseSuccess, setPurchaseSuccess] = useState(false);
+
+  // Close open dropdown on outside click
+  useEffect(() => {
+    const handleOutsideClick = () => {
+      setOpenDropdownId(null);
+    };
+    if (openDropdownId) {
+      window.addEventListener('click', handleOutsideClick);
+      return () => window.removeEventListener('click', handleOutsideClick);
+    }
+  }, [openDropdownId]);
 
   // Filter beats
   const filteredTracks = useMemo(() => {
     return tracks.filter((track) => {
+      const isFree = isFreeBeat(track);
+
       // 0. Section Filter
       if (selectedSection === 'free') {
-        // Free streamable beats
-        if (track.priceNgn && track.priceNgn > 5000) return false;
-      }
-      if (selectedSection === 'premium') {
-        // Stems & WAV tier
+        if (!isFree) return false;
       }
       if (selectedSection === 'exclusive') {
-        // Exclusive tier
+        if (isFree) return false;
+      }
+      if (selectedSection === 'premium') {
+        if (isFree) return false;
       }
 
       // 1. Search Query
@@ -103,7 +151,8 @@ export function UserMarketplaceView({
         const matchesTitle = track.title.toLowerCase().includes(q);
         const matchesArtist = track.artist.toLowerCase().includes(q);
         const matchesGenre = (track.genre || '').toLowerCase().includes(q);
-        if (!matchesTitle && !matchesArtist && !matchesGenre) return false;
+        const matchesTags = (track.tags || []).some(t => t.toLowerCase().includes(q));
+        if (!matchesTitle && !matchesArtist && !matchesGenre && !matchesTags) return false;
       }
 
       // 2. Genre Filter
@@ -132,125 +181,134 @@ export function UserMarketplaceView({
     });
   }, [tracks, selectedSection, searchQuery, selectedGenre, selectedBpmRange, sortBy]);
 
-  // Counts
-  const totalCount = tracks.length;
-  const freeCount = tracks.filter((t) => !t.priceNgn || t.priceNgn <= 5000).length;
-
-  const handleCheckout = async () => {
-    if (!licenseModalTrack) return;
-    try {
-      setPurchaseSuccess(true);
-      await fetch('/api/beats/license', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          beatId: licenseModalTrack.id,
-          tier: selectedTier
-        })
-      });
-      setTimeout(() => {
-        setPurchaseSuccess(false);
-        setLicenseModalTrack(null);
-      }, 2500);
-    } catch (e) {
-      console.error('License checkout failed:', e);
+  const handleCheckout = () => {
+    setPurchaseSuccess(true);
+    setTimeout(() => {
       setPurchaseSuccess(false);
-    }
+      setLicenseModalTrack(null);
+    }, 2500);
   };
 
   return (
     <div className="space-y-6">
       {/* 1. Header Banner */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-white/[0.06]">
-        <div>
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#E8B896]/10 border border-[#E8B896]/20 text-xs font-semibold text-[#E8B896] mb-2">
-            <ShoppingBag className="h-3.5 w-3.5 text-[#E8B896]" />
-            <span>Official Caution Studio Beat Store</span>
-          </div>
-          <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
-            Caution Studio Beat Store
-          </h1>
-          <p className="text-xs text-gray-400 mt-1 max-w-2xl leading-relaxed">
-            Browse Afrobeats, Amapiano, Trap & Drill master recordings. As a registered artist, stream free beats, audition stems, or license commercial master WAV rights and exclusive 1-of-1 buyouts.
-          </p>
-        </div>
+      <div className="relative rounded-2xl bg-gradient-to-br from-[#1A1325] via-[#10121A] to-[#0A0D14] border border-white/10 p-6 sm:p-8 overflow-hidden shadow-2xl">
+        <div className="absolute -right-16 -top-16 w-80 h-80 bg-purple-500/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute right-1/3 -bottom-16 w-80 h-80 bg-[#E8B896]/10 rounded-full blur-3xl pointer-events-none" />
 
-        <div className="flex items-center gap-2 shrink-0">
-          <div className="px-3.5 py-2 rounded-xl bg-teal-500/10 border border-teal-500/20 text-teal-300 text-xs font-semibold flex items-center gap-1.5">
-            <CheckCircle2 className="h-4 w-4 text-teal-400" />
-            <span>Unlimited Studio Playback Active</span>
+        <div className="relative z-10 max-w-2xl space-y-3">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 border border-white/10 text-xs font-mono text-[#E8B896]">
+            <Sparkles className="h-3.5 w-3.5 text-[#E8B896]" />
+            <span>Caution Marketplace · Direct License Store</span>
           </div>
+
+          <h1 className="text-2xl sm:text-4xl font-black text-white tracking-tight">
+            Discover & License World-Class Beats
+          </h1>
+
+          <p className="text-xs sm:text-sm text-gray-300 leading-relaxed">
+            Free streamable beats, commercial standard leases, and sole exclusive buyouts.
+            Stream artist spotlight songs through ads to unlock bonus daily downloads.
+          </p>
         </div>
       </div>
 
-      {/* 2. Category Tabs */}
-      <div className="flex flex-wrap items-center gap-2 p-1.5 rounded-2xl bg-[#121316] border border-white/[0.06]">
+      {/* 2. Daily Download Quota & Ad Reward Banner */}
+      <div className="p-3.5 sm:p-4 rounded-xl bg-gradient-to-r from-teal-500/15 via-[#0F131C] to-amber-500/10 border border-teal-500/25 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs shadow-lg">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-xl bg-teal-500/20 border border-teal-500/30 flex items-center justify-center shrink-0 text-teal-300 shadow-sm">
+            <Gift className="h-4 w-4" />
+          </div>
+          <div>
+            <div className="flex flex-wrap items-center gap-2 font-bold text-white">
+              <span>Daily Beat Downloads</span>
+              <span className="px-2 py-0.5 rounded-full text-[11px] font-mono font-bold bg-teal-400/20 text-teal-300 border border-teal-400/30">
+                {remainingDownloads !== undefined ? `${remainingDownloads} remaining today` : '2 available today'}
+              </span>
+              {bonusDownloads > 0 && (
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-amber-400/20 text-amber-300 border border-amber-400/30 flex items-center gap-1">
+                  <Sparkles className="h-2.5 w-2.5" />
+                  +{bonusDownloads} bonus from ads
+                </span>
+              )}
+            </div>
+            <p className="text-[11px] text-gray-400 mt-0.5">
+              Stream artist songs through ads to earn <strong>+1 bonus beat download</strong> for the day whenever you want more beats!
+            </p>
+          </div>
+        </div>
+
+        {onTriggerAd && (
+          <button
+            type="button"
+            onClick={onTriggerAd}
+            className="w-full sm:w-auto px-4 py-2 rounded-xl bg-[#2dd4bf] hover:bg-[#20b8a4] text-zinc-950 font-black text-xs flex items-center justify-center gap-1.5 transition-transform hover:scale-105 shadow-md shadow-[#2dd4bf]/20 shrink-0 cursor-pointer"
+          >
+            <Headphones className="h-3.5 w-3.5" />
+            <span>Stream Artist Song (+1 Download)</span>
+          </button>
+        )}
+      </div>
+
+      {/* 3. Section Tabs */}
+      <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar border-b border-white/[0.08]">
         <button
           type="button"
           onClick={() => setSelectedSection('all')}
-          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
+          className={`h-9 px-4 rounded-t-xl text-xs font-bold transition-all flex items-center gap-2 shrink-0 ${
             selectedSection === 'all'
-              ? 'bg-[#E8B896] text-black shadow-md shadow-[#E8B896]/20'
-              : 'text-gray-400 hover:text-white hover:bg-white/5'
+              ? 'bg-white/10 text-white border-b-2 border-[#E8B896]'
+              : 'text-gray-400 hover:text-white'
           }`}
         >
-          <Layers className="h-3.5 w-3.5" />
+          <Music2 className="h-3.5 w-3.5" />
           <span>All Beats</span>
-          <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${selectedSection === 'all' ? 'bg-black/20 text-black' : 'bg-white/10 text-gray-400'}`}>
-            {totalCount}
-          </span>
         </button>
 
         <button
           type="button"
           onClick={() => setSelectedSection('free')}
-          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
+          className={`h-9 px-4 rounded-t-xl text-xs font-bold transition-all flex items-center gap-2 shrink-0 ${
             selectedSection === 'free'
-              ? 'bg-teal-400 text-black shadow-md shadow-teal-400/20'
-              : 'text-teal-400 hover:text-teal-300 hover:bg-teal-400/10'
+              ? 'bg-emerald-500/10 text-emerald-300 border-b-2 border-emerald-400'
+              : 'text-emerald-400/70 hover:text-emerald-300'
           }`}
         >
-          <Headphones className="h-3.5 w-3.5" />
-          <span>Free Beats (Commercial)</span>
-          <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${selectedSection === 'free' ? 'bg-black/20 text-black' : 'bg-teal-400/20 text-teal-300'}`}>
-            {freeCount}
+          <Sparkles className="h-3.5 w-3.5" />
+          <span>Free Beats</span>
+          <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-emerald-500/20 text-emerald-300 font-mono">
+            FREE
           </span>
         </button>
 
         <button
           type="button"
           onClick={() => setSelectedSection('premium')}
-          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
+          className={`h-9 px-4 rounded-t-xl text-xs font-bold transition-all flex items-center gap-2 shrink-0 ${
             selectedSection === 'premium'
-              ? 'bg-amber-400 text-black shadow-md shadow-amber-400/20'
-              : 'text-amber-400 hover:text-amber-300 hover:bg-amber-400/10'
+              ? 'bg-amber-500/10 text-amber-300 border-b-2 border-amber-400'
+              : 'text-amber-400/70 hover:text-amber-300'
           }`}
         >
           <Zap className="h-3.5 w-3.5" />
-          <span>Premium (WAV + Stems)</span>
-          <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${selectedSection === 'premium' ? 'bg-black/20 text-black' : 'bg-amber-400/20 text-amber-300 font-mono font-bold'}`}>
-            ₦30,000+
-          </span>
+          <span>Standard / Leases</span>
         </button>
 
         <button
           type="button"
           onClick={() => setSelectedSection('exclusive')}
-          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
+          className={`h-9 px-4 rounded-t-xl text-xs font-bold transition-all flex items-center gap-2 shrink-0 ${
             selectedSection === 'exclusive'
-              ? 'bg-purple-400 text-black shadow-md shadow-purple-400/20'
-              : 'text-purple-400 hover:text-purple-300 hover:bg-purple-400/10'
+              ? 'bg-purple-500/10 text-purple-300 border-b-2 border-purple-400'
+              : 'text-purple-400/70 hover:text-purple-300'
           }`}
         >
           <Crown className="h-3.5 w-3.5" />
-          <span>Exclusive (1-of-1 Buyout)</span>
-          <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${selectedSection === 'exclusive' ? 'bg-black/20 text-black' : 'bg-purple-400/20 text-purple-300'}`}>
-            ₦100,000+
-          </span>
+          <span>Exclusive Buyouts</span>
         </button>
       </div>
 
-      {/* 3. Search and Filters */}
+      {/* 4. Search and Filters */}
       <div className="flex flex-col md:flex-row items-center gap-3">
         <div className="relative flex-1 w-full">
           <Search className="h-4 w-4 text-gray-400 absolute left-3.5 top-3 pointer-events-none" />
@@ -299,7 +357,7 @@ export function UserMarketplaceView({
         </select>
       </div>
 
-      {/* 4. Genre Horizontal Pills */}
+      {/* 5. Genre Horizontal Pills */}
       <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
         {GENRE_LIST.map((genre) => {
           const isSelected = selectedGenre.toLowerCase() === genre.toLowerCase();
@@ -320,14 +378,14 @@ export function UserMarketplaceView({
         })}
       </div>
 
-      {/* 5. Beats Table Layout */}
+      {/* 6. Beats Table Layout */}
       <div className="p-4 sm:p-5 rounded-2xl bg-[#121316] border border-white/[0.06] space-y-3">
         <div className="hidden sm:flex items-center justify-between px-3 text-[11px] font-mono uppercase tracking-wider text-gray-500 pb-1 border-b border-white/[0.04]">
-          <div className="w-80">Track / Producer</div>
-          <div className="w-32 text-left">BPM / Key</div>
-          <div className="w-28 text-left">Genre</div>
-          <div className="w-32 text-left">License Tiers</div>
-          <div className="w-44 text-right">Get Beat & Options</div>
+          <div className="w-72">Track / Producer</div>
+          <div className="w-28 text-left">BPM / Key</div>
+          <div className="w-24 text-left">Genre</div>
+          <div className="w-44 text-left">License Tiers</div>
+          <div className="w-48 text-right">Get Beat & Options</div>
         </div>
 
         {filteredTracks.length === 0 ? (
@@ -345,7 +403,7 @@ export function UserMarketplaceView({
                 setSelectedGenre('All Genres');
                 setSelectedBpmRange('All');
               }}
-              className="px-4 py-2 rounded-lg bg-[#E8B896] text-black text-xs font-bold"
+              className="px-4 py-2 rounded-lg bg-[#E8B896] text-black text-xs font-bold cursor-pointer"
             >
               Reset Filters
             </button>
@@ -356,15 +414,24 @@ export function UserMarketplaceView({
               const isThisPlaying = isPlaying && currentTrack.id === row.id;
               const isLiked = likedTrackIds.includes(row.id);
               const isLater = listenLaterIds.includes(row.id);
+              const isFree = isFreeBeat(row);
+
+              // License tier choice for priced beat
+              const activeTier = selectedTiers[row.id] || 'standard';
+              const standardPrice = row.priceNgn && row.priceNgn > 0 ? row.priceNgn : 3000;
+              const exclusivePrice = row.exclusivePriceNgn && row.exclusivePriceNgn > 0 ? row.exclusivePriceNgn : 50000;
+              const isDropdownOpen = openDropdownId === row.id;
 
               return (
                 <div
                   key={'marketplace-' + row.id}
                   onClick={() => handlePlayToggle(row)}
-                  className="flex items-center justify-between p-3 rounded-xl bg-white/[0.02] hover:bg-white/[0.05] border border-white/[0.04] transition-all cursor-pointer group"
+                  className={`relative flex items-center justify-between p-3 rounded-xl bg-white/[0.02] hover:bg-white/[0.05] border border-white/[0.04] transition-all cursor-pointer group ${
+                    isDropdownOpen ? 'z-30 border-white/20 bg-white/[0.04]' : 'z-10'
+                  }`}
                 >
                   {/* Track & Producer */}
-                  <div className="flex items-center gap-3.5 min-w-0 w-80">
+                  <div className="flex items-center gap-3.5 min-w-0 w-72">
                     <div className="w-11 h-11 rounded-lg overflow-hidden bg-black/40 border border-white/10 shrink-0 relative">
                       <img
                         src={row.coverUrl}
@@ -393,33 +460,139 @@ export function UserMarketplaceView({
                   </div>
 
                   {/* BPM / Key */}
-                  <div className="hidden sm:block text-xs font-mono text-gray-300 w-32 truncate">
+                  <div className="hidden sm:block text-xs font-mono text-gray-300 w-28 truncate">
                     <div>{row.bpm || 110} BPM</div>
                     <div className="text-[10px] text-gray-500">{row.musicalKey || 'C Minor'}</div>
                   </div>
 
                   {/* Genre */}
-                  <div className="hidden sm:block text-xs text-gray-300 w-28 truncate">
+                  <div className="hidden sm:block text-xs text-gray-300 w-24 truncate">
                     <span className="px-2 py-0.5 rounded-md bg-white/5 border border-white/10 text-[11px] font-mono">
                       {row.genre || 'Afrobeats'}
                     </span>
                   </div>
 
-                  {/* License Tiers */}
-                  <div className="hidden sm:flex items-center gap-1.5 w-32">
-                    <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-teal-500/10 text-teal-300 border border-teal-500/20">
-                      Free
-                    </span>
-                    <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-500/10 text-amber-300 border border-amber-500/20">
-                      ₦30k
-                    </span>
-                    <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-purple-500/10 text-purple-300 border border-purple-500/20">
-                      1-of-1
-                    </span>
+                  {/* License Tiers Column */}
+                  <div className="hidden sm:flex items-center w-44">
+                    {isFree ? (
+                      /* Free Beat: Displays ONLY Free Badge */
+                      <span className="px-2.5 py-1 rounded-md text-[11px] font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 flex items-center gap-1.5 shadow-sm shadow-emerald-500/10">
+                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                        <span>Free</span>
+                      </span>
+                    ) : (
+                      /* Beat with Price Tag: Dropdown selector between Standard and Exclusive */
+                      <div className="relative">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setOpenDropdownId(isDropdownOpen ? null : row.id);
+                          }}
+                          title="Select License: Standard or Exclusive"
+                          className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border flex items-center justify-between gap-1.5 transition-all shadow-sm cursor-pointer min-w-[135px] max-w-[155px] ${
+                            activeTier === 'exclusive'
+                              ? 'bg-purple-500/15 text-purple-300 border-purple-500/30 hover:bg-purple-500/25'
+                              : 'bg-amber-500/15 text-amber-300 border-amber-500/30 hover:bg-amber-500/25'
+                          }`}
+                        >
+                          <div className="flex items-center gap-1.5 truncate">
+                            {activeTier === 'exclusive' ? (
+                              <Crown className="h-3 w-3 text-purple-400 shrink-0" />
+                            ) : (
+                              <ShieldCheck className="h-3 w-3 text-amber-400 shrink-0" />
+                            )}
+                            <span className="truncate">
+                              {activeTier === 'exclusive' ? 'Exclusive' : 'Standard'}
+                            </span>
+                            <span className="text-[10px] opacity-80 font-mono">
+                              · {formatPriceBadge(activeTier === 'exclusive' ? exclusivePrice : standardPrice)}
+                            </span>
+                          </div>
+                          <ChevronDown
+                            className={`h-3 w-3 shrink-0 text-gray-400 transition-transform duration-200 ${
+                              isDropdownOpen ? 'rotate-180 text-white' : ''
+                            }`}
+                          />
+                        </button>
+
+                        {/* Dropdown Menu */}
+                        {isDropdownOpen && (
+                          <div
+                            className="absolute top-full left-0 mt-1.5 w-60 p-1.5 rounded-xl bg-[#0F131C] border border-white/10 shadow-2xl z-50 text-white animate-in fade-in zoom-in-95 duration-150"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <div className="px-2 py-1 text-[10px] font-mono uppercase tracking-wider text-gray-400 border-b border-white/5 mb-1">
+                              Choose License Tier
+                            </div>
+
+                            {/* Standard Option */}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSelectedTiers((prev) => ({ ...prev, [row.id]: 'standard' }));
+                                setOpenDropdownId(null);
+                              }}
+                              className={`w-full p-2 rounded-lg text-left transition-colors flex items-center justify-between cursor-pointer ${
+                                activeTier === 'standard'
+                                  ? 'bg-amber-500/15 text-amber-300 border border-amber-500/30'
+                                  : 'hover:bg-white/5 text-gray-300'
+                              }`}
+                            >
+                              <div className="min-w-0 pr-2">
+                                <div className="flex items-center gap-1.5 text-xs font-bold text-white">
+                                  <ShieldCheck className="h-3.5 w-3.5 text-amber-400 shrink-0" />
+                                  <span>Standard Lease</span>
+                                  {activeTier === 'standard' && (
+                                    <Check className="h-3 w-3 text-amber-400 ml-auto" />
+                                  )}
+                                </div>
+                                <div className="text-[10px] text-gray-400 mt-0.5 truncate">
+                                  Commercial MP3/WAV Master
+                                </div>
+                              </div>
+                              <span className="text-xs font-black text-amber-300 font-mono shrink-0">
+                                ₦{standardPrice.toLocaleString()}
+                              </span>
+                            </button>
+
+                            {/* Exclusive Option */}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSelectedTiers((prev) => ({ ...prev, [row.id]: 'exclusive' }));
+                                setOpenDropdownId(null);
+                              }}
+                              className={`w-full p-2 mt-1 rounded-lg text-left transition-colors flex items-center justify-between cursor-pointer ${
+                                activeTier === 'exclusive'
+                                  ? 'bg-purple-500/15 text-purple-300 border border-purple-500/30'
+                                  : 'hover:bg-white/5 text-gray-300'
+                              }`}
+                            >
+                              <div className="min-w-0 pr-2">
+                                <div className="flex items-center gap-1.5 text-xs font-bold text-white">
+                                  <Crown className="h-3.5 w-3.5 text-purple-400 shrink-0" />
+                                  <span>Exclusive (1-of-1)</span>
+                                  {activeTier === 'exclusive' && (
+                                    <Check className="h-3 w-3 text-purple-400 ml-auto" />
+                                  )}
+                                </div>
+                                <div className="text-[10px] text-gray-400 mt-0.5 truncate">
+                                  Sole Ownership · Retired from Store
+                                </div>
+                              </div>
+                              <span className="text-xs font-black text-purple-300 font-mono shrink-0">
+                                ₦{exclusivePrice.toLocaleString()}
+                              </span>
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
 
                   {/* Actions & "Get Beat" */}
-                  <div className="flex items-center gap-2 shrink-0 w-44 justify-end">
+                  <div className="flex items-center gap-2 shrink-0 w-48 justify-end">
                     {/* Favorite */}
                     <button
                       type="button"
@@ -450,7 +623,7 @@ export function UserMarketplaceView({
                       <Clock className="h-3.5 w-3.5" />
                     </button>
 
-                    {/* Download */}
+                    {/* Download button */}
                     <button
                       type="button"
                       onClick={(e) => handleDownload(row, e)}
@@ -478,15 +651,29 @@ export function UserMarketplaceView({
                       </button>
                     )}
 
-                    {/* "Get Beat" CTA Button - Hide on Free Beats section */}
-                    {selectedSection !== 'free' && (
+                    {/* Action Button: Free Download vs "Get Beat" with Selected Tier */}
+                    {isFree ? (
+                      <button
+                        type="button"
+                        onClick={(e) => handleDownload(row, e)}
+                        className="px-3 py-1.5 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/40 text-emerald-300 text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 transition-transform hover:scale-105 shadow-sm cursor-pointer"
+                      >
+                        <Download className="h-3 w-3 stroke-[2.5]" />
+                        <span>Free Beat</span>
+                      </button>
+                    ) : (
                       <button
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation();
+                          setSelectedTier(activeTier === 'exclusive' ? 'exclusive' : 'basic');
                           setLicenseModalTrack(row);
                         }}
-                        className="px-3 py-1.5 rounded-lg bg-[#E8B896] hover:bg-[#d8a886] text-black text-xs font-black uppercase tracking-wider flex items-center gap-1.5 transition-transform hover:scale-105 shadow-sm"
+                        className={`px-3 py-1.5 rounded-lg text-xs font-black uppercase tracking-wider flex items-center gap-1.5 transition-transform hover:scale-105 shadow-sm cursor-pointer ${
+                          activeTier === 'exclusive'
+                            ? 'bg-purple-500 hover:bg-purple-400 text-white'
+                            : 'bg-[#E8B896] hover:bg-[#d8a886] text-black'
+                        }`}
                       >
                         <ShoppingBag className="h-3 w-3 stroke-[2.5]" />
                         <span>Get Beat</span>
@@ -500,7 +687,7 @@ export function UserMarketplaceView({
         )}
       </div>
 
-      {/* 6. "Get Beat" Price Tag Pop-Up Modal */}
+      {/* 7. "Get Beat" Price Tag Pop-Up Modal */}
       {licenseModalTrack && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
           <div
@@ -544,10 +731,12 @@ export function UserMarketplaceView({
               >
                 <div className="flex items-center justify-between">
                   <div>
-                    <span className="text-xs font-black text-white block">Basic Commercial Lease</span>
-                    <span className="text-[11px] text-gray-400">MP3 Master · 50,000 Streams · 1 Commercial Music Video</span>
+                    <span className="text-xs font-black text-white block">Standard Commercial Lease</span>
+                    <span className="text-[11px] text-gray-400">MP3 & WAV Master · 50,000 Streams · 1 Commercial Music Video</span>
                   </div>
-                  <span className="text-sm font-black text-teal-400">₦3,000</span>
+                  <span className="text-sm font-black text-teal-400">
+                    ₦{(licenseModalTrack.priceNgn || 3000).toLocaleString()}
+                  </span>
                 </div>
               </div>
 
@@ -570,7 +759,9 @@ export function UserMarketplaceView({
                     </div>
                     <span className="text-[11px] text-gray-400">24-Bit WAV Master + Trackout ZIP Stems · 500,000 Streams</span>
                   </div>
-                  <span className="text-sm font-black text-amber-400">₦30,000+</span>
+                  <span className="text-sm font-black text-amber-400">
+                    ₦{Math.max(15000, (licenseModalTrack.priceNgn || 3000) * 3).toLocaleString()}
+                  </span>
                 </div>
               </div>
 
@@ -593,7 +784,9 @@ export function UserMarketplaceView({
                     </div>
                     <span className="text-[11px] text-gray-400">Unlimited Streams · Sole Master Rights · Retired from Store</span>
                   </div>
-                  <span className="text-sm font-black text-purple-400">₦100,000+</span>
+                  <span className="text-sm font-black text-purple-400">
+                    ₦{(licenseModalTrack.exclusivePriceNgn || 50000).toLocaleString()}
+                  </span>
                 </div>
               </div>
             </div>
@@ -625,11 +818,11 @@ export function UserMarketplaceView({
                 <button
                   type="button"
                   onClick={handleCheckout}
-                  className="w-full py-3 rounded-xl bg-[#E8B896] hover:bg-[#d8a886] text-black font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-transform hover:scale-[1.01] shadow-lg shadow-[#E8B896]/20"
+                  className="w-full py-3 rounded-xl bg-[#E8B896] hover:bg-[#d8a886] text-black font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-transform hover:scale-[1.01] shadow-lg shadow-[#E8B896]/20 cursor-pointer"
                 >
                   <ShoppingBag className="h-4 w-4" />
                   <span>
-                    Confirm & License {selectedTier === 'basic' ? '₦3,000' : selectedTier === 'premium' ? '₦30,000+' : '₦100,000+'}
+                    Confirm & License {selectedTier === 'basic' ? `₦${(licenseModalTrack.priceNgn || 3000).toLocaleString()}` : selectedTier === 'premium' ? `₦${Math.max(15000, (licenseModalTrack.priceNgn || 3000) * 3).toLocaleString()}` : `₦${(licenseModalTrack.exclusivePriceNgn || 50000).toLocaleString()}`}
                   </span>
                 </button>
               )}
@@ -640,3 +833,4 @@ export function UserMarketplaceView({
     </div>
   );
 }
+export default UserMarketplaceView;

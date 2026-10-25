@@ -36,6 +36,11 @@ import { UserMarketplaceView } from '../components/UserMarketplaceView';
 import { UserSoundstageModal } from '../components/UserSoundstageModal';
 import { useUserSubscription, FREE_PREVIEW_LIMIT_SECONDS } from '../lib/subscription';
 import { supabase } from '../lib/supabaseClient';
+import {
+  useDailyDownloadQuota,
+  recordBeatDownload,
+  getDailyDownloadState
+} from '../lib/downloadQuota';
 
 import {
   TrackItem,
@@ -89,6 +94,9 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
   const [streamsCount, setStreamsCount] = useState(0);
   const [songsPlayedCount, setSongsPlayedCount] = useState(0);
   const [isAdModalOpen, setIsAdModalOpen] = useState(false);
+  const [isDownloadLimitModalOpen, setIsDownloadLimitModalOpen] = useState(false);
+  const [rewardNotification, setRewardNotification] = useState<string | null>(null);
+  const downloadQuota = useDailyDownloadQuota();
   const [isSoundstageOpen, setIsSoundstageOpen] = useState(false);
   const [soundstageTrack, setSoundstageTrack] = useState<TrackItem | null>(null);
 
@@ -536,14 +544,32 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
 
   // Song download handler & toast feedback
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
-  const [downloadToast, setDownloadToast] = useState<{ title: string; artist: string } | null>(null);
+  const [downloadToast, setDownloadToast] = useState<{
+    title: string;
+    artist: string;
+    remaining?: number;
+    bonusUsed?: boolean;
+  } | null>(null);
 
   const handleDownload = (track: TrackItem, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
     if (!track) return;
 
+    // Check daily download allowance (base + ad bonus)
+    const quotaState = getDailyDownloadState();
+    if (!isSubscribed && !quotaState.canDownload) {
+      setIsDownloadLimitModalOpen(true);
+      return;
+    }
+
     setDownloadingId(track.id);
-    setDownloadToast({ title: track.title, artist: track.artist });
+    const newQuota = recordBeatDownload(track.id, track.title);
+    setDownloadToast({
+      title: track.title,
+      artist: track.artist,
+      remaining: newQuota.remaining,
+      bonusUsed: quotaState.bonus > 0 && quotaState.used >= quotaState.baseLimit
+    });
 
     try {
       const safeTitle = (track.title || 'track').replace(/[^a-zA-Z0-9_\-\s]/g, '').trim();
@@ -1654,6 +1680,9 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
               handleDownload={handleDownload}
               downloadingId={downloadingId}
               onOpenSoundstage={handleOpenSoundstage}
+              onTriggerAd={() => setIsAdModalOpen(true)}
+              bonusDownloads={downloadQuota.bonus}
+              remainingDownloads={downloadQuota.remaining}
             />
           ) : (
             <>
@@ -2750,10 +2779,22 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
             <Download className="h-4 w-4 animate-bounce" />
           </div>
           <div>
-            <p className="text-xs font-bold text-white">Downloading Audio Master</p>
-            <p className="text-[11px] text-gray-400 truncate max-w-[200px]">
+            <p className="text-xs font-bold text-white flex items-center gap-1.5">
+              <span>Downloading Audio Master</span>
+              {downloadToast.bonusUsed && (
+                <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-amber-400/20 text-amber-300 font-bold border border-amber-400/30">
+                  Ad Bonus Used
+                </span>
+              )}
+            </p>
+            <p className="text-[11px] text-gray-400 truncate max-w-[220px]">
               {downloadToast.title} • {downloadToast.artist}
             </p>
+            {downloadToast.remaining !== undefined && (
+              <p className="text-[10px] text-teal-400 font-mono mt-0.5">
+                {downloadToast.remaining} {downloadToast.remaining === 1 ? 'download' : 'downloads'} left today
+              </p>
+            )}
           </div>
           <button
             type="button"
@@ -2765,10 +2806,90 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
         </div>
       )}
 
+      {/* REWARD EARNED TOAST NOTIFICATION */}
+      {rewardNotification && (
+        <div className="fixed top-20 right-6 z-50 max-w-sm p-4 rounded-2xl bg-[#0F131C] border border-teal-500/40 text-white shadow-2xl animate-in slide-in-from-top-4 duration-300 flex items-start gap-3">
+          <div className="w-8 h-8 rounded-full bg-teal-500/20 border border-teal-500/40 flex items-center justify-center text-teal-300 shrink-0">
+            <Sparkles className="h-4 w-4" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-xs font-bold text-teal-300">Benefit Earned</p>
+            <p className="text-xs text-gray-200 mt-0.5 leading-snug">{rewardNotification}</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setRewardNotification(null)}
+            className="p-1 text-gray-400 hover:text-white"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      )}
+
+      {/* DAILY DOWNLOAD LIMIT REACHED MODAL */}
+      {isDownloadLimitModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-200">
+          <div
+            className="relative w-full max-w-md rounded-2xl bg-[#0F131C] border border-white/10 p-6 sm:p-7 shadow-2xl text-white overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              type="button"
+              onClick={() => setIsDownloadLimitModalOpen(false)}
+              className="absolute top-4 right-4 p-1.5 rounded-full text-gray-400 hover:text-white hover:bg-white/10 transition-colors"
+            >
+              <X className="h-4 w-4" />
+            </button>
+
+            <div className="w-12 h-12 rounded-2xl bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-300 mb-4 shadow-inner">
+              <Download className="h-6 w-6" />
+            </div>
+
+            <h3 className="text-xl font-black text-white tracking-tight">
+              Daily Download Limit Reached
+            </h3>
+            <p className="text-xs text-gray-300 mt-2 leading-relaxed">
+              You have downloaded your quota for today. Stream an artist sponsored track through ads to instantly earn <strong className="text-teal-300">+1 bonus beat download</strong> for today!
+            </p>
+
+            <div className="mt-6 flex flex-col gap-2.5">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsDownloadLimitModalOpen(false);
+                  setIsAdModalOpen(true);
+                }}
+                className="w-full py-3 rounded-xl bg-[#2dd4bf] hover:bg-[#20b8a4] text-zinc-950 font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-transform hover:scale-[1.02] shadow-lg shadow-[#2dd4bf]/20 cursor-pointer"
+              >
+                <Sparkles className="h-4 w-4" />
+                <span>Stream Artist Track (+1 Download)</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setIsDownloadLimitModalOpen(false);
+                  setShowUpgradeModal(true);
+                }}
+                className="w-full py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-white font-bold text-xs flex items-center justify-center gap-2 border border-white/10 transition-colors cursor-pointer"
+              >
+                <span>Upgrade to Plus for Unlimited Downloads</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* 3-Song Unskippable Audio Ad (Audiomack / Spotify Model) */}
       <UserAdModal
         isOpen={isAdModalOpen}
         onClose={() => setIsAdModalOpen(false)}
+        onRewardEarned={(bonusCount) => {
+          setRewardNotification(
+            `You streamed the sponsored artist song! +1 bonus beat download has been credited for today (total bonus: ${bonusCount}).`
+          );
+          setTimeout(() => setRewardNotification(null), 6000);
+        }}
       />
 
       {/* Soundstage In-Browser Vocal & Song Recorder */}

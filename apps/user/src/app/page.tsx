@@ -39,7 +39,23 @@ export default async function UserPortalPage() {
           audioUrl = '/api/media/masters/alex-morgan-afrobeat-instrumental-summer-groove-573648-hubz_1791151613114.mp3';
         }
         const basicLic = b.licenses?.find((l: any) => l.type === 'basic');
-        const priceNgn = basicLic?.price_cents ? basicLic.price_cents / 100 : 3000;
+        const exclusiveLic = b.licenses?.find((l: any) => l.type === 'exclusive');
+        const beatTags: string[] = Array.isArray(b.tags) ? b.tags : [];
+        const isFreeTagged =
+          beatTags.some((t: string) => t.toLowerCase() === 'free' || t.toLowerCase() === 'free download') ||
+          b.title?.toLowerCase().includes('(free)') ||
+          b.title?.toLowerCase().includes('[free]') ||
+          b.category === 'free';
+
+        const priceNgn = isFreeTagged
+          ? 0
+          : basicLic?.price_cents
+          ? basicLic.price_cents / 100
+          : 3000;
+        const exclusivePriceNgn = exclusiveLic?.price_cents
+          ? exclusiveLic.price_cents / 100
+          : 50000;
+
         const durationSec = b.duration_seconds || 180;
         const mins = Math.floor(durationSec / 60);
         const secs = Math.floor(durationSec % 60);
@@ -54,12 +70,15 @@ export default async function UserPortalPage() {
           duration: `${mins}:${secs.toString().padStart(2, '0')}`,
           durationSeconds: durationSec,
           coverUrl: b.cover_url || '/images/album_neon_dj.jpg',
-          category: 'playlists',
+          category: isFreeTagged ? 'free' : 'playlists',
           audioUrl,
           bpm: b.bpm || 120,
           genre: b.genre || 'Electronic',
           musicalKey: b.musical_key || 'C Minor',
           priceNgn,
+          exclusivePriceNgn,
+          isFree: isFreeTagged,
+          tags: beatTags,
           playCount: b.play_count || 0
         };
       });

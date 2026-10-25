@@ -13,6 +13,9 @@ export interface TrackItem {
   category?: string;
   audioUrl?: string;
   priceNgn?: number;
+  exclusivePriceNgn?: number;
+  isFree?: boolean;
+  tags?: string[];
   bpm?: number;
   genre?: string;
   musicalKey?: string;
