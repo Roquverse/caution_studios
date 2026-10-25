@@ -257,6 +257,17 @@ export default function UserPortalPage() {
   ];
 
   // Audio Playback Simulation Timer
+  const handleCloseUpgradeModal = () => {
+    setShowUpgradeModal(false);
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+    }
+    setCurrentTime(0);
+    setIsPlaying(false);
+    audioSynth.stop();
+  };
+
   useEffect(() => {
     let interval: any;
     if (isPlaying) {
@@ -269,7 +280,7 @@ export default function UserPortalPage() {
             if (!isSubscribed) {
               setShowUpgradeModal(true);
             }
-            return limit;
+            return 0;
           }
           return prev + 1;
         });
@@ -1225,8 +1236,14 @@ export default function UserPortalPage() {
 
       {/* UPGRADE SUBSCRIPTION MODAL */}
       {showUpgradeModal && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="max-w-md w-full bg-[#121316] border border-white/10 rounded-2xl p-6 space-y-5">
+        <div 
+          onClick={handleCloseUpgradeModal}
+          className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 cursor-pointer"
+        >
+          <div 
+            onClick={(e) => e.stopPropagation()}
+            className="max-w-md w-full bg-[#121316] border border-white/10 rounded-2xl p-6 space-y-5 cursor-default shadow-2xl"
+          >
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Sparkles className="h-5 w-5 text-[#2dd4bf]" />
@@ -1234,15 +1251,16 @@ export default function UserPortalPage() {
               </div>
               <button
                 type="button"
-                onClick={() => setShowUpgradeModal(false)}
-                className="p-1 text-gray-400 hover:text-white"
+                onClick={handleCloseUpgradeModal}
+                className="p-1.5 text-gray-400 hover:text-white rounded-lg hover:bg-white/5 transition-colors cursor-pointer"
+                aria-label="Close modal"
               >
                 <X className="h-4 w-4" />
               </button>
             </div>
 
             <p className="text-xs text-gray-400 leading-relaxed">
-              {!isSubscribed && currentTime >= FREE_PREVIEW_LIMIT_SECONDS
+              {!isSubscribed
                 ? "You've reached the 15-second preview limit for free accounts. Upgrade to Caution Plus to unlock unlimited full-length streaming, WAV stem downloads, and commercial licensing."
                 : "Unlock unlimited 24-bit lossless streaming, stem downloads, multi-track separation, and automated synchronization clearance for commercial releases."}
             </p>
@@ -1269,7 +1287,7 @@ export default function UserPortalPage() {
               </div>
               <Link
                 href="/subscriptions"
-                onClick={() => setShowUpgradeModal(false)}
+                onClick={handleCloseUpgradeModal}
                 className="px-5 py-2.5 rounded-full bg-[#04564f] hover:bg-[#03453f] text-xs font-bold text-white uppercase tracking-wider transition-colors inline-block text-center cursor-pointer"
               >
                 Upgrade to Plus
