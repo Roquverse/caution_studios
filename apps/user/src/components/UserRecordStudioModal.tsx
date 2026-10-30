@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   Mic,
   Square,
@@ -41,7 +41,9 @@ import {
   Minimize2,
   ChevronDown,
   Search,
-  ArrowLeft
+  ArrowLeft,
+  Bookmark,
+  Target
 } from 'lucide-react';
 import { TrackItem } from '../types/tracks';
 import { useUserSubscription } from '../lib/subscription';
@@ -244,7 +246,7 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
     '// Write rhymes, hooks, and harmonies here while you record in the studio...\n[Lead Vocal]\n\n[Backup Vocals / Harmonies]\n'
   );
 
-  // Cloudflare R2 & Database Save State
+  // Cloud Storage & Database Save State
   const [artistName, setArtistName] = useState('Caution Artist');
   const [socialHandle, setSocialHandle] = useState('');
   const [contactPhone, setContactPhone] = useState('');
@@ -257,6 +259,74 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
     message?: string;
   } | null>(null);
   const [linkCopied, setLinkCopied] = useState(false);
+
+  // =========================================================================
+  // STUDIO LOCATORS & EXPORT RANGE
+  // =========================================================================
+  // 'recorded': Auto-detects end of recorded vocals (exports only recorded song length)
+  // 'custom': User-positioned [R] Right Locator on timeline
+  // 'full': Full length of backing instrumental beat
+  const [exportRangeMode, setExportRangeMode] = useState<'recorded' | 'custom' | 'full'>('recorded');
+  const [customExportEndSeconds, setCustomExportEndSeconds] = useState<number | null>(null);
+  const [isExportDialogOpen, setIsExportDialogOpen] = useState<boolean>(false);
+  const [isDraggingLocator, setIsDraggingLocator] = useState<boolean>(false);
+  const rulerRef = useRef<HTMLDivElement | null>(null);
+
+  // Calculate longest recorded vocal duration across all takes
+  const maxRecordedVocalDuration = useMemo(() => {
+    const recorded = vocalTracks.filter((t) => t.vocalBlob !== null && t.durationSeconds > 0);
+    if (recorded.length === 0) return 0;
+    return Math.max(...recorded.map((t) => t.durationSeconds));
+  }, [vocalTracks]);
+
+  // Effective export length in seconds (locator [R] stop position)
+  const effectiveExportDuration = useMemo(() => {
+    const beatDuration = selectedTrack?.durationSeconds || 180;
+    if (exportRangeMode === 'recorded') {
+      return maxRecordedVocalDuration > 0 ? Math.min(beatDuration, maxRecordedVocalDuration) : beatDuration;
+    }
+    if (exportRangeMode === 'full') {
+      return beatDuration;
+    }
+    if (exportRangeMode === 'custom') {
+      if (customExportEndSeconds && customExportEndSeconds > 0) {
+        return Math.min(beatDuration, Math.max(1, customExportEndSeconds));
+      }
+      return maxRecordedVocalDuration > 0 ? Math.min(beatDuration, maxRecordedVocalDuration) : beatDuration;
+    }
+    return beatDuration;
+  }, [exportRangeMode, customExportEndSeconds, maxRecordedVocalDuration, selectedTrack?.durationSeconds]);
+
+  // Drag handler for interactive [R] Right Locator on the timeline ruler
+  const handleLocatorDrag = useCallback(
+    (clientX: number) => {
+      if (!rulerRef.current) return;
+      const rect = rulerRef.current.getBoundingClientRect();
+      const clickX = clientX - rect.left;
+      const ratio = Math.max(0.01, Math.min(1, clickX / rect.width));
+      const totalDuration = selectedTrack?.durationSeconds || 180;
+      const newSec = Math.max(1, Number((ratio * totalDuration).toFixed(1)));
+      setExportRangeMode('custom');
+      setCustomExportEndSeconds(newSec);
+    },
+    [selectedTrack?.durationSeconds]
+  );
+
+  useEffect(() => {
+    if (!isDraggingLocator) return;
+    const onMouseMove = (e: MouseEvent) => {
+      handleLocatorDrag(e.clientX);
+    };
+    const onMouseUp = () => {
+      setIsDraggingLocator(false);
+    };
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onMouseUp);
+    return () => {
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseup', onMouseUp);
+    };
+  }, [isDraggingLocator, handleLocatorDrag]);
 
   // Audio Element Refs
   const beatAudioRef = useRef<HTMLAudioElement | null>(null);
@@ -1149,7 +1219,8 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
   };
 
   // Render Full Multi-Track Master Mix WAV (Beat + Lead + All Backup Vocals with Pan & Gain)
-  const renderMasterMixBlob = async (): Promise<Blob> => {
+  // Honors export range (exports only recorded song length or custom [R] locator stop point)
+  const renderMasterMixBlob = async (exportLimitSeconds?: number): Promise<Blob> => {
     if (!selectedTrack) {
       throw new Error('No backing beat selected');
     }
@@ -1181,14 +1252,11 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
     decodeCtx.close();
 
     // 3. Render Offline Mix with active Gain, Stereo Pan, EQ & Reverb
-    let maxDuration = beatAudioBuffer.duration;
-    for (const item of decodedVocalBuffers) {
-      if (item.buffer.duration > maxDuration) {
-        maxDuration = item.buffer.duration;
-      }
-    }
+    // In DAWs, the export ends at the specified locator / recorded song length
+    const limit = exportLimitSeconds !== undefined ? exportLimitSeconds : effectiveExportDuration;
+    const targetDuration = Math.max(1, Math.min(beatAudioBuffer.duration, limit));
 
-    const offlineCtx = new OfflineAudioContext(2, Math.ceil(maxDuration * 44100), 44100);
+    const offlineCtx = new OfflineAudioContext(2, Math.ceil(targetDuration * 44100), 44100);
 
     // Add Backing Beat Track
     const beatSource = offlineCtx.createBufferSource();
@@ -1245,8 +1313,8 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
     return audioBufferToWav(mixedAudioBuffer);
   };
 
-  // Export & Download Mixed Master WAV
-  const handleExportWav = async () => {
+  // Export & Download Mixed Master WAV (Honors Studio Locators)
+  const handleExportWav = async (durationOverride?: number) => {
     const hasAnyTakes = vocalTracks.some((t) => t.vocalBlob !== null);
     if (!hasAnyTakes || !selectedTrack) {
       alert('Record at least one vocal track before exporting master.');
@@ -1255,9 +1323,10 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
 
     setIsExportingWav(true);
     try {
-      const mixedBlob = await renderMasterMixBlob();
+      const renderDuration = durationOverride !== undefined ? durationOverride : effectiveExportDuration;
+      const mixedBlob = await renderMasterMixBlob(renderDuration);
       const safeProject = projectTitle.replace(/[^a-zA-Z0-9_\-]/g, '_');
-      const filename = `Caution_RecordStudio_${safeProject}_FullMaster.wav`;
+      const filename = `Caution_RecordStudio_${safeProject}_MasterMix_${Math.round(renderDuration)}s.wav`;
 
       const url = URL.createObjectURL(mixedBlob);
       const link = document.createElement('a');
@@ -1267,6 +1336,7 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
       link.click();
       document.body.removeChild(link);
       setTimeout(() => URL.revokeObjectURL(url), 2000);
+      setIsExportDialogOpen(false);
     } catch (err: any) {
       console.error('Render master mix error:', err);
       alert('Error rendering master mix: ' + err.message);
@@ -1275,7 +1345,7 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
     }
   };
 
-  // Wire to Cloudflare R2 and Supabase Database (Uploading Lead + All Backup Stems)
+  // Wire to Cloud Storage and Supabase Database (Uploading Lead + All Backup Stems)
   const handleSaveToCloud = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     const recordedTracks = vocalTracks.filter((t) => t.vocalBlob !== null);
@@ -1288,10 +1358,10 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
     setCloudSaveResult(null);
 
     try {
-      // 1. Render Full Master Mix WAV
+      // 1. Render Full Master Mix WAV (using active export length)
       let masterBlob: Blob | null = null;
       try {
-        masterBlob = await renderMasterMixBlob();
+        masterBlob = await renderMasterMixBlob(effectiveExportDuration);
       } catch (mixErr) {
         console.warn('Could not render master mix, uploading individual stems:', mixErr);
       }
@@ -1315,7 +1385,8 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
           compressor: compressorEnabled,
           lowCut: lowCutEnabled,
           beatVolume,
-          masterVolume
+          masterVolume,
+          exportDurationSeconds: effectiveExportDuration
         })
       );
 
@@ -1345,7 +1416,7 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
         setCloudSaveResult({
           vocalStems: data.vocalStems,
           masterUrl: data.masterUrl || data.primaryUrl,
-          message: `Saved to Cloudflare R2 (${recordedTracks.length} vocal stems + master mix) & Database!`
+          message: `Saved to Studio Cloud (${recordedTracks.length} vocal stems + master mix) & Database!`
         });
         setActiveConsoleTab('cloud');
       } else {
@@ -1353,7 +1424,7 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
       }
     } catch (err: any) {
       console.error('Cloud save error:', err);
-      alert('Error uploading to Cloudflare R2: ' + err.message);
+      alert('Error uploading to studio cloud: ' + err.message);
     } finally {
       setIsSavingToCloud(false);
     }
@@ -1448,7 +1519,7 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
       <audio ref={auditionAudioRef} onEnded={() => setIsAuditioningId(null)} />
 
       {/* =========================================================================
-          1. TOP DAW TITLE BAR (Audacity / Cubase Header Chassis)
+          1. TOP DAW TITLE BAR (Pro Studio Header Chassis)
          ========================================================================= */}
       <div className="w-full px-4 py-2 bg-[#0E1119] border-b border-white/10 flex items-center justify-between text-xs shrink-0">
         {/* Left: DAW Branding & Back Button */}
@@ -1497,19 +1568,20 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
             {vocalTracks.length + 1} TRACKS ({vocalTracks.filter((t) => t.vocalBlob).length} RECORDED)
           </span>
           <span>·</span>
-          <span>CLOUDFLARE R2 READY</span>
+          <span>STUDIO CLOUD READY</span>
         </div>
 
         {/* Right: Quick Actions & Window Close */}
         <div className="flex items-center gap-2">
           <button
             type="button"
-            onClick={handleExportWav}
+            onClick={() => setIsExportDialogOpen(true)}
             disabled={!hasAnyRecordedTakes || isExportingWav}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-bold text-gray-200 transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+            title="Configure export range and download master WAV mixdown"
           >
             <Download className="h-3.5 w-3.5 text-teal-300" />
-            <span>{isExportingWav ? 'Rendering...' : 'Export Master WAV'}</span>
+            <span>{isExportingWav ? 'Rendering...' : `Export Master WAV (${effectiveExportDuration.toFixed(0)}s)`}</span>
           </button>
 
           <button
@@ -1519,7 +1591,7 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
             className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-teal-500/20 hover:bg-teal-500/30 border border-teal-500/40 text-xs font-bold text-teal-300 transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer shadow-sm"
           >
             <CloudUpload className="h-3.5 w-3.5" />
-            <span>{isSavingToCloud ? 'Saving to R2...' : 'Save to Cloud (R2)'}</span>
+            <span>{isSavingToCloud ? 'Saving to Cloud...' : 'Save to Cloud'}</span>
           </button>
 
           <button
@@ -1534,7 +1606,7 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
       </div>
 
       {/* =========================================================================
-          2. MASTER TRANSPORT BAR & DIGITAL TIME COUNTER (Audacity / Cubase Style)
+          2. MASTER TRANSPORT BAR & DIGITAL TIME COUNTER (Pro Studio Style)
          ========================================================================= */}
       <div className="w-full px-4 py-2.5 bg-[#0C0F17] border-b border-white/10 flex flex-wrap items-center justify-between gap-3 text-xs shrink-0">
         {/* Main Transport Buttons */}
@@ -1872,24 +1944,148 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
           3. FULL-WIDTH MULTI-TRACK TIMELINE & ARRANGEMENT WORKSPACE
          ========================================================================= */}
       <div className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-2 bg-[#07090E] w-full">
-        {/* Timeline Time Ruler */}
+        {/* Studio Locators & Export Range Bar */}
+        <div className="w-full px-3 py-1.5 rounded-xl bg-[#0C101B] border border-white/10 flex flex-wrap items-center justify-between gap-2 text-xs shadow-inner">
+          {/* Locators Indicator [L] -> [R] */}
+          <div className="flex items-center gap-2">
+            <span className="font-mono text-[10px] font-bold text-amber-400 flex items-center gap-1 uppercase tracking-wider">
+              <Bookmark className="h-3 w-3 text-amber-400" />
+              <span>Studio Locators:</span>
+            </span>
+            <div className="flex items-center gap-1 font-mono text-[11px]">
+              <span className="px-1.5 py-0.5 rounded bg-white/5 border border-white/10 text-gray-400" title="Left Locator (Start)">
+                [L] 00:00.00
+              </span>
+              <span className="text-gray-500">►</span>
+              <span className="px-1.5 py-0.5 rounded bg-amber-500/20 border border-amber-500/40 text-amber-300 font-bold" title="Right Locator (Export Stop Marker)">
+                [R] {formatTimecode(effectiveExportDuration)}
+              </span>
+            </div>
+            <span className="text-[10px] font-mono text-teal-300 bg-teal-500/15 border border-teal-500/30 px-2 py-0.5 rounded-full font-bold">
+              Export Length: {effectiveExportDuration.toFixed(1)}s
+            </span>
+          </div>
+
+          {/* Quick Locator Actions */}
+          <div className="flex items-center gap-1.5">
+            {/* Auto: Recorded Song Length */}
+            <button
+              type="button"
+              onClick={() => {
+                setExportRangeMode('recorded');
+                setCustomExportEndSeconds(null);
+              }}
+              title="Automatically export only the recorded song length (stops where last vocal take ends)"
+              className={`px-2 py-1 rounded-lg text-[10px] font-mono font-bold flex items-center gap-1 transition-all cursor-pointer border ${
+                exportRangeMode === 'recorded'
+                  ? 'bg-teal-500/25 text-teal-300 border-teal-400 shadow-xs'
+                  : 'bg-white/5 border-white/10 text-gray-400 hover:text-white'
+              }`}
+            >
+              <span>⚡ Auto (Song: {maxRecordedVocalDuration > 0 ? `${maxRecordedVocalDuration.toFixed(1)}s` : '0s'})</span>
+            </button>
+
+            {/* Set [R] at Current Playhead */}
+            <button
+              type="button"
+              onClick={() => {
+                const newStop = Math.max(1, playheadTime);
+                setExportRangeMode('custom');
+                setCustomExportEndSeconds(newStop);
+              }}
+              title="Set export stop locator [R] to current playhead cursor"
+              className={`px-2 py-1 rounded-lg text-[10px] font-mono font-bold flex items-center gap-1 transition-all cursor-pointer border ${
+                exportRangeMode === 'custom'
+                  ? 'bg-amber-500/25 text-amber-300 border-amber-400 shadow-xs'
+                  : 'bg-white/5 border-white/10 text-gray-400 hover:text-white'
+              }`}
+            >
+              <Target className="h-3 w-3 text-amber-400" />
+              <span>Set [R] at Playhead</span>
+            </button>
+
+            {/* Full Beat */}
+            <button
+              type="button"
+              onClick={() => {
+                setExportRangeMode('full');
+                setCustomExportEndSeconds(null);
+              }}
+              title="Export the entire backing beat duration"
+              className={`px-2 py-1 rounded-lg text-[10px] font-mono font-bold transition-all cursor-pointer border ${
+                exportRangeMode === 'full'
+                  ? 'bg-purple-500/25 text-purple-300 border-purple-400 shadow-xs'
+                  : 'bg-white/5 border-white/10 text-gray-400 hover:text-white'
+              }`}
+            >
+              <span>Full Beat ({selectedTrack?.durationSeconds ? `${Math.round(selectedTrack.durationSeconds)}s` : '180s'})</span>
+            </button>
+
+            {/* Configure Mixdown Dialog */}
+            <button
+              type="button"
+              onClick={() => setIsExportDialogOpen(true)}
+              className="px-2 py-1 rounded-lg bg-teal-500/10 hover:bg-teal-500/20 border border-teal-500/30 text-teal-300 text-[10px] font-mono font-bold flex items-center gap-1 transition-colors cursor-pointer"
+              title="Configure export range and mixdown settings"
+            >
+              <SlidersHorizontal className="h-3 w-3" />
+              <span>Export Options</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Timeline Time Ruler with Locators */}
         <div
+          ref={rulerRef}
           onClick={handleTimelineSeek}
-          className="relative h-6 bg-[#0B0E17] border border-white/10 rounded-md cursor-pointer flex items-center justify-between px-3 text-[10px] font-mono text-gray-500 select-none w-full"
+          className="relative h-8 bg-[#0B0E17] border border-white/10 rounded-lg cursor-pointer flex items-center justify-between px-3 text-[10px] font-mono text-gray-500 select-none w-full overflow-hidden"
         >
-          <span>00:00</span>
-          <span>00:15</span>
-          <span>00:30</span>
-          <span>00:45</span>
-          <span>01:00</span>
-          <span>01:15</span>
-          <span>01:30</span>
-          <span>01:45</span>
-          <span>02:00</span>
-          <span>02:15</span>
-          <span>02:30</span>
-          <span>02:45</span>
-          <span>03:00</span>
+          {/* Shaded Active Export Range Region (Locators Highlight) */}
+          {selectedTrack?.durationSeconds && (
+            <div
+              className="absolute top-0 bottom-0 left-0 bg-teal-500/10 border-r-2 border-amber-400/80 pointer-events-none z-10"
+              style={{
+                width: `${Math.min(100, (effectiveExportDuration / selectedTrack.durationSeconds) * 100)}%`
+              }}
+            />
+          )}
+
+          <span className="z-20">00:00</span>
+          <span className="z-20">00:15</span>
+          <span className="z-20">00:30</span>
+          <span className="z-20">00:45</span>
+          <span className="z-20">01:00</span>
+          <span className="z-20">01:15</span>
+          <span className="z-20">01:30</span>
+          <span className="z-20">01:45</span>
+          <span className="z-20">02:00</span>
+          <span className="z-20">02:15</span>
+          <span className="z-20">02:30</span>
+          <span className="z-20">02:45</span>
+          <span className="z-20">03:00</span>
+
+          {/* Right Locator [R] Stop Marker (draggable / interactive handle) */}
+          {selectedTrack?.durationSeconds && (
+            <div
+              className="absolute top-0 bottom-0 z-40 group cursor-ew-resize select-none"
+              style={{
+                left: `${Math.min(100, (effectiveExportDuration / selectedTrack.durationSeconds) * 100)}%`
+              }}
+              title={`[R] Export Stop: ${formatTimecode(effectiveExportDuration)} (Drag to move)`}
+              onMouseDown={(e) => {
+                e.stopPropagation();
+                setIsDraggingLocator(true);
+              }}
+            >
+              <div className="relative -ml-3 flex flex-col items-center">
+                <div className="px-1 py-0.5 rounded bg-amber-400 text-black text-[9px] font-mono font-black flex items-center gap-0.5 shadow-md border border-amber-300">
+                  <span>[R]</span>
+                  <span className="text-[8px]">{effectiveExportDuration.toFixed(1)}s</span>
+                </div>
+                <div className="w-0.5 h-4 bg-amber-400 shadow-sm" />
+              </div>
+            </div>
+          )}
 
           {/* Playhead Marker on Ruler */}
           {selectedTrack?.durationSeconds && (
@@ -2320,7 +2516,7 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
                           </div>
                         </div>
 
-                        {/* Empty region after the clip (dark, like Cubase/FL Studio) */}
+                        {/* Empty region after the clip */}
                         {clipPct < 100 && (
                           <div className="flex-1 h-full bg-transparent" />
                         )}
@@ -2423,7 +2619,7 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
               }`}
             >
               <CloudUpload className="h-3.5 w-3.5" />
-              <span>Cloudflare R2 Sync & Stems</span>
+              <span>Cloud Sync & Stems</span>
             </button>
           </div>
 
@@ -2563,7 +2759,7 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
           </div>
         )}
 
-        {/* Tab 3: Cloudflare R2 Sync & Stems */}
+        {/* Tab 3: Cloud Sync & Stems */}
         {activeConsoleTab === 'cloud' && (
           <div className="p-3 space-y-2">
             {cloudSaveResult ? (
@@ -2572,7 +2768,7 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
                   <CheckCircle2 className="h-5 w-5 text-teal-400 shrink-0" />
                   <div>
                     <p className="font-bold text-teal-300">
-                      All Stems & Master Mix Stored in Cloudflare R2!
+                      All Stems & Master Mix Saved to Studio Cloud!
                     </p>
                     <p className="text-[11px] text-gray-300">
                       {cloudSaveResult.vocalStems?.length || 0} vocal stems + stereo master WAV archived.
@@ -2636,6 +2832,265 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
           </div>
         )}
       </div>
+
+      {/* =========================================================================
+          STUDIO EXPORT AUDIO MIXDOWN MODAL DIALOG
+         ========================================================================= */}
+      {isExportDialogOpen && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="w-full max-w-lg bg-[#0F131E] border border-white/15 rounded-2xl p-5 shadow-2xl space-y-4 animate-in fade-in zoom-in-95 duration-150">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between border-b border-white/10 pb-3">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-teal-500/20 border border-teal-500/30 flex items-center justify-center">
+                  <Download className="h-4 w-4 text-teal-300" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-white uppercase tracking-wider">
+                    Export Audio Mixdown
+                  </h3>
+                  <p className="text-[10px] text-gray-400 font-mono">
+                    Studio locator range engine · High-definition WAV bounce
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsExportDialogOpen(false)}
+                className="p-1 rounded-lg text-gray-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            {/* Export Range Options */}
+            <div className="space-y-2">
+              <label className="block text-[11px] font-mono uppercase text-gray-400 font-bold">
+                1. Select Export Range (Where Should Export Stop?)
+              </label>
+
+              {/* Option A: Recorded Song Length (Auto) */}
+              <div
+                onClick={() => {
+                  setExportRangeMode('recorded');
+                  setCustomExportEndSeconds(null);
+                }}
+                className={`p-3 rounded-xl border cursor-pointer transition-all flex items-start gap-3 ${
+                  exportRangeMode === 'recorded'
+                    ? 'bg-teal-500/15 border-teal-400/60 ring-1 ring-teal-400/30'
+                    : 'bg-black/30 border-white/5 hover:border-white/20'
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="exportRange"
+                  checked={exportRangeMode === 'recorded'}
+                  onChange={() => {
+                    setExportRangeMode('recorded');
+                    setCustomExportEndSeconds(null);
+                  }}
+                  className="accent-teal-400 mt-1 cursor-pointer"
+                />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-bold text-white flex items-center gap-1.5">
+                      <span>Recorded Song Length (Auto)</span>
+                      <span className="text-[9px] font-mono px-1.5 py-0.2 rounded-full bg-teal-400/20 text-teal-300 font-bold">
+                        RECOMMENDED
+                      </span>
+                    </p>
+                    <span className="text-xs font-mono font-bold text-teal-300">
+                      {maxRecordedVocalDuration > 0 ? `${maxRecordedVocalDuration.toFixed(1)}s` : 'Full'}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-gray-400 mt-0.5">
+                    Automatically stops export where your recorded vocals end. No trailing dead silence!
+                  </p>
+                </div>
+              </div>
+
+              {/* Option B: Right Locator [R] / Custom Stop Marker */}
+              <div
+                onClick={() => setExportRangeMode('custom')}
+                className={`p-3 rounded-xl border cursor-pointer transition-all flex flex-col gap-2 ${
+                  exportRangeMode === 'custom'
+                    ? 'bg-amber-500/15 border-amber-400/60 ring-1 ring-amber-400/30'
+                    : 'bg-black/30 border-white/5 hover:border-white/20'
+                }`}
+              >
+                <div className="flex items-start gap-3">
+                  <input
+                    type="radio"
+                    name="exportRange"
+                    checked={exportRangeMode === 'custom'}
+                    onChange={() => setExportRangeMode('custom')}
+                    className="accent-amber-400 mt-1 cursor-pointer"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs font-bold text-white flex items-center gap-1.5">
+                        <span className="px-1 py-0.2 rounded bg-amber-400 text-black text-[9px] font-mono font-black">
+                          [R]
+                        </span>
+                        <span>Right Locator / Custom Stop Point</span>
+                      </p>
+                      <span className="text-xs font-mono font-bold text-amber-300">
+                        {effectiveExportDuration.toFixed(1)}s ({formatTimecode(effectiveExportDuration)})
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-gray-400 mt-0.5">
+                      Choose exactly where the song ends (e.g. leave room for beat outro fade).
+                    </p>
+                  </div>
+                </div>
+
+                {/* Custom Stop Point Slider & Input */}
+                {exportRangeMode === 'custom' && (
+                  <div className="mt-1 pt-2 border-t border-white/10 space-y-2 pl-6">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-gray-400 text-[10px] font-mono">STOP TIME:</span>
+                      <div className="flex items-center gap-1.5">
+                        <input
+                          type="number"
+                          min="1"
+                          max={Math.round(selectedTrack?.durationSeconds || 300)}
+                          step="0.5"
+                          value={customExportEndSeconds || effectiveExportDuration}
+                          onChange={(e) => {
+                            const val = parseFloat(e.target.value);
+                            if (!isNaN(val) && val > 0) {
+                              setCustomExportEndSeconds(val);
+                            }
+                          }}
+                          className="w-16 px-1.5 py-0.5 text-center font-mono text-xs font-bold rounded bg-black/60 border border-amber-400 text-amber-300 focus:outline-none"
+                        />
+                        <span className="text-gray-400 text-[10px] font-mono">sec</span>
+                      </div>
+                    </div>
+
+                    <input
+                      type="range"
+                      min="1"
+                      max={Math.round(selectedTrack?.durationSeconds || 180)}
+                      step="0.5"
+                      value={customExportEndSeconds || effectiveExportDuration}
+                      onChange={(e) => setCustomExportEndSeconds(parseFloat(e.target.value))}
+                      className="w-full accent-amber-400 h-1.5 bg-black/50 rounded cursor-pointer"
+                    />
+
+                    <div className="flex items-center justify-between">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setCustomExportEndSeconds(Math.max(1, playheadTime));
+                        }}
+                        className="px-2 py-0.5 rounded bg-white/5 hover:bg-white/10 border border-white/10 text-gray-300 text-[9px] font-mono flex items-center gap-1 cursor-pointer"
+                      >
+                        <Target className="h-2.5 w-2.5 text-amber-400" />
+                        <span>Snap to Playhead ({formatTimecode(playheadTime)})</span>
+                      </button>
+
+                      {maxRecordedVocalDuration > 0 && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setCustomExportEndSeconds(maxRecordedVocalDuration);
+                          }}
+                          className="px-2 py-0.5 rounded bg-white/5 hover:bg-white/10 border border-white/10 text-gray-300 text-[9px] font-mono cursor-pointer"
+                        >
+                          Snap to Vocals ({maxRecordedVocalDuration.toFixed(1)}s)
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Option C: Entire Backing Beat */}
+              <div
+                onClick={() => {
+                  setExportRangeMode('full');
+                  setCustomExportEndSeconds(null);
+                }}
+                className={`p-3 rounded-xl border cursor-pointer transition-all flex items-start gap-3 ${
+                  exportRangeMode === 'full'
+                    ? 'bg-purple-500/15 border-purple-400/60 ring-1 ring-purple-400/30'
+                    : 'bg-black/30 border-white/5 hover:border-white/20'
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="exportRange"
+                  checked={exportRangeMode === 'full'}
+                  onChange={() => {
+                    setExportRangeMode('full');
+                    setCustomExportEndSeconds(null);
+                  }}
+                  className="accent-purple-400 mt-1 cursor-pointer"
+                />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-bold text-white">Full Backing Beat Duration</p>
+                    <span className="text-xs font-mono font-bold text-purple-300">
+                      {selectedTrack?.durationSeconds ? `${Math.round(selectedTrack.durationSeconds)}s` : '180s'}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-gray-400 mt-0.5">
+                    Exports the complete instrumental track from start to finish.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Technical Mixdown Specs Summary */}
+            <div className="p-3 rounded-xl bg-black/40 border border-white/5 space-y-1 font-mono text-[10px]">
+              <div className="flex items-center justify-between text-gray-400">
+                <span>FORMAT & SAMPLE RATE:</span>
+                <span className="text-white font-bold">16-Bit PCM WAV · 44.1 kHz Stereo</span>
+              </div>
+              <div className="flex items-center justify-between text-gray-400">
+                <span>INCLUDED STEMS:</span>
+                <span className="text-teal-300 font-bold">
+                  Track 01 (Beat) + {vocalTracks.filter((t) => t.vocalBlob).length} Vocal Takes
+                </span>
+              </div>
+              <div className="flex items-center justify-between text-gray-400">
+                <span>EXPORT DURATION:</span>
+                <span className="text-amber-300 font-bold text-xs">
+                  {effectiveExportDuration.toFixed(1)} seconds ({formatTimecode(effectiveExportDuration)})
+                </span>
+              </div>
+            </div>
+
+            {/* Modal Actions */}
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setIsExportDialogOpen(false)}
+                className="px-3.5 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-xs font-bold text-gray-300 transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleExportWav()}
+                disabled={isExportingWav}
+                className="px-4 py-2 rounded-xl bg-teal-500 hover:bg-teal-400 text-black text-xs font-bold flex items-center gap-2 transition-all cursor-pointer shadow-lg shadow-teal-500/20 disabled:opacity-50"
+              >
+                <Download className="h-4 w-4" />
+                <span>
+                  {isExportingWav
+                    ? 'Rendering Master WAV...'
+                    : `Render & Download WAV (${effectiveExportDuration.toFixed(1)}s)`}
+                </span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

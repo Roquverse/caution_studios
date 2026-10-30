@@ -71,7 +71,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // 2. Upload Master Mix Demo to Cloudflare R2
+    // 2. Upload Master Mix Demo to Cloud Storage
     let masterR2Url = '';
     const masterMixFile = formData.get('masterMixAudio') as File | null;
     if (masterMixFile && masterMixFile.size > 0) {
@@ -129,7 +129,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: 'Session successfully saved to Cloudflare R2 and database!',
+      message: 'Session successfully saved to cloud storage and database!',
       vocalStems: vocalStemEntries,
       masterUrl: masterR2Url,
       primaryUrl: primaryAudioUrl,
