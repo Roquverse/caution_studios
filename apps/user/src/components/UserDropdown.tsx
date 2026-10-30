@@ -124,6 +124,17 @@ export function UserDropdown() {
     };
   }, [isOpen]);
 
+  const getAuthLoginUrl = () => {
+    const authUrl = process.env.NEXT_PUBLIC_AUTH_URL;
+    if (authUrl) return `${authUrl}/login`;
+    // In production, redirect to the dedicated auth subdomain
+    if (typeof window !== 'undefined' && window.location.hostname.includes('cautionstudioz.com')) {
+      return 'https://auth.cautionstudioz.com/login';
+    }
+    // In local dev, auth runs on port 3001
+    return 'http://localhost:3001/login';
+  };
+
   const handleSignOut = async () => {
     try {
       await supabase.auth.signOut();
@@ -134,11 +145,12 @@ export function UserDropdown() {
         document.cookie = `sb-refresh=; path=/; max-age=0${domainStr}`;
       }
       setCachedUserPlan('free');
-      router.push('/login');
+      // Redirect to the auth app login page (not an internal /login route)
+      window.location.href = getAuthLoginUrl();
     } catch (err) {
       console.error('Sign out error:', err);
       setCachedUserPlan('free');
-      router.push('/login');
+      window.location.href = getAuthLoginUrl();
     }
   };
 

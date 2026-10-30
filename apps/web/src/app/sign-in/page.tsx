@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { supabase } from '../../lib/supabaseClient';
 import { ArrowRight, AlertCircle, ArrowUpRight, Disc3, Check } from 'lucide-react';
+import { APP_URL } from '../../lib/urls';
 
 export default function SignInPage() {
   const router = useRouter();
@@ -27,7 +28,7 @@ export default function SignInPage() {
       if (error) {
         setErrorMsg(error.message);
       } else {
-        router.push('/dashboard');
+        window.location.href = APP_URL;
       }
     } catch (err: any) {
       setErrorMsg(err?.message || 'Failed to sign in. Please try again.');

@@ -554,11 +554,10 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                       <button
                         type="button"
                         onClick={() => {
-                          if (onOpenSoundstage) onOpenSoundstage();
-                          else setIsRecording(!isRecording);
+                          window.location.href = APP_URL;
                         }}
                         className="flex items-center gap-2 group cursor-pointer focus:outline-none"
-                        title="Click to Open Soundstage Studio Recorder"
+                        title="Open User Dashboard"
                       >
                         <span
                           className={`w-3 h-3 rounded-full ${
@@ -639,14 +638,14 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                         type="button"
                         onClick={() => {
                           setActiveTab('music');
-                          if (onOpenSoundstage) onOpenSoundstage();
+                          window.location.href = APP_URL;
                         }}
                         className={`h-14 rounded-xl flex items-center justify-center transition-all duration-200 border ${
                           activeTab === 'music'
                             ? 'bg-[#04564f]/35 border-[#2dd4bf]/50 text-[#2dd4bf] shadow-[0_0_15px_rgba(4,86,79,0.35)]'
                             : 'bg-[#14181c] border-white/[0.06] text-neutral-400 hover:text-white hover:bg-[#1a2026]'
                         }`}
-                        title="Import Free Beat & Record Vocals in Soundstage"
+                        title="Open User Dashboard"
                       >
                         <Music className="w-5 h-5" />
                       </button>
@@ -674,11 +673,10 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
               <button
                 type="button"
                 onClick={() => {
-                  if (onOpenSoundstage) onOpenSoundstage();
-                  else if (onGetStarted) onGetStarted();
-                  else window.location.href = `${APP_URL}?tab=marketplace`;
+                  window.location.href = APP_URL;
                 }}
                 className="absolute top-[48%] -right-4 sm:-right-6 -translate-y-1/2 w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-gradient-to-br from-[#0F4F49] via-[#04564f] to-[#033430] border border-[#2dd4bf]/50 hover:border-[#2dd4bf] shadow-[0_10px_30px_rgba(0,0,0,0.8),0_0_30px_rgba(45,212,191,0.4)] flex flex-col items-center justify-center text-white transition-all duration-300 hover:scale-105 group z-30"
+                title="Go to User Dashboard"
               >
                 <ArrowUpRight className="w-4 h-4 sm:w-5 sm:h-5 text-[#2dd4bf] group-hover:text-white transition-colors transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
                 <span className="text-[10px] sm:text-xs font-bold tracking-wider mt-0.5 text-white">

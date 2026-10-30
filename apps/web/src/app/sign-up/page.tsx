@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { supabase } from '../../lib/supabaseClient';
 import { Check, ArrowRight, AlertCircle, ArrowUpRight, Mic2, ShieldCheck, ArrowLeft, RefreshCw, CheckCircle2, Gift, Sparkles, Sliders } from 'lucide-react';
+import { APP_URL, CREATOR_URL } from '../../lib/urls';
 
 export default function SignUpPage() {
   const router = useRouter();
@@ -96,7 +97,7 @@ export default function SignUpPage() {
             console.warn('Profile init:', err);
           }
         }
-        router.push(isProducer ? '/studio' : '/dashboard');
+        window.location.href = isProducer ? CREATOR_URL : APP_URL;
         return;
       }
 
@@ -254,7 +255,7 @@ export default function SignUpPage() {
 
       setStep('success');
       setTimeout(() => {
-        router.push(isProducer ? '/studio' : '/dashboard');
+        window.location.href = isProducer ? CREATOR_URL : APP_URL;
       }, 1000);
     } catch (err: any) {
       setErrorMessage(err?.message || 'Verification failed. Please try again.');

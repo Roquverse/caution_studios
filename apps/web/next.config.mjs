@@ -1,5 +1,10 @@
 /** @type {import('next').NextConfig} */
-const authUrl = process.env.NEXT_PUBLIC_AUTH_URL || 'https://auth.cautionstudioz.com';
+const authUrl =
+  process.env.NEXT_PUBLIC_AUTH_URL ||
+  (process.env.NODE_ENV === 'development' ? 'http://localhost:3001' : 'https://auth.cautionstudioz.com');
+const appUrl =
+  process.env.NEXT_PUBLIC_USER_URL ||
+  (process.env.NODE_ENV === 'development' ? 'http://localhost:3002' : 'https://app.cautionstudioz.com');
 
 const nextConfig = {
   transpilePackages: ['@caution/ui', '@caution/types', '@caution/tailwind-config'],
@@ -8,6 +13,16 @@ const nextConfig = {
   },
   async redirects() {
     return [
+      {
+        source: '/dashboard',
+        destination: appUrl,
+        permanent: false
+      },
+      {
+        source: '/user',
+        destination: appUrl,
+        permanent: false
+      },
       {
         source: '/login',
         destination: `${authUrl}/login`,

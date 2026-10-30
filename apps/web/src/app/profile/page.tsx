@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '../../lib/supabaseClient';
 import { UserDropdown, UserProfileData } from '../../components/UserDropdown';
+import { APP_URL } from '../../lib/urls';
 
 export default function ProfilePage() {
   const [profile, setProfile] = useState<UserProfileData | null>(null);
@@ -218,14 +219,14 @@ export default function ProfilePage() {
       <header className="h-16 border-b border-white/[0.06] bg-[#0A0B0E] px-4 sm:px-6 flex items-center justify-between gap-4 sticky top-0 z-40">
         {/* Brand Logo with 200px width */}
         <div className="flex items-center gap-8 w-64 shrink-0">
-          <Link href="/dashboard" className="inline-flex items-center">
+          <a href={APP_URL} className="inline-flex items-center">
             <img
               src="/logo.png"
               alt="Caution Studio"
               className="h-8 w-auto object-contain brightness-0 invert"
               style={{ width: 200 }}
             />
-          </Link>
+          </a>
         </div>
 
         {/* Center Search Bar */}
@@ -244,13 +245,13 @@ export default function ProfilePage() {
 
         {/* Right User Controls */}
         <div className="flex items-center gap-3 shrink-0">
-          <Link
-            href="/dashboard"
+          <a
+            href={APP_URL}
             className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full border border-white/20 hover:border-white/40 text-xs font-semibold text-white/90 transition-colors cursor-pointer"
           >
             <ChevronLeft className="h-3.5 w-3.5 text-gray-400" />
             <span>Dashboard</span>
-          </Link>
+          </a>
 
           {/* Functional User Dropdown */}
           <UserDropdown />
@@ -263,9 +264,9 @@ export default function ProfilePage() {
         <div className="flex items-center justify-between">
           <div>
             <div className="flex items-center gap-2 text-xs text-gray-400 mb-1">
-              <Link href="/dashboard" className="hover:text-white transition-colors">
+              <a href={APP_URL} className="hover:text-white transition-colors">
                 Dashboard
-              </Link>
+              </a>
               <span>/</span>
               <span className="text-[#2dd4bf] font-medium">Profile</span>
             </div>
@@ -456,12 +457,12 @@ export default function ProfilePage() {
 
             {/* Submit Action */}
             <div className="pt-4 border-t border-white/[0.06] flex items-center justify-end gap-3">
-              <Link
-                href="/dashboard"
+              <a
+                href={APP_URL}
                 className="px-4 py-2.5 rounded-xl text-xs font-semibold text-gray-400 hover:text-white transition-colors"
               >
                 Cancel
-              </Link>
+              </a>
               <button
                 type="submit"
                 disabled={isSaving}

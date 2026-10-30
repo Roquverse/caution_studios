@@ -181,28 +181,34 @@ export default function BeatUploadPage() {
               <label className="text-xs font-medium text-zinc-300 mb-1.5 block">
                 Audio Master (24-bit WAV or high-res MP3) *
               </label>
-              <div className="border border-dashed border-zinc-700 hover:border-[#2dd4bf] rounded-lg p-6 text-center cursor-pointer transition-colors bg-zinc-950/60">
-                <Upload className="h-6 w-6 text-zinc-500 mx-auto mb-2" />
+              {/* Entire zone is tappable — critical for mobile iOS where only label clicks work */}
+              <label
+                htmlFor="master-audio-input"
+                className="flex flex-col items-center border border-dashed border-zinc-700 hover:border-[#2dd4bf] active:border-[#2dd4bf] rounded-lg p-6 text-center cursor-pointer transition-colors bg-zinc-950/60 select-none"
+              >
+                <Upload className="h-6 w-6 text-zinc-500 mb-2" />
                 <span className="text-xs font-medium text-zinc-200 block">
-                  {audioFileObj ? audioFileObj.name : 'Click to select or drag & drop master audio'}
+                  {audioFileObj ? audioFileObj.name : 'Tap or click to select master audio'}
                 </span>
+                {audioFileObj && (
+                  <span className="text-[10px] text-[#2dd4bf] block mt-1 font-mono">
+                    {(audioFileObj.size / (1024 * 1024)).toFixed(1)} MB selected ✓
+                  </span>
+                )}
                 <span className="text-[10px] text-zinc-500 block mt-1">
                   Supports .wav, .mp3 up to 150MB
                 </span>
                 <input
                   type="file"
-                  accept="audio/*"
+                  accept="audio/mpeg,audio/wav,audio/x-wav,audio/mp4,audio/aac,audio/*,.mp3,.wav,.m4a,.aac,.flac"
                   onChange={(e) => setAudioFileObj(e.target.files?.[0] || null)}
-                  className="hidden"
+                  className="sr-only"
                   id="master-audio-input"
                 />
-                <label
-                  htmlFor="master-audio-input"
-                  className="mt-3 inline-block px-3 py-1 bg-zinc-800 hover:bg-zinc-700 text-xs font-medium text-zinc-200 rounded cursor-pointer"
-                >
+                <span className="mt-3 inline-block px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-xs font-medium text-zinc-200 rounded pointer-events-none">
                   Choose Audio File
-                </label>
-              </div>
+                </span>
+              </label>
             </div>
 
             {/* Trackout Stems ZIP */}
@@ -210,28 +216,33 @@ export default function BeatUploadPage() {
               <label className="text-xs font-medium text-zinc-300 mb-1.5 block">
                 Trackout Stems Archive (.zip) (Required for Premium & Exclusive)
               </label>
-              <div className="border border-dashed border-zinc-700 hover:border-[#2dd4bf] rounded-lg p-5 text-center cursor-pointer transition-colors bg-zinc-950/60">
-                <FileArchive className="h-6 w-6 text-zinc-500 mx-auto mb-2" />
+              <label
+                htmlFor="stems-zip-input"
+                className="flex flex-col items-center border border-dashed border-zinc-700 hover:border-[#2dd4bf] active:border-[#2dd4bf] rounded-lg p-5 text-center cursor-pointer transition-colors bg-zinc-950/60 select-none"
+              >
+                <FileArchive className="h-6 w-6 text-zinc-500 mb-2" />
                 <span className="text-xs font-medium text-zinc-200 block">
-                  {stemsFileObj ? stemsFileObj.name : 'Upload stems archive containing separated WAV tracks'}
+                  {stemsFileObj ? stemsFileObj.name : 'Tap or click to upload stems archive'}
                 </span>
+                {stemsFileObj && (
+                  <span className="text-[10px] text-[#2dd4bf] block mt-1 font-mono">
+                    {(stemsFileObj.size / (1024 * 1024)).toFixed(1)} MB selected ✓
+                  </span>
+                )}
                 <span className="text-[10px] text-zinc-500 block mt-1">
                   Kick, Snare, Hi-Hats, Bass, Melodies (.zip up to 1GB)
                 </span>
                 <input
                   type="file"
-                  accept=".zip,.rar,.tar"
+                  accept=".zip,.rar,.tar,application/zip,application/x-zip-compressed"
                   onChange={(e) => setStemsFileObj(e.target.files?.[0] || null)}
-                  className="hidden"
+                  className="sr-only"
                   id="stems-zip-input"
                 />
-                <label
-                  htmlFor="stems-zip-input"
-                  className="mt-3 inline-block px-3 py-1 bg-zinc-800 hover:bg-zinc-700 text-xs font-medium text-zinc-200 rounded cursor-pointer"
-                >
+                <span className="mt-3 inline-block px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-xs font-medium text-zinc-200 rounded pointer-events-none">
                   Choose ZIP Archive
-                </label>
-              </div>
+                </span>
+              </label>
             </div>
 
             {/* Cover Artwork */}

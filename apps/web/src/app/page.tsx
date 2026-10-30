@@ -24,7 +24,7 @@ import { useAudio } from '../components/audio/AudioProvider';
 import { AudioPlayer, audioSynth, MOCK_TRACKS } from '@caution/ui';
 import { Track } from '@caution/types';
 import { useUserSubscription, FREE_PREVIEW_LIMIT_SECONDS } from '../lib/subscription';
-import { AUTH_LOGIN_URL, AUTH_SIGNUP_URL } from '../lib/urls';
+import { AUTH_LOGIN_URL, AUTH_SIGNUP_URL, APP_URL } from '../lib/urls';
 
 export default function LandingPage() {
   const { isSubscribed } = useUserSubscription();
@@ -151,8 +151,8 @@ export default function LandingPage() {
         onBookCall={() => setIsBookCallOpen(true)}
         onOpenAssessment={() => setIsAssessmentOpen(true)}
         onSignIn={() => (window.location.href = AUTH_LOGIN_URL)}
-        onGetStarted={() => setIsSoundstageOpen(true)}
-        onOpenSoundstage={() => setIsSoundstageOpen(true)}
+        onGetStarted={() => (window.location.href = APP_URL)}
+        onOpenSoundstage={() => (window.location.href = APP_URL)}
         cartCount={cart.length}
         onOpenCart={() => setIsCartOpen(true)}
       />
