@@ -1,4 +1,5 @@
 import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
 const accountId = process.env.R2_ACCOUNT_ID || 'f36f0330e251899bfc0d1eff48a006b6';
 const accessKeyId = process.env.R2_ACCESS_KEY_ID || 'f2fe6c68e00a09f04a4db39bfaa3fc4b';
@@ -42,4 +43,13 @@ export async function deleteFromR2(key: string) {
       Key: key
     })
   );
+}
+
+export async function getPresignedUploadUrl(key: string, contentType?: string, expiresIn = 3600): Promise<string> {
+  const command = new PutObjectCommand({
+    Bucket: R2_BUCKET,
+    Key: key,
+    ContentType: contentType || 'application/octet-stream'
+  });
+  return await getSignedUrl(r2, command, { expiresIn });
 }

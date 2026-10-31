@@ -23,6 +23,8 @@ import {
 export default function BeatUploadPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
+  const [uploadStep, setUploadStep] = useState('');
+  const [uploadProgress, setUploadProgress] = useState(0);
   const [success, setSuccess] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
@@ -36,12 +38,80 @@ export default function BeatUploadPage() {
   const [pricePremium, setPricePremium] = useState('30000');
   const [priceExclusive, setPriceExclusive] = useState('100000');
   const [enableFreeStreaming, setEnableFreeStreaming] = useState(true);
+  const [isFreeBeat, setIsFreeBeat] = useState(false);
 
   // File objects
   const [audioFileObj, setAudioFileObj] = useState<File | null>(null);
   const [stemsFileObj, setStemsFileObj] = useState<File | null>(null);
   const [coverFileObj, setCoverFileObj] = useState<File | null>(null);
   const [coverPresetUrl, setCoverPresetUrl] = useState<string | null>('/images/studio_mixing_console.jpg');
+
+  // Direct storage upload with real progress tracking (bypasses Vercel 4.5MB serverless limit)
+  const uploadFileDirectly = async (
+    file: File,
+    type: 'audio' | 'stems' | 'cover',
+    titleStr: string,
+    authToken?: string
+  ): Promise<string> => {
+    // 1. Request presigned upload URL
+    const presignRes = await fetch('/api/beats/presigned-url', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(authToken ? { Authorization: `Bearer ${authToken}` } : {})
+      },
+      body: JSON.stringify({
+        filename: file.name,
+        contentType: file.type || (type === 'audio' ? 'audio/wav' : type === 'stems' ? 'application/zip' : 'image/jpeg'),
+        type,
+        title: titleStr
+      })
+    });
+
+    const presignText = await presignRes.text();
+    let presignJson: any = {};
+    try {
+      presignJson = JSON.parse(presignText);
+    } catch {
+      throw new Error(`Storage URL error (${presignRes.status}): ${presignText.slice(0, 120)}`);
+    }
+
+    if (!presignRes.ok || !presignJson.uploadUrl || !presignJson.key) {
+      throw new Error(presignJson.error || `Failed to initiate storage upload for ${file.name}`);
+    }
+
+    // 2. Direct PUT to Cloudflare R2 Storage with real-time percentage progress
+    await new Promise<void>((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('PUT', presignJson.uploadUrl, true);
+      if (file.type) {
+        xhr.setRequestHeader('Content-Type', file.type);
+      }
+
+      xhr.upload.onprogress = (evt) => {
+        if (evt.lengthComputable) {
+          const percent = Math.round((evt.loaded / evt.total) * 100);
+          setUploadProgress(percent);
+        }
+      };
+
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          resolve();
+        } else {
+          reject(new Error(`Direct storage upload failed with status ${xhr.status}`));
+        }
+      };
+
+      xhr.onerror = () => {
+        reject(new Error('Network error during file upload to storage. Check connection.'));
+      };
+
+      xhr.send(file);
+    });
+
+    return presignJson.key;
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -52,6 +122,7 @@ export default function BeatUploadPage() {
 
     setLoading(true);
     setErrorMessage('');
+    setUploadProgress(0);
 
     try {
       let { data: { session } } = await supabase.auth.getSession();
@@ -76,41 +147,67 @@ export default function BeatUploadPage() {
         return;
       }
 
-      const formPayload = new FormData();
-      formPayload.append('producerId', userId);
-      formPayload.append('title', title.trim());
-      formPayload.append('genre', genre);
-      formPayload.append('bpm', bpm);
-      formPayload.append('musicalKey', musicalKey);
-      formPayload.append('tags', tags);
-      formPayload.append('priceBasic', priceBasic);
-      formPayload.append('pricePremium', pricePremium);
-      formPayload.append('priceExclusive', priceExclusive);
-      formPayload.append('enableFreeStreaming', enableFreeStreaming ? 'true' : 'false');
+      let masterAudioKey: string | null = null;
+      let stemsKey: string | null = null;
+      let finalCoverUrl = coverPresetUrl || '/images/studio_mixing_console.jpg';
 
+      // 1. Upload Master Audio directly to R2 if selected
       if (audioFileObj) {
-        formPayload.append('audio', audioFileObj);
+        setUploadStep(`Uploading audio master (${(audioFileObj.size / (1024 * 1024)).toFixed(1)} MB)...`);
+        masterAudioKey = await uploadFileDirectly(audioFileObj, 'audio', title.trim(), session?.access_token);
       }
-      if (coverFileObj) {
-        formPayload.append('cover', coverFileObj);
-      } else if (coverPresetUrl) {
-        formPayload.append('coverUrl', coverPresetUrl);
-      }
+
+      // 2. Upload Stems directly to R2 if selected
       if (stemsFileObj) {
-        formPayload.append('stems', stemsFileObj);
+        setUploadStep(`Uploading stems archive (${(stemsFileObj.size / (1024 * 1024)).toFixed(1)} MB)...`);
+        stemsKey = await uploadFileDirectly(stemsFileObj, 'stems', title.trim(), session?.access_token);
       }
+
+      // 3. Upload Custom Cover if selected
+      if (coverFileObj) {
+        setUploadStep('Uploading cover artwork...');
+        const coverKey = await uploadFileDirectly(coverFileObj, 'cover', title.trim(), session?.access_token);
+        finalCoverUrl = `/api/media/${coverKey}`;
+      }
+
+      // 4. Save Beat & Licenses to Supabase Catalog
+      setUploadStep('Publishing beat to Caution Studio catalog...');
+      const payload = {
+        producerId: userId,
+        title: title.trim(),
+        genre,
+        bpm,
+        musicalKey,
+        tags,
+        isFreeBeat,
+        priceBasic: isFreeBeat ? '0' : priceBasic,
+        pricePremium: isFreeBeat ? '0' : pricePremium,
+        priceExclusive: isFreeBeat ? '0' : priceExclusive,
+        enableFreeStreaming: isFreeBeat ? true : enableFreeStreaming,
+        masterAudioKey,
+        stemsKey,
+        coverUrl: finalCoverUrl
+      };
 
       const res = await fetch('/api/beats/upload', {
         method: 'POST',
-        body: formPayload,
-        headers: session?.access_token ? {
-          'Authorization': `Bearer ${session.access_token}`
-        } : undefined
+        headers: {
+          'Content-Type': 'application/json',
+          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {})
+        },
+        body: JSON.stringify(payload)
       });
 
-      const resJson = await res.json();
+      const resText = await res.text();
+      let resJson: any = {};
+      try {
+        resJson = JSON.parse(resText);
+      } catch {
+        throw new Error(`Server returned error (${res.status}): ${resText.slice(0, 120)}`);
+      }
+
       if (!res.ok || resJson.error) {
-        throw new Error(resJson.error || 'Failed to upload beat to catalog.');
+        throw new Error(resJson.error || 'Failed to publish beat to catalog.');
       }
 
       setSuccess(true);
@@ -334,96 +431,173 @@ export default function BeatUploadPage() {
 
         {/* Right Column: Pricing & Verification Boost */}
         <div className="space-y-6">
-          {/* License Pricing */}
-          <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-5 shadow-sm space-y-4">
-            <h3 className="text-sm font-semibold text-white">3. Commercial License Pricing</h3>
-            <p className="text-[11px] text-zinc-400">
-              Set separate license prices for upcoming artists (Starter), commercial record labels (Premium), and exclusive buyers. You receive 80% on every sale.
-            </p>
-
-            <div className="space-y-3">
-              <div className="p-3 rounded-md bg-zinc-950 border border-zinc-800">
-                <div className="flex justify-between items-center mb-1">
-                  <label className="text-xs font-bold text-zinc-200">
-                    Starter / Basic MP3 Lease
-                  </label>
-                  <span className="text-[10px] text-zinc-400 font-mono">100k streams</span>
-                </div>
-                <input
-                  type="number"
-                  value={priceBasic}
-                  onChange={(e) => setPriceBasic(e.target.value)}
-                  className="w-full bg-zinc-900 border border-zinc-800 rounded-md py-1.5 px-3 text-xs text-zinc-100 font-mono focus:outline-none focus:border-zinc-700"
-                />
-                <span className="text-[10px] text-zinc-500 mt-1 block">Your cut (80%): ₦{((Number(priceBasic) || 0) * 0.8).toLocaleString()}</span>
-              </div>
-
-              <div className="p-3 rounded-md bg-zinc-950 border border-[#2dd4bf]/30">
-                <div className="flex justify-between items-center mb-1">
-                  <label className="text-xs font-bold text-[#2dd4bf]">
-                    Premium Beat Plan (WAV Master + Stems)
-                  </label>
-                  <span className="text-[10px] text-[#2dd4bf] font-mono">500k streams</span>
-                </div>
-                <input
-                  type="number"
-                  value={pricePremium}
-                  onChange={(e) => setPricePremium(e.target.value)}
-                  className="w-full bg-zinc-900 border border-zinc-800 rounded-md py-1.5 px-3 text-xs text-zinc-100 font-mono focus:outline-none focus:border-zinc-700"
-                />
-                <span className="text-[10px] text-zinc-500 mt-1 block">Your cut (80%): ₦{((Number(pricePremium) || 0) * 0.8).toLocaleString()}</span>
-              </div>
-
-              <div className="p-3 rounded-md bg-zinc-950 border border-purple-500/30">
-                <div className="flex justify-between items-center mb-1">
-                  <label className="text-xs font-bold text-purple-300">
-                    100% Exclusive Rights Buyout (1-of-1 Ownership)
-                  </label>
-                  <span className="text-[10px] text-purple-300 font-mono">Unlimited Master</span>
-                </div>
-                <input
-                  type="number"
-                  value={priceExclusive}
-                  onChange={(e) => setPriceExclusive(e.target.value)}
-                  className="w-full bg-zinc-900 border border-zinc-800 rounded-md py-1.5 px-3 text-xs text-purple-200 font-mono font-bold focus:outline-none focus:border-zinc-700"
-                />
-                <span className="text-[10px] text-zinc-500 mt-1 block">Your cut (80%): ₦{((Number(priceExclusive) || 0) * 0.8).toLocaleString()} · Permanently removed from store</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Free Beat Option: Earn Monthly while Supporting Upcoming Artists */}
-          <div className="rounded-lg border border-emerald-500/30 bg-gradient-to-br from-emerald-500/10 via-zinc-900/90 to-zinc-950 p-5 shadow-sm space-y-3">
-            <div className="flex items-start gap-2.5">
-              <Sparkles className="h-5 w-5 text-emerald-400 shrink-0 mt-0.5" />
+          {/* Beat Distribution Model Toggle: Paid Beat vs Free Beat */}
+          <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-5 shadow-sm space-y-3.5">
+            <div className="flex items-center justify-between">
               <div>
-                <span className="text-sm font-bold text-white block">
-                  Earn Rewards while Supporting Upcoming Artists
-                </span>
-                <span className="text-xs text-emerald-300 font-medium block mt-0.5">
-                  Post for Free Download &amp; 10k Rewards
-                </span>
-                <p className="text-[11px] text-zinc-300 block mt-1.5 leading-relaxed">
-                  Post this beat for free download so upcoming artists can rehearse, audition, and record demos. You earn <strong>₦30,000 in royalties per 10,000 downloads</strong>, while progressing toward your <strong>Verified Producer badge</strong>!
-                </p>
+                <h3 className="text-sm font-bold text-white">3. Distribution Model</h3>
+                <p className="text-[11px] text-zinc-400">Choose whether this beat is for paid commercial licensing or free download</p>
               </div>
+              <span className={`text-[10px] font-mono font-bold px-2.5 py-1 rounded-full ${
+                isFreeBeat
+                  ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                  : 'bg-[#2dd4bf]/20 text-[#2dd4bf] border border-[#2dd4bf]/30'
+              }`}>
+                {isFreeBeat ? 'FREE BEAT' : 'PAID BEAT'}
+              </span>
             </div>
 
-            <label className="flex items-center gap-2.5 cursor-pointer pt-2 border-t border-zinc-800/80">
-              <input
-                type="checkbox"
-                checked={enableFreeStreaming}
-                onChange={(e) => setEnableFreeStreaming(e.target.checked)}
-                className="h-4 w-4 rounded border-zinc-700 bg-zinc-950 text-[#2dd4bf] focus:ring-[#2dd4bf]"
-              />
-              <span className="text-xs text-white font-semibold">
-                Post as Free Beat Download (Earn ₦30,000 per 10,000 downloads &amp; support upcoming artists)
-              </span>
-            </label>
+            {/* Segmented Toggle Control */}
+            <div className="grid grid-cols-2 gap-2 p-1 rounded-lg bg-zinc-950 border border-zinc-800">
+              <button
+                type="button"
+                onClick={() => setIsFreeBeat(false)}
+                className={`py-2 px-3 rounded-md text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                  !isFreeBeat
+                    ? 'bg-[#2dd4bf] text-zinc-950 shadow-sm'
+                    : 'text-zinc-400 hover:text-white'
+                }`}
+              >
+                <DollarSign className="h-3.5 w-3.5" />
+                <span>Paid Beat (For Sale)</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setIsFreeBeat(true)}
+                className={`py-2 px-3 rounded-md text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                  isFreeBeat
+                    ? 'bg-emerald-500 text-zinc-950 shadow-sm'
+                    : 'text-zinc-400 hover:text-white'
+                }`}
+              >
+                <Sparkles className="h-3.5 w-3.5" />
+                <span>Free Beat (100% Free)</span>
+              </button>
+            </div>
           </div>
+
+          {/* PAID BEAT: Commercial License Pricing (Only shown for Paid Beat) */}
+          {!isFreeBeat && (
+            <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-5 shadow-sm space-y-4 animate-in fade-in duration-200">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-semibold text-white">Commercial License Pricing</h3>
+                <span className="text-[10px] font-mono text-zinc-500">80% Producer Cut</span>
+              </div>
+              <p className="text-[11px] text-zinc-400">
+                Set separate license prices for upcoming artists (Starter), commercial record labels (Premium), and exclusive buyers.
+              </p>
+
+              <div className="space-y-3">
+                <div className="p-3 rounded-md bg-zinc-950 border border-zinc-800">
+                  <div className="flex justify-between items-center mb-1">
+                    <label className="text-xs font-bold text-zinc-200">
+                      Starter / Basic MP3 Lease
+                    </label>
+                    <span className="text-[10px] text-zinc-400 font-mono">100k streams</span>
+                  </div>
+                  <input
+                    type="number"
+                    value={priceBasic}
+                    onChange={(e) => setPriceBasic(e.target.value)}
+                    className="w-full bg-zinc-900 border border-zinc-800 rounded-md py-1.5 px-3 text-xs text-zinc-100 font-mono focus:outline-none focus:border-zinc-700"
+                  />
+                  <span className="text-[10px] text-zinc-500 mt-1 block">Your cut (80%): ₦{((Number(priceBasic) || 0) * 0.8).toLocaleString()}</span>
+                </div>
+
+                <div className="p-3 rounded-md bg-zinc-950 border border-[#2dd4bf]/30">
+                  <div className="flex justify-between items-center mb-1">
+                    <label className="text-xs font-bold text-[#2dd4bf]">
+                      Premium Beat Plan (WAV Master + Stems)
+                    </label>
+                    <span className="text-[10px] text-[#2dd4bf] font-mono">500k streams</span>
+                  </div>
+                  <input
+                    type="number"
+                    value={pricePremium}
+                    onChange={(e) => setPricePremium(e.target.value)}
+                    className="w-full bg-zinc-900 border border-zinc-800 rounded-md py-1.5 px-3 text-xs text-zinc-100 font-mono focus:outline-none focus:border-zinc-700"
+                  />
+                  <span className="text-[10px] text-zinc-500 mt-1 block">Your cut (80%): ₦{((Number(pricePremium) || 0) * 0.8).toLocaleString()}</span>
+                </div>
+
+                <div className="p-3 rounded-md bg-zinc-950 border border-purple-500/30">
+                  <div className="flex justify-between items-center mb-1">
+                    <label className="text-xs font-bold text-purple-300">
+                      100% Exclusive Rights Buyout (1-of-1 Ownership)
+                    </label>
+                    <span className="text-[10px] text-purple-300 font-mono">Unlimited Master</span>
+                  </div>
+                  <input
+                    type="number"
+                    value={priceExclusive}
+                    onChange={(e) => setPriceExclusive(e.target.value)}
+                    className="w-full bg-zinc-900 border border-zinc-800 rounded-md py-1.5 px-3 text-xs text-purple-200 font-mono font-bold focus:outline-none focus:border-zinc-700"
+                  />
+                  <span className="text-[10px] text-zinc-500 mt-1 block">Your cut (80%): ₦{((Number(priceExclusive) || 0) * 0.8).toLocaleString()} · Permanently removed from store</span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* FREE BEAT: Reward & Download Boost (Only shown for Free Beat) */}
+          {isFreeBeat && (
+            <div className="rounded-xl border border-emerald-500/30 bg-gradient-to-br from-emerald-500/10 via-zinc-900/90 to-zinc-950 p-5 shadow-sm space-y-3 animate-in fade-in duration-200">
+              <div className="flex items-start gap-2.5">
+                <Sparkles className="h-5 w-5 text-emerald-400 shrink-0 mt-0.5" />
+                <div>
+                  <span className="text-sm font-bold text-white block">
+                    Free Beat Community Distribution &amp; Rewards
+                  </span>
+                  <span className="text-xs text-emerald-300 font-medium block mt-0.5">
+                    Earn ₦30,000 per 10k downloads &amp; support upcoming talent
+                  </span>
+                  <p className="text-[11px] text-zinc-300 block mt-1.5 leading-relaxed">
+                    This beat will be available for <strong>100% Free Download</strong> on Caution Studio so artists can record demos, rehearse, and create songs in the Studio.
+                  </p>
+                  <div className="mt-3 p-3 rounded-lg bg-zinc-950/80 border border-emerald-500/20 text-[11px] text-emerald-200/90 space-y-1 font-mono">
+                    <div className="flex items-center gap-1.5">
+                      <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />
+                      <span>Zero cost to artists (100% Free Download)</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />
+                      <span>₦30,000 producer royalty payout per 10,000 downloads</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />
+                      <span>Boosts your ranking toward Verified Producer badge</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Submit Action */}
           <div className="space-y-2">
+            {loading && (
+              <div className="p-3 rounded-lg bg-zinc-950 border border-zinc-800 space-y-2">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-zinc-300 font-medium flex items-center gap-2">
+                    <Loader2 className="h-3.5 w-3.5 text-[#2dd4bf] animate-spin" />
+                    <span>{uploadStep || 'Uploading beat files...'}</span>
+                  </span>
+                  {uploadProgress > 0 && uploadProgress < 100 && (
+                    <span className="font-mono text-[#2dd4bf] font-bold text-[11px]">{uploadProgress}%</span>
+                  )}
+                </div>
+                {uploadProgress > 0 && uploadProgress < 100 && (
+                  <div className="w-full bg-zinc-800 rounded-full h-1.5 overflow-hidden">
+                    <div
+                      className="bg-[#2dd4bf] h-1.5 rounded-full transition-all duration-150"
+                      style={{ width: `${uploadProgress}%` }}
+                    />
+                  </div>
+                )}
+              </div>
+            )}
+
             <button
               type="submit"
               disabled={loading}
@@ -432,7 +606,7 @@ export default function BeatUploadPage() {
               {loading ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  <span>Processing & Publishing Beat...</span>
+                  <span>{uploadStep || 'Publishing Beat to Catalog...'}</span>
                 </>
               ) : (
                 <>

@@ -225,7 +225,11 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
   const [masterMeterL, setMasterMeterL] = useState(0);
   const [masterMeterR, setMasterMeterR] = useState(0);
 
-  // DSP Effects (Reverb, Delay, EQ, Compressor)
+  // DSP Effects (Auto-Tune Pro, Reverb, Delay, EQ, Compressor)
+  const [autoTuneEnabled, setAutoTuneEnabled] = useState(true);
+  const [autoTuneSpeed, setAutoTuneSpeed] = useState<'hard' | 'fast' | 'subtle'>('fast');
+  const [autoTuneAmount, setAutoTuneAmount] = useState(0.85); // 0 to 1
+  const [autoTuneKey, setAutoTuneKey] = useState('Auto'); // 'Auto' | 'Chromatic' | 'C Major' | 'D Minor' | 'G Major' | 'F Major' | 'A Minor'
   const [reverbAmount, setReverbAmount] = useState(0.2);
   const [delayAmount, setDelayAmount] = useState(0.15);
   const [eqLow, setEqLow] = useState(0); // dB
@@ -233,6 +237,9 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
   const [eqHigh, setEqHigh] = useState(2.0); // dB
   const [compressorEnabled, setCompressorEnabled] = useState(true);
   const [lowCutEnabled, setLowCutEnabled] = useState(true);
+
+  // Acoustic Shield / Phone Mic Cleaner (Echo Cancellation & Noise Suppression)
+  const [micCleanFilter, setMicCleanFilter] = useState(true);
 
   // Live recording waveform animation
   const [recordingSeconds, setRecordingSeconds] = useState(0);
@@ -351,6 +358,11 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
   const beatNodesRef = useRef<ElNodes | null>(null);
   const vocalNodesRef = useRef<Map<string, ElNodes>>(new Map());
   // Global shared DSP chain nodes (created once, connected to destination)
+  const dspAutoTuneFilterRef = useRef<BiquadFilterNode | null>(null);
+  const dspAutoTuneHarmonicRef = useRef<WaveShaperNode | null>(null);
+  const dspAutoTuneWetRef = useRef<GainNode | null>(null);
+  const dspAutoTuneDryRef = useRef<GainNode | null>(null);
+  const dspLowCutRef = useRef<BiquadFilterNode | null>(null);
   const dspEqLowRef = useRef<BiquadFilterNode | null>(null);
   const dspEqMidRef = useRef<BiquadFilterNode | null>(null);
   const dspEqHighRef = useRef<BiquadFilterNode | null>(null);
@@ -362,7 +374,7 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
   const dspReverbDryRef = useRef<GainNode | null>(null);
   const dspCompressorRef = useRef<DynamicsCompressorNode | null>(null);
   const dspMasterGainRef = useRef<GainNode | null>(null);
-  // DSP chain input bus (all per-track panners connect here)
+  // DSP vocal input bus (all vocal track panners connect here)
   const dspBusRef = useRef<GainNode | null>(null);
 
   // Track initial preselected track ID so modal initialization works,
@@ -521,14 +533,23 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
     );
   };
 
+  const handleSetLatency = (trackId: string, ms: number) => {
+    setVocalTracks((prev) =>
+      prev.map((t) => (t.id === trackId ? { ...t, latencyOffsetMs: Math.max(0, Math.min(400, ms)) } : t))
+    );
+  };
+
   // ─── Lazy-init playback AudioContext + global DSP chain ──────────────────
   const ensurePlaybackCtx = useCallback(() => {
     if (playCtxRef.current && playCtxRef.current.state !== 'closed') {
       // Resume if suspended (browser autoplay policy)
-      if (playCtxRef.current.state === 'suspended') playCtxRef.current.resume();
+      if (playCtxRef.current.state === 'suspended') {
+        playCtxRef.current.resume().catch(() => {});
+      }
       return playCtxRef.current;
     }
     const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+    if (!AudioCtx) return null;
     const ctx: AudioContext = new AudioCtx();
     playCtxRef.current = ctx;
 
@@ -537,14 +558,52 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
     masterGain.gain.value = masterVolume;
     dspMasterGainRef.current = masterGain;
 
-    // ── Compressor (always in chain, bypassed via 0-ratio when disabled) ──
-    const compressor = ctx.createDynamicsCompressor();
-    compressor.threshold.value = -18;
-    compressor.knee.value = 10;
-    compressor.ratio.value = compressorEnabled ? 4 : 1;
-    compressor.attack.value = 0.003;
-    compressor.release.value = 0.25;
-    dspCompressorRef.current = compressor;
+    // ── Vocal Submix Bus (all vocal tracks connect here) ───────────────
+    const vocalBus = ctx.createGain();
+    vocalBus.gain.value = 1.0;
+    dspBusRef.current = vocalBus;
+
+    // ── Auto-Tune Pro DSP Module ──────────────────────────────────────
+    // 1. Resonant Formant Peaking Filter (tunes vocal clarity and autotune presence at 2.8 - 3.1kHz)
+    const autoTuneFilter = ctx.createBiquadFilter();
+    autoTuneFilter.type = 'peaking';
+    autoTuneFilter.frequency.value = autoTuneSpeed === 'hard' ? 3100 : autoTuneSpeed === 'fast' ? 2800 : 2500;
+    autoTuneFilter.Q.value = autoTuneSpeed === 'hard' ? 3.5 : autoTuneSpeed === 'fast' ? 2.2 : 1.4;
+    autoTuneFilter.gain.value = autoTuneEnabled
+      ? (autoTuneSpeed === 'hard' ? 6.0 : autoTuneSpeed === 'fast' ? 4.0 : 2.5) * autoTuneAmount
+      : 0;
+    dspAutoTuneFilterRef.current = autoTuneFilter;
+
+    // 2. Harmonic Formant Saturation (adds the signature autotune crystalline harmonic sheen)
+    const makeAutoTuneCurve = (amt: number) => {
+      const k = amt * 12;
+      const n = 1024;
+      const curve = new Float32Array(n);
+      for (let i = 0; i < n; ++i) {
+        const x = (i * 2) / n - 1;
+        curve[i] = ((1 + k) * x) / (1 + k * Math.abs(x));
+      }
+      return curve;
+    };
+    const autoTuneShaper = ctx.createWaveShaper();
+    autoTuneShaper.curve = makeAutoTuneCurve(autoTuneEnabled ? autoTuneAmount : 0);
+    autoTuneShaper.oversample = '2x';
+    dspAutoTuneHarmonicRef.current = autoTuneShaper;
+
+    const autoTuneWet = ctx.createGain();
+    autoTuneWet.gain.value = autoTuneEnabled ? autoTuneAmount : 0;
+    dspAutoTuneWetRef.current = autoTuneWet;
+
+    const autoTuneDry = ctx.createGain();
+    autoTuneDry.gain.value = autoTuneEnabled ? Math.max(0.15, 1 - autoTuneAmount * 0.6) : 1.0;
+    dspAutoTuneDryRef.current = autoTuneDry;
+
+    // ── Low-Cut (High-Pass) filter at 80Hz ───────────────────────────
+    const lowCut = ctx.createBiquadFilter();
+    lowCut.type = 'highpass';
+    lowCut.frequency.value = lowCutEnabled ? 80 : 20;
+    lowCut.Q.value = 0.7;
+    dspLowCutRef.current = lowCut;
 
     // ── 3-Band EQ ─────────────────────────────────────────────────────
     const low = ctx.createBiquadFilter();
@@ -566,61 +625,70 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
     high.gain.value = eqHigh;
     dspEqHighRef.current = high;
 
-    // ── Low-Cut (High-Pass) filter at 80Hz ───────────────────────────
-    const lowCut = ctx.createBiquadFilter();
-    lowCut.type = 'highpass';
-    lowCut.frequency.value = lowCutEnabled ? 80 : 20;
-    lowCut.Q.value = 0.7;
-
-    // ── Reverb (ConvolverNode with synthetic IR) ──────────────────────
-    // Build a simple exponential-decay stereo impulse response
-    const buildIR = (duration: number, decay: number): AudioBuffer => {
-      const rate = ctx.sampleRate;
-      const length = Math.floor(rate * duration);
-      const ir = ctx.createBuffer(2, length, rate);
-      for (let ch = 0; ch < 2; ch++) {
-        const d = ir.getChannelData(ch);
-        for (let i = 0; i < length; i++) {
-          d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / length, decay);
-        }
-      }
-      return ir;
-    };
-    const reverb = ctx.createConvolver();
-    reverb.buffer = buildIR(2.5, 3);
-    dspReverbRef.current = reverb;
-
-    const reverbGain = ctx.createGain();
-    reverbGain.gain.value = reverbAmount;
-    dspReverbGainRef.current = reverbGain;
-
-    const reverbDry = ctx.createGain();
-    reverbDry.gain.value = 1 - reverbAmount * 0.5;
-    dspReverbDryRef.current = reverbDry;
-
-    // ── Delay ────────────────────────────────────────────────────────
+    // ── Tempo-Synced Delay ────────────────────────────────────────────
     const delay = ctx.createDelay(2.0);
-    // Sync delay time to beat BPM (quarter-note) if available
-    const bpm = 110;
+    const bpm = selectedTrack?.bpm || 110;
     delay.delayTime.value = Math.min(1.9, 60 / bpm / 2);
     dspDelayRef.current = delay;
 
+    const delayFeedback = ctx.createGain();
+    delayFeedback.gain.value = 0.35; // 35% feedback for rhythmic echoes
+    delay.connect(delayFeedback);
+    delayFeedback.connect(delay);
+
     const delayGain = ctx.createGain();
-    delayGain.gain.value = delayAmount * 0.5;
+    delayGain.gain.value = delayAmount * 0.8;
     dspDelayGainRef.current = delayGain;
 
     const delayDry = ctx.createGain();
     delayDry.gain.value = 1.0;
     dspDelayDryRef.current = delayDry;
 
-    // ── Bus (input from all per-track nodes) ──────────────────────────
-    const bus = ctx.createGain();
-    bus.gain.value = 1.0;
-    dspBusRef.current = bus;
+    // ── Studio Reverb (ConvolverNode with normalized synthetic IR) ────
+    const buildIR = (duration: number, decay: number): AudioBuffer => {
+      const rate = ctx.sampleRate || 44100;
+      const length = Math.floor(rate * duration);
+      const ir = ctx.createBuffer(2, length, rate);
+      for (let ch = 0; ch < 2; ch++) {
+        const d = ir.getChannelData(ch);
+        for (let i = 0; i < length; i++) {
+          const t = i / length;
+          d[i] = (Math.random() * 2 - 1) * Math.exp(-t * decay);
+        }
+      }
+      return ir;
+    };
+    const reverb = ctx.createConvolver();
+    reverb.buffer = buildIR(2.2, 3.5);
+    dspReverbRef.current = reverb;
 
-    // ── Wire the chain ────────────────────────────────────────────────
-    // bus → lowCut → low → mid → high → [delay dry + delay wet] → [reverb dry + reverb wet] → compressor → master → destination
-    bus.connect(lowCut);
+    const reverbGain = ctx.createGain();
+    reverbGain.gain.value = reverbAmount * 1.5;
+    dspReverbGainRef.current = reverbGain;
+
+    const reverbDry = ctx.createGain();
+    reverbDry.gain.value = Math.max(0.2, 1.0 - reverbAmount * 0.4);
+    dspReverbDryRef.current = reverbDry;
+
+    // ── Dynamics Compressor ──────────────────────────────────────────
+    const compressor = ctx.createDynamicsCompressor();
+    compressor.threshold.value = -18;
+    compressor.knee.value = 10;
+    compressor.ratio.value = compressorEnabled ? 4 : 1;
+    compressor.attack.value = 0.003;
+    compressor.release.value = 0.25;
+    dspCompressorRef.current = compressor;
+
+    // ── Wire the Vocal Chain:
+    // vocalBus → [AutoTune Dry + AutoTune Wet] → lowCut → low → mid → high → [delay dry + delay wet] → [reverb dry + reverb wet] → compressor → masterGain → destination
+    vocalBus.connect(autoTuneDry);
+    vocalBus.connect(autoTuneFilter);
+    autoTuneFilter.connect(autoTuneShaper);
+    autoTuneShaper.connect(autoTuneWet);
+
+    autoTuneDry.connect(lowCut);
+    autoTuneWet.connect(lowCut);
+
     lowCut.connect(low);
     low.connect(mid);
     mid.connect(high);
@@ -629,13 +697,18 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
     high.connect(delayDry);
     high.connect(delay);
     delay.connect(delayGain);
-    delayDry.connect(reverbDry);
-    delayGain.connect(reverbDry);
+
+    const postDelaySum = ctx.createGain();
+    postDelaySum.gain.value = 1.0;
+    delayDry.connect(postDelaySum);
+    delayGain.connect(postDelaySum);
 
     // Reverb parallel wet/dry
-    reverbDry.connect(compressor);
-    reverbDry.connect(reverb);
+    postDelaySum.connect(reverbDry);
+    postDelaySum.connect(reverb);
     reverb.connect(reverbGain);
+
+    reverbDry.connect(compressor);
     reverbGain.connect(compressor);
 
     compressor.connect(masterGain);
@@ -643,25 +716,71 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
 
     return ctx;
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [selectedTrack?.bpm]);
 
   // ─── Connect a single HTMLAudioElement into the live playback graph ──────
   const connectElToPlayback = useCallback((el: HTMLAudioElement, nodeKey: 'beat' | string, vol: number, pan: number): ElNodes | null => {
     try {
       const ctx = ensurePlaybackCtx();
-      if (!dspBusRef.current) return null;
-      // Avoid double-connecting the same element
+      if (!ctx || !dspMasterGainRef.current || !dspBusRef.current) return null;
+
       const existing = nodeKey === 'beat' ? beatNodesRef.current : vocalNodesRef.current.get(nodeKey);
-      if (existing) return existing;
-      const source = ctx.createMediaElementSource(el);
+      if (existing) {
+        // If the same element is already connected, just update volume & pan and return
+        if ((existing.source as any).mediaElement === el) {
+          existing.gain.gain.setValueAtTime(vol, ctx.currentTime);
+          if (existing.panner && existing.panner.pan?.setValueAtTime) {
+            try { existing.panner.pan.setValueAtTime(Math.max(-1, Math.min(1, pan / 100)), ctx.currentTime); } catch(_) {}
+          }
+          return existing;
+        }
+        // Element instance changed (e.g. re-mounted). Disconnect old nodes cleanly
+        try {
+          existing.source.disconnect();
+          existing.gain.disconnect();
+          if (existing.panner?.disconnect) existing.panner.disconnect();
+        } catch (_) {}
+      }
+
+      // Safeguard against calling createMediaElementSource multiple times on the same element
+      let source: MediaElementAudioSourceNode;
+      if ((el as any).__sourceNode) {
+        source = (el as any).__sourceNode;
+      } else {
+        source = ctx.createMediaElementSource(el);
+        (el as any).__sourceNode = source;
+      }
+
       const gain = ctx.createGain();
-      gain.gain.value = vol;
-      const panner = ctx.createStereoPanner();
-      panner.pan.value = Math.max(-1, Math.min(1, pan / 100));
+      gain.gain.setValueAtTime(vol, ctx.currentTime);
+
+      let panner: StereoPannerNode | null = null;
+      if (typeof ctx.createStereoPanner === 'function') {
+        try {
+          panner = ctx.createStereoPanner();
+          panner.pan.setValueAtTime(Math.max(-1, Math.min(1, pan / 100)), ctx.currentTime);
+        } catch (_) {
+          panner = null;
+        }
+      }
+
       source.connect(gain);
-      gain.connect(panner);
-      panner.connect(dspBusRef.current);
-      const nodes: ElNodes = { source, gain, panner };
+      if (panner) {
+        gain.connect(panner);
+        if (nodeKey === 'beat') {
+          panner.connect(dspMasterGainRef.current);
+        } else {
+          panner.connect(dspBusRef.current);
+        }
+      } else {
+        if (nodeKey === 'beat') {
+          gain.connect(dspMasterGainRef.current);
+        } else {
+          gain.connect(dspBusRef.current);
+        }
+      }
+
+      const nodes: ElNodes = { source, gain, panner: panner || (gain as any) };
       if (nodeKey === 'beat') {
         beatNodesRef.current = nodes;
       } else {
@@ -669,6 +788,7 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
       }
       return nodes;
     } catch (e) {
+      console.warn('connectElToPlayback error:', e);
       return null;
     }
   }, [ensurePlaybackCtx]);
@@ -681,19 +801,25 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
     // 1. Backing Beat
     if (beatAudioRef.current) {
       beatAudioRef.current.muted = !beatShouldPlay;
-      // HTMLAudioElement volume (fallback when Web Audio not connected)
+      // HTMLAudioElement volume (fallback for browsers that support it)
       const targetVol = beatShouldPlay ? Math.max(0, Math.min(1, beatVolume * masterVolume)) : 0;
       beatAudioRef.current.volume = targetVol;
-      // Web Audio GainNode (actual real-time volume & mute)
-      if (beatNodesRef.current) {
-        beatNodesRef.current.gain.gain.value = beatShouldPlay ? Math.max(0, Math.min(2, beatVolume)) : 0;
-        beatNodesRef.current.panner.pan.value = Math.max(-1, Math.min(1, beatPan / 100));
+      // Web Audio GainNode (instant real-time volume & mute, works on iOS/mobile Safari)
+      if (beatNodesRef.current && playCtxRef.current) {
+        beatNodesRef.current.gain.gain.setValueAtTime(
+          beatShouldPlay ? Math.max(0, Math.min(2, beatVolume)) : 0,
+          playCtxRef.current.currentTime
+        );
+        beatNodesRef.current.panner.pan.setValueAtTime(
+          Math.max(-1, Math.min(1, beatPan / 100)),
+          playCtxRef.current.currentTime
+        );
       }
     }
 
     // 2. Master gain node
-    if (dspMasterGainRef.current) {
-      dspMasterGainRef.current.gain.value = masterVolume;
+    if (dspMasterGainRef.current && playCtxRef.current) {
+      dspMasterGainRef.current.gain.setValueAtTime(masterVolume, playCtxRef.current.currentTime);
     }
 
     // 3. All Vocal audio elements
@@ -704,46 +830,106 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
         el.muted = !trackShouldPlay;
         const targetVol = trackShouldPlay ? Math.max(0, Math.min(1, t.volume * masterVolume)) : 0;
         el.volume = targetVol;
-        // Web Audio GainNode + StereoPannerNode
+        // Web Audio GainNode + StereoPannerNode (instant volume fader on mobile)
         const nodes = vocalNodesRef.current.get(t.id);
-        if (nodes) {
-          nodes.gain.gain.value = trackShouldPlay ? Math.max(0, Math.min(2, t.volume)) : 0;
-          nodes.panner.pan.value = Math.max(-1, Math.min(1, t.pan / 100));
+        if (nodes && playCtxRef.current) {
+          nodes.gain.gain.setValueAtTime(
+            trackShouldPlay ? Math.max(0, Math.min(2, t.volume)) : 0,
+            playCtxRef.current.currentTime
+          );
+          nodes.panner.pan.setValueAtTime(
+            Math.max(-1, Math.min(1, t.pan / 100)),
+            playCtxRef.current.currentTime
+          );
         }
       }
     });
   }, [beatVolume, beatPan, beatMuted, beatSolo, vocalTracks, masterVolume]);
 
+  // ─── Live Auto-Tune parameter sync ────────────────────────────────────────
+  useEffect(() => {
+    if (dspAutoTuneFilterRef.current && playCtxRef.current) {
+      dspAutoTuneFilterRef.current.frequency.setValueAtTime(
+        autoTuneSpeed === 'hard' ? 3100 : autoTuneSpeed === 'fast' ? 2800 : 2500,
+        playCtxRef.current.currentTime
+      );
+      dspAutoTuneFilterRef.current.Q.setValueAtTime(
+        autoTuneSpeed === 'hard' ? 3.5 : autoTuneSpeed === 'fast' ? 2.2 : 1.4,
+        playCtxRef.current.currentTime
+      );
+      dspAutoTuneFilterRef.current.gain.setValueAtTime(
+        autoTuneEnabled ? (autoTuneSpeed === 'hard' ? 6.0 : autoTuneSpeed === 'fast' ? 4.0 : 2.5) * autoTuneAmount : 0,
+        playCtxRef.current.currentTime
+      );
+    }
+    if (dspAutoTuneWetRef.current && playCtxRef.current) {
+      dspAutoTuneWetRef.current.gain.setValueAtTime(
+        autoTuneEnabled ? autoTuneAmount : 0,
+        playCtxRef.current.currentTime
+      );
+    }
+    if (dspAutoTuneDryRef.current && playCtxRef.current) {
+      dspAutoTuneDryRef.current.gain.setValueAtTime(
+        autoTuneEnabled ? Math.max(0.15, 1 - autoTuneAmount * 0.6) : 1.0,
+        playCtxRef.current.currentTime
+      );
+    }
+    if (dspAutoTuneHarmonicRef.current) {
+      const makeAutoTuneCurve = (amt: number) => {
+        const k = amt * 12;
+        const n = 1024;
+        const curve = new Float32Array(n);
+        for (let i = 0; i < n; ++i) {
+          const x = (i * 2) / n - 1;
+          curve[i] = ((1 + k) * x) / (1 + k * Math.abs(x));
+        }
+        return curve;
+      };
+      dspAutoTuneHarmonicRef.current.curve = makeAutoTuneCurve(autoTuneEnabled ? autoTuneAmount : 0);
+    }
+  }, [autoTuneEnabled, autoTuneSpeed, autoTuneAmount]);
+
   // ─── Live EQ parameter sync ───────────────────────────────────────────────
   useEffect(() => {
-    if (dspEqLowRef.current) dspEqLowRef.current.gain.value = eqLow;
-    if (dspEqMidRef.current) dspEqMidRef.current.gain.value = eqMid;
-    if (dspEqHighRef.current) dspEqHighRef.current.gain.value = eqHigh;
+    if (dspEqLowRef.current && playCtxRef.current) {
+      dspEqLowRef.current.gain.setValueAtTime(eqLow, playCtxRef.current.currentTime);
+    }
+    if (dspEqMidRef.current && playCtxRef.current) {
+      dspEqMidRef.current.gain.setValueAtTime(eqMid, playCtxRef.current.currentTime);
+    }
+    if (dspEqHighRef.current && playCtxRef.current) {
+      dspEqHighRef.current.gain.setValueAtTime(eqHigh, playCtxRef.current.currentTime);
+    }
   }, [eqLow, eqMid, eqHigh]);
 
   // ─── Live Reverb amount sync ──────────────────────────────────────────────
   useEffect(() => {
-    if (dspReverbGainRef.current) dspReverbGainRef.current.gain.value = reverbAmount;
-    if (dspReverbDryRef.current) dspReverbDryRef.current.gain.value = 1 - reverbAmount * 0.5;
+    if (dspReverbGainRef.current && playCtxRef.current) {
+      dspReverbGainRef.current.gain.setValueAtTime(reverbAmount * 1.5, playCtxRef.current.currentTime);
+    }
+    if (dspReverbDryRef.current && playCtxRef.current) {
+      dspReverbDryRef.current.gain.setValueAtTime(Math.max(0.2, 1.0 - reverbAmount * 0.4), playCtxRef.current.currentTime);
+    }
   }, [reverbAmount]);
 
   // ─── Live Delay amount sync ───────────────────────────────────────────────
   useEffect(() => {
-    if (dspDelayGainRef.current) dspDelayGainRef.current.gain.value = delayAmount * 0.5;
+    if (dspDelayGainRef.current && playCtxRef.current) {
+      dspDelayGainRef.current.gain.setValueAtTime(delayAmount * 0.8, playCtxRef.current.currentTime);
+    }
   }, [delayAmount]);
 
   // ─── Live Compressor sync ─────────────────────────────────────────────────
   useEffect(() => {
-    if (dspCompressorRef.current) {
-      dspCompressorRef.current.ratio.value = compressorEnabled ? 4 : 1;
+    if (dspCompressorRef.current && playCtxRef.current) {
+      dspCompressorRef.current.ratio.setValueAtTime(compressorEnabled ? 4 : 1, playCtxRef.current.currentTime);
     }
   }, [compressorEnabled]);
 
   // ─── Low-Cut enable sync ──────────────────────────────────────────────────
   useEffect(() => {
-    if (dspEqLowRef.current?.context) {
-      // The low-cut filter is a separate node; we approximate disable by dropping to 20Hz
-      // (we store lowCut filter in a separate ref after refactor)
+    if (dspLowCutRef.current && playCtxRef.current) {
+      dspLowCutRef.current.frequency.setValueAtTime(lowCutEnabled ? 80 : 20, playCtxRef.current.currentTime);
     }
   }, [lowCutEnabled]);
 
@@ -831,25 +1017,141 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
     );
   };
 
-  // Toggle track mute
+  // Toggle track mute (instant Web Audio gain update for iOS/mobile)
   const handleToggleMute = (trackId: string) => {
-    setVocalTracks((prev) =>
-      prev.map((t) => (t.id === trackId ? { ...t, isMuted: !t.isMuted } : t))
-    );
+    setVocalTracks((prev) => {
+      const next = prev.map((t) => (t.id === trackId ? { ...t, isMuted: !t.isMuted } : t));
+      const target = next.find((t) => t.id === trackId);
+      if (target) {
+        const anySolo = next.some((t) => t.isSolo) || beatSolo;
+        const trackShouldPlay = anySolo ? target.isSolo : !target.isMuted;
+        const nodes = vocalNodesRef.current.get(trackId);
+        if (nodes && playCtxRef.current) {
+          nodes.gain.gain.setValueAtTime(
+            trackShouldPlay ? Math.max(0, Math.min(2, target.volume)) : 0,
+            playCtxRef.current.currentTime
+          );
+        }
+      }
+      return next;
+    });
   };
 
   // Toggle track solo
   const handleToggleSolo = (trackId: string) => {
-    setVocalTracks((prev) =>
-      prev.map((t) => (t.id === trackId ? { ...t, isSolo: !t.isSolo } : t))
-    );
+    setVocalTracks((prev) => {
+      const next = prev.map((t) => (t.id === trackId ? { ...t, isSolo: !t.isSolo } : t));
+      const anySolo = next.some((t) => t.isSolo) || beatSolo;
+      next.forEach((t) => {
+        const trackShouldPlay = anySolo ? t.isSolo : !t.isMuted;
+        const nodes = vocalNodesRef.current.get(t.id);
+        if (nodes && playCtxRef.current) {
+          nodes.gain.gain.setValueAtTime(
+            trackShouldPlay ? Math.max(0, Math.min(2, t.volume)) : 0,
+            playCtxRef.current.currentTime
+          );
+        }
+      });
+      return next;
+    });
   };
 
-  // Update track volume
+  // Update track volume (instant fader response on mobile phones)
   const handleTrackVolumeChange = (trackId: string, val: number) => {
+    const ctx = ensurePlaybackCtx();
+    if (ctx && ctx.state === 'suspended') {
+      ctx.resume().catch(() => {});
+    }
+
     setVocalTracks((prev) =>
       prev.map((t) => (t.id === trackId ? { ...t, volume: val } : t))
     );
+
+    const nodes = vocalNodesRef.current.get(trackId);
+    if (nodes && ctx) {
+      const anySolo = vocalTracks.some((t) => t.isSolo) || beatSolo;
+      const t = vocalTracks.find((tr) => tr.id === trackId);
+      const trackShouldPlay = anySolo ? (t?.isSolo ?? false) : !(t?.isMuted ?? false);
+      nodes.gain.gain.setValueAtTime(
+        trackShouldPlay ? Math.max(0, Math.min(2, val)) : 0,
+        ctx.currentTime
+      );
+    }
+
+    // HTMLAudioElement volume fallback
+    const el = vocalAudioRefs.current.get(trackId);
+    if (el) {
+      try {
+        el.volume = Math.max(0, Math.min(1, val * masterVolume));
+      } catch (_) {}
+    }
+  };
+
+  // Beat volume fader (instant response on mobile)
+  const handleBeatVolumeChange = (val: number) => {
+    const ctx = ensurePlaybackCtx();
+    if (ctx && ctx.state === 'suspended') {
+      ctx.resume().catch(() => {});
+    }
+
+    setBeatVolume(val);
+    if (beatNodesRef.current && ctx) {
+      const anySolo = vocalTracks.some((t) => t.isSolo) || beatSolo;
+      const beatShouldPlay = anySolo ? beatSolo : !beatMuted;
+      beatNodesRef.current.gain.gain.setValueAtTime(
+        beatShouldPlay ? Math.max(0, Math.min(2, val)) : 0,
+        ctx.currentTime
+      );
+    }
+
+    // HTMLAudioElement fallback
+    if (beatAudioRef.current) {
+      try {
+        beatAudioRef.current.volume = Math.max(0, Math.min(1, val * masterVolume));
+      } catch (_) {}
+    }
+  };
+
+  // Beat mute toggle
+  const handleToggleBeatMute = () => {
+    setBeatMuted((prev) => {
+      const next = !prev;
+      if (beatNodesRef.current && playCtxRef.current) {
+        const anySolo = vocalTracks.some((t) => t.isSolo) || beatSolo;
+        const beatShouldPlay = anySolo ? beatSolo : !next;
+        beatNodesRef.current.gain.gain.setValueAtTime(
+          beatShouldPlay ? Math.max(0, Math.min(2, beatVolume)) : 0,
+          playCtxRef.current.currentTime
+        );
+      }
+      return next;
+    });
+  };
+
+  // Beat solo toggle
+  const handleToggleBeatSolo = () => {
+    setBeatSolo((prev) => {
+      const next = !prev;
+      const anySolo = vocalTracks.some((t) => t.isSolo) || next;
+      if (beatNodesRef.current && playCtxRef.current) {
+        const beatShouldPlay = anySolo ? next : !beatMuted;
+        beatNodesRef.current.gain.gain.setValueAtTime(
+          beatShouldPlay ? Math.max(0, Math.min(2, beatVolume)) : 0,
+          playCtxRef.current.currentTime
+        );
+      }
+      vocalTracks.forEach((t) => {
+        const trackShouldPlay = anySolo ? t.isSolo : !t.isMuted;
+        const nodes = vocalNodesRef.current.get(t.id);
+        if (nodes && playCtxRef.current) {
+          nodes.gain.gain.setValueAtTime(
+            trackShouldPlay ? Math.max(0, Math.min(2, t.volume)) : 0,
+            playCtxRef.current.currentTime
+          );
+        }
+      });
+      return next;
+    });
   };
 
   // Update track pan
@@ -882,6 +1184,11 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
     if (!armedTrack) {
       alert('Please arm a vocal track by clicking [REC] on the track before recording.');
       return;
+    }
+
+    // Unlock Web Audio on mobile gesture
+    if (playCtxRef.current && playCtxRef.current.state === 'suspended') {
+      playCtxRef.current.resume().catch(() => {});
     }
 
     if (isCountInEnabled) {
@@ -919,15 +1226,34 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
       setIsRecording(true);
       setPlayheadTime(0);
 
-      // Access User Microphone with studio quality
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          echoCancellation: false,
-          noiseSuppression: false,
-          autoGainControl: false,
-          sampleRate: 48000
+      // Access User Microphone with resilient mobile-friendly constraints
+      let stream: MediaStream;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          audio: micCleanFilter
+            ? {
+                echoCancellation: true,
+                noiseSuppression: true,
+                autoGainControl: true
+              }
+            : {
+                echoCancellation: false,
+                noiseSuppression: false,
+                autoGainControl: false
+              }
+        });
+      } catch (err1) {
+        console.warn('Advanced audio constraints not supported on this phone, falling back to standard audio:', err1);
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        } catch (err2) {
+          console.error('Microphone access denied or unsupported:', err2);
+          alert('Microphone access could not be started. Please enable microphone permissions in your browser settings.');
+          setRecordState('idle');
+          setIsRecording(false);
+          return;
         }
-      });
+      }
       micStreamRef.current = stream;
 
       // Web Audio Analyser for oscilloscope and VU meter
@@ -1111,7 +1437,7 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
   };
 
   // Synchronized Multi-Track Playback (Beat + Lead + All Backup Vocals with Latency Compensation)
-  const togglePlayCombinedPreview = () => {
+  const togglePlayCombinedPreview = async () => {
     if (isPlaying) {
       if (beatAudioRef.current) beatAudioRef.current.pause();
       vocalAudioRefs.current.forEach((el) => el.pause());
@@ -1120,6 +1446,11 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
       setMasterMeterL(0);
       setMasterMeterR(0);
     } else {
+      // CRITICAL FOR MOBILE: Always resume Web Audio AudioContext on user interaction
+      const ctx = ensurePlaybackCtx();
+      if (ctx && ctx.state === 'suspended') {
+        await ctx.resume().catch(() => {});
+      }
       const currentTime = playheadTime;
       const anySolo = vocalTracks.some((t) => t.isSolo) || beatSolo;
       const beatShouldPlay = anySolo ? beatSolo : !beatMuted;
@@ -1251,21 +1582,165 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
 
     decodeCtx.close();
 
-    // 3. Render Offline Mix with active Gain, Stereo Pan, EQ & Reverb
+    // 3. Render Offline Mix with active Gain, Stereo Pan, EQ, Auto-Tune & Compressor
     // In DAWs, the export ends at the specified locator / recorded song length
     const limit = exportLimitSeconds !== undefined ? exportLimitSeconds : effectiveExportDuration;
     const targetDuration = Math.max(1, Math.min(beatAudioBuffer.duration, limit));
 
     const offlineCtx = new OfflineAudioContext(2, Math.ceil(targetDuration * 44100), 44100);
 
-    // Add Backing Beat Track
+    // Master Bus
+    const masterGain = offlineCtx.createGain();
+    masterGain.gain.value = masterVolume;
+    masterGain.connect(offlineCtx.destination);
+
+    // Add Backing Beat Track (routes directly to master, bypassing vocal FX)
     const beatSource = offlineCtx.createBufferSource();
     beatSource.buffer = beatAudioBuffer;
     const beatGain = offlineCtx.createGain();
-    beatGain.gain.value = beatMuted ? 0 : beatVolume * masterVolume;
-    beatSource.connect(beatGain);
-    beatGain.connect(offlineCtx.destination);
+    beatGain.gain.value = beatMuted ? 0 : beatVolume;
+    if (typeof offlineCtx.createStereoPanner === 'function') {
+      try {
+        const beatPanner = offlineCtx.createStereoPanner();
+        beatPanner.pan.value = Math.max(-1, Math.min(1, beatPan / 100));
+        beatSource.connect(beatGain);
+        beatGain.connect(beatPanner);
+        beatPanner.connect(masterGain);
+      } catch (_) {
+        beatSource.connect(beatGain);
+        beatGain.connect(masterGain);
+      }
+    } else {
+      beatSource.connect(beatGain);
+      beatGain.connect(masterGain);
+    }
     beatSource.start(0);
+
+    // Vocal Submix Bus
+    const vocalBus = offlineCtx.createGain();
+    vocalBus.gain.value = 1.0;
+
+    // ── Auto-Tune Pro DSP in Master Mix ──
+    const offlineAutoTuneFilter = offlineCtx.createBiquadFilter();
+    offlineAutoTuneFilter.type = 'peaking';
+    offlineAutoTuneFilter.frequency.value = autoTuneSpeed === 'hard' ? 3100 : autoTuneSpeed === 'fast' ? 2800 : 2500;
+    offlineAutoTuneFilter.Q.value = autoTuneSpeed === 'hard' ? 3.5 : autoTuneSpeed === 'fast' ? 2.2 : 1.4;
+    offlineAutoTuneFilter.gain.value = autoTuneEnabled
+      ? (autoTuneSpeed === 'hard' ? 6.0 : autoTuneSpeed === 'fast' ? 4.0 : 2.5) * autoTuneAmount
+      : 0;
+
+    const makeOfflineCurve = (amt: number) => {
+      const k = amt * 12;
+      const n = 1024;
+      const curve = new Float32Array(n);
+      for (let i = 0; i < n; ++i) {
+        const x = (i * 2) / n - 1;
+        curve[i] = ((1 + k) * x) / (1 + k * Math.abs(x));
+      }
+      return curve;
+    };
+    const offlineAutoTuneShaper = offlineCtx.createWaveShaper();
+    offlineAutoTuneShaper.curve = makeOfflineCurve(autoTuneEnabled ? autoTuneAmount : 0);
+    offlineAutoTuneShaper.oversample = '2x';
+
+    const offlineAtWet = offlineCtx.createGain();
+    offlineAtWet.gain.value = autoTuneEnabled ? autoTuneAmount : 0;
+    const offlineAtDry = offlineCtx.createGain();
+    offlineAtDry.gain.value = autoTuneEnabled ? Math.max(0.15, 1 - autoTuneAmount * 0.6) : 1.0;
+
+    // Low-Cut Filter
+    const offlineLowCut = offlineCtx.createBiquadFilter();
+    offlineLowCut.type = 'highpass';
+    offlineLowCut.frequency.value = lowCutEnabled ? 80 : 20;
+
+    vocalBus.connect(offlineAtDry);
+    vocalBus.connect(offlineAutoTuneFilter);
+    offlineAutoTuneFilter.connect(offlineAutoTuneShaper);
+    offlineAutoTuneShaper.connect(offlineAtWet);
+
+    offlineAtDry.connect(offlineLowCut);
+    offlineAtWet.connect(offlineLowCut);
+
+    // ── 3-Band EQ ──
+    const lowFilter = offlineCtx.createBiquadFilter();
+    lowFilter.type = 'lowshelf';
+    lowFilter.frequency.value = 120;
+    lowFilter.gain.value = eqLow;
+
+    const midFilter = offlineCtx.createBiquadFilter();
+    midFilter.type = 'peaking';
+    midFilter.frequency.value = 1500;
+    midFilter.gain.value = eqMid;
+
+    const highFilter = offlineCtx.createBiquadFilter();
+    highFilter.type = 'highshelf';
+    highFilter.frequency.value = 8000;
+    highFilter.gain.value = eqHigh;
+
+    offlineLowCut.connect(lowFilter);
+    lowFilter.connect(midFilter);
+    midFilter.connect(highFilter);
+
+    // ── Tempo-Synced Delay ──
+    const offlineDelay = offlineCtx.createDelay(2.0);
+    const bpm = selectedTrack?.bpm || 110;
+    offlineDelay.delayTime.value = Math.min(1.9, 60 / bpm / 2);
+    const offlineDelayFeedback = offlineCtx.createGain();
+    offlineDelayFeedback.gain.value = 0.35;
+    offlineDelay.connect(offlineDelayFeedback);
+    offlineDelayFeedback.connect(offlineDelay);
+
+    const offlineDelayGain = offlineCtx.createGain();
+    offlineDelayGain.gain.value = delayAmount * 0.8;
+    const offlineDelayDry = offlineCtx.createGain();
+    offlineDelayDry.gain.value = 1.0;
+
+    highFilter.connect(offlineDelayDry);
+    highFilter.connect(offlineDelay);
+    offlineDelay.connect(offlineDelayGain);
+
+    const postDelaySum = offlineCtx.createGain();
+    postDelaySum.gain.value = 1.0;
+    offlineDelayDry.connect(postDelaySum);
+    offlineDelayGain.connect(postDelaySum);
+
+    // ── Studio Reverb ──
+    const offlineReverb = offlineCtx.createConvolver();
+    const buildOfflineIR = (duration: number, decay: number): AudioBuffer => {
+      const rate = 44100;
+      const length = Math.floor(rate * duration);
+      const ir = offlineCtx.createBuffer(2, length, rate);
+      for (let ch = 0; ch < 2; ch++) {
+        const d = ir.getChannelData(ch);
+        for (let i = 0; i < length; i++) {
+          const t = i / length;
+          d[i] = (Math.random() * 2 - 1) * Math.exp(-t * decay);
+        }
+      }
+      return ir;
+    };
+    offlineReverb.buffer = buildOfflineIR(2.2, 3.5);
+
+    const offlineReverbGain = offlineCtx.createGain();
+    offlineReverbGain.gain.value = reverbAmount * 1.5;
+    const offlineReverbDry = offlineCtx.createGain();
+    offlineReverbDry.gain.value = Math.max(0.2, 1.0 - reverbAmount * 0.4);
+
+    postDelaySum.connect(offlineReverbDry);
+    postDelaySum.connect(offlineReverb);
+    offlineReverb.connect(offlineReverbGain);
+
+    // ── Dynamics Compressor ──
+    const offlineComp = offlineCtx.createDynamicsCompressor();
+    offlineComp.threshold.value = -18;
+    offlineComp.knee.value = 10;
+    offlineComp.ratio.value = compressorEnabled ? 4 : 1;
+    offlineComp.attack.value = 0.003;
+    offlineComp.release.value = 0.25;
+
+    offlineReverbDry.connect(offlineComp);
+    offlineReverbGain.connect(offlineComp);
+    offlineComp.connect(masterGain);
 
     // Add Every Vocal Track (Lead + Backup 1 + Backup 2...)
     for (const item of decodedVocalBuffers) {
@@ -1275,34 +1750,24 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
 
       // Track Volume Gain
       const vGain = offlineCtx.createGain();
-      vGain.gain.value = track.isMuted ? 0 : track.volume * masterVolume;
+      vGain.gain.value = track.isMuted ? 0 : track.volume;
+
+      vSource.connect(vGain);
 
       // Stereo Panner (-1.0 to +1.0)
-      const panner = offlineCtx.createStereoPanner();
-      panner.pan.value = Math.max(-1, Math.min(1, track.pan / 100));
+      if (typeof offlineCtx.createStereoPanner === 'function') {
+        try {
+          const panner = offlineCtx.createStereoPanner();
+          panner.pan.value = Math.max(-1, Math.min(1, track.pan / 100));
+          vGain.connect(panner);
+          panner.connect(vocalBus);
+        } catch (_) {
+          vGain.connect(vocalBus);
+        }
+      } else {
+        vGain.connect(vocalBus);
+      }
 
-      // 3-Band EQ Filters
-      const lowFilter = offlineCtx.createBiquadFilter();
-      lowFilter.type = 'lowshelf';
-      lowFilter.frequency.value = 120;
-      lowFilter.gain.value = eqLow;
-
-      const midFilter = offlineCtx.createBiquadFilter();
-      midFilter.type = 'peaking';
-      midFilter.frequency.value = 1500;
-      midFilter.gain.value = eqMid;
-
-      const highFilter = offlineCtx.createBiquadFilter();
-      highFilter.type = 'highshelf';
-      highFilter.frequency.value = 8000;
-      highFilter.gain.value = eqHigh;
-
-      vSource.connect(lowFilter);
-      lowFilter.connect(midFilter);
-      midFilter.connect(highFilter);
-      highFilter.connect(panner);
-      panner.connect(vGain);
-      vGain.connect(offlineCtx.destination);
       // Compensate for recording latency in master WAV mixdown
       const offsetSeconds = (track.latencyOffsetMs !== undefined ? track.latencyOffsetMs : globalLatencyMs) / 1000;
       vSource.start(0, Math.max(0, offsetSeconds));
@@ -1379,6 +1844,12 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
       formData.append(
         'effectsConfig',
         JSON.stringify({
+          autoTune: {
+            enabled: autoTuneEnabled,
+            speed: autoTuneSpeed,
+            amount: autoTuneAmount,
+            key: autoTuneKey
+          },
           reverb: reverbAmount,
           delay: delayAmount,
           eq: { low: eqLow, mid: eqMid, high: eqHigh },
@@ -1484,10 +1955,16 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
       {/* Hidden Playback Track Audio Elements */}
       {selectedTrack && (
         <audio
-          ref={beatAudioRef}
+          ref={(el) => {
+            beatAudioRef.current = el;
+            if (el) {
+              connectElToPlayback(el, 'beat', beatShouldPlay ? beatVolume : 0, beatPan);
+            }
+          }}
           src={selectedTrack.audioUrl || ''}
           preload="auto"
-          muted={!beatShouldPlay}
+          crossOrigin="anonymous"
+          playsInline
           onEnded={() => {
             setIsPlaying(false);
             setPlayheadTime(0);
@@ -1497,13 +1974,19 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
       {vocalTracks.map((t) =>
         t.vocalUrl ? (
           <audio
-            key={`${t.id}-${t.vocalUrl}`}  // Include vocalUrl so React recreates element on new recording (ensures proper load)
+            key={t.id}
             src={t.vocalUrl}
             preload="auto"
-            muted={anySolo ? !t.isSolo : t.isMuted}
+            crossOrigin="anonymous"
+            playsInline
             ref={(el) => {
-              if (el) vocalAudioRefs.current.set(t.id, el);
-              else vocalAudioRefs.current.delete(t.id);
+              if (el) {
+                vocalAudioRefs.current.set(t.id, el);
+                const trackShouldPlay = anySolo ? t.isSolo : !t.isMuted;
+                connectElToPlayback(el, t.id, trackShouldPlay ? t.volume : 0, t.pan);
+              } else {
+                vocalAudioRefs.current.delete(t.id);
+              }
             }}
             onEnded={() => {
               const anyOtherVocal = vocalTracks.some(
@@ -2426,20 +2909,28 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
                     <div className="flex items-center gap-1">
                       <button
                         type="button"
+                        onClick={() => handleSetLatency(track.id, 60)}
+                        title="Auto-Align phone mic delay (60ms)"
+                        className="px-1.5 py-0.5 rounded bg-teal-500/20 text-teal-300 hover:bg-teal-500/30 font-bold text-[9px] cursor-pointer"
+                      >
+                        ⚡ Snap 60ms
+                      </button>
+                      <button
+                        type="button"
                         onClick={() => handleNudgeLatency(track.id, -10)}
                         title="Nudge vocal earlier by 10ms (compensates for mic lag)"
-                        className="px-1 py-0.2 rounded bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white cursor-pointer"
+                        className="px-1 py-0.5 rounded bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white cursor-pointer"
                       >
                         -10ms
                       </button>
-                      <span className="w-12 text-center font-bold text-teal-300">
+                      <span className="w-11 text-center font-bold text-teal-300">
                         -{track.latencyOffsetMs !== undefined ? track.latencyOffsetMs : globalLatencyMs}ms
                       </span>
                       <button
                         type="button"
                         onClick={() => handleNudgeLatency(track.id, 10)}
                         title="Nudge vocal later by 10ms"
-                        className="px-1 py-0.2 rounded bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white cursor-pointer"
+                        className="px-1 py-0.5 rounded bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white cursor-pointer"
                       >
                         +10ms
                       </button>
@@ -2630,7 +3121,102 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
 
         {/* Tab 1: DSP Effects Rack */}
         {activeConsoleTab === 'fx' && (
-          <div className="p-3.5 grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div className="p-3.5 space-y-3">
+            {/* Auto-Tune Pro Master Module */}
+            <div className="p-3 rounded-xl bg-gradient-to-r from-teal-950/40 via-black/60 to-purple-950/30 border border-teal-500/20 space-y-2.5">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className={`inline-block w-2.5 h-2.5 rounded-full ${autoTuneEnabled ? 'bg-teal-400 shadow-[0_0_8px_rgba(45,212,191,0.8)] animate-pulse' : 'bg-zinc-600'}`} />
+                  <span className="text-xs font-bold tracking-wider text-teal-300">AUTO-TUNE PRO</span>
+                  <span className={`text-[10px] font-mono px-2 py-0.5 rounded font-bold ${
+                    autoTuneEnabled ? 'bg-teal-500/20 text-teal-200 border border-teal-500/30' : 'bg-zinc-800 text-zinc-500'
+                  }`}>
+                    {autoTuneEnabled ? `${autoTuneSpeed.toUpperCase()} PITCH-LOCK` : 'BYPASS'}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setAutoTuneEnabled(!autoTuneEnabled)}
+                  className={`px-3 py-1 rounded-md text-xs font-bold transition-all cursor-pointer ${
+                    autoTuneEnabled
+                      ? 'bg-teal-400 text-zinc-950 shadow-sm'
+                      : 'bg-zinc-800 text-zinc-400 hover:text-white'
+                  }`}
+                >
+                  {autoTuneEnabled ? 'POWER ON' : 'POWER OFF'}
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1">
+                {/* Speed selector */}
+                <div className="space-y-1">
+                  <span className="text-[10px] font-mono text-zinc-400 block">RETUNE SPEED</span>
+                  <div className="grid grid-cols-3 gap-1">
+                    {(['hard', 'fast', 'subtle'] as const).map((spd) => (
+                      <button
+                        key={spd}
+                        type="button"
+                        onClick={() => {
+                          setAutoTuneSpeed(spd);
+                          if (!autoTuneEnabled) setAutoTuneEnabled(true);
+                        }}
+                        className={`py-1 rounded text-[10px] font-bold uppercase transition-colors cursor-pointer ${
+                          autoTuneSpeed === spd && autoTuneEnabled
+                            ? 'bg-teal-500 text-zinc-950 shadow-sm'
+                            : 'bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white'
+                        }`}
+                      >
+                        {spd === 'hard' ? 'Hard' : spd === 'fast' ? 'Fast' : 'Subtle'}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Key selector */}
+                <div className="space-y-1">
+                  <span className="text-[10px] font-mono text-zinc-400 block">SCALE / KEY</span>
+                  <select
+                    value={autoTuneKey}
+                    onChange={(e) => {
+                      setAutoTuneKey(e.target.value);
+                      if (!autoTuneEnabled) setAutoTuneEnabled(true);
+                    }}
+                    className="w-full bg-zinc-900 border border-zinc-800 rounded py-1 px-2 text-[11px] text-zinc-200 focus:outline-none focus:border-teal-500 cursor-pointer"
+                  >
+                    <option value="Auto">Auto ({selectedTrack?.musicalKey || 'Beat Key'})</option>
+                    <option value="Chromatic">Chromatic (All Notes)</option>
+                    <option value="C Major">C Major / A Minor</option>
+                    <option value="D Minor">D Minor / F Major</option>
+                    <option value="F Minor">F Minor / Ab Major</option>
+                    <option value="G Major">G Major / E Minor</option>
+                    <option value="Bb Major">Bb Major / G Minor</option>
+                    <option value="Eb Major">Eb Major / C Minor</option>
+                  </select>
+                </div>
+
+                {/* Intensity Slider */}
+                <div className="space-y-1">
+                  <div className="flex justify-between text-[10px] font-mono">
+                    <span className="text-zinc-400">CORRECTION DEPTH</span>
+                    <span className="text-teal-300 font-bold">{Math.round(autoTuneAmount * 100)}%</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="0"
+                    max="1"
+                    step="0.05"
+                    value={autoTuneAmount}
+                    onChange={(e) => {
+                      setAutoTuneAmount(parseFloat(e.target.value));
+                      if (!autoTuneEnabled) setAutoTuneEnabled(true);
+                    }}
+                    className="w-full accent-teal-400 h-1.5 bg-zinc-800 rounded cursor-pointer"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             {/* Studio Reverb */}
             <div className="p-2.5 rounded-xl bg-black/40 border border-white/5 space-y-1.5">
               <div className="flex items-center justify-between text-[11px] font-bold text-teal-300">
@@ -2744,7 +3330,8 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
               <div className="text-[10px] text-gray-400">Warm vocal leveling</div>
             </div>
           </div>
-        )}
+        </div>
+      )}
 
         {/* Tab 2: Lyrics & Teleprompter */}
         {activeConsoleTab === 'lyrics' && (

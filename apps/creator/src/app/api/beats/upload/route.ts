@@ -17,11 +17,44 @@ function generateSlug(text: string) {
 
 export async function POST(req: NextRequest) {
   try {
-    const formData = await req.formData();
+    const contentType = req.headers.get('content-type') || '';
+    const isJson = contentType.includes('application/json');
+
+    let bodyData: any = {};
+    let audioFile: File | null = null;
+    let coverFile: File | null = null;
+    let stemsFile: File | null = null;
+
+    if (isJson) {
+      bodyData = await req.json();
+    } else {
+      const formData = await req.formData();
+      bodyData = {
+        producerId: formData.get('producerId') as string,
+        title: formData.get('title') as string,
+        genre: formData.get('genre') as string,
+        bpm: formData.get('bpm') as string,
+        musicalKey: formData.get('musicalKey') as string,
+        tags: formData.get('tags') as string,
+        durationSeconds: formData.get('durationSeconds') as string,
+        isFreeBeat: formData.get('isFreeBeat') === 'true',
+        enableFreeStreaming: formData.get('enableFreeStreaming') !== 'false',
+        priceBasic: formData.get('priceBasic') as string,
+        pricePremium: formData.get('pricePremium') as string,
+        priceExclusive: formData.get('priceExclusive') as string,
+        masterAudioKey: formData.get('masterAudioKey') as string,
+        stemsKey: formData.get('stemsKey') as string,
+        coverUrl: formData.get('coverUrl') as string,
+      };
+      audioFile = formData.get('audio') as File | null;
+      coverFile = (formData.get('cover') || formData.get('artwork')) as File | null;
+      stemsFile = formData.get('stems') as File | null;
+    }
+
     const supabase = getServiceRoleClient();
 
     // 1. Resolve Producer ID
-    let producerId = formData.get('producerId') as string | null;
+    let producerId = bodyData.producerId;
 
     if (!producerId) {
       // Try to read auth token from header or cookie
@@ -50,43 +83,44 @@ export async function POST(req: NextRequest) {
     }
 
     // 2. Extract Metadata
-    const title = (formData.get('title') as string) || '';
+    const title = (bodyData.title as string) || '';
     if (!title.trim()) {
       return NextResponse.json({ error: 'Title is required' }, { status: 400 });
     }
 
-    const genre = (formData.get('genre') as string) || 'Afrobeats';
-    const bpm = parseInt(formData.get('bpm') as string, 10) || 110;
-    const musicalKey = (formData.get('musicalKey') as string) || 'C Minor';
-    const tagsRaw = (formData.get('tags') as string) || '';
-    const tags = tagsRaw.split(',').map((t) => t.trim()).filter(Boolean);
-    const durationSeconds = parseInt(formData.get('durationSeconds') as string, 10) || 180;
-    const enableFreeStreaming = formData.get('enableFreeStreaming') !== 'false';
+    const genre = (bodyData.genre as string) || 'Afrobeats';
+    const bpm = parseInt(bodyData.bpm as string, 10) || 110;
+    const musicalKey = (bodyData.musicalKey as string) || 'C Minor';
+    const tagsRaw = (bodyData.tags as string) || '';
+    const tags = Array.isArray(bodyData.tags)
+      ? bodyData.tags
+      : tagsRaw.split(',').map((t: string) => t.trim()).filter(Boolean);
+    const durationSeconds = parseInt(bodyData.durationSeconds as string, 10) || 180;
+    const isFreeBeat = bodyData.isFreeBeat === true || bodyData.isFreeBeat === 'true';
+    const enableFreeStreaming = isFreeBeat ? true : (bodyData.enableFreeStreaming !== false && bodyData.enableFreeStreaming !== 'false');
 
-    const priceBasic = parseInt(formData.get('priceBasic') as string, 10) || 3000;
-    const pricePremium = parseInt(formData.get('pricePremium') as string, 10) || 30000;
-    const priceExclusive = parseInt(formData.get('priceExclusive') as string, 10) || 100000;
+    const priceBasic = isFreeBeat ? 0 : (parseInt(bodyData.priceBasic as string, 10) || 3000);
+    const pricePremium = isFreeBeat ? 0 : (parseInt(bodyData.pricePremium as string, 10) || 30000);
+    const priceExclusive = isFreeBeat ? 0 : (parseInt(bodyData.priceExclusive as string, 10) || 100000);
 
     const slug = generateSlug(title);
 
-    // 3. Upload Audio File (Required)
-    const audioFile = formData.get('audio') as File | null;
-    let masterAudioKey: string | null = null;
+    // 3. Resolve Master Audio Key
+    let masterAudioKey: string | null = bodyData.masterAudioKey || null;
 
-    if (audioFile && audioFile.size > 0) {
+    if (!masterAudioKey && audioFile && audioFile.size > 0) {
       const audioBuffer = Buffer.from(await audioFile.arrayBuffer());
       const ext = audioFile.name.split('.').pop()?.toLowerCase() || 'wav';
       masterAudioKey = `masters/${slug}_${Date.now()}.${ext}`;
       await uploadToR2(masterAudioKey, audioBuffer, audioFile.type || 'audio/wav');
-    } else {
-      // Fallback: Default caution studio master demo track if not provided
+    } else if (!masterAudioKey) {
       masterAudioKey = 'masters/alex-morgan-afrobeat-instrumental-summer-groove-573648-hubz_1791151613114.mp3';
     }
 
-    // 4. Upload Cover Art (Optional)
-    const coverFile = (formData.get('cover') || formData.get('artwork')) as File | null;
-    const requestedCoverUrl = formData.get('coverUrl') as string | null;
-    let coverUrl = requestedCoverUrl && requestedCoverUrl.trim() ? requestedCoverUrl.trim() : '/images/studio_mixing_console.jpg';
+    // 4. Resolve Cover Art
+    let coverUrl = bodyData.coverUrl && bodyData.coverUrl.trim()
+      ? bodyData.coverUrl.trim()
+      : '/images/studio_mixing_console.jpg';
 
     if (coverFile && coverFile.size > 0) {
       const coverBuffer = Buffer.from(await coverFile.arrayBuffer());
@@ -96,17 +130,16 @@ export async function POST(req: NextRequest) {
       coverUrl = `/api/media/${coverKey}`;
     }
 
-    // 5. Upload Stems Archive (Optional)
-    const stemsFile = formData.get('stems') as File | null;
-    let stemsKey: string | null = null;
+    // 5. Resolve Stems Archive
+    let stemsKey: string | null = bodyData.stemsKey || null;
 
-    if (stemsFile && stemsFile.size > 0) {
+    if (!stemsKey && stemsFile && stemsFile.size > 0) {
       const stemsBuffer = Buffer.from(await stemsFile.arrayBuffer());
       stemsKey = `stems/${slug}_${Date.now()}.zip`;
       await uploadToR2(stemsKey, stemsBuffer, 'application/zip');
     }
 
-    // 6. Insert Beat Record
+    // 6. Insert Beat Record into Supabase
     const { data: newBeat, error: beatErr } = await supabase
       .from('beats')
       .insert({
@@ -141,11 +174,19 @@ export async function POST(req: NextRequest) {
     }
 
     // 7. Insert Beat Licenses
-    await supabase.from('beat_licenses').insert([
-      { beat_id: newBeat.id, type: 'basic', price_cents: priceBasic * 100, enabled: true },
-      { beat_id: newBeat.id, type: 'premium', price_cents: pricePremium * 100, enabled: true },
-      { beat_id: newBeat.id, type: 'exclusive', price_cents: priceExclusive * 100, enabled: true }
-    ]);
+    if (isFreeBeat) {
+      await supabase.from('beat_licenses').insert([
+        { beat_id: newBeat.id, type: 'basic', price_cents: 0, enabled: true },
+        { beat_id: newBeat.id, type: 'premium', price_cents: 0, enabled: false },
+        { beat_id: newBeat.id, type: 'exclusive', price_cents: 0, enabled: false }
+      ]);
+    } else {
+      await supabase.from('beat_licenses').insert([
+        { beat_id: newBeat.id, type: 'basic', price_cents: priceBasic * 100, enabled: true },
+        { beat_id: newBeat.id, type: 'premium', price_cents: pricePremium * 100, enabled: true },
+        { beat_id: newBeat.id, type: 'exclusive', price_cents: priceExclusive * 100, enabled: true }
+      ]);
+    }
 
     return NextResponse.json({
       success: true,

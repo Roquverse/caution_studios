@@ -24,5 +24,8 @@
   },
   "devDependencies": {
     "turbo": "^2.4.4"
+  },
+  "dependencies": {
+    "@aws-sdk/s3-request-presigner": "^3.1161.0"
   }
 }
