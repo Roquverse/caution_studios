@@ -18,7 +18,8 @@ import {
   Mic,
   Disc3,
   ShieldCheck,
-  CheckCircle2
+  CheckCircle2,
+  Radio
 } from 'lucide-react';
 import { APP_URL, AUTH_LOGIN_URL, AUTH_SIGNUP_URL } from '../lib/urls';
 import { useUserSubscription } from '../lib/subscription';
@@ -498,6 +499,30 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                     </h2>
                     <p className="text-[11px] sm:text-xs text-neutral-400 line-clamp-1">
                       Directly connect with verified producers to arrange and record.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="w-7 h-7 rounded-full bg-white/[0.04] border border-white/[0.08] flex items-center justify-center text-neutral-400 group-hover:text-white group-hover:bg-[#04564f]/40 group-hover:border-[#2dd4bf]/40 transition-all shrink-0 ml-2">
+                  <ArrowUpRight className="w-3.5 h-3.5" />
+                </div>
+              </a>
+
+              {/* Feature Card 3: 10s Audio Ads & Song Promotion */}
+              <a
+                href={`${APP_URL}?tab=ads`}
+                className="group relative flex items-center justify-between p-4 rounded-2xl bg-[#121418]/80 hover:bg-[#161a20]/90 border border-white/[0.08] hover:border-[#2dd4bf]/40 backdrop-blur-xl transition-all duration-300 shadow-lg shadow-black/40 hover:-translate-y-0.5"
+              >
+                <div className="flex items-center gap-3.5">
+                  <div className="w-10 h-10 rounded-xl bg-[#04564f]/30 border border-[#2dd4bf]/20 flex items-center justify-center text-[#2dd4bf] group-hover:bg-[#04564f]/50 transition-colors">
+                    <Radio className="w-4 h-4" />
+                  </div>
+                  <div className="text-left">
+                    <h2 className="text-xs sm:text-sm font-semibold text-white tracking-wide group-hover:text-[#2dd4bf] transition-colors">
+                      10s Audio Ads &amp; Song Promo
+                    </h2>
+                    <p className="text-[11px] sm:text-xs text-neutral-400 line-clamp-1">
+                      Upload a 10-sec snippet with links to Spotify, Apple Music &amp; Audiomack.
                     </p>
                   </div>
                 </div>

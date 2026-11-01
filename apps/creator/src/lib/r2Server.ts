@@ -48,8 +48,7 @@ export async function deleteFromR2(key: string) {
 export async function getPresignedUploadUrl(key: string, contentType?: string, expiresIn = 3600): Promise<string> {
   const command = new PutObjectCommand({
     Bucket: R2_BUCKET,
-    Key: key,
-    ContentType: contentType || 'application/octet-stream'
+    Key: key
   });
   return await getSignedUrl(r2, command, { expiresIn });
 }

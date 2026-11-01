@@ -174,11 +174,13 @@ export async function POST(req: NextRequest) {
     }
 
     // 7. Insert Beat Licenses
+    // Note: price_cents has a DB check (price_cents > 0), so free beats use price_cents: 1
+    // (₦0.01 placeholder) with enabled: false for paid tiers, free tier enabled: true.
     if (isFreeBeat) {
       await supabase.from('beat_licenses').insert([
-        { beat_id: newBeat.id, type: 'basic', price_cents: 0, enabled: true },
-        { beat_id: newBeat.id, type: 'premium', price_cents: 0, enabled: false },
-        { beat_id: newBeat.id, type: 'exclusive', price_cents: 0, enabled: false }
+        { beat_id: newBeat.id, type: 'basic', price_cents: 1, enabled: true },
+        { beat_id: newBeat.id, type: 'premium', price_cents: 1, enabled: false },
+        { beat_id: newBeat.id, type: 'exclusive', price_cents: 1, enabled: false }
       ]);
     } else {
       await supabase.from('beat_licenses').insert([

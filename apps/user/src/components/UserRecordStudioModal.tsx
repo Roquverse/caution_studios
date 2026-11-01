@@ -225,6 +225,9 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
   const [masterMeterL, setMasterMeterL] = useState(0);
   const [masterMeterR, setMasterMeterR] = useState(0);
 
+  // DSP Console: collapsed by default on mobile to free up track timeline space
+  const [isConsoleOpen, setIsConsoleOpen] = useState(false);
+
   // DSP Effects (Auto-Tune Pro, Reverb, Delay, EQ, Compressor)
   const [autoTuneEnabled, setAutoTuneEnabled] = useState(true);
   const [autoTuneSpeed, setAutoTuneSpeed] = useState<'hard' | 'fast' | 'subtle'>('fast');
@@ -1072,10 +1075,10 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
       const anySolo = vocalTracks.some((t) => t.isSolo) || beatSolo;
       const t = vocalTracks.find((tr) => tr.id === trackId);
       const trackShouldPlay = anySolo ? (t?.isSolo ?? false) : !(t?.isMuted ?? false);
-      nodes.gain.gain.setValueAtTime(
-        trackShouldPlay ? Math.max(0, Math.min(2, val)) : 0,
-        ctx.currentTime
-      );
+      const targetGain = trackShouldPlay ? Math.max(0, Math.min(2, val)) : 0;
+      // Set .value directly for instant mobile response, then schedule via setValueAtTime
+      nodes.gain.gain.value = targetGain;
+      nodes.gain.gain.setValueAtTime(targetGain, ctx.currentTime);
     }
 
     // HTMLAudioElement volume fallback
@@ -3071,14 +3074,27 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
           4. BOTTOM DAW DSP EFFECTS RACK & STUDIO CONSOLE
          ========================================================================= */}
       <div className="w-full bg-[#0B0E17] border-t border-white/10 flex flex-col text-xs shrink-0">
-        {/* Console Navigation Tabs */}
+        {/* Console Navigation Tabs + Collapse Toggle */}
         <div className="px-4 py-1.5 bg-[#0F131E] border-b border-white/10 flex items-center justify-between">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* Collapse / Expand toggle — especially useful on mobile */}
             <button
               type="button"
-              onClick={() => setActiveConsoleTab('fx')}
+              onClick={() => setIsConsoleOpen((prev) => !prev)}
+              title={isConsoleOpen ? 'Collapse FX Rack' : 'Expand FX Rack'}
+              className="flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-bold text-gray-400 hover:text-teal-300 hover:bg-teal-500/10 transition-colors cursor-pointer border border-transparent hover:border-teal-500/20"
+            >
+              <ChevronDown
+                className={`h-3.5 w-3.5 transition-transform duration-200 ${isConsoleOpen ? 'rotate-180' : ''}`}
+              />
+              <span className="hidden sm:inline">{isConsoleOpen ? 'Hide' : 'Show'} FX</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => { setActiveConsoleTab('fx'); setIsConsoleOpen(true); }}
               className={`px-3 py-1 rounded-md text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5 ${
-                activeConsoleTab === 'fx'
+                activeConsoleTab === 'fx' && isConsoleOpen
                   ? 'bg-teal-500/20 text-teal-300 border border-teal-500/30'
                   : 'text-gray-400 hover:text-white'
               }`}
@@ -3089,9 +3105,9 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
 
             <button
               type="button"
-              onClick={() => setActiveConsoleTab('lyrics')}
+              onClick={() => { setActiveConsoleTab('lyrics'); setIsConsoleOpen(true); }}
               className={`px-3 py-1 rounded-md text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5 ${
-                activeConsoleTab === 'lyrics'
+                activeConsoleTab === 'lyrics' && isConsoleOpen
                   ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30'
                   : 'text-gray-400 hover:text-white'
               }`}
@@ -3102,9 +3118,9 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
 
             <button
               type="button"
-              onClick={() => setActiveConsoleTab('cloud')}
+              onClick={() => { setActiveConsoleTab('cloud'); setIsConsoleOpen(true); }}
               className={`px-3 py-1 rounded-md text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5 ${
-                activeConsoleTab === 'cloud'
+                activeConsoleTab === 'cloud' && isConsoleOpen
                   ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
                   : 'text-gray-400 hover:text-white'
               }`}
@@ -3114,14 +3130,14 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
             </button>
           </div>
 
-          <div className="text-[10px] font-mono text-gray-500">
+          <div className="text-[10px] font-mono text-gray-500 hidden sm:block">
             STEREO HARMONY MATRIX: ACTIVE · 48kHz 24-BIT
           </div>
         </div>
 
         {/* Tab 1: DSP Effects Rack */}
-        {activeConsoleTab === 'fx' && (
-          <div className="p-3.5 space-y-3">
+        {isConsoleOpen && activeConsoleTab === 'fx' && (
+          <div className="p-3.5 space-y-3 max-h-[45vh] overflow-y-auto overscroll-contain">
             {/* Auto-Tune Pro Master Module */}
             <div className="p-3 rounded-xl bg-gradient-to-r from-teal-950/40 via-black/60 to-purple-950/30 border border-teal-500/20 space-y-2.5">
               <div className="flex items-center justify-between">
@@ -3334,8 +3350,8 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
       )}
 
         {/* Tab 2: Lyrics & Teleprompter */}
-        {activeConsoleTab === 'lyrics' && (
-          <div className="p-3">
+        {isConsoleOpen && activeConsoleTab === 'lyrics' && (
+          <div className="p-3 max-h-[45vh] overflow-y-auto overscroll-contain">
             <textarea
               value={lyricsText}
               onChange={(e) => setLyricsText(e.target.value)}
@@ -3347,8 +3363,8 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
         )}
 
         {/* Tab 3: Cloud Sync & Stems */}
-        {activeConsoleTab === 'cloud' && (
-          <div className="p-3 space-y-2">
+        {isConsoleOpen && activeConsoleTab === 'cloud' && (
+          <div className="p-3 space-y-2 max-h-[45vh] overflow-y-auto overscroll-contain">
             {cloudSaveResult ? (
               <div className="p-3 rounded-xl bg-teal-500/10 border border-teal-500/30 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
                 <div className="flex items-center gap-2.5">
