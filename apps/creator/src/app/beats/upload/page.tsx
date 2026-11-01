@@ -34,7 +34,7 @@ export default function BeatUploadPage() {
   const [bpm, setBpm] = useState('110');
   const [musicalKey, setMusicalKey] = useState('F Minor');
   const [tags, setTags] = useState('Burnaboy, Asake, Wizkid, Summer');
-  const [priceBasic, setPriceBasic] = useState('3000');
+  const [priceBasic, setPriceBasic] = useState('20000');
   const [pricePremium, setPricePremium] = useState('30000');
   const [priceExclusive, setPriceExclusive] = useState('100000');
   const [enableFreeStreaming, setEnableFreeStreaming] = useState(true);
@@ -485,10 +485,11 @@ export default function BeatUploadPage() {
                 <span className="text-[10px] font-mono text-zinc-500">80% Producer Cut</span>
               </div>
               <p className="text-[11px] text-zinc-400">
-                Set separate license prices for upcoming artists (Starter), commercial record labels (Premium), and exclusive buyers.
+                Set your preferred minimum price for each license tier. Artists pay at least this amount — you can always raise it, never lower it below your minimum.
               </p>
 
               <div className="space-y-3">
+                {/* Starter / Basic */}
                 <div className="p-3 rounded-md bg-zinc-950 border border-zinc-800">
                   <div className="flex justify-between items-center mb-1">
                     <label className="text-xs font-bold text-zinc-200">
@@ -496,15 +497,23 @@ export default function BeatUploadPage() {
                     </label>
                     <span className="text-[10px] text-zinc-400 font-mono">100k streams</span>
                   </div>
-                  <input
-                    type="number"
-                    value={priceBasic}
-                    onChange={(e) => setPriceBasic(e.target.value)}
-                    className="w-full bg-zinc-900 border border-zinc-800 rounded-md py-1.5 px-3 text-xs text-zinc-100 font-mono focus:outline-none focus:border-zinc-700"
-                  />
-                  <span className="text-[10px] text-zinc-500 mt-1 block">Your cut (80%): ₦{((Number(priceBasic) || 0) * 0.8).toLocaleString()}</span>
+                  <div className="relative flex items-center">
+                    <span className="absolute left-3 text-xs text-zinc-400 font-mono pointer-events-none">₦</span>
+                    <input
+                      type="number"
+                      min="1000"
+                      value={priceBasic}
+                      onChange={(e) => setPriceBasic(e.target.value)}
+                      className="w-full bg-zinc-900 border border-zinc-800 rounded-md py-1.5 pl-7 pr-8 text-xs text-zinc-100 font-mono focus:outline-none focus:border-zinc-700"
+                    />
+                    <span className="absolute right-3 text-sm font-bold text-[#2dd4bf] pointer-events-none">+</span>
+                  </div>
+                  <span className="text-[10px] text-zinc-500 mt-1 block">
+                    Your cut (80%): ₦{((Number(priceBasic) || 0) * 0.8).toLocaleString()} · min price, artist pays ₦{Number(priceBasic).toLocaleString()}+
+                  </span>
                 </div>
 
+                {/* Premium */}
                 <div className="p-3 rounded-md bg-zinc-950 border border-[#2dd4bf]/30">
                   <div className="flex justify-between items-center mb-1">
                     <label className="text-xs font-bold text-[#2dd4bf]">
@@ -512,15 +521,23 @@ export default function BeatUploadPage() {
                     </label>
                     <span className="text-[10px] text-[#2dd4bf] font-mono">500k streams</span>
                   </div>
-                  <input
-                    type="number"
-                    value={pricePremium}
-                    onChange={(e) => setPricePremium(e.target.value)}
-                    className="w-full bg-zinc-900 border border-zinc-800 rounded-md py-1.5 px-3 text-xs text-zinc-100 font-mono focus:outline-none focus:border-zinc-700"
-                  />
-                  <span className="text-[10px] text-zinc-500 mt-1 block">Your cut (80%): ₦{((Number(pricePremium) || 0) * 0.8).toLocaleString()}</span>
+                  <div className="relative flex items-center">
+                    <span className="absolute left-3 text-xs text-zinc-400 font-mono pointer-events-none">₦</span>
+                    <input
+                      type="number"
+                      min="5000"
+                      value={pricePremium}
+                      onChange={(e) => setPricePremium(e.target.value)}
+                      className="w-full bg-zinc-900 border border-zinc-800 rounded-md py-1.5 pl-7 pr-8 text-xs text-zinc-100 font-mono focus:outline-none focus:border-zinc-700"
+                    />
+                    <span className="absolute right-3 text-sm font-bold text-[#2dd4bf] pointer-events-none">+</span>
+                  </div>
+                  <span className="text-[10px] text-zinc-500 mt-1 block">
+                    Your cut (80%): ₦{((Number(pricePremium) || 0) * 0.8).toLocaleString()} · min price, artist pays ₦{Number(pricePremium).toLocaleString()}+
+                  </span>
                 </div>
 
+                {/* Exclusive */}
                 <div className="p-3 rounded-md bg-zinc-950 border border-purple-500/30">
                   <div className="flex justify-between items-center mb-1">
                     <label className="text-xs font-bold text-purple-300">
@@ -528,13 +545,20 @@ export default function BeatUploadPage() {
                     </label>
                     <span className="text-[10px] text-purple-300 font-mono">Unlimited Master</span>
                   </div>
-                  <input
-                    type="number"
-                    value={priceExclusive}
-                    onChange={(e) => setPriceExclusive(e.target.value)}
-                    className="w-full bg-zinc-900 border border-zinc-800 rounded-md py-1.5 px-3 text-xs text-purple-200 font-mono font-bold focus:outline-none focus:border-zinc-700"
-                  />
-                  <span className="text-[10px] text-zinc-500 mt-1 block">Your cut (80%): ₦{((Number(priceExclusive) || 0) * 0.8).toLocaleString()} · Permanently removed from store</span>
+                  <div className="relative flex items-center">
+                    <span className="absolute left-3 text-xs text-zinc-400 font-mono pointer-events-none">₦</span>
+                    <input
+                      type="number"
+                      min="50000"
+                      value={priceExclusive}
+                      onChange={(e) => setPriceExclusive(e.target.value)}
+                      className="w-full bg-zinc-900 border border-zinc-800 rounded-md py-1.5 pl-7 pr-8 text-xs text-purple-200 font-mono font-bold focus:outline-none focus:border-zinc-700"
+                    />
+                    <span className="absolute right-3 text-sm font-bold text-purple-400 pointer-events-none">+</span>
+                  </div>
+                  <span className="text-[10px] text-zinc-500 mt-1 block">
+                    Your cut (80%): ₦{((Number(priceExclusive) || 0) * 0.8).toLocaleString()} · Permanently removed from store
+                  </span>
                 </div>
               </div>
             </div>

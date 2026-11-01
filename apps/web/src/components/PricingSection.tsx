@@ -31,7 +31,7 @@ export const PricingSection: React.FC<PricingSectionProps> = ({ onSelectPlan }) 
       id: 'premium',
       name: 'Premium Beat Plan',
       badge: 'Recommended',
-      price: '₦30,000',
+      price: '₦30,000+',
       period: 'one-time',
       description: 'For artists building a serious commercial catalog',
       isRecommended: true,
@@ -40,14 +40,15 @@ export const PricingSection: React.FC<PricingSectionProps> = ({ onSelectPlan }) 
         'Full Trackout Stems included',
         'Up to 500,000 monetized streams',
         'Radio airplay & music video sync',
-        '100% Royalty keeping on releases',
+        '100% Royalty keeping on your releases',
+        'Producer earns 20% royalties on song releases (optional)',
         'Automated Content ID clearance'
       ]
     },
     {
       id: 'exclusive',
       name: 'Exclusive Rights Plan',
-      price: '₦100,000',
+      price: '₦100,000+',
       period: 'one-time',
       description: 'Full master ownership & unlimited commercial reach',
       isRecommended: false,
@@ -111,8 +112,11 @@ export const PricingSection: React.FC<PricingSectionProps> = ({ onSelectPlan }) 
                 {/* Price Display */}
                 <div className="mt-6 flex items-baseline gap-1.5 pb-6 border-b border-gray-100">
                   <span className="text-3xl sm:text-4xl font-black text-gray-950">
-                    {plan.price}
+                    {plan.price.replace('+', '')}
                   </span>
+                  {plan.price.endsWith('+') && (
+                    <span className="text-xl font-black text-[#04564f]">+</span>
+                  )}
                   <span className="text-xs text-gray-400 font-medium">
                     {plan.period}
                   </span>
@@ -123,12 +127,21 @@ export const PricingSection: React.FC<PricingSectionProps> = ({ onSelectPlan }) 
                   <span className="text-[11px] font-bold uppercase tracking-wider text-gray-400 block">
                     What&apos;s Included:
                   </span>
-                  {plan.features.map((feat, idx) => (
-                    <div key={idx} className="flex items-start gap-2.5 text-xs text-gray-700">
-                      <Check className="h-4 w-4 text-[#04564f] shrink-0 stroke-[2.5] mt-0.5" />
-                      <span className="leading-snug">{feat}</span>
-                    </div>
-                  ))}
+                  {plan.features.map((feat, idx) => {
+                    const isOptional = feat.includes('(optional)');
+                    const label = feat.replace(' (optional)', '');
+                    return (
+                      <div key={idx} className="flex items-start gap-2.5 text-xs text-gray-700">
+                        <Check className={`h-4 w-4 shrink-0 stroke-[2.5] mt-0.5 ${isOptional ? 'text-gray-300' : 'text-[#04564f]'}`} />
+                        <span className={`leading-snug ${isOptional ? 'text-gray-400 italic' : ''}`}>
+                          {label}
+                          {isOptional && (
+                            <span className="ml-1 text-[10px] not-italic font-semibold text-[#04564f] bg-[#04564f]/10 px-1.5 py-0.5 rounded-full">optional</span>
+                          )}
+                        </span>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
 

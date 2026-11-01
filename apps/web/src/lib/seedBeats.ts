@@ -59,8 +59,8 @@ export const SEEDED_PRODUCERS = [
     roles: ['producer'] as any,
     primary_role: 'producer' as any,
     plan: 'plus' as any,
-    is_verified: false, // Has beat sales, but NOT YET verified because streaming earnings < ₦50,000 threshold
-    verification_reason: 'Unverified Beat Seller: Has sold 42 licenses, but pending ₦50,000 milestone from free streaming plays.',
+    is_verified: false, // Has beat sales, but NOT YET verified because streaming earnings < ₦60,000 threshold
+    verification_reason: 'Unverified Beat Seller: Has sold 42 licenses, but pending ₦60,000 milestone from free streaming plays.',
     streaming_earnings_cents: 1420000, // ₦14,200 (under ₦50,000 threshold)
     streaming_streams_count: 12300,
     stripe_payouts_enabled: true,
@@ -77,7 +77,7 @@ export const SEEDED_PRODUCERS = [
     primary_role: 'producer' as any,
     plan: 'plus' as any,
     is_verified: false, // Beat seller, not yet qualified from free streaming earnings
-    verification_reason: 'Unverified Beat Seller: Free beat streaming royalties under ₦50,000 verification minimum.',
+    verification_reason: 'Unverified Beat Seller: Free beat streaming royalties under ₦60,000 verification minimum.',
     streaming_earnings_cents: 850000, // ₦8,500
     streaming_streams_count: 7400,
     stripe_payouts_enabled: true,

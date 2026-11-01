@@ -152,7 +152,7 @@ export default function AboutPage() {
                   </div>
                   <div className="flex items-start gap-2.5 text-xs text-gray-300">
                     <CheckCircle2 className="h-4 w-4 text-teal-400 shrink-0 mt-0.5" />
-                    <span><strong>Verified Producer badge</strong> when reaching ₦50,000 monthly streaming threshold.</span>
+                    <span><strong>Verified Producer badge</strong> when reaching ₦60,000 monthly streaming threshold.</span>
                   </div>
                 </div>
 
