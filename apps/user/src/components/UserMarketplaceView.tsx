@@ -99,7 +99,7 @@ export function UserMarketplaceView({
   const [sortBy, setSortBy] = useState<'popular' | 'newest' | 'bpm'>('popular');
 
   // License dropdown selection per beat: 'standard' vs 'exclusive'
-  const [selectedTiers, setSelectedTiers] = useState<Record<string, 'standard' | 'exclusive'>>({});
+  const [selectedTiers, setSelectedTiers] = useState<Record<string, 'premium' | 'exclusive'>>({});
   const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
 
   // Read URL query params on mount
@@ -119,7 +119,7 @@ export function UserMarketplaceView({
 
   // License Modal State
   const [licenseModalTrack, setLicenseModalTrack] = useState<TrackItem | null>(null);
-  const [selectedTier, setSelectedTier] = useState<'basic' | 'premium' | 'exclusive'>('basic');
+  const [selectedTier, setSelectedTier] = useState<'premium' | 'exclusive'>('premium');
   const [purchaseSuccess, setPurchaseSuccess] = useState(false);
 
   // Close open dropdown on outside click
@@ -303,7 +303,7 @@ export function UserMarketplaceView({
           }`}
         >
           <Zap className="h-3.5 w-3.5" />
-          <span>Standard / Leases</span>
+          <span>Premium / Stems</span>
         </button>
 
         <button
@@ -429,8 +429,8 @@ export function UserMarketplaceView({
               const isFree = isFreeBeat(row);
 
               // License tier choice for priced beat
-              const activeTier = selectedTiers[row.id] || 'standard';
-              const standardPrice = row.priceNgn && row.priceNgn > 0 ? row.priceNgn : 3000;
+              const activeTier = selectedTiers[row.id] || 'premium';
+              const premiumPrice = Math.max(15000, (row.priceNgn && row.priceNgn > 0 ? row.priceNgn : 5000) * 3);
               const exclusivePrice = row.exclusivePriceNgn && row.exclusivePriceNgn > 0 ? row.exclusivePriceNgn : 50000;
               const isDropdownOpen = openDropdownId === row.id;
 
@@ -501,8 +501,8 @@ export function UserMarketplaceView({
                             e.stopPropagation();
                             setOpenDropdownId(isDropdownOpen ? null : row.id);
                           }}
-                          title="Select License: Standard or Exclusive"
-                          className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border flex items-center justify-between gap-1.5 transition-all shadow-sm cursor-pointer min-w-[135px] max-w-[155px] ${
+                          title="Select License: Premium Stems or Exclusive"
+                          className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border flex items-center justify-between gap-1.5 transition-all shadow-sm cursor-pointer min-w-[145px] max-w-[170px] ${
                             activeTier === 'exclusive'
                               ? 'bg-purple-500/15 text-purple-300 border-purple-500/30 hover:bg-purple-500/25'
                               : 'bg-amber-500/15 text-amber-300 border-amber-500/30 hover:bg-amber-500/25'
@@ -515,10 +515,10 @@ export function UserMarketplaceView({
                               <ShieldCheck className="h-3 w-3 text-amber-400 shrink-0" />
                             )}
                             <span className="truncate">
-                              {activeTier === 'exclusive' ? 'Exclusive' : 'Standard'}
+                              {activeTier === 'exclusive' ? 'Exclusive' : 'Premium Stems'}
                             </span>
                             <span className="text-[10px] opacity-80 font-mono">
-                              · {formatPriceBadge(activeTier === 'exclusive' ? exclusivePrice : standardPrice)}
+                              · {formatPriceBadge(activeTier === 'exclusive' ? exclusivePrice : premiumPrice)}
                             </span>
                           </div>
                           <ChevronDown
@@ -538,15 +538,15 @@ export function UserMarketplaceView({
                               Choose License Tier
                             </div>
 
-                            {/* Standard Option */}
+                            {/* Premium WAV + Stems */}
                             <button
                               type="button"
                               onClick={() => {
-                                setSelectedTiers((prev) => ({ ...prev, [row.id]: 'standard' }));
+                                setSelectedTiers((prev) => ({ ...prev, [row.id]: 'premium' }));
                                 setOpenDropdownId(null);
                               }}
                               className={`w-full p-2 rounded-lg text-left transition-colors flex items-center justify-between cursor-pointer ${
-                                activeTier === 'standard'
+                                activeTier === 'premium'
                                   ? 'bg-amber-500/15 text-amber-300 border border-amber-500/30'
                                   : 'hover:bg-white/5 text-gray-300'
                               }`}
@@ -554,17 +554,17 @@ export function UserMarketplaceView({
                               <div className="min-w-0 pr-2">
                                 <div className="flex items-center gap-1.5 text-xs font-bold text-white">
                                   <ShieldCheck className="h-3.5 w-3.5 text-amber-400 shrink-0" />
-                                  <span>Standard Lease</span>
-                                  {activeTier === 'standard' && (
+                                  <span>Premium WAV + Stems</span>
+                                  {activeTier === 'premium' && (
                                     <Check className="h-3 w-3 text-amber-400 ml-auto" />
                                   )}
                                 </div>
                                 <div className="text-[10px] text-gray-400 mt-0.5 truncate">
-                                  Commercial MP3/WAV Master
+                                  24-Bit WAV Master + Trackout ZIP Stems
                                 </div>
                               </div>
                               <span className="text-xs font-black text-amber-300 font-mono shrink-0">
-                                ₦{standardPrice.toLocaleString()}
+                                ₦{premiumPrice.toLocaleString()}
                               </span>
                             </button>
 
@@ -669,7 +669,7 @@ export function UserMarketplaceView({
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation();
-                          setSelectedTier(activeTier === 'exclusive' ? 'exclusive' : 'basic');
+                          setSelectedTier(activeTier === 'exclusive' ? 'exclusive' : 'premium');
                           setLicenseModalTrack(row);
                         }}
                         className={`px-3 py-1.5 rounded-lg text-xs font-black uppercase tracking-wider flex items-center gap-1.5 transition-transform hover:scale-105 shadow-sm cursor-pointer ${
@@ -723,26 +723,6 @@ export function UserMarketplaceView({
 
             {/* License Tier Selector */}
             <div className="mt-5 space-y-2.5">
-              {/* Basic License */}
-              <div
-                onClick={() => setSelectedTier('basic')}
-                className={`p-3.5 rounded-xl border transition-all cursor-pointer ${
-                  selectedTier === 'basic'
-                    ? 'border-teal-400 bg-teal-400/10'
-                    : 'border-white/10 bg-white/[0.02] hover:bg-white/[0.05]'
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <div>
-                    <span className="text-xs font-black text-white block">Standard Commercial Lease</span>
-                    <span className="text-[11px] text-gray-400">MP3 & WAV Master · 50,000 Streams · 1 Commercial Music Video</span>
-                  </div>
-                  <span className="text-sm font-black text-teal-400">
-                    ₦{(licenseModalTrack.priceNgn || 3000).toLocaleString()}
-                  </span>
-                </div>
-              </div>
-
               {/* Premium License */}
               <div
                 onClick={() => setSelectedTier('premium')}
@@ -825,7 +805,7 @@ export function UserMarketplaceView({
                 >
                   <ShoppingBag className="h-4 w-4" />
                   <span>
-                    Confirm & License {selectedTier === 'basic' ? `₦${(licenseModalTrack.priceNgn || 3000).toLocaleString()}` : selectedTier === 'premium' ? `₦${Math.max(15000, (licenseModalTrack.priceNgn || 3000) * 3).toLocaleString()}` : `₦${(licenseModalTrack.exclusivePriceNgn || 50000).toLocaleString()}`}
+                    Confirm & License {selectedTier === 'exclusive' ? `₦${(licenseModalTrack.exclusivePriceNgn || 50000).toLocaleString()}` : `₦${Math.max(15000, (licenseModalTrack.priceNgn || 3000) * 3).toLocaleString()}`}
                   </span>
                 </button>
               )}

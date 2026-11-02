@@ -98,7 +98,7 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
   const [isDownloadLimitModalOpen, setIsDownloadLimitModalOpen] = useState(false);
   const [rewardNotification, setRewardNotification] = useState<string | null>(null);
   const [paidBeatPurchaseTrack, setPaidBeatPurchaseTrack] = useState<TrackItem | null>(null);
-  const [purchaseTier, setPurchaseTier] = useState<'basic' | 'premium' | 'exclusive'>('basic');
+  const [purchaseTier, setPurchaseTier] = useState<'premium' | 'exclusive'>('premium');
   const [purchaseComplete, setPurchaseComplete] = useState(false);
   const downloadQuota = useDailyDownloadQuota();
   const router = useRouter();
@@ -751,9 +751,13 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
   return (
     <div className="min-h-screen bg-[#111214] text-[#eceef2] flex flex-col font-sans selection:bg-[#2bbbad] selection:text-black pb-20">
       {/* HTML5 Audio Element for Real Streaming from Cloudflare R2 & Database */}
+      {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
       <audio
         ref={audioRef}
         preload="metadata"
+        controlsList="nodownload noplaybackrate"
+        {...({ disableRemotePlayback: true } as React.AudioHTMLAttributes<HTMLAudioElement>)}
+        onContextMenu={(e) => e.preventDefault()}
         onPlay={() => {
           audioSynth.stop();
         }}
@@ -766,6 +770,14 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
           const limit = isSubscribed || !isPaid
             ? currentTrack.durationSeconds
             : Math.min(FREE_PREVIEW_LIMIT_SECONDS, currentTrack.durationSeconds);
+
+          // Audio watermark anti-rip protection: watermark pulse at 10s and 22s during paid preview
+          if (isPaid && !isSubscribed) {
+            const roundedSec = Math.floor(sec);
+            if (roundedSec === 10 || roundedSec === 22) {
+              audioSynth.playPreviewWatermark();
+            }
+          }
 
           // If track reaches 20 seconds and hasn't been counted for this session, store the count
           if (sec >= 20 && activeListenSessionRef.current !== currentTrack.id) {
@@ -1263,16 +1275,18 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
                               <Heart className="h-3.5 w-3.5 fill-red-500" />
                             </button>
 
-                            <button
-                              type="button"
-                              onClick={(e) => handleDownload(row, e)}
-                              title="Download Song (WAV)"
-                              className={`p-1.5 rounded-full transition-colors cursor-pointer ${
-                                downloadingId === row.id ? 'text-[#2dd4bf] bg-[#2dd4bf]/10 animate-pulse' : 'text-gray-500 hover:text-white hover:bg-white/10'
-                              }`}
-                            >
-                              <Download className="h-3.5 w-3.5" />
-                            </button>
+                            {isFreeBeat(row) && (
+                              <button
+                                type="button"
+                                onClick={(e) => handleDownload(row, e)}
+                                title="Download Song (WAV)"
+                                className={`p-1.5 rounded-full transition-colors cursor-pointer ${
+                                  downloadingId === row.id ? 'text-[#2dd4bf] bg-[#2dd4bf]/10 animate-pulse' : 'text-gray-500 hover:text-white hover:bg-white/10'
+                                }`}
+                              >
+                                <Download className="h-3.5 w-3.5" />
+                              </button>
+                            )}
 
                             <button
                               type="button"
@@ -1430,16 +1444,18 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
                               <Heart className={`h-3.5 w-3.5 ${row.isLiked || likedTrackIds.includes(row.id) ? 'fill-red-500 text-red-500' : ''}`} />
                             </button>
 
-                            <button
-                              type="button"
-                              onClick={(e) => handleDownload(row, e)}
-                              title="Download Song (WAV)"
-                              className={`p-1.5 rounded-full transition-colors cursor-pointer ${
-                                downloadingId === row.id ? 'text-[#2dd4bf] bg-[#2dd4bf]/10 animate-pulse' : 'text-gray-500 hover:text-white hover:bg-white/10'
-                              }`}
-                            >
-                              <Download className="h-3.5 w-3.5" />
-                            </button>
+                            {isFreeBeat(row) && (
+                              <button
+                                type="button"
+                                onClick={(e) => handleDownload(row, e)}
+                                title="Download Song (WAV)"
+                                className={`p-1.5 rounded-full transition-colors cursor-pointer ${
+                                  downloadingId === row.id ? 'text-[#2dd4bf] bg-[#2dd4bf]/10 animate-pulse' : 'text-gray-500 hover:text-white hover:bg-white/10'
+                                }`}
+                              >
+                                <Download className="h-3.5 w-3.5" />
+                              </button>
+                            )}
 
                             <button
                               type="button"
@@ -1604,16 +1620,18 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
                               <Heart className={`h-3.5 w-3.5 ${row.isLiked || likedTrackIds.includes(row.id) ? 'fill-red-500 text-red-500' : ''}`} />
                             </button>
 
-                            <button
-                              type="button"
-                              onClick={(e) => handleDownload(row, e)}
-                              title="Download Song (WAV)"
-                              className={`p-1.5 rounded-full transition-colors cursor-pointer ${
-                                downloadingId === row.id ? 'text-[#2dd4bf] bg-[#2dd4bf]/10 animate-pulse' : 'text-gray-500 hover:text-white hover:bg-white/10'
-                              }`}
-                            >
-                              <Download className="h-3.5 w-3.5" />
-                            </button>
+                            {isFreeBeat(row) && (
+                              <button
+                                type="button"
+                                onClick={(e) => handleDownload(row, e)}
+                                title="Download Song (WAV)"
+                                className={`p-1.5 rounded-full transition-colors cursor-pointer ${
+                                  downloadingId === row.id ? 'text-[#2dd4bf] bg-[#2dd4bf]/10 animate-pulse' : 'text-gray-500 hover:text-white hover:bg-white/10'
+                                }`}
+                              >
+                                <Download className="h-3.5 w-3.5" />
+                              </button>
+                            )}
 
                             <button
                               type="button"
@@ -1810,11 +1828,27 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
                             )}
                           </div>
                           <div className="min-w-0">
-                            <p className={`text-xs font-bold truncate ${isThisPlaying ? 'text-[#2dd4bf]' : 'text-white'}`}>
-                              {row.title}
-                            </p>
-                            <p className="text-[11px] text-gray-500 truncate mt-0.5">
-                              {row.artist}
+                            <div className="flex items-center gap-1.5">
+                              <p className={`text-xs font-bold truncate ${isThisPlaying ? 'text-[#2dd4bf]' : 'text-white'}`}>
+                                {row.title}
+                              </p>
+                              {!isFreeBeat(row) ? (
+                                <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30 shrink-0 font-mono">
+                                  PAID
+                                </span>
+                              ) : (
+                                <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 shrink-0 font-mono">
+                                  FREE
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-[11px] text-gray-500 truncate mt-0.5 flex items-center gap-1.5">
+                              <span>{row.artist}</span>
+                              {!isFreeBeat(row) && row.priceNgn && (
+                                <span className="text-[10px] text-amber-400 font-mono font-bold">
+                                  · ₦{row.priceNgn.toLocaleString()}
+                                </span>
+                              )}
                             </p>
                           </div>
                         </div>
@@ -1863,16 +1897,18 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
                             <Heart className={`h-3.5 w-3.5 ${row.isLiked || likedTrackIds.includes(row.id) ? 'fill-red-500 text-red-500' : ''}`} />
                           </button>
 
-                          <button
-                            type="button"
-                            onClick={(e) => handleDownload(row, e)}
-                            title="Download Song (WAV)"
-                            className={`p-1.5 rounded-full transition-colors cursor-pointer ${
-                              downloadingId === row.id ? 'text-[#2dd4bf] bg-[#2dd4bf]/10 animate-pulse' : 'text-gray-500 hover:text-white hover:bg-white/10'
-                            }`}
-                          >
-                            <Download className="h-3.5 w-3.5" />
-                          </button>
+                          {isFreeBeat(row) && (
+                            <button
+                              type="button"
+                              onClick={(e) => handleDownload(row, e)}
+                              title="Download Song (WAV)"
+                              className={`p-1.5 rounded-full transition-colors cursor-pointer ${
+                                downloadingId === row.id ? 'text-[#2dd4bf] bg-[#2dd4bf]/10 animate-pulse' : 'text-gray-500 hover:text-white hover:bg-white/10'
+                              }`}
+                            >
+                              <Download className="h-3.5 w-3.5" />
+                            </button>
+                          )}
 
                           <button
                             type="button"
@@ -2072,16 +2108,18 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
                       >
                         <Heart className={`h-3.5 w-3.5 ${track.isLiked || likedTrackIds.includes(track.id) ? 'fill-red-500 text-red-500' : ''}`} />
                       </button>
-                      <button
-                        type="button"
-                        onClick={(e) => handleDownload(track, e)}
-                        className={`p-1 transition-colors cursor-pointer ${
-                          downloadingId === track.id ? 'text-[#2dd4bf]' : 'text-gray-500 hover:text-white'
-                        }`}
-                        title="Download Song (WAV)"
-                      >
-                        <Download className="h-3.5 w-3.5" />
-                      </button>
+                      {isFreeBeat(track) && (
+                        <button
+                          type="button"
+                          onClick={(e) => handleDownload(track, e)}
+                          className={`p-1 transition-colors cursor-pointer ${
+                            downloadingId === track.id ? 'text-[#2dd4bf]' : 'text-gray-500 hover:text-white'
+                          }`}
+                          title="Download Song (WAV)"
+                        >
+                          <Download className="h-3.5 w-3.5" />
+                        </button>
+                      )}
                       <button
                         type="button"
                         className="p-1 text-gray-500 hover:text-white transition-colors"
@@ -2172,7 +2210,7 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
                 </p>
                 {!isSubscribed && (
                   <span className="px-1 py-0.2 rounded text-[8px] font-mono font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30 shrink-0">
-                    15s
+                    30s
                   </span>
                 )}
               </div>
@@ -2184,16 +2222,18 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
 
               {/* Row below Publisher name: Download icon + Music bar right beside download + Music count on same line */}
               <div className="flex items-center gap-1.5 mt-1 w-full">
-                <button
-                  type="button"
-                  onClick={(e) => handleDownload(currentTrack, e)}
-                  title="Download Song (WAV)"
-                  className={`p-0.5 text-gray-400 hover:text-[#2dd4bf] transition-colors shrink-0 cursor-pointer ${
-                    downloadingId === currentTrack.id ? 'text-[#2dd4bf]' : ''
-                  }`}
-                >
-                  <Download className="h-3 w-3" />
-                </button>
+                {isFreeBeat(currentTrack) && (
+                  <button
+                    type="button"
+                    onClick={(e) => handleDownload(currentTrack, e)}
+                    title="Download Song (WAV)"
+                    className={`p-0.5 text-gray-400 hover:text-[#2dd4bf] transition-colors shrink-0 cursor-pointer ${
+                      downloadingId === currentTrack.id ? 'text-[#2dd4bf]' : ''
+                    }`}
+                  >
+                    <Download className="h-3 w-3" />
+                  </button>
+                )}
 
                 <div
                   onClick={(e) => {
@@ -2406,16 +2446,18 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
                 <Clock className="h-3.5 w-3.5" />
               </button>
 
-              <button
-                type="button"
-                onClick={(e) => handleDownload(currentTrack, e)}
-                className={`p-1 transition-colors cursor-pointer ${
-                  downloadingId === currentTrack.id ? 'text-[#2dd4bf]' : 'text-gray-400 hover:text-white'
-                }`}
-                title="Download Current Song (WAV)"
-              >
-                <Download className="h-3.5 w-3.5" />
-              </button>
+              {isFreeBeat(currentTrack) && (
+                <button
+                  type="button"
+                  onClick={(e) => handleDownload(currentTrack, e)}
+                  className={`p-1 transition-colors cursor-pointer ${
+                    downloadingId === currentTrack.id ? 'text-[#2dd4bf]' : 'text-gray-400 hover:text-white'
+                  }`}
+                  title="Download Current Song (WAV)"
+                >
+                  <Download className="h-3.5 w-3.5" />
+                </button>
+              )}
 
               <button
                 type="button"
@@ -2784,23 +2826,6 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
 
             <div className="mt-5 space-y-2.5">
               <div
-                onClick={() => setPurchaseTier('basic')}
-                className={`p-3 rounded-xl border transition-all cursor-pointer flex items-center justify-between ${
-                  purchaseTier === 'basic'
-                    ? 'bg-teal-500/15 border-teal-500/40 text-teal-300'
-                    : 'bg-white/[0.02] border-white/5 hover:bg-white/[0.05] text-gray-300'
-                }`}
-              >
-                <div>
-                  <span className="text-xs font-black text-white block">Standard Commercial Lease</span>
-                  <span className="text-[11px] text-gray-400">MP3 & WAV Master · 50,000 Streams · 1 Commercial Music Video</span>
-                </div>
-                <span className="text-sm font-black text-teal-400">
-                  ₦{(paidBeatPurchaseTrack.priceNgn || 3000).toLocaleString()}
-                </span>
-              </div>
-
-              <div
                 onClick={() => setPurchaseTier('premium')}
                 className={`p-3 rounded-xl border transition-all cursor-pointer flex items-center justify-between ${
                   purchaseTier === 'premium'
@@ -2866,7 +2891,7 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
                 >
                   <ShoppingBag className="h-4 w-4" />
                   <span>
-                    Confirm & License {purchaseTier === 'basic' ? `₦${(paidBeatPurchaseTrack.priceNgn || 3000).toLocaleString()}` : purchaseTier === 'premium' ? `₦${Math.max(15000, (paidBeatPurchaseTrack.priceNgn || 3000) * 3).toLocaleString()}` : `₦${(paidBeatPurchaseTrack.exclusivePriceNgn || 50000).toLocaleString()}`}
+                    Confirm & License {purchaseTier === 'premium' ? `₦${Math.max(15000, (paidBeatPurchaseTrack.priceNgn || 3000) * 3).toLocaleString()}` : `₦${(paidBeatPurchaseTrack.exclusivePriceNgn || 50000).toLocaleString()}`}
                   </span>
                 </button>
               )}
