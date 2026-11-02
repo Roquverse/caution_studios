@@ -2871,78 +2871,73 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
               3. BOTTOM BANDLAB STUDIO CONSOLE & AUTOPITCH™ (Responsive Block Style & Collapsible)
              ========================================================================= */}
           {isConsoleOpen && (
-            <div className="h-[275px] sm:h-[295px] bg-[#121417] border-t border-[#24272e] flex flex-col shrink-0 select-none">
-              <div className="h-7 px-3 bg-[#131417] border-b border-[#24272e] flex items-center justify-between shrink-0">
+            <div className="h-[145px] sm:h-[155px] bg-[#121417] border-t border-[#24272e] flex flex-col shrink-0 select-none">
+              {/* Ultra-compact Console Header Bar */}
+              <div className="h-6 px-3 bg-[#131417] border-b border-[#24272e] flex items-center justify-between shrink-0">
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
                     onClick={() => setIsConsoleOpen(false)}
                     title="Collapse Console"
-                    className="daw-icon-btn !w-5 !h-5 text-[#8b8f98] hover:text-white"
+                    className="daw-icon-btn !w-4.5 !h-4.5 text-[#8b8f98] hover:text-white"
                   >
-                    <ChevronDown className="h-3.5 w-3.5" />
+                    <ChevronDown className="h-3 w-3" />
                   </button>
-                  <span className="text-[11px] font-semibold text-[#eceef2] tracking-wide">Voice / Audio</span>
+                  <span className="text-[10px] font-semibold text-[#eceef2] tracking-wide">Voice / Audio</span>
                 </div>
-                <div className="flex items-center gap-3">
-                  <span className="text-[10px] tabular-nums text-[#6f737d]">48 kHz · 24-bit</span>
+                <div className="flex items-center gap-2.5">
+                  <span className="text-[9px] tabular-nums text-[#6f737d]">48 kHz · 24-bit</span>
                   <button
                     type="button"
                     onClick={() => setIsConsoleOpen(false)}
                     title="Collapse"
-                    className="text-[#8b8f98] hover:text-white text-[11px] font-medium transition-colors flex items-center gap-1"
+                    className="text-[#8b8f98] hover:text-white text-[10px] font-medium transition-colors flex items-center gap-0.5"
                   >
-                    <X className="h-3 w-3" />
+                    <X className="h-2.5 w-2.5" />
                     <span className="hidden sm:inline">Collapse</span>
                   </button>
                 </div>
               </div>
 
-              {/* Console Content: Responsive Modular Card Blocks */}
-              <div className="flex-1 p-2 flex gap-2 overflow-x-auto overflow-y-hidden">
+              {/* Console Content: Compact Modular Card Blocks (Fits once at a glance) */}
+              <div className="flex-1 p-1.5 flex gap-1.5 overflow-hidden">
                 {/* Block 1: Mic & Input Card (Dedicated block on xl screens, or active when 'input' tab selected) */}
-                <div className={`${activeInspectorTab === 'input' ? 'flex flex-1 max-w-sm mx-auto' : 'hidden xl:flex w-56 shrink-0'} p-3 rounded-xl bg-[#181a1f] border border-[#282a30] flex flex-col justify-between shadow-sm`}>
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between text-[11px] font-semibold text-[#eceef2] pb-1 border-b border-[#282a30]">
+                <div className={`${activeInspectorTab === 'input' ? 'flex flex-1 max-w-sm mx-auto' : 'hidden xl:flex w-44 shrink-0'} p-2 rounded-lg bg-[#181a1f] border border-[#282a30] flex flex-col justify-between shadow-sm overflow-hidden`}>
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between text-[10px] font-semibold text-[#eceef2] pb-0.5 border-b border-[#282a30]">
                       <span>Mic & Input</span>
-                      <span className="text-[10px] text-[#2bbbad] font-mono">Ready</span>
+                      <span className="text-[9px] text-[#2bbbad] font-mono">Ready</span>
                     </div>
 
                     {/* Input Device Dropdown */}
-                    <div className="space-y-0.5">
-                      <span className="text-[10px] text-[#8b8f98] block">Input Device</span>
-                      <select
-                        value={audioInputDevice}
-                        onChange={(e) => setAudioInputDevice(e.target.value)}
-                        className="w-full bg-[#141518] border border-[#2a2d34] rounded-lg py-1 px-2 text-xs text-[#eceef2] focus:outline-none cursor-pointer truncate"
-                      >
-                        <option value="MacBook Pro Microphone (Built-in)">MacBook Pro Microphone (Built-in)</option>
-                        <option value="Default USB Audio Codec">Default USB Audio Codec</option>
-                        <option value="Studio Microphone Array">Studio Microphone Array</option>
-                      </select>
-                    </div>
+                    <select
+                      value={audioInputDevice}
+                      onChange={(e) => setAudioInputDevice(e.target.value)}
+                      className="w-full bg-[#141518] border border-[#2a2d34] rounded h-5 px-1.5 text-[10px] text-[#eceef2] focus:outline-none cursor-pointer truncate"
+                    >
+                      <option value="MacBook Pro Microphone (Built-in)">MacBook Pro Mic</option>
+                      <option value="Default USB Audio Codec">USB Audio Codec</option>
+                      <option value="Studio Microphone Array">Studio Mic Array</option>
+                    </select>
 
                     {/* Channel Mode Dropdown */}
-                    <div className="space-y-0.5">
-                      <span className="text-[10px] text-[#8b8f98] block">Channel</span>
-                      <select
-                        value={audioInputChannel}
-                        onChange={(e) => setAudioInputChannel(e.target.value as any)}
-                        className="w-full bg-[#141518] border border-[#2a2d34] rounded-lg py-1 px-2 text-xs text-[#eceef2] focus:outline-none cursor-pointer"
-                      >
-                        <option value="Channel 1 (Mono)">Channel 1 (Mono)</option>
-                        <option value="Channel 2">Channel 2</option>
-                        <option value="Stereo">Stereo</option>
-                      </select>
-                    </div>
+                    <select
+                      value={audioInputChannel}
+                      onChange={(e) => setAudioInputChannel(e.target.value as any)}
+                      className="w-full bg-[#141518] border border-[#2a2d34] rounded h-5 px-1.5 text-[10px] text-[#eceef2] focus:outline-none cursor-pointer"
+                    >
+                      <option value="Channel 1 (Mono)">Channel 1 (Mono)</option>
+                      <option value="Channel 2">Channel 2</option>
+                      <option value="Stereo">Stereo</option>
+                    </select>
 
                     {/* Input Level Animated Meter */}
-                    <div className="space-y-1 pt-1">
-                      <div className="flex items-center justify-between text-[10px] text-[#8b8f98]">
+                    <div className="space-y-0.5 pt-0.5">
+                      <div className="flex items-center justify-between text-[9px] text-[#8b8f98]">
                         <span>Level</span>
                         <span className="tabular-nums font-mono">{Math.round(inputLevelMeter * 100)}%</span>
                       </div>
-                      <div className="h-1.5 w-full bg-[#0e1013] rounded-sm overflow-hidden border border-white/5">
+                      <div className="h-1 w-full bg-[#0e1013] rounded-sm overflow-hidden border border-white/5">
                         <div
                           className="h-full bg-gradient-to-r from-emerald-500 to-[#2bbbad] transition-all duration-75"
                           style={{ width: `${Math.min(100, Math.max(5, inputLevelMeter * 100))}%` }}
@@ -2953,32 +2948,27 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
                     <button
                       type="button"
                       onClick={() => setIsInputMonitoring(!isInputMonitoring)}
-                      className={`w-full h-7 rounded-lg border text-[11px] font-semibold flex items-center justify-center gap-1.5 transition-all ${
+                      className={`w-full h-5.5 rounded border text-[10px] font-semibold flex items-center justify-center gap-1 transition-all ${
                         isInputMonitoring
                           ? 'bg-[#2bbbad]/20 border-[#2bbbad] text-[#2bbbad]'
                           : 'bg-[#141518] border-[#2a2d34] text-[#8b8f98] hover:text-white'
                       }`}
                     >
-                      <Headphones className="h-3.5 w-3.5" />
-                      {isInputMonitoring ? 'Monitoring on' : 'Monitoring'}
+                      <Headphones className="h-3 w-3" />
+                      {isInputMonitoring ? 'Monitor on' : 'Monitoring'}
                     </button>
-                  </div>
-
-                  <div className="pt-1.5 border-t border-[#26282e] flex items-center justify-between text-[10px] text-[#8b8f98]">
-                    <span>Mic Status</span>
-                    <span className="text-[#2bbbad] font-medium">Ready</span>
                   </div>
                 </div>
 
                 {/* Block 2: BandLab AutoPitch™ & Inspector Unit Centerpiece */}
-                <div className={`${activeInspectorTab === 'input' || activeInspectorTab === 'output' ? 'hidden xl:flex' : 'flex'} flex-1 min-w-[280px] p-3 rounded-xl bg-[#181a1f] border border-[#282a30] flex-col justify-between overflow-y-auto shadow-sm`}>
+                <div className={`${activeInspectorTab === 'input' || activeInspectorTab === 'output' ? 'hidden xl:flex' : 'flex'} flex-1 min-w-[280px] p-2 rounded-lg bg-[#181a1f] border border-[#282a30] flex-col justify-between shadow-sm overflow-hidden`}>
                   {activeInspectorTab === 'fx' ? (
                     /* Tab 2: Fx Effects Rack (Reverb, Delay, EQ, Compressor) */
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 h-full overflow-y-auto">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 h-full overflow-hidden">
                       {/* Reverb */}
-                      <div className="p-2.5 rounded-lg bg-[#141518] border border-[#2a2d34] space-y-2 flex flex-col justify-between">
+                      <div className="p-1.5 rounded-md bg-[#141518] border border-[#2a2d34] flex flex-col justify-between">
                         <div>
-                          <div className="flex justify-between text-[11px] font-semibold text-[#2bbbad]">
+                          <div className="flex justify-between text-[10px] font-semibold text-[#2bbbad]">
                             <span>Reverb</span>
                             <span className="font-mono">{Math.round(reverbAmount * 100)}%</span>
                           </div>
@@ -2989,16 +2979,16 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
                             step="0.05"
                             value={reverbAmount}
                             onChange={(e) => setReverbAmount(parseFloat(e.target.value))}
-                            className="w-full accent-[#2bbbad] h-1.5 bg-black/60 rounded cursor-pointer mt-2"
+                            className="w-full accent-[#2bbbad] h-1 bg-black/60 rounded cursor-pointer mt-1"
                           />
                         </div>
-                        <span className="text-[10px] text-gray-500">Convolver Hall simulation</span>
+                        <span className="text-[8px] text-gray-500">Hall simulation</span>
                       </div>
 
                       {/* Delay */}
-                      <div className="p-2.5 rounded-lg bg-[#141518] border border-[#2a2d34] space-y-2 flex flex-col justify-between">
+                      <div className="p-1.5 rounded-md bg-[#141518] border border-[#2a2d34] flex flex-col justify-between">
                         <div>
-                          <div className="flex justify-between text-[11px] font-semibold text-[#d7dbe2]">
+                          <div className="flex justify-between text-[10px] font-semibold text-[#d7dbe2]">
                             <span>Delay</span>
                             <span className="font-mono">{Math.round(delayAmount * 100)}%</span>
                           </div>
@@ -3009,21 +2999,21 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
                             step="0.05"
                             value={delayAmount}
                             onChange={(e) => setDelayAmount(parseFloat(e.target.value))}
-                            className="w-full accent-amber-400 h-1.5 bg-black/60 rounded cursor-pointer mt-2"
+                            className="w-full accent-amber-400 h-1 bg-black/60 rounded cursor-pointer mt-1"
                           />
                         </div>
-                        <span className="text-[10px] text-gray-500">1/4 note tempo sync</span>
+                        <span className="text-[8px] text-gray-500">Tempo sync</span>
                       </div>
 
                       {/* 3-Band EQ */}
-                      <div className="p-2.5 rounded-lg bg-[#141518] border border-[#2a2d34] space-y-2 flex flex-col justify-between">
-                        <div className="flex justify-between text-[11px] font-semibold text-[#d7dbe2]">
+                      <div className="p-1.5 rounded-md bg-[#141518] border border-[#2a2d34] flex flex-col justify-between">
+                        <div className="flex justify-between text-[10px] font-semibold text-[#d7dbe2]">
                           <span>EQ</span>
                           <span className="font-mono">+{eqMid}dB</span>
                         </div>
-                        <div className="grid grid-cols-3 gap-1 text-[9px] font-mono text-center">
+                        <div className="grid grid-cols-3 gap-1 text-[8px] font-mono text-center">
                           <div>
-                            <span className="text-gray-400">LOW</span>
+                            <span className="text-gray-400 block text-[7px]">LOW</span>
                             <input
                               type="range"
                               min="-6"
@@ -3035,7 +3025,7 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
                             />
                           </div>
                           <div>
-                            <span className="text-gray-400">MID</span>
+                            <span className="text-gray-400 block text-[7px]">MID</span>
                             <input
                               type="range"
                               min="-6"
@@ -3047,7 +3037,7 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
                             />
                           </div>
                           <div>
-                            <span className="text-gray-400">HI</span>
+                            <span className="text-gray-400 block text-[7px]">HI</span>
                             <input
                               type="range"
                               min="-6"
@@ -3059,252 +3049,244 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
                             />
                           </div>
                         </div>
-                        <span className="text-[9px] text-gray-500">3-band parametric</span>
+                        <span className="text-[8px] text-gray-500">3-band parametric</span>
                       </div>
 
                       {/* Dynamics */}
-                      <div className="p-2.5 rounded-lg bg-[#141518] border border-[#2a2d34] space-y-2 flex flex-col justify-between">
-                        <div className="flex justify-between text-[11px] font-semibold text-white">
+                      <div className="p-1.5 rounded-md bg-[#141518] border border-[#2a2d34] flex flex-col justify-between">
+                        <div className="flex justify-between text-[10px] font-semibold text-white">
                           <span>Dynamics</span>
-                          <span className="text-[9px] px-1 text-[#8b8f98]">Opto</span>
+                          <span className="text-[8px] text-[#8b8f98]">Opto</span>
                         </div>
-                        <div className="space-y-1.5">
-                          <label className="flex items-center gap-2 cursor-pointer text-xs text-gray-300">
+                        <div className="space-y-0.5">
+                          <label className="flex items-center gap-1.5 cursor-pointer text-[10px] text-gray-300">
                             <input
                               type="checkbox"
                               checked={compressorEnabled}
                               onChange={(e) => setCompressorEnabled(e.target.checked)}
-                              className="rounded accent-[#2bbbad]"
+                              className="rounded accent-[#2bbbad] h-3 w-3"
                             />
-                            <span className="text-[11px]">Compressor</span>
+                            <span>Compressor</span>
                           </label>
-                          <label className="flex items-center gap-2 cursor-pointer text-xs text-gray-300">
+                          <label className="flex items-center gap-1.5 cursor-pointer text-[10px] text-gray-300">
                             <input
                               type="checkbox"
                               checked={lowCutEnabled}
                               onChange={(e) => setLowCutEnabled(e.target.checked)}
-                              className="rounded accent-[#2bbbad]"
+                              className="rounded accent-[#2bbbad] h-3 w-3"
                             />
-                            <span className="text-[11px]">80Hz Low-Cut</span>
+                            <span>80Hz Low-Cut</span>
                           </label>
                         </div>
-                        <span className="text-[9px] text-gray-500">Studio dynamics</span>
                       </div>
                     </div>
                   ) : activeInspectorTab === 'editor' ? (
                     /* Tab 3: Editor / Lyrics & Notepad */
-                    <div className="flex flex-col h-full space-y-2">
-                      <div className="flex items-center justify-between pb-1 border-b border-[#282a30]">
-                        <span className="text-[11px] font-semibold text-[#eceef2]">Lyrics & Recording Notes</span>
-                        <span className="text-[10px] text-gray-500">Auto-saved to session</span>
+                    <div className="flex flex-col h-full space-y-1 overflow-hidden">
+                      <div className="flex items-center justify-between pb-0.5 border-b border-[#282a30]">
+                        <span className="text-[10px] font-semibold text-[#eceef2]">Lyrics & Recording Notes</span>
+                        <span className="text-[9px] text-gray-500">Auto-saved</span>
                       </div>
                       <textarea
                         value={lyricsText}
                         onChange={(e) => setLyricsText(e.target.value)}
                         placeholder="Verses, cues, notes…"
-                        className="w-full flex-1 p-2.5 rounded-lg bg-[#141518] border border-[#2a2d34] text-xs text-white resize-none focus:outline-none focus:border-[#2bbbad]/50 leading-relaxed font-mono"
+                        className="w-full flex-1 p-2 rounded bg-[#141518] border border-[#2a2d34] text-[11px] text-white resize-none focus:outline-none focus:border-[#2bbbad]/50 leading-normal font-mono"
                       />
                     </div>
                   ) : (
-                    /* Default Tab: AutoPitch Unit */
-                    <div className="flex flex-col justify-between h-full space-y-2">
-                      {/* Top Row: Power Switch + Title + AutoDetect Key */}
-                      <div className="flex items-center justify-between pb-1 border-b border-[#282a30]">
-                        <div className="flex items-center gap-2.5">
+                    /* Default Tab: AutoPitch Unit (Ultra-Compact At-A-Glance) */
+                    <div className="flex flex-col justify-between h-full space-y-1 overflow-hidden">
+                      {/* Top Row: Power Switch + Title + Category & Scale Dropdowns + Detect key */}
+                      <div className="flex items-center justify-between gap-2 pb-1 border-b border-[#282a30] shrink-0">
+                        <div className="flex items-center gap-2">
                           {/* Power Toggle Switch */}
                           <button
                             type="button"
                             onClick={() => setAutoTuneEnabled(!autoTuneEnabled)}
                             aria-label="Toggle pitch correction"
-                            className={`w-9 h-5 rounded-full transition-colors relative shrink-0 cursor-pointer p-0.5 flex items-center ${
+                            className={`w-7 h-4 rounded-full transition-colors relative shrink-0 cursor-pointer p-0.5 flex items-center ${
                               autoTuneEnabled ? 'bg-[#2bbbad]' : 'bg-[#2a2d34]'
                             }`}
                           >
                             <span
-                              className={`block w-4 h-4 rounded-full bg-white shadow-sm transition-transform duration-150 ${
-                                autoTuneEnabled ? 'translate-x-4' : 'translate-x-0'
+                              className={`block w-3 h-3 rounded-full bg-white shadow-sm transition-transform duration-150 ${
+                                autoTuneEnabled ? 'translate-x-3' : 'translate-x-0'
                               }`}
                             />
                           </button>
 
                           <div className="flex items-center gap-1.5">
-                            <span className="text-[13px] font-semibold text-white tracking-wide">Pitch</span>
+                            <span className="text-[11px] font-semibold text-white tracking-wide">Pitch</span>
                             {!autoTuneEnabled ? (
-                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/5 text-[#8b8f98]">Bypassed</span>
+                              <span className="text-[8px] px-1 py-0.2 rounded bg-white/5 text-[#8b8f98]">Off</span>
                             ) : (
-                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#2bbbad]/15 text-[#2bbbad] font-medium">Active</span>
+                              <span className="text-[8px] px-1 py-0.2 rounded bg-[#2bbbad]/15 text-[#2bbbad] font-medium">Active</span>
                             )}
                           </div>
                         </div>
 
-                        {/* AutoDetect Key Button */}
-                        <button
-                          type="button"
-                          onClick={handleAutoDetectKey}
-                          className="h-6.5 px-2.5 rounded-lg bg-[#141518] border border-[#2a2d34] text-[#d7dbe2] text-[11px] font-medium hover:bg-[#20232a] hover:border-[#383d47] transition-colors"
-                        >
-                          Detect key
-                        </button>
+                        {/* Category & Scale Selectors inline */}
+                        <div className={`flex items-center gap-1.5 transition-opacity ${autoTuneEnabled ? 'opacity-100' : 'opacity-40 pointer-events-none'}`}>
+                          <select
+                            value={autoPitchCategory}
+                            onChange={(e) => setAutoPitchCategory(e.target.value as any)}
+                            className="bg-[#141518] border border-[#2a2d34] rounded h-5 px-1.5 text-[10px] text-[#eceef2] focus:outline-none cursor-pointer"
+                            title="Category"
+                          >
+                            <option value="Essentials">Essentials</option>
+                            <option value="Modern Rap">Modern Rap</option>
+                            <option value="Afrobeat">Afrobeats</option>
+                            <option value="Pop">Pop</option>
+                            <option value="R&B">R&B</option>
+                          </select>
+
+                          <select
+                            value={autoTuneKey}
+                            onChange={(e) => {
+                              setAutoTuneKey(e.target.value);
+                              if (!autoTuneEnabled) setAutoTuneEnabled(true);
+                            }}
+                            className="bg-[#141518] border border-[#2a2d34] rounded h-5 px-1.5 text-[10px] text-[#eceef2] focus:outline-none cursor-pointer"
+                            title="Scale"
+                          >
+                            <option value="D Minor">D Minor</option>
+                            <option value="C Major">C Major</option>
+                            <option value="A Minor">A Minor</option>
+                            <option value="G Major">G Major</option>
+                            <option value="E Minor">E Minor</option>
+                            <option value="F Major">F Major</option>
+                            <option value="F Minor">F Minor</option>
+                            <option value="B Minor">B Minor</option>
+                            <option value="Bb Major">Bb Major</option>
+                            <option value="Eb Major">Eb Major</option>
+                            <option value="Chromatic">Chromatic</option>
+                          </select>
+
+                          {/* AutoDetect Key Button */}
+                          <button
+                            type="button"
+                            onClick={handleAutoDetectKey}
+                            className="h-5 px-2 rounded bg-[#141518] border border-[#2a2d34] text-[#d7dbe2] text-[10px] font-medium hover:bg-[#20232a] hover:border-[#383d47] transition-colors"
+                          >
+                            Detect key
+                          </button>
+                        </div>
                       </div>
 
-                      {/* Rest of panel dims when bypassed */}
-                      <div className={`flex-1 flex flex-col justify-between transition-opacity duration-150 ${autoTuneEnabled ? 'opacity-100' : 'opacity-40 pointer-events-none'}`}>
-                        {/* Category & Scale Selectors */}
-                        <div className="grid grid-cols-2 gap-2 sm:gap-4 max-w-sm">
-                          <div className="min-w-0">
-                            <span className="text-[10px] text-[#8b8f98] block mb-0.5">Category</span>
-                            <select
-                              value={autoPitchCategory}
-                              onChange={(e) => setAutoPitchCategory(e.target.value as any)}
-                              className="w-full bg-[#141518] border border-[#2a2d34] rounded-lg py-1 px-2 text-xs text-[#eceef2] focus:outline-none cursor-pointer truncate"
-                            >
-                              <option value="Essentials">Essentials</option>
-                              <option value="Modern Rap">Modern Rap</option>
-                              <option value="Afrobeat">Afrobeats</option>
-                              <option value="Pop">Pop</option>
-                              <option value="R&B">R&B</option>
-                            </select>
-                          </div>
-
-                          <div className="min-w-0">
-                            <span className="text-[10px] text-[#8b8f98] block mb-0.5">Scale</span>
-                            <select
-                              value={autoTuneKey}
-                              onChange={(e) => {
-                                setAutoTuneKey(e.target.value);
-                                if (!autoTuneEnabled) setAutoTuneEnabled(true);
-                              }}
-                              className="w-full bg-[#141518] border border-[#2a2d34] rounded-lg py-1 px-2 text-xs text-[#eceef2] focus:outline-none cursor-pointer truncate"
-                            >
-                              <option value="D Minor">D Minor</option>
-                              <option value="C Major">C Major</option>
-                              <option value="A Minor">A Minor</option>
-                              <option value="G Major">G Major</option>
-                              <option value="E Minor">E Minor</option>
-                              <option value="F Major">F Major</option>
-                              <option value="F Minor">F Minor</option>
-                              <option value="B Minor">B Minor</option>
-                              <option value="Bb Major">Bb Major</option>
-                              <option value="Eb Major">Eb Major</option>
-                              <option value="Chromatic">Chromatic (All)</option>
-                            </select>
-                          </div>
+                      {/* Main Center Area: Presets (left) + Dial (center) + Piano Notes (right) */}
+                      <div className={`flex-1 flex items-center justify-between gap-2.5 transition-opacity duration-150 ${autoTuneEnabled ? 'opacity-100' : 'opacity-40 pointer-events-none'}`}>
+                        {/* 6 Preset Cards (3 columns x 2 rows) */}
+                        <div className="grid grid-cols-3 gap-1 shrink-0 w-48 sm:w-56">
+                          {(['Classic', 'Duet', 'Big Harmony', 'Natural', 'Third', 'Octave'] as const).map((pst) => {
+                            const isActive = autoPitchPreset === pst && autoTuneEnabled;
+                            return (
+                              <button
+                                key={pst}
+                                type="button"
+                                onClick={() => handleSelectAutoPitchPreset(pst)}
+                                className={`h-6.5 px-1 rounded border flex items-center justify-center text-center transition-all ${
+                                  isActive
+                                    ? 'bg-[#2bbbad]/15 border-[#2bbbad] text-[#2bbbad] font-semibold shadow-sm'
+                                    : 'bg-[#141518] border-[#2a2d34] text-[#8b8f98] hover:text-white hover:border-[#383d47]'
+                                }`}
+                              >
+                                <span className="text-[9px] font-medium truncate w-full tracking-tight">{pst}</span>
+                              </button>
+                            );
+                          })}
                         </div>
 
-                        {/* Middle Section: Preset Grid + Big Central Rotary Dial + Piano Notes */}
-                        <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-center py-1">
-                          {/* 6 Preset Cards (2x3 Grid) */}
-                          <div className="md:col-span-4 grid grid-cols-3 gap-1.5">
-                            {(['Classic', 'Duet', 'Big Harmony', 'Natural', 'Third', 'Octave'] as const).map((pst) => {
-                              const isActive = autoPitchPreset === pst && autoTuneEnabled;
+                        {/* Centerpiece Radial Rotary Dial */}
+                        <div className="flex flex-col items-center justify-center shrink-0">
+                          <div
+                            className="relative w-14 h-14 flex items-center justify-center cursor-pointer group"
+                            onClick={() => {
+                              const next = autoPitchPercent >= 90 ? 35 : autoPitchPercent + 25;
+                              setAutoTuneAmount(next / 100);
+                              if (!autoTuneEnabled) setAutoTuneEnabled(true);
+                            }}
+                            title="Click to cycle Pitch Depth / Drag slider"
+                          >
+                            <svg className="w-full h-full -rotate-90" viewBox="0 0 100 100">
+                              <circle
+                                cx="50"
+                                cy="50"
+                                r="40"
+                                stroke="#20232c"
+                                strokeWidth="7"
+                                fill="transparent"
+                                strokeDasharray="251.2"
+                                strokeDashoffset="62.8"
+                              />
+                              <circle
+                                cx="50"
+                                cy="50"
+                                r="40"
+                                stroke={autoTuneEnabled ? '#2dd4bf' : '#4b5563'}
+                                strokeWidth="7"
+                                fill="transparent"
+                                strokeDasharray="251.2"
+                                strokeDashoffset={251.2 - (autoPitchPercent / 100) * 188.4}
+                                strokeLinecap="round"
+                                className="transition-all duration-150"
+                              />
+                            </svg>
+                            <div className="absolute w-8.5 h-8.5 rounded-full bg-[#141518] border border-[#2a2d34] group-hover:border-[#2bbbad]/50 shadow-inner flex flex-col items-center justify-center transition-colors">
+                              <span className="text-[10px] font-bold text-white tabular-nums">
+                                {autoTuneEnabled ? `${autoPitchPercent}%` : 'Off'}
+                              </span>
+                            </div>
+                          </div>
+                          <span className="text-[8px] font-medium text-[#8b8f98] mt-0.5">
+                            {autoTuneEnabled ? `Strength ${autoPitchPercent}%` : 'Bypassed'}
+                          </span>
+                        </div>
+
+                        {/* 12-Note Piano Key Matrix Grid */}
+                        <div className="flex flex-col gap-0.5 p-1 rounded-md bg-[#141518] border border-[#2a2d34] shrink-0">
+                          <span className="text-[8px] text-[#8b8f98] text-center font-medium block">Scale notes</span>
+                          {/* Naturals (C D E F G A B) */}
+                          <div className="grid grid-cols-7 gap-0.5">
+                            {['C', 'D', 'E', 'F', 'G', 'A', 'B'].map((note) => {
+                              const inScale = activeScaleNotes.has(note) && !mutedScaleNotes.includes(note);
                               return (
                                 <button
-                                  key={pst}
+                                  key={note}
                                   type="button"
-                                  onClick={() => handleSelectAutoPitchPreset(pst)}
-                                  className={`h-9 px-1 rounded-lg border flex flex-col items-center justify-center text-center transition-all ${
-                                    isActive
-                                      ? 'bg-[#2bbbad]/15 border-[#2bbbad] text-[#2bbbad] font-semibold shadow-sm'
-                                      : 'bg-[#141518] border-[#2a2d34] text-[#8b8f98] hover:text-white hover:border-[#383d47]'
+                                  onClick={() => toggleScaleNote(note)}
+                                  title={`Click to play & toggle ${note}`}
+                                  className={`h-5 w-4.5 sm:w-5.5 rounded font-mono text-[9px] font-bold transition-all active:scale-95 cursor-pointer flex items-center justify-center ${
+                                    inScale
+                                      ? 'bg-[#2bbbad] text-black shadow-sm'
+                                      : 'bg-[#1e2230] text-gray-500 hover:text-white'
                                   }`}
                                 >
-                                  <span className="text-[10px] font-medium truncate w-full tracking-tight">{pst}</span>
+                                  {note}
                                 </button>
                               );
                             })}
                           </div>
-
-                          {/* Centerpiece Big Radial Rotary Dial */}
-                          <div className="md:col-span-4 flex flex-col items-center justify-center py-0.5">
-                            <div
-                              className="relative w-22 h-22 flex items-center justify-center cursor-pointer group"
-                              onClick={() => {
-                                const next = autoPitchPercent >= 90 ? 35 : autoPitchPercent + 25;
-                                setAutoTuneAmount(next / 100);
-                                if (!autoTuneEnabled) setAutoTuneEnabled(true);
-                              }}
-                              title="Click to cycle Pitch Depth / Drag slider"
-                            >
-                              <svg className="w-full h-full -rotate-90" viewBox="0 0 100 100">
-                                <circle
-                                  cx="50"
-                                  cy="50"
-                                  r="40"
-                                  stroke="#20232c"
-                                  strokeWidth="6"
-                                  fill="transparent"
-                                  strokeDasharray="251.2"
-                                  strokeDashoffset="62.8"
-                                />
-                                <circle
-                                  cx="50"
-                                  cy="50"
-                                  r="40"
-                                  stroke={autoTuneEnabled ? '#2dd4bf' : '#4b5563'}
-                                  strokeWidth="6"
-                                  fill="transparent"
-                                  strokeDasharray="251.2"
-                                  strokeDashoffset={251.2 - (autoPitchPercent / 100) * 188.4}
-                                  strokeLinecap="round"
-                                  className="transition-all duration-150"
-                                />
-                              </svg>
-                              <div className="absolute w-13 h-13 rounded-full bg-[#141518] border border-[#2a2d34] group-hover:border-[#2bbbad]/50 shadow-inner flex flex-col items-center justify-center transition-colors">
-                                <span className="text-xs font-bold text-white tabular-nums">
-                                  {autoTuneEnabled ? `${autoPitchPercent}%` : 'Off'}
-                                </span>
-                              </div>
-                            </div>
-                            <span className="text-[10px] font-medium text-[#8b8f98] mt-0.5">
-                              {autoTuneEnabled ? `Strength ${autoPitchPercent}%` : 'Bypassed'}
-                            </span>
-                          </div>
-
-                          {/* 12-Note Piano Key Matrix Grid */}
-                          <div className="md:col-span-4 flex flex-col gap-1.5 p-2 rounded-lg bg-[#141518] border border-[#2a2d34]">
-                            <span className="text-[10px] text-[#8b8f98] text-center font-medium block">Scale notes</span>
-                            {/* Naturals (C D E F G A B) */}
-                            <div className="grid grid-cols-7 gap-1">
-                              {['C', 'D', 'E', 'F', 'G', 'A', 'B'].map((note) => {
-                                const inScale = activeScaleNotes.has(note) && !mutedScaleNotes.includes(note);
-                                return (
-                                  <button
-                                    key={note}
-                                    type="button"
-                                    onClick={() => toggleScaleNote(note)}
-                                    title={`Click to play & toggle ${note}`}
-                                    className={`h-7 rounded font-mono text-[11px] font-bold transition-all active:scale-95 cursor-pointer ${
-                                      inScale
-                                        ? 'bg-[#2bbbad] text-black shadow-sm'
-                                        : 'bg-[#1e2230] text-gray-500 hover:text-white'
-                                    }`}
-                                  >
-                                    {note}
-                                  </button>
-                                );
-                              })}
-                            </div>
-                            {/* Accidentals (C# D# F# G# A#) */}
-                            <div className="grid grid-cols-5 gap-1 pt-0.5">
-                              {['C#', 'D#', 'F#', 'G#', 'A#'].map((note) => {
-                                const inScale = activeScaleNotes.has(note) && !mutedScaleNotes.includes(note);
-                                return (
-                                  <button
-                                    key={note}
-                                    type="button"
-                                    onClick={() => toggleScaleNote(note)}
-                                    title={`Click to play & toggle ${note}`}
-                                    className={`h-6 rounded font-mono text-[10px] font-bold transition-all active:scale-95 cursor-pointer ${
-                                      inScale
-                                        ? 'bg-amber-400 text-black shadow-sm'
-                                        : 'bg-[#181b24] text-gray-600 hover:text-white'
-                                    }`}
-                                  >
-                                    {note}
-                                  </button>
-                                );
-                              })}
-                            </div>
+                          {/* Accidentals (C# D# F# G# A#) */}
+                          <div className="grid grid-cols-5 gap-0.5 justify-center">
+                            {['C#', 'D#', 'F#', 'G#', 'A#'].map((note) => {
+                              const inScale = activeScaleNotes.has(note) && !mutedScaleNotes.includes(note);
+                              return (
+                                <button
+                                  key={note}
+                                  type="button"
+                                  onClick={() => toggleScaleNote(note)}
+                                  title={`Click to play & toggle ${note}`}
+                                  className={`h-4.5 rounded font-mono text-[8px] font-bold transition-all active:scale-95 cursor-pointer flex items-center justify-center ${
+                                    inScale
+                                      ? 'bg-amber-400 text-black shadow-sm'
+                                      : 'bg-[#181b24] text-gray-600 hover:text-white'
+                                  }`}
+                                >
+                                  {note}
+                                </button>
+                              );
+                            })}
                           </div>
                         </div>
                       </div>
@@ -3313,30 +3295,29 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
                 </div>
 
                 {/* Block 3: Track Output Strip (Dedicated block on xl screens, or active when 'output' tab selected) */}
-                <div className={`${activeInspectorTab === 'output' ? 'flex flex-1 max-w-xs mx-auto' : 'hidden xl:flex w-40 shrink-0'} p-3 rounded-xl bg-[#181a1f] border border-[#282a30] flex flex-col items-center justify-between shadow-sm`}>
-                  <div className="flex flex-col items-center text-center max-w-[130px] pb-1 border-b border-[#282a30] w-full">
-                    <span className="text-[11px] font-semibold text-[#eceef2] truncate w-full">
+                <div className={`${activeInspectorTab === 'output' ? 'flex flex-1 max-w-xs mx-auto' : 'hidden xl:flex w-32 shrink-0'} p-2 rounded-lg bg-[#181a1f] border border-[#282a30] flex flex-col items-center justify-between shadow-sm overflow-hidden`}>
+                  <div className="flex items-center justify-between w-full pb-0.5 border-b border-[#282a30]">
+                    <span className="text-[10px] font-semibold text-[#eceef2] truncate max-w-[70px]">
                       {activeSelectedTrack.name}
                     </span>
                     <span className="text-[9px] text-[#2bbbad] font-mono">
-                      {Math.round(activeSelectedTrack.volume * 100)}% Vol
+                      {Math.round(activeSelectedTrack.volume * 100)}%
                     </span>
                   </div>
 
                   {/* Vertical Channel Fader with Decibel Marks & Meter */}
-                  <div className="flex items-center justify-center gap-2 h-32 my-1">
+                  <div className="flex items-center justify-center gap-1.5 h-16 my-0.5">
                     {/* dB Marks */}
-                    <div className="flex flex-col justify-between text-[9px] font-mono text-gray-500 h-full py-1 select-none">
+                    <div className="flex flex-col justify-between text-[7px] font-mono text-gray-500 h-full py-0.5 select-none">
                       <span>+6</span>
                       <span>0</span>
-                      <span>-6</span>
                       <span>-12</span>
                       <span>-24</span>
                     </div>
 
                     {/* Interactive Vertical Fader */}
                     <div
-                      className="h-28 w-8 flex items-center justify-center relative cursor-pointer touch-none select-none"
+                      className="h-16 w-6 flex items-center justify-center relative cursor-pointer touch-none select-none"
                       title={`Volume: ${Math.round(activeSelectedTrack.volume * 100)}%`}
                       onPointerDown={(e) => {
                         const el = e.currentTarget;
@@ -3358,7 +3339,7 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
                       }}
                     >
                       {/* Slot Track */}
-                      <div className="w-2 h-full bg-[#0d0e11] rounded-full border border-[#2a2d34] relative overflow-hidden">
+                      <div className="w-1.5 h-full bg-[#0d0e11] rounded-full border border-[#2a2d34] relative overflow-hidden">
                         <div
                           className="w-full bg-[#2bbbad] absolute bottom-0"
                           style={{ height: `${Math.min(100, (activeSelectedTrack.volume / 1.5) * 100)}%` }}
@@ -3366,17 +3347,17 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
                       </div>
                       {/* Fader Thumb Handle */}
                       <div
-                        className="absolute w-7 h-4 rounded-md bg-[#252830] border border-[#4a4e57] shadow-lg flex items-center justify-center pointer-events-none"
+                        className="absolute w-5 h-3 rounded bg-[#252830] border border-[#4a4e57] shadow-sm flex items-center justify-center pointer-events-none"
                         style={{
-                          bottom: `calc(${Math.min(100, Math.max(0, (activeSelectedTrack.volume / 1.5) * 100))}% - 8px)`
+                          bottom: `calc(${Math.min(100, Math.max(0, (activeSelectedTrack.volume / 1.5) * 100))}% - 6px)`
                         }}
                       >
-                        <div className="w-3.5 h-0.5 bg-white/70 rounded-full" />
+                        <div className="w-2.5 h-0.5 bg-white/70 rounded-full" />
                       </div>
                     </div>
 
                     {/* Peak Level LED meter */}
-                    <div className="w-2 h-28 bg-black/60 rounded-full overflow-hidden p-0.5 border border-white/10 flex flex-col justify-end">
+                    <div className="w-1.5 h-16 bg-black/60 rounded-full overflow-hidden p-0.5 border border-white/10 flex flex-col justify-end">
                       <div
                         className="w-full bg-gradient-to-t from-emerald-500 via-teal-400 to-amber-400 rounded-full transition-all duration-75"
                         style={{ height: `${Math.min(100, Math.max(5, (activeSelectedTrack.volume || 1) * 60))}%` }}
@@ -3385,14 +3366,14 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
                   </div>
 
                   {/* Rotary Pan & Reverb Knobs */}
-                  <div className="grid grid-cols-2 gap-2 w-full pt-1 text-center border-t border-[#26282e]">
+                  <div className="grid grid-cols-2 gap-1 w-full pt-0.5 text-center border-t border-[#26282e]">
                     <div>
-                      <span className="text-[9px] font-mono text-gray-400 block">Pan</span>
-                      <span className="text-[10px] font-mono text-teal-300">{formatPanLabel(activeSelectedTrack.pan || 0)}</span>
+                      <span className="text-[7px] font-mono text-gray-400 block">Pan</span>
+                      <span className="text-[9px] font-mono text-teal-300">{formatPanLabel(activeSelectedTrack.pan || 0)}</span>
                     </div>
                     <div>
-                      <span className="text-[9px] font-mono text-gray-400 block">Reverb</span>
-                      <span className="text-[10px] font-mono text-amber-300">{Math.round(reverbAmount * 100)}%</span>
+                      <span className="text-[7px] font-mono text-gray-400 block">Reverb</span>
+                      <span className="text-[9px] font-mono text-amber-300">{Math.round(reverbAmount * 100)}%</span>
                     </div>
                   </div>
                 </div>
@@ -3401,7 +3382,7 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
           )}
 
           {/* Bottom Tab Switcher Dock Footer (Always visible, stays docked when collapsed) */}
-          <div className="h-8.5 bg-[#141518] border-t border-[#24272e] flex items-center justify-between px-2.5 text-[12px] shrink-0 select-none">
+          <div className="h-7 bg-[#141518] border-t border-[#24272e] flex items-center justify-between px-2 text-[11px] shrink-0 select-none">
             <div className="flex items-center gap-1">
               <button
                 type="button"
@@ -3409,7 +3390,7 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
                   setActiveInspectorTab('autopitch');
                   setIsConsoleOpen(true);
                 }}
-                className={`px-2.5 h-6 rounded-md text-[11px] font-medium transition-colors ${
+                className={`px-2 h-5 rounded text-[10px] font-medium transition-colors ${
                   activeInspectorTab === 'autopitch' && isConsoleOpen
                     ? 'bg-white/10 text-white shadow-sm'
                     : 'text-[#8b8f98] hover:text-white'
@@ -3423,7 +3404,7 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
                   setActiveInspectorTab('fx');
                   setIsConsoleOpen(true);
                 }}
-                className={`px-2.5 h-6 rounded-md text-[11px] font-medium transition-colors ${
+                className={`px-2 h-5 rounded text-[10px] font-medium transition-colors ${
                   activeInspectorTab === 'fx' && isConsoleOpen
                     ? 'bg-white/10 text-white shadow-sm'
                     : 'text-[#8b8f98] hover:text-white'
@@ -3437,7 +3418,7 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
                   setActiveInspectorTab('editor');
                   setIsConsoleOpen(true);
                 }}
-                className={`px-2.5 h-6 rounded-md text-[11px] font-medium transition-colors ${
+                className={`px-2 h-5 rounded text-[10px] font-medium transition-colors ${
                   activeInspectorTab === 'editor' && isConsoleOpen
                     ? 'bg-white/10 text-white shadow-sm'
                     : 'text-[#8b8f98] hover:text-white'
@@ -3453,7 +3434,7 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
                   setActiveInspectorTab('input');
                   setIsConsoleOpen(true);
                 }}
-                className={`xl:hidden px-2.5 h-6 rounded-md text-[11px] font-medium transition-colors ${
+                className={`xl:hidden px-2 h-5 rounded text-[10px] font-medium transition-colors ${
                   activeInspectorTab === 'input' && isConsoleOpen
                     ? 'bg-white/10 text-white shadow-sm'
                     : 'text-[#8b8f98] hover:text-white'
@@ -3467,7 +3448,7 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
                   setActiveInspectorTab('output');
                   setIsConsoleOpen(true);
                 }}
-                className={`xl:hidden px-2.5 h-6 rounded-md text-[11px] font-medium transition-colors ${
+                className={`xl:hidden px-2 h-5 rounded text-[10px] font-medium transition-colors ${
                   activeInspectorTab === 'output' && isConsoleOpen
                     ? 'bg-white/10 text-white shadow-sm'
                     : 'text-[#8b8f98] hover:text-white'
@@ -3485,7 +3466,7 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
                   setActiveInspectorTab('editor');
                   setIsConsoleOpen(true);
                 }}
-                className="hover:text-white flex items-center gap-1 text-[11px] font-medium transition-colors"
+                className="hover:text-white flex items-center gap-1 text-[10px] font-medium transition-colors"
               >
                 <FileText className="h-3 w-3" />
                 <span className="hidden sm:inline">Lyrics/Notes</span>
@@ -3494,7 +3475,7 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
               <button
                 type="button"
                 onClick={() => setBeatPickerOpen(true)}
-                className="hover:text-white flex items-center gap-1 text-[11px] font-medium transition-colors"
+                className="hover:text-white flex items-center gap-1 text-[10px] font-medium transition-colors"
               >
                 <Disc3 className="h-3 w-3 text-amber-400" />
                 <span>Beats</span>
@@ -3503,29 +3484,29 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
               <button
                 type="button"
                 onClick={() => setIsShortcutsModalOpen(true)}
-                className="hover:text-white flex items-center gap-1 text-[11px] font-medium transition-colors"
+                className="hover:text-white flex items-center gap-1 text-[10px] font-medium transition-colors"
               >
                 <Keyboard className="h-3 w-3" />
                 <span className="hidden sm:inline">Shortcuts</span>
               </button>
 
-              <div className="h-3 w-[1px] bg-[#2a2d34] mx-0.5" />
+              <div className="h-2.5 w-[1px] bg-[#2a2d34] mx-0.5" />
 
               {/* 1-Click Collapsible Toggle */}
               <button
                 type="button"
                 onClick={() => setIsConsoleOpen(!isConsoleOpen)}
-                className="flex items-center gap-1 px-2 h-6 rounded-md text-[11px] font-medium text-[#8b8f98] hover:text-white hover:bg-white/5 transition-colors"
+                className="flex items-center gap-1 px-1.5 h-5 rounded text-[10px] font-medium text-[#8b8f98] hover:text-white hover:bg-white/5 transition-colors"
                 title={isConsoleOpen ? 'Collapse console drawer' : 'Expand console drawer'}
               >
                 {isConsoleOpen ? (
                   <>
-                    <ChevronDown className="h-3.5 w-3.5" />
+                    <ChevronDown className="h-3 w-3" />
                     <span className="hidden sm:inline">Collapse</span>
                   </>
                 ) : (
                   <>
-                    <ChevronUp className="h-3.5 w-3.5 text-[#2bbbad]" />
+                    <ChevronUp className="h-3 w-3 text-[#2bbbad]" />
                     <span className="text-[#2bbbad] font-semibold">Console</span>
                   </>
                 )}
