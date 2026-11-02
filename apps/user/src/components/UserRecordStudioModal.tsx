@@ -2194,15 +2194,6 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
 
       <header className="h-12 bg-[#16181c] border-b border-[#2a2d34] flex items-center justify-between px-2 sm:px-3 text-[12px] shrink-0 z-30">
         <div className="flex items-center gap-1.5 min-w-0">
-          <button
-            type="button"
-            onClick={onClose || (() => window.history.back())}
-            title="Exit Studio"
-            className="daw-icon-btn"
-          >
-            <Menu className="h-4 w-4" />
-          </button>
-
           <div className="flex items-center gap-2 pl-0.5 pr-1">
             <img src="/logo.png" alt="Caution Studio" className="h-5 w-auto object-contain brightness-0 invert max-w-[92px]" />
             <span className="hidden sm:inline text-[11px] font-semibold text-[#8b8f98]">Studio</span>
@@ -2420,67 +2411,23 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
           >
             Publish
           </button>
+          {onClose && (
+            <button
+              type="button"
+              onClick={onClose}
+              title="Close"
+              className="daw-icon-btn ml-0.5"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
         </div>
       </header>
 
       {/* =========================================================================
-          2. MAIN DAW WORKSPACE (Side Toolbar + Multi-Track Timeline)
+          2. MAIN DAW WORKSPACE (Multi-Track Timeline)
          ========================================================================= */}
       <div className="flex-1 flex overflow-hidden relative">
-        {/* Leftmost Vertical Slim App Toolbar */}
-        <aside className="w-11 bg-[#16181c] border-r border-[#2a2d34] flex flex-col items-center py-2 justify-between shrink-0 z-20">
-          <div className="flex flex-col items-center gap-1">
-            <button
-              type="button"
-              onClick={() => setIsConsoleOpen(!isConsoleOpen)}
-              title="Mix"
-              className={`daw-icon-btn ${isConsoleOpen ? 'is-on' : ''}`}
-            >
-              <Sliders className="h-4 w-4" />
-            </button>
-            <button
-              type="button"
-              onClick={() => setBeatPickerOpen(true)}
-              title="Sounds"
-              className="daw-icon-btn"
-            >
-              <Folder className="h-4 w-4" />
-            </button>
-            <button
-              type="button"
-              onClick={() => setBeatPickerOpen(true)}
-              title="Beats"
-              className="daw-icon-btn"
-            >
-              <Music2 className="h-4 w-4" />
-            </button>
-            <button
-              type="button"
-              onClick={handleAutoMixAI}
-              title="AutoMix"
-              className={`daw-icon-btn ${isAutoMixRunning ? 'is-on' : ''}`}
-            >
-              <Wand2 className="h-4 w-4" />
-            </button>
-          </div>
-          <div className="flex flex-col items-center gap-1">
-            <button type="button" onClick={() => setIsShortcutsModalOpen(true)} title="Shortcuts" className="daw-icon-btn">
-              <Keyboard className="h-4 w-4" />
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setActiveInspectorTab('editor');
-                setIsConsoleOpen(true);
-              }}
-              title="Notes"
-              className="daw-icon-btn"
-            >
-              <FileText className="h-4 w-4" />
-            </button>
-          </div>
-        </aside>
-
         {/* Multi-Track Workspace Body */}
         <div className="flex-1 flex flex-col overflow-hidden">
           {/* Upper Half: Arrangement Tracks (Split TCP Left + Timeline Grid Right) */}
@@ -2513,8 +2460,23 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
                 >
                   <span className="absolute left-0 top-0 bottom-0 w-[3px] bg-[#d97706]" />
                   <div className="flex items-center justify-between pl-1.5">
-                    <span className="text-[12px] font-semibold text-[#eceef2] truncate">Drum Machine</span>
-                    <div className="flex items-center gap-0.5">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setBeatPickerOpen(true);
+                      }}
+                      className="text-left flex items-center gap-1.5 min-w-0 flex-1 mr-1.5 group"
+                      title="Select instrumental beat"
+                    >
+                      <span className="text-[12px] font-semibold text-[#eceef2] group-hover:text-white truncate">
+                        Instrumental
+                      </span>
+                      <span className="text-[9px] px-1 py-0.5 rounded bg-white/10 text-[#2bbbad] group-hover:bg-[#2bbbad] group-hover:text-black transition-colors shrink-0 font-medium">
+                        {selectedTrack ? 'Change' : 'Select'}
+                      </span>
+                    </button>
+                    <div className="flex items-center gap-0.5 shrink-0">
                       <button
                         type="button"
                         onClick={(e) => { e.stopPropagation(); setBeatMuted(!beatMuted); }}
@@ -2706,11 +2668,16 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
 
                 <div className="daw-lane flex items-center px-1.5">
                   <div
-                    className="daw-clip flex items-end gap-px px-2 pb-1.5 pt-4"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setBeatPickerOpen(true);
+                    }}
+                    className="daw-clip flex items-end gap-px px-2 pb-1.5 pt-4 cursor-pointer hover:brightness-105 transition-all"
                     style={{ width: '85%', background: 'linear-gradient(180deg, #c67a1a 0%, #9a5a12 100%)' }}
+                    title="Click to select or change instrumental"
                   >
-                    <span className="absolute top-0.5 left-1.5 text-[10px] font-medium text-black/70">
-                      {selectedTrack?.title || 'Drum Machine'}
+                    <span className="absolute top-0.5 left-1.5 text-[10px] font-medium text-black/80 truncate max-w-[90%]">
+                      {selectedTrack ? `Instrumental · ${selectedTrack.title}` : 'Instrumental (Click to select beat)'}
                     </span>
                     {Array.from({ length: 64 }).map((_, i) => {
                       const h = 22 + Math.sin(i * 0.45) * 28 + Math.cos(i * 0.8) * 16;
