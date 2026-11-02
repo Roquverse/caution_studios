@@ -43,7 +43,24 @@ import {
   Search,
   ArrowLeft,
   Bookmark,
-  Target
+  Target,
+  Undo2,
+  Redo2,
+  ZoomIn,
+  ZoomOut,
+  Magnet,
+  Wand2,
+  Scissors,
+  Music2,
+  Folder,
+  Keyboard,
+  ChevronRight,
+  Settings,
+  HelpCircle,
+  Upload,
+  Globe,
+  Menu,
+  Star
 } from 'lucide-react';
 import { TrackItem } from '../types/tracks';
 import { useUserSubscription } from '../lib/subscription';
@@ -226,7 +243,7 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
   const [masterMeterR, setMasterMeterR] = useState(0);
 
   // DSP Console: collapsed by default on mobile to free up track timeline space
-  const [isConsoleOpen, setIsConsoleOpen] = useState(false);
+  const [isConsoleOpen, setIsConsoleOpen] = useState(true);
 
   // DSP Effects (Auto-Tune Pro, Reverb, Delay, EQ, Compressor)
   const [autoTuneEnabled, setAutoTuneEnabled] = useState(true);
@@ -240,6 +257,34 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
   const [eqHigh, setEqHigh] = useState(2.0); // dB
   const [compressorEnabled, setCompressorEnabled] = useState(true);
   const [lowCutEnabled, setLowCutEnabled] = useState(true);
+
+
+  // =========================================================================
+  // BANDLAB PRO DAW WORKSTATION STATE
+  // =========================================================================
+  const [timeSignature, setTimeSignature] = useState<'4/4' | '3/4' | '6/8'>('4/4');
+  const [timeSigDropdownOpen, setTimeSigDropdownOpen] = useState(false);
+  const [keyDropdownOpen, setKeyDropdownOpen] = useState(false);
+  const [bpmInputOpen, setBpmInputOpen] = useState(false);
+  const [sessionBpm, setSessionBpm] = useState<number>(selectedTrack?.bpm || 125);
+  const [masteringPreset, setMasteringPreset] = useState<'Select Preset' | 'Universal' | 'Warm' | 'Clarity' | 'Bass Boost'>('Universal');
+  const [masteringDropdownOpen, setMasteringDropdownOpen] = useState(false);
+  const [zoomLevel, setZoomLevel] = useState<number>(1);
+  const [snapToGrid, setSnapToGrid] = useState<boolean>(true);
+  const [activeInspectorTab, setActiveInspectorTab] = useState<'autopitch' | 'fx' | 'editor'>('autopitch');
+  const [autoPitchCategory, setAutoPitchCategory] = useState<'Essentials' | 'Modern Rap' | 'Afrobeat' | 'Pop' | 'R&B'>('Essentials');
+  const [autoPitchPreset, setAutoPitchPreset] = useState<'Classic' | 'Duet' | 'Big Harmony' | 'Natural' | 'Third' | 'Octave'>('Classic');
+  const [selectedTrackTab, setSelectedTrackTab] = useState<string>('trk_lead');
+  const [audioInputDevice, setAudioInputDevice] = useState<string>('MacBook Pro Microphone (Built-in)');
+  const [audioInputChannel, setAudioInputChannel] = useState<'Channel 1 (Mono)' | 'Channel 2' | 'Stereo'>('Channel 1 (Mono)');
+  const [isInputMonitoring, setIsInputMonitoring] = useState<boolean>(false);
+  const [isShortcutsModalOpen, setIsShortcutsModalOpen] = useState<boolean>(false);
+  const [isLyricsDrawerOpen, setIsLyricsDrawerOpen] = useState<boolean>(false);
+  const [mutedScaleNotes, setMutedScaleNotes] = useState<string[]>([]);
+  const [loopStartBar, setLoopStartBar] = useState<number>(1);
+  const [loopEndBar, setLoopEndBar] = useState<number>(5);
+  const [isAutoMixRunning, setIsAutoMixRunning] = useState<boolean>(false);
+  const [autoMixSuccess, setAutoMixSuccess] = useState<boolean>(false);
 
   // Acoustic Shield / Phone Mic Cleaner (Echo Cancellation & Noise Suppression)
   const [micCleanFilter, setMicCleanFilter] = useState(true);
@@ -1943,17 +1988,107 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
   const anySolo = vocalTracks.some((t) => t.isSolo) || beatSolo;
   const beatShouldPlay = anySolo ? beatSolo : !beatMuted;
 
+
+  // =========================================================================
+  // BANDLAB PRO DAW HELPERS & LOGIC
+  // =========================================================================
+  const autoPitchPercent = Math.round(autoTuneAmount * 100);
+
+  const getAutoPitchDialLabel = (val: number) => {
+    if (!autoTuneEnabled || val === 0) return 'Bypass';
+    if (val >= 80) return 'Heaviest';
+    if (val >= 55) return 'Heavy';
+    if (val >= 30) return 'Medium';
+    return 'Subtle';
+  };
+
+  const handleSelectAutoPitchPreset = (preset: 'Classic' | 'Duet' | 'Big Harmony' | 'Natural' | 'Third' | 'Octave') => {
+    setAutoPitchPreset(preset);
+    if (!autoTuneEnabled) setAutoTuneEnabled(true);
+    if (preset === 'Classic') {
+      setAutoTuneSpeed('hard');
+      setAutoTuneAmount(0.95);
+    } else if (preset === 'Natural') {
+      setAutoTuneSpeed('subtle');
+      setAutoTuneAmount(0.45);
+    } else if (preset === 'Big Harmony') {
+      setAutoTuneSpeed('fast');
+      setAutoTuneAmount(0.85);
+      setReverbAmount(0.35);
+    } else if (preset === 'Duet') {
+      setAutoTuneSpeed('fast');
+      setAutoTuneAmount(0.75);
+      setDelayAmount(0.2);
+    } else if (preset === 'Third') {
+      setAutoTuneSpeed('hard');
+      setAutoTuneAmount(0.85);
+    } else if (preset === 'Octave') {
+      setAutoTuneSpeed('hard');
+      setAutoTuneAmount(0.9);
+    }
+  };
+
+  const handleAutoDetectKey = () => {
+    const detected = selectedTrack?.musicalKey || 'D Minor';
+    setAutoTuneKey(detected);
+    setAutoTuneEnabled(true);
+  };
+
+  const handleAutoMixAI = () => {
+    setIsAutoMixRunning(true);
+    setTimeout(() => {
+      // Intelligent vocal balancing & mastering
+      setBeatVolume(0.78);
+      setVocalTracks((prev) =>
+        prev.map((t) => ({ ...t, volume: t.type === 'lead' ? 1.05 : 0.85 }))
+      );
+      setCompressorEnabled(true);
+      setLowCutEnabled(true);
+      setEqLow(-1.0);
+      setEqMid(2.0);
+      setEqHigh(2.5);
+      setReverbAmount(0.22);
+      setDelayAmount(0.12);
+      setIsAutoMixRunning(false);
+      setAutoMixSuccess(true);
+      setTimeout(() => setAutoMixSuccess(false), 3000);
+    }, 1200);
+  };
+
+  // Determine active scale notes for key matrix
+  const scaleKeyRoot = useMemo(() => {
+    const raw = autoTuneKey.replace('Auto', '').trim() || (selectedTrack?.musicalKey || 'D Minor');
+    const firstPart = raw.split(' ')[0] || 'D';
+    return firstPart.toUpperCase();
+  }, [autoTuneKey, selectedTrack?.musicalKey]);
+
+  const isMinorScale = useMemo(() => {
+    const raw = (autoTuneKey + ' ' + (selectedTrack?.musicalKey || '')).toLowerCase();
+    return raw.includes('minor') || raw.includes('min');
+  }, [autoTuneKey, selectedTrack?.musicalKey]);
+
+  const activeScaleNotes = useMemo(() => {
+    const allNotes = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+    const rootIdx = allNotes.findIndex((n) => n.toLowerCase() === scaleKeyRoot.toLowerCase());
+    const validRoot = rootIdx >= 0 ? rootIdx : 2; // Default D
+    const intervals = isMinorScale ? [0, 2, 3, 5, 7, 8, 10] : [0, 2, 4, 5, 7, 9, 11];
+    const notesInScale = new Set(intervals.map((i) => allNotes[(validRoot + i) % 12]));
+    return notesInScale;
+  }, [scaleKeyRoot, isMinorScale]);
+
+  const toggleScaleNote = (note: string) => {
+    setMutedScaleNotes((prev) =>
+      prev.includes(note) ? prev.filter((n) => n !== note) : [...prev, note]
+    );
+  };
   return (
-    /* =========================================================================
-       FULL-WIDTH & FULL-SCREEN DAW WORKSTATION (Edge-to-Edge Desktop Layout)
-       ========================================================================= */
     <div
       className={`${
         isStandalonePage
           ? 'w-full min-h-screen h-screen'
           : 'fixed inset-0 z-50 w-screen h-screen'
-      } bg-[#07090E] text-white flex flex-col font-sans select-none overflow-hidden`}
-      style={{ backgroundColor: '#07090E', opacity: 1 }}
+      } bg-[#0c0d10] text-[#e5e7eb] flex flex-col font-sans select-none overflow-hidden`}
+      style={{ backgroundColor: '#0c0d10', color: '#e5e7eb' }}
     >
       {/* Hidden Playback Track Audio Elements */}
       {selectedTrack && (
@@ -2005,1691 +2140,1549 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
       <audio ref={auditionAudioRef} onEnded={() => setIsAuditioningId(null)} />
 
       {/* =========================================================================
-          1. TOP DAW TITLE BAR (Pro Studio Header Chassis)
+          1. TOP BANDLAB HEADER & TRANSPORT BAR (Exact Layout from Screenshot)
          ========================================================================= */}
-      <div className="w-full px-4 py-2 bg-[#0E1119] border-b border-white/10 flex items-center justify-between text-xs shrink-0">
-        {/* Left: DAW Branding & Back Button */}
-        <div className="flex items-center gap-3 min-w-0">
-          {isStandalonePage && onClose && (
+      <header className="h-13 min-h-[52px] bg-[#0c0d10] border-b border-[#1f2229] flex items-center justify-between px-3 text-xs shrink-0 select-none z-30">
+        {/* Left Section: Menu + Caution/BandLab Brand + Undo/Redo + Project Settings */}
+        <div className="flex items-center gap-2 sm:gap-2.5 min-w-0">
+          {/* Hamburger Menu / Exit */}
+          <button
+            type="button"
+            onClick={onClose || (() => window.history.back())}
+            title="Menu / Exit Studio"
+            className="w-8 h-8 rounded-lg bg-white/5 hover:bg-white/10 flex items-center justify-center text-gray-300 hover:text-white transition-colors cursor-pointer"
+          >
+            <Menu className="h-4 w-4" />
+          </button>
+
+          {/* Brand Logo & Star Badge */}
+          <div className="flex items-center gap-2 pl-1">
+            <div className="flex items-center gap-1.5 font-black text-white tracking-tight text-sm">
+              <span className="w-2.5 h-2.5 rounded-full bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.8)] animate-pulse" />
+              <span>BandLab</span>
+            </div>
             <button
               type="button"
-              onClick={onClose}
-              className="px-2.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-bold text-gray-300 hover:text-white flex items-center gap-1.5 transition-colors cursor-pointer mr-1"
-              title="Return to Caution Studio Portal"
+              onClick={() => setIsExportDialogOpen(true)}
+              className="px-2 py-0.5 rounded-md bg-[#241a0e] border border-[#f59e0b]/40 text-[#f59e0b] text-[10px] font-bold flex items-center gap-1 hover:bg-[#382613] transition-colors cursor-pointer"
             >
-              <ArrowLeft className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">Exit Studio</span>
+              <Star className="h-2.5 w-2.5 fill-current" />
+              <span>Get Pro</span>
             </button>
-          )}
-          <div className="flex items-center gap-2">
-            <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse" />
-            <span className="font-mono font-black text-white uppercase tracking-wider text-xs flex items-center gap-1.5">
-              <span>RECORD STUDIO</span>
-              <span className="text-[10px] text-teal-400 font-normal px-1.5 py-0.2 rounded bg-teal-500/10 border border-teal-500/20">
-                DAW MULTI-TRACK v2.5
-              </span>
-            </span>
           </div>
 
-          <div className="hidden md:flex items-center gap-2 pl-3 border-l border-white/10">
-            <span className="text-gray-500 text-[11px] font-mono">SESSION:</span>
+          {/* Undo / Redo */}
+          <div className="hidden md:flex items-center gap-0.5 pl-2">
+            <button
+              type="button"
+              onClick={handleReturnToZero}
+              title="Undo (Ctrl+Z)"
+              className="w-7 h-7 rounded-md hover:bg-white/10 flex items-center justify-center text-gray-400 hover:text-white transition-colors cursor-pointer"
+            >
+              <Undo2 className="h-3.5 w-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={handleReturnToZero}
+              title="Redo (Ctrl+Y)"
+              className="w-7 h-7 rounded-md hover:bg-white/10 flex items-center justify-center text-gray-400 hover:text-white transition-colors cursor-pointer"
+            >
+              <Redo2 className="h-3.5 w-3.5" />
+            </button>
+          </div>
+
+          {/* Project Settings Pills (Metronome / BPM, 4/4 Time Signature, Key) */}
+          <div className="hidden lg:flex items-center gap-1.5 pl-1.5">
+            {/* Metronome toggle + BPM Pill */}
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setBpmInputOpen(!bpmInputOpen)}
+                className="h-7 px-2.5 rounded-md bg-[#16181f] border border-white/5 hover:border-white/20 text-gray-200 text-xs font-mono font-medium flex items-center gap-1.5 transition-colors cursor-pointer"
+                title="Project Tempo / Tap BPM"
+              >
+                <SlidersHorizontal className="h-3 w-3 text-gray-400" />
+                <span>{sessionBpm} bpm</span>
+              </button>
+              {bpmInputOpen && (
+                <div className="absolute top-full left-0 mt-1 w-44 p-2.5 rounded-xl bg-[#16181f] border border-white/15 shadow-2xl z-50 text-xs space-y-2">
+                  <span className="text-[10px] font-mono text-gray-400 uppercase block">Tempo (BPM)</span>
+                  <input
+                    type="number"
+                    min="50"
+                    max="220"
+                    value={sessionBpm}
+                    onChange={(e) => setSessionBpm(parseInt(e.target.value, 10) || 120)}
+                    className="w-full bg-black/60 border border-white/10 rounded px-2 py-1 text-white font-mono text-xs focus:outline-none focus:border-teal-400"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setBpmInputOpen(false)}
+                    className="w-full py-1 rounded bg-teal-500 text-black font-bold text-[11px]"
+                  >
+                    Done
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Time Signature */}
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setTimeSigDropdownOpen(!timeSigDropdownOpen)}
+                className="h-7 px-2 rounded-md bg-[#16181f] border border-white/5 hover:border-white/20 text-gray-200 text-xs font-mono flex items-center gap-1 transition-colors cursor-pointer"
+                title="Time Signature"
+              >
+                <span>{timeSignature}</span>
+                <ChevronDown className="h-3 w-3 text-gray-400" />
+              </button>
+              {timeSigDropdownOpen && (
+                <div className="absolute top-full left-0 mt-1 w-24 p-1 rounded-lg bg-[#16181f] border border-white/15 shadow-2xl z-50 text-xs space-y-0.5 font-mono">
+                  {(['4/4', '3/4', '6/8'] as const).map((sig) => (
+                    <button
+                      key={sig}
+                      type="button"
+                      onClick={() => { setTimeSignature(sig); setTimeSigDropdownOpen(false); }}
+                      className={`w-full text-left px-2 py-1 rounded hover:bg-white/10 ${timeSignature === sig ? 'text-teal-300 font-bold' : 'text-gray-300'}`}
+                    >
+                      {sig}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Key / Scale Signature */}
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setKeyDropdownOpen(!keyDropdownOpen)}
+                className="h-7 px-2.5 rounded-md bg-[#16181f] border border-white/5 hover:border-white/20 text-gray-200 text-xs font-mono flex items-center gap-1.5 transition-colors cursor-pointer"
+                title="Musical Key / Scale"
+              >
+                <span>{scaleKeyRoot} {isMinorScale ? 'min' : 'maj'}</span>
+                <ChevronDown className="h-3 w-3 text-gray-400" />
+              </button>
+              {keyDropdownOpen && (
+                <div className="absolute top-full left-0 mt-1 w-44 p-2 rounded-xl bg-[#16181f] border border-white/15 shadow-2xl z-50 text-xs space-y-1 font-mono max-h-56 overflow-y-auto">
+                  <div className="text-[10px] text-gray-400 px-1.5 py-0.5">Scale Key</div>
+                  {['D min', 'F min', 'C maj', 'A min', 'G maj', 'Bb min', 'Eb maj'].map((k) => (
+                    <button
+                      key={k}
+                      type="button"
+                      onClick={() => {
+                        setAutoTuneKey(k);
+                        setKeyDropdownOpen(false);
+                      }}
+                      className="w-full text-left px-2 py-1 rounded hover:bg-white/10 text-gray-200"
+                    >
+                      {k}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Center Section: Session Title + Transport Controls */}
+        <div className="flex items-center gap-3">
+          {/* Editable Session Title */}
+          <div className="hidden xl:flex items-center gap-1">
             <input
               type="text"
               value={projectTitle}
               onChange={(e) => setProjectTitle(e.target.value)}
-              placeholder="Session Name"
-              className="bg-transparent border-b border-white/10 hover:border-white/30 focus:border-teal-400 text-xs text-white font-medium focus:outline-none px-1 py-0.5 w-64"
+              placeholder="New Project"
+              className="bg-transparent border-b border-transparent hover:border-white/20 focus:border-teal-400 text-xs text-white font-medium focus:outline-none px-1.5 py-0.5 w-36 text-center truncate"
             />
+          </div>
+
+          {/* Transport Controls Cluster */}
+          <div className="flex items-center gap-1 bg-[#16181f] p-1 rounded-xl border border-white/5 shadow-inner">
+            {/* Rewind to Beginning */}
+            <button
+              type="button"
+              onClick={handleReturnToZero}
+              title="Rewind to Start (Return to Zero)"
+              className="w-7 h-7 rounded-lg hover:bg-white/10 text-gray-300 hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+            >
+              <SkipBack className="h-3.5 w-3.5" />
+            </button>
+
+            {/* Play / Pause Button */}
+            <button
+              type="button"
+              onClick={togglePlayCombinedPreview}
+              disabled={isRecording}
+              title="Play / Pause (Space)"
+              className="w-8 h-8 rounded-lg bg-white hover:bg-gray-100 text-black flex items-center justify-center transition-transform hover:scale-105 shadow cursor-pointer"
+            >
+              {isPlaying ? (
+                <Pause className="h-4 w-4 fill-current text-black" />
+              ) : (
+                <Play className="h-4 w-4 fill-current text-black ml-0.5" />
+              )}
+            </button>
+
+            {/* Big Iconic Red Record Button */}
+            <button
+              type="button"
+              onClick={handleRecordTrigger}
+              title={`Record into: ${armedTrack?.name || 'Vocal Track'} (R)`}
+              className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all cursor-pointer ${
+                isRecording
+                  ? 'bg-red-500 text-white shadow-[0_0_15px_rgba(239,68,68,0.8)] animate-pulse'
+                  : 'bg-red-500/20 hover:bg-red-500/30 text-red-400 border border-red-500/30'
+              }`}
+            >
+              <span className={`w-3.5 h-3.5 rounded-full bg-red-500 border-2 border-[#16181f] ${isRecording ? 'animate-ping' : ''}`} />
+            </button>
+
+            {/* Loop Toggle */}
+            <button
+              type="button"
+              onClick={() => setIsLoopEnabled(!isLoopEnabled)}
+              title="Cycle Loop Mode (L)"
+              className={`w-7 h-7 rounded-lg flex items-center justify-center transition-colors cursor-pointer ${
+                isLoopEnabled ? 'bg-teal-500/20 text-teal-300' : 'text-gray-400 hover:text-white hover:bg-white/5'
+              }`}
+            >
+              <Repeat className="h-3.5 w-3.5" />
+            </button>
+
+            {/* Timecode LCD Display (00:00.0) */}
+            <div className="px-2 py-0.5 font-mono text-xs font-bold text-gray-200 bg-black/40 rounded border border-white/5 tracking-wider">
+              {formatTimecode(playheadTime)}
+            </div>
           </div>
         </div>
 
-        {/* Center: Audio Engine & Multi-track Specs */}
-        <div className="hidden lg:flex items-center gap-3 text-[11px] font-mono text-gray-400">
-          <span className="flex items-center gap-1">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-            <span>48.0 kHz · 24-Bit PCM</span>
-          </span>
-          <span>·</span>
-          <span className="text-teal-300 font-bold">
-            {vocalTracks.length + 1} TRACKS ({vocalTracks.filter((t) => t.vocalBlob).length} RECORDED)
-          </span>
-          <span>·</span>
-          <span>STUDIO CLOUD READY</span>
-        </div>
+        {/* Right Section: Mastering + Master Volume + Save & Publish */}
+        <div className="flex items-center gap-2 sm:gap-2.5">
+          {/* Mastering Selector Dropdown */}
+          <div className="relative hidden md:block">
+            <button
+              type="button"
+              onClick={() => setMasteringDropdownOpen(!masteringDropdownOpen)}
+              className="h-7 px-2.5 rounded-md bg-[#16181f] border border-white/5 hover:border-white/20 text-gray-300 hover:text-white text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer"
+            >
+              <Sparkles className="h-3 w-3 text-amber-400" />
+              <span className="text-[11px]">Mastering: <strong className="text-white">{masteringPreset}</strong></span>
+              <ChevronDown className="h-3 w-3 text-gray-400" />
+            </button>
+            {masteringDropdownOpen && (
+              <div className="absolute top-full right-0 mt-1 w-44 p-1.5 rounded-xl bg-[#16181f] border border-white/15 shadow-2xl z-50 text-xs space-y-0.5 font-sans">
+                {(['Universal', 'Warm', 'Clarity', 'Bass Boost', 'Select Preset'] as const).map((pst) => (
+                  <button
+                    key={pst}
+                    type="button"
+                    onClick={() => { setMasteringPreset(pst as any); setMasteringDropdownOpen(false); }}
+                    className={`w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-white/10 ${masteringPreset === pst ? 'text-amber-300 font-bold bg-amber-400/10' : 'text-gray-300'}`}
+                  >
+                    {pst}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
 
-        {/* Right: Quick Actions & Window Close */}
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setIsExportDialogOpen(true)}
-            disabled={!hasAnyRecordedTakes || isExportingWav}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-bold text-gray-200 transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
-            title="Configure export range and download master WAV mixdown"
-          >
-            <Download className="h-3.5 w-3.5 text-teal-300" />
-            <span>{isExportingWav ? 'Rendering...' : `Export Master WAV (${effectiveExportDuration.toFixed(0)}s)`}</span>
-          </button>
+          {/* Master Volume Fader with Speaker Icon */}
+          <div className="hidden xl:flex items-center gap-1.5 bg-[#16181f] px-2.5 py-1 rounded-lg border border-white/5">
+            <Volume2 className="h-3.5 w-3.5 text-gray-400 shrink-0" />
+            <input
+              type="range"
+              min="0"
+              max="1.5"
+              step="0.02"
+              value={masterVolume}
+              onChange={(e) => setMasterVolume(parseFloat(e.target.value))}
+              className="w-16 accent-teal-400 h-1 bg-black/60 rounded cursor-pointer"
+              title="Master Output Gain"
+            />
+            <span className="text-[10px] font-mono text-gray-400 w-10 text-right">
+              {masterVolume >= 1 ? `+${((masterVolume - 1) * 6).toFixed(1)}dB` : `-${((1 - masterVolume) * 24).toFixed(1)}dB`}
+            </span>
+          </div>
 
+          {/* Save Button (Pill) */}
           <button
             type="button"
             onClick={() => handleSaveToCloud()}
-            disabled={!hasAnyRecordedTakes || isSavingToCloud}
-            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-teal-500/20 hover:bg-teal-500/30 border border-teal-500/40 text-xs font-bold text-teal-300 transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer shadow-sm"
+            disabled={isSavingToCloud}
+            className="px-3.5 py-1.5 rounded-full bg-white/5 hover:bg-white/10 border border-white/15 text-gray-200 hover:text-white text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5"
           >
-            <CloudUpload className="h-3.5 w-3.5" />
-            <span>{isSavingToCloud ? 'Saving to Cloud...' : 'Save to Cloud'}</span>
+            <CloudUpload className="h-3.5 w-3.5 text-teal-400" />
+            <span>{isSavingToCloud ? 'Saving...' : 'Save'}</span>
           </button>
 
+          {/* Publish / Export Master Button (Solid White Pill with Black text) */}
           <button
             type="button"
-            onClick={onClose}
-            className="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-white/10 transition-colors ml-1 cursor-pointer"
-            title="Exit Studio"
+            onClick={() => setIsExportDialogOpen(true)}
+            className="px-4 py-1.5 rounded-full bg-white hover:bg-gray-100 text-black text-xs font-black uppercase tracking-wider transition-all hover:scale-105 shadow-md shadow-white/10 cursor-pointer flex items-center gap-1.5"
           >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-      </div>
-
-      {/* =========================================================================
-          2. MASTER TRANSPORT BAR & DIGITAL TIME COUNTER (Pro Studio Style)
-         ========================================================================= */}
-      <div className="w-full px-4 py-2.5 bg-[#0C0F17] border-b border-white/10 flex flex-wrap items-center justify-between gap-3 text-xs shrink-0">
-        {/* Main Transport Buttons */}
-        <div className="flex items-center gap-1.5 sm:gap-2">
-          {/* Return to Zero (RTZ) */}
-          <button
-            type="button"
-            onClick={handleReturnToZero}
-            title="Return to Zero (00:00)"
-            className="w-8 h-8 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-gray-300 hover:text-white flex items-center justify-center transition-colors cursor-pointer"
-          >
-            <SkipBack className="h-4 w-4" />
+            <Download className="h-3.5 w-3.5 stroke-[2.5]" />
+            <span>Publish</span>
           </button>
 
-          {/* Play Button */}
+          {/* Bell Notification Icon */}
           <button
             type="button"
-            onClick={togglePlayCombinedPreview}
-            disabled={isRecording}
-            title="Play / Pause All Tracks (Space)"
-            className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all cursor-pointer shadow-md ${
-              isPlaying
-                ? 'bg-emerald-500 text-black shadow-emerald-500/30'
-                : 'bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/40 text-emerald-400'
-            }`}
-          >
-            {isPlaying ? <Pause className="h-4 w-4 fill-current" /> : <Play className="h-4 w-4 fill-current ml-0.5" />}
-          </button>
-
-          {/* Stop Button */}
-          <button
-            type="button"
-            onClick={() => {
-              if (isRecording) stopRecordingSession();
-              else if (isPlaying) togglePlayCombinedPreview();
-              handleReturnToZero();
-            }}
-            title="Stop"
-            className="w-8 h-8 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-gray-300 hover:text-white flex items-center justify-center transition-colors cursor-pointer"
-          >
-            <Square className="h-3.5 w-3.5 fill-current text-gray-300" />
-          </button>
-
-          {/* Big Record Button */}
-          <button
-            type="button"
-            onClick={handleRecordTrigger}
-            title={`Record into: ${armedTrack?.name || 'Armed Track'} (R)`}
-            className={`h-9 px-3.5 rounded-xl font-bold flex items-center gap-2 transition-all cursor-pointer shadow-lg ${
-              isRecording
-                ? 'bg-red-500 text-white animate-pulse shadow-red-500/40'
-                : 'bg-red-500/20 hover:bg-red-500/30 border border-red-500/40 text-red-300'
-            }`}
-          >
-            <span className={`w-3 h-3 rounded-full bg-red-500 ${isRecording ? 'animate-ping' : ''}`} />
-            <span className="font-mono uppercase text-xs">
-              {recordState === 'countdown'
-                ? `COUNTDOWN ${countdownNumber}`
-                : isRecording
-                ? `REC (${armedTrack?.name || 'ARMED'})`
-                : `RECORD (${armedTrack?.name?.split(' ')[0] || 'ARM'})`}
-            </span>
-          </button>
-
-          {/* Delete Armed Take button if current armed track has a take */}
-          {armedTrack?.vocalBlob && !isRecording && (
-            <button
-              type="button"
-              onClick={() => handleClearVocalTake(armedTrack.id)}
-              title={`Delete recorded take on ${armedTrack.name} and re-record`}
-              className="h-9 px-2.5 rounded-xl bg-red-500/15 hover:bg-red-500/30 border border-red-500/40 text-red-300 hover:text-white text-xs font-mono font-bold flex items-center gap-1.5 transition-colors cursor-pointer shadow-sm"
-            >
-              <Trash2 className="h-3.5 w-3.5 text-red-400" />
-              <span className="hidden sm:inline">Delete Take</span>
-            </button>
-          )}
-
-          {/* Loop Toggle */}
-          <button
-            type="button"
-            onClick={() => setIsLoopEnabled(!isLoopEnabled)}
-            title="Cycle / Loop Region"
-            className={`p-2 rounded-lg border text-xs font-mono transition-colors cursor-pointer ${
-              isLoopEnabled
-                ? 'bg-teal-500/20 text-teal-300 border-teal-500/40'
-                : 'bg-white/5 border-white/10 text-gray-400 hover:text-white'
-            }`}
-          >
-            <Repeat className="h-3.5 w-3.5" />
-          </button>
-
-          {/* Metronome Click Toggle */}
-          <button
-            type="button"
-            onClick={() => setIsMetronomeEnabled(!isMetronomeEnabled)}
-            title="Metronome / Click Track"
-            className={`p-2 rounded-lg border text-xs font-mono transition-colors flex items-center gap-1 cursor-pointer ${
-              isMetronomeEnabled
-                ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
-                : 'bg-white/5 border-white/10 text-gray-400 hover:text-white'
-            }`}
+            title="Notifications"
+            className="w-8 h-8 rounded-full bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white flex items-center justify-center transition-colors relative"
           >
             <Bell className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline text-[10px]">CLICK</span>
-          </button>
-
-          {/* 3s Count-in Toggle */}
-          <button
-            type="button"
-            onClick={() => setIsCountInEnabled(!isCountInEnabled)}
-            title="3-Second Count-In"
-            className={`px-2 py-1.5 rounded-lg border text-[10px] font-mono transition-colors cursor-pointer ${
-              isCountInEnabled
-                ? 'bg-purple-500/20 text-purple-300 border-purple-500/40 font-bold'
-                : 'bg-white/5 border-white/10 text-gray-400'
-            }`}
-          >
-            3s PRE
-          </button>
-
-          {/* + ADD BACKUP VOCAL TRACK BUTTON */}
-          <button
-            type="button"
-            onClick={handleAddBackupVocalTrack}
-            className="h-8 px-3 rounded-lg bg-teal-500/15 hover:bg-teal-500/25 border border-teal-500/30 text-teal-300 text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer shadow-sm"
-            title="Add a new backup vocal harmony or doubles track"
-          >
-            <Plus className="h-3.5 w-3.5 text-teal-400" />
-            <span>+ Add Backup Vocal</span>
+            <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-red-500" />
           </button>
         </div>
-
-        {/* Digital LED Timecode Readout */}
-        <div className="flex items-center gap-2 bg-black/60 border border-white/10 rounded-xl px-3 py-1.5 shadow-inner">
-          <div className="text-right">
-            <div className="text-sm sm:text-base font-mono font-black text-amber-400 tracking-wider">
-              {formatTimecode(isRecording ? recordingSeconds : playheadTime)}
-            </div>
-            <div className="text-[9px] font-mono text-gray-500 flex items-center justify-end gap-1.5">
-              <span>BAR: {formatBarsBeats(isRecording ? recordingSeconds : playheadTime, selectedTrack?.bpm || 120)}</span>
-            </div>
-          </div>
-
-          <div className="h-6 w-px bg-white/10 mx-1" />
-
-          <div className="text-[10px] font-mono text-gray-400 space-y-0.5">
-            <div className="flex items-center gap-1 text-white font-bold">
-              <span className="text-teal-400">{selectedTrack?.bpm || 120}</span>
-              <span>BPM</span>
-            </div>
-            <div className="text-gray-500">{selectedTrack?.musicalKey || 'C Minor'}</div>
-          </div>
-        </div>
-
-        {/* Master Output VU Meter & Master Volume Knob */}
-        <div className="hidden md:flex items-center gap-2.5 bg-black/40 border border-white/10 rounded-xl px-2.5 py-1.5">
-          <div className="text-[9px] font-mono text-gray-400">MASTER</div>
-          <div className="flex gap-1">
-            <div className="w-2.5 h-7 bg-black rounded-sm overflow-hidden flex flex-col-reverse p-0.5 border border-white/10">
-              <div
-                className="w-full bg-gradient-to-t from-emerald-500 via-yellow-400 to-red-500 rounded-xs transition-all duration-75"
-                style={{ height: `${masterMeterL}%` }}
-              />
-            </div>
-            <div className="w-2.5 h-7 bg-black rounded-sm overflow-hidden flex flex-col-reverse p-0.5 border border-white/10">
-              <div
-                className="w-full bg-gradient-to-t from-emerald-500 via-yellow-400 to-red-500 rounded-xs transition-all duration-75"
-                style={{ height: `${masterMeterR}%` }}
-              />
-            </div>
-          </div>
-          <input
-            type="range"
-            min="0"
-            max="1.5"
-            step="0.01"
-            value={masterVolume}
-            onChange={(e) => setMasterVolume(parseFloat(e.target.value))}
-            aria-label="Master Volume Fader"
-            className="w-16 accent-teal-400 h-1.5 bg-black/50 rounded cursor-pointer"
-          />
-          <span className="text-[9px] font-mono text-teal-300 w-7 text-right">
-            {Math.round(masterVolume * 100)}%
-          </span>
-        </div>
-
-        {/* Backing Beat Switcher Trigger */}
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setBeatPickerOpen(!beatPickerOpen)}
-            className="px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-bold text-gray-300 hover:text-white flex items-center gap-1.5 transition-colors cursor-pointer"
-            title="Click to choose a backing beat"
-          >
-            <Music className="h-3.5 w-3.5 text-amber-400" />
-            <span className="truncate max-w-[140px] sm:max-w-[200px]">
-              {selectedTrack ? selectedTrack.title : 'Choose Beat'}
-            </span>
-            <ChevronDown className="h-3 w-3 text-gray-400" />
-          </button>
-        </div>
-      </div>
-
-      {/* Dropdown / Modal Beat Selector Overlay */}
-      {beatPickerOpen && (
-        <div className="p-4 bg-[#0B0D14] border-b border-amber-400/20 flex flex-col gap-3 z-40 animate-in slide-in-from-top-2 duration-150 shrink-0 shadow-2xl">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
-              <Disc3 className="h-4 w-4 text-amber-400 animate-[spin_8s_linear_infinite]" />
-              <div>
-                <h3 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
-                  <span>Track 01 Beat Library · Choose Your Backing Beat</span>
-                </h3>
-                <p className="text-[10px] text-gray-400">
-                  Select any beat from your studio catalog. Your recorded vocal takes will be preserved.
-                </p>
-              </div>
-            </div>
-
-            {/* Search Input & Close */}
-            <div className="flex items-center gap-2">
-              <div className="relative">
-                <Search className="h-3.5 w-3.5 text-gray-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
-                <input
-                  type="text"
-                  placeholder="Search title, artist, genre..."
-                  value={beatSearchQuery}
-                  onChange={(e) => setBeatSearchQuery(e.target.value)}
-                  className="pl-8 pr-3 py-1 text-xs bg-black/60 border border-white/10 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-amber-400 w-44 sm:w-60"
-                />
-              </div>
-              <button
-                type="button"
-                onClick={() => setBeatPickerOpen(false)}
-                className="px-2.5 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-xs font-bold text-white cursor-pointer transition-colors"
-              >
-                Done
-              </button>
-            </div>
-          </div>
-
-          {/* Genre filter tags */}
-          <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
-            {['All', 'Afrobeat', 'Amapiano', 'Hip Hop', 'Trap', 'R&B', 'Pop'].map((genre) => (
-              <button
-                key={genre}
-                type="button"
-                onClick={() => setBeatGenreFilter(genre)}
-                className={`px-2.5 py-0.5 rounded-full text-[10px] font-mono whitespace-nowrap transition-colors cursor-pointer border ${
-                  beatGenreFilter === genre
-                    ? 'bg-amber-400 text-black border-amber-300 font-bold shadow-sm'
-                    : 'bg-white/5 border-white/10 text-gray-400 hover:text-white'
-                }`}
-              >
-                {genre}
-              </button>
-            ))}
-          </div>
-
-          {/* Beats Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2.5 max-h-56 overflow-y-auto pr-1">
-            {filteredBeats.map((b) => {
-              const isCurrent = selectedTrack?.id === b.id;
-              const isAuditioning = isAuditioningId === b.id;
-
-              return (
-                <div
-                  key={b.id}
-                  onClick={() => handleSelectBeat(b)}
-                  className={`p-2.5 rounded-xl border text-left cursor-pointer transition-all flex items-center justify-between group ${
-                    isCurrent
-                      ? 'bg-amber-500/15 border-amber-400/50 text-amber-200 ring-1 ring-amber-400/30'
-                      : 'bg-[#111422] border-white/5 hover:border-amber-400/30 hover:bg-[#15192b] text-gray-300'
-                  }`}
-                >
-                  <div className="min-w-0 pr-2 flex-1">
-                    <div className="flex items-center gap-1">
-                      <p className="text-xs font-bold text-white truncate">{b.title}</p>
-                      {isCurrent && (
-                        <span className="text-[8px] font-mono px-1 py-0.2 rounded bg-amber-400 text-black font-bold shrink-0">
-                          LOADED
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-[10px] text-gray-400 truncate">
-                      {b.artist || 'Caution'} · {b.bpm || 110} BPM
-                    </p>
-                    <span className="text-[9px] font-mono text-gray-500">{b.genre || 'Afrobeat'}</span>
-                  </div>
-
-                  <div className="flex items-center gap-1.5 shrink-0">
-                    <button
-                      type="button"
-                      title={isAuditioning ? 'Pause audition' : 'Audition preview'}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleAuditionToggle(b);
-                      }}
-                      className={`p-1.5 rounded-lg border transition-colors cursor-pointer ${
-                        isAuditioning
-                          ? 'bg-amber-400 text-black border-amber-300'
-                          : 'bg-black/50 border-white/10 text-gray-300 hover:text-white hover:border-white/20'
-                      }`}
-                    >
-                      {isAuditioning ? <Pause className="h-3 w-3" /> : <Play className="h-3 w-3" />}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleSelectBeat(b);
-                      }}
-                      className={`px-2 py-1 rounded-md text-[10px] font-mono font-bold transition-colors cursor-pointer ${
-                        isCurrent
-                          ? 'bg-amber-400/20 text-amber-300 border border-amber-400/30'
-                          : 'bg-white/10 hover:bg-amber-400 hover:text-black text-gray-200'
-                      }`}
-                    >
-                      {isCurrent ? 'Active' : 'Load'}
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-            {filteredBeats.length === 0 && (
-              <div className="col-span-full py-6 text-center text-gray-400 text-xs">
-                No beats found matching &quot;{beatSearchQuery}&quot;
-              </div>
-            )}
-          </div>
-        </div>
-      )}
+      </header>
 
       {/* =========================================================================
-          3. FULL-WIDTH MULTI-TRACK TIMELINE & ARRANGEMENT WORKSPACE
+          2. MAIN DAW WORKSPACE (Side Toolbar + Multi-Track Timeline)
          ========================================================================= */}
-      <div className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-2 bg-[#07090E] w-full">
-        {/* Studio Locators & Export Range Bar */}
-        <div className="w-full px-3 py-1.5 rounded-xl bg-[#0C101B] border border-white/10 flex flex-wrap items-center justify-between gap-2 text-xs shadow-inner">
-          {/* Locators Indicator [L] -> [R] */}
-          <div className="flex items-center gap-2">
-            <span className="font-mono text-[10px] font-bold text-amber-400 flex items-center gap-1 uppercase tracking-wider">
-              <Bookmark className="h-3 w-3 text-amber-400" />
-              <span>Studio Locators:</span>
-            </span>
-            <div className="flex items-center gap-1 font-mono text-[11px]">
-              <span className="px-1.5 py-0.5 rounded bg-white/5 border border-white/10 text-gray-400" title="Left Locator (Start)">
-                [L] 00:00.00
-              </span>
-              <span className="text-gray-500">►</span>
-              <span className="px-1.5 py-0.5 rounded bg-amber-500/20 border border-amber-500/40 text-amber-300 font-bold" title="Right Locator (Export Stop Marker)">
-                [R] {formatTimecode(effectiveExportDuration)}
-              </span>
-            </div>
-            <span className="text-[10px] font-mono text-teal-300 bg-teal-500/15 border border-teal-500/30 px-2 py-0.5 rounded-full font-bold">
-              Export Length: {effectiveExportDuration.toFixed(1)}s
-            </span>
-          </div>
-
-          {/* Quick Locator Actions */}
-          <div className="flex items-center gap-1.5">
-            {/* Auto: Recorded Song Length */}
+      <div className="flex-1 flex overflow-hidden relative">
+        {/* Leftmost Vertical Slim App Toolbar */}
+        <aside className="w-12 bg-[#0c0d10] border-r border-[#1f2229] flex flex-col items-center py-3 justify-between shrink-0 select-none z-20">
+          <div className="flex flex-col items-center gap-4 text-gray-400">
+            {/* Mixer icon */}
             <button
               type="button"
-              onClick={() => {
-                setExportRangeMode('recorded');
-                setCustomExportEndSeconds(null);
-              }}
-              title="Automatically export only the recorded song length (stops where last vocal take ends)"
-              className={`px-2 py-1 rounded-lg text-[10px] font-mono font-bold flex items-center gap-1 transition-all cursor-pointer border ${
-                exportRangeMode === 'recorded'
-                  ? 'bg-teal-500/25 text-teal-300 border-teal-400 shadow-xs'
-                  : 'bg-white/5 border-white/10 text-gray-400 hover:text-white'
-              }`}
+              onClick={() => setIsConsoleOpen(!isConsoleOpen)}
+              title="Toggle Console / Inspector"
+              className={`p-2 rounded-xl transition-colors cursor-pointer ${isConsoleOpen ? 'text-teal-400 bg-teal-400/10' : 'hover:text-white hover:bg-white/5'}`}
             >
-              <span>⚡ Auto (Song: {maxRecordedVocalDuration > 0 ? `${maxRecordedVocalDuration.toFixed(1)}s` : '0s'})</span>
+              <Sliders className="h-4 w-4" />
             </button>
 
-            {/* Set [R] at Current Playhead */}
+            {/* Folder / Sounds icon */}
             <button
               type="button"
-              onClick={() => {
-                const newStop = Math.max(1, playheadTime);
-                setExportRangeMode('custom');
-                setCustomExportEndSeconds(newStop);
-              }}
-              title="Set export stop locator [R] to current playhead cursor"
-              className={`px-2 py-1 rounded-lg text-[10px] font-mono font-bold flex items-center gap-1 transition-all cursor-pointer border ${
-                exportRangeMode === 'custom'
-                  ? 'bg-amber-500/25 text-amber-300 border-amber-400 shadow-xs'
-                  : 'bg-white/5 border-white/10 text-gray-400 hover:text-white'
-              }`}
+              onClick={() => setBeatPickerOpen(true)}
+              title="Open Beat & Loops Library"
+              className="p-2 rounded-xl hover:text-white hover:bg-white/5 transition-colors cursor-pointer"
             >
-              <Target className="h-3 w-3 text-amber-400" />
-              <span>Set [R] at Playhead</span>
+              <Folder className="h-4 w-4" />
             </button>
 
-            {/* Full Beat */}
+            {/* Disc library icon */}
             <button
               type="button"
-              onClick={() => {
-                setExportRangeMode('full');
-                setCustomExportEndSeconds(null);
-              }}
-              title="Export the entire backing beat duration"
-              className={`px-2 py-1 rounded-lg text-[10px] font-mono font-bold transition-all cursor-pointer border ${
-                exportRangeMode === 'full'
-                  ? 'bg-purple-500/25 text-purple-300 border-purple-400 shadow-xs'
-                  : 'bg-white/5 border-white/10 text-gray-400 hover:text-white'
-              }`}
+              onClick={() => setBeatPickerOpen(true)}
+              title="Caution Beat Catalog"
+              className="p-2 rounded-xl hover:text-white hover:bg-white/5 transition-colors cursor-pointer"
             >
-              <span>Full Beat ({selectedTrack?.durationSeconds ? `${Math.round(selectedTrack.durationSeconds)}s` : '180s'})</span>
+              <Disc3 className="h-4 w-4" />
             </button>
 
-            {/* Configure Mixdown Dialog */}
+            {/* AI Assistant */}
             <button
               type="button"
-              onClick={() => setIsExportDialogOpen(true)}
-              className="px-2 py-1 rounded-lg bg-teal-500/10 hover:bg-teal-500/20 border border-teal-500/30 text-teal-300 text-[10px] font-mono font-bold flex items-center gap-1 transition-colors cursor-pointer"
-              title="Configure export range and mixdown settings"
+              onClick={handleAutoMixAI}
+              title="AI Vocal AutoMix"
+              className={`p-2 rounded-xl transition-colors cursor-pointer ${isAutoMixRunning ? 'text-teal-400 animate-spin' : 'hover:text-teal-300 hover:bg-white/5'}`}
             >
-              <SlidersHorizontal className="h-3 w-3" />
-              <span>Export Options</span>
+              <Sparkles className="h-4 w-4" />
             </button>
           </div>
-        </div>
 
-        {/* Timeline Time Ruler with Locators */}
-        <div
-          ref={rulerRef}
-          onClick={handleTimelineSeek}
-          className="relative h-8 bg-[#0B0E17] border border-white/10 rounded-lg cursor-pointer flex items-center justify-between px-3 text-[10px] font-mono text-gray-500 select-none w-full overflow-hidden"
-        >
-          {/* Shaded Active Export Range Region (Locators Highlight) */}
-          {selectedTrack?.durationSeconds && (
-            <div
-              className="absolute top-0 bottom-0 left-0 bg-teal-500/10 border-r-2 border-amber-400/80 pointer-events-none z-10"
-              style={{
-                width: `${Math.min(100, (effectiveExportDuration / selectedTrack.durationSeconds) * 100)}%`
-              }}
-            />
-          )}
-
-          <span className="z-20">00:00</span>
-          <span className="z-20">00:15</span>
-          <span className="z-20">00:30</span>
-          <span className="z-20">00:45</span>
-          <span className="z-20">01:00</span>
-          <span className="z-20">01:15</span>
-          <span className="z-20">01:30</span>
-          <span className="z-20">01:45</span>
-          <span className="z-20">02:00</span>
-          <span className="z-20">02:15</span>
-          <span className="z-20">02:30</span>
-          <span className="z-20">02:45</span>
-          <span className="z-20">03:00</span>
-
-          {/* Right Locator [R] Stop Marker (draggable / interactive handle) */}
-          {selectedTrack?.durationSeconds && (
-            <div
-              className="absolute top-0 bottom-0 z-40 group cursor-ew-resize select-none"
-              style={{
-                left: `${Math.min(100, (effectiveExportDuration / selectedTrack.durationSeconds) * 100)}%`
-              }}
-              title={`[R] Export Stop: ${formatTimecode(effectiveExportDuration)} (Drag to move)`}
-              onMouseDown={(e) => {
-                e.stopPropagation();
-                setIsDraggingLocator(true);
-              }}
+          <div className="flex flex-col items-center gap-3 text-gray-500">
+            {/* Keyboard Shortcuts */}
+            <button
+              type="button"
+              onClick={() => setIsShortcutsModalOpen(true)}
+              title="Keyboard Shortcuts"
+              className="p-2 rounded-xl hover:text-white hover:bg-white/5 transition-colors cursor-pointer"
             >
-              <div className="relative -ml-3 flex flex-col items-center">
-                <div className="px-1 py-0.5 rounded bg-amber-400 text-black text-[9px] font-mono font-black flex items-center gap-0.5 shadow-md border border-amber-300">
-                  <span>[R]</span>
-                  <span className="text-[8px]">{effectiveExportDuration.toFixed(1)}s</span>
-                </div>
-                <div className="w-0.5 h-4 bg-amber-400 shadow-sm" />
-              </div>
-            </div>
-          )}
+              <Keyboard className="h-4 w-4" />
+            </button>
 
-          {/* Playhead Marker on Ruler */}
-          {selectedTrack?.durationSeconds && (
-            <div
-              className="absolute top-0 bottom-0 w-0.5 bg-teal-400 z-30"
-              style={{
-                left: `${Math.min(100, (playheadTime / selectedTrack.durationSeconds) * 100)}%`
+            {/* Lyrics Drawer */}
+            <button
+              type="button"
+              onClick={() => {
+                setActiveInspectorTab('editor');
+                setIsConsoleOpen(true);
               }}
+              title="Lyrics & Notepad"
+              className="p-2 rounded-xl hover:text-white hover:bg-white/5 transition-colors cursor-pointer"
             >
-              <div className="w-2.5 h-2.5 -ml-1 bg-teal-400 rounded-b-sm shadow-sm" />
-            </div>
-          )}
-        </div>
+              <FileText className="h-4 w-4" />
+            </button>
+          </div>
+        </aside>
 
-        {/* TRACK 01: Backing Instrumental Beat Track */}
-        <div className="w-full flex flex-col sm:flex-row items-stretch rounded-xl bg-[#0D101A] border border-white/10 overflow-hidden shadow-sm">
-          {/* Left Control Panel (TCP) */}
-          <div className="w-full sm:w-64 p-3 bg-[#111422] border-b sm:border-b-0 sm:border-r border-white/10 flex flex-col justify-between text-xs shrink-0">
-            <div>
-              <div className="flex items-center justify-between">
-                <span className="font-mono text-[10px] font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
-                  <Disc3 className="h-3 w-3 text-amber-400 animate-[spin_8s_linear_infinite]" />
-                  <span>TRK 01 · BEAT</span>
-                </span>
-                <span className="text-[9px] font-mono px-1 rounded bg-white/5 text-gray-400">
-                  STEREO WAV
-                </span>
-              </div>
-
-              {/* Beat Selection Dropdown in Track Options */}
-              <div className="mt-1.5 space-y-1">
-                <div className="relative">
-                  <select
-                    value={selectedTrack?.id || ''}
-                    onChange={(e) => {
-                      const found = availableTracks.find((b) => b.id === e.target.value);
-                      if (found) {
-                        handleSelectBeat(found);
-                      }
-                    }}
-                    aria-label="Choose beat in Track Options"
-                    className="w-full text-xs font-bold bg-[#080B12] hover:bg-[#0c101c] border border-amber-400/40 hover:border-amber-400 text-amber-200 rounded-lg py-1.5 pl-2 pr-6 appearance-none cursor-pointer focus:outline-none focus:ring-1 focus:ring-amber-400 truncate transition-colors shadow-inner"
-                  >
-                    {availableTracks.length === 0 ? (
-                      <option value="">{selectedTrack?.title || 'No beats available'}</option>
-                    ) : (
-                      availableTracks.map((b) => (
-                        <option key={b.id} value={b.id} className="bg-[#111422] text-white">
-                          {b.title} ({b.bpm || 110} BPM · {b.genre || 'Beat'})
-                        </option>
-                      ))
-                    )}
-                  </select>
-                  <ChevronDown className="h-3.5 w-3.5 text-amber-400 absolute right-1.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-                </div>
-
-                <div className="flex items-center justify-between text-[10px] text-gray-400">
-                  <span className="truncate max-w-[130px] font-mono text-[9px] text-gray-400">
-                    {selectedTrack?.artist || 'Caution Studio'}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setBeatPickerOpen(true)}
-                    className="text-[9px] font-mono text-amber-400 hover:text-amber-300 flex items-center gap-0.5 underline cursor-pointer shrink-0"
-                  >
-                    <SlidersHorizontal className="h-2.5 w-2.5" />
-                    <span>Browse All</span>
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {/* Mute, Solo, Pan & Volume */}
-            <div className="mt-2.5 space-y-1.5">
-              <div className="flex items-center gap-1.5">
+        {/* Multi-Track Workspace Body */}
+        <div className="flex-1 flex flex-col overflow-hidden">
+          {/* Upper Half: Arrangement Tracks (Split TCP Left + Timeline Grid Right) */}
+          <div className="flex-1 flex overflow-hidden relative">
+            {/* Track Control Panels (TCP) on the Left */}
+            <div className="w-72 sm:w-80 bg-[#12141a] border-r border-[#1f2229] flex flex-col shrink-0 overflow-y-auto">
+              {/* "+ Add Track" Button at the Top */}
+              <div className="p-2.5 border-b border-[#1f2229] flex items-center justify-between bg-[#0e1014]">
                 <button
                   type="button"
-                  onClick={() => setBeatMuted(!beatMuted)}
-                  className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold border transition-colors cursor-pointer ${
-                    beatMuted
-                      ? 'bg-amber-500 text-black border-amber-400'
-                      : 'bg-white/5 border-white/10 text-gray-400 hover:text-white'
-                  }`}
+                  onClick={handleAddBackupVocalTrack}
+                  className="px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-white font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
                 >
-                  M
+                  <Plus className="h-3.5 w-3.5 text-teal-400" />
+                  <span>+ Add Track</span>
                 </button>
+
                 <button
                   type="button"
-                  onClick={() => setBeatSolo(!beatSolo)}
-                  className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold border transition-colors cursor-pointer ${
-                    beatSolo
-                      ? 'bg-yellow-400 text-black border-yellow-300'
-                      : 'bg-white/5 border-white/10 text-gray-400 hover:text-white'
-                  }`}
+                  onClick={() => setBeatPickerOpen(true)}
+                  className="text-[11px] text-gray-400 hover:text-white flex items-center gap-1 font-mono transition-colors"
                 >
-                  S
+                  <Music className="h-3 w-3 text-amber-400" />
+                  <span className="truncate max-w-[110px]">{selectedTrack?.title || 'Load Beat'}</span>
                 </button>
-
-                {/* Pan Slider */}
-                <div className="flex items-center gap-1 ml-auto">
-                  <span className="text-[9px] font-mono text-gray-400">PAN</span>
-                  <input
-                    type="range"
-                    min="-100"
-                    max="100"
-                    step="5"
-                    value={beatPan}
-                    onChange={(e) => setBeatPan(parseInt(e.target.value, 10))}
-                    aria-label="Beat Pan"
-                    className="w-16 accent-amber-400 h-1 bg-black/40 rounded cursor-pointer"
-                  />
-                  <span className="text-[9px] font-mono text-amber-300 w-6 text-right">
-                    {formatPanLabel(beatPan)}
-                  </span>
-                </div>
               </div>
 
-              {/* Volume Slider */}
-              <div className="flex items-center gap-2">
-                <Volume2 className="h-3 w-3 text-gray-400 shrink-0" />
-                <input
-                  type="range"
-                  min="0"
-                  max="1.5"
-                  step="0.01"
-                  value={beatVolume}
-                  onChange={(e) => setBeatVolume(parseFloat(e.target.value))}
-                  aria-label="Beat Volume Fader"
-                  className="w-full accent-amber-400 h-1.5 bg-black/40 rounded-lg cursor-pointer"
-                />
-                <span className="text-[10px] font-mono text-gray-400 w-8 text-right">
-                  {beatMuted ? 'MUTE' : `${Math.round(beatVolume * 100)}%`}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {/* Right Waveform Display Lane (Full Width) */}
-          <div
-            onClick={handleTimelineSeek}
-            className="relative flex-1 h-20 bg-[#080B12] p-2 flex items-center justify-center cursor-pointer select-none overflow-hidden"
-          >
-            <div className="w-full flex items-center justify-between gap-0.5 h-14 opacity-80">
-              {Array.from({ length: 80 }).map((_, i) => {
-                const h = 20 + Math.sin(i * 0.35) * 35 + Math.cos(i * 0.7) * 20;
-                return (
-                  <div
-                    key={i}
-                    className="flex-1 bg-amber-400/50 rounded-xs"
-                    style={{ height: `${Math.max(12, Math.min(90, h))}%` }}
-                  />
-                );
-              })}
-            </div>
-
-            {selectedTrack?.durationSeconds && (
-              <div
-                className="absolute top-0 bottom-0 w-0.5 bg-teal-400 z-20 pointer-events-none"
-                style={{
-                  left: `${Math.min(100, (playheadTime / selectedTrack.durationSeconds) * 100)}%`
-                }}
-              />
-            )}
-          </div>
-        </div>
-
-        {/* VOCAL TRACKS: Lead Vocal + Multiple Backup Vocal Tracks */}
-        {vocalTracks.map((track, trackIdx) => {
-          const isThisTrackArmed = track.isArmed;
-          const isThisRecording = isRecording && isThisTrackArmed;
-
-          return (
-            <div
-              key={track.id}
-              className={`w-full flex flex-col sm:flex-row items-stretch rounded-xl bg-[#0D101A] border transition-all overflow-hidden shadow-sm ${
-                isThisTrackArmed ? 'border-red-500/40' : 'border-white/10'
-              }`}
-            >
-              {/* Left Control Panel (TCP) */}
-              <div className="w-full sm:w-64 p-3 bg-[#111422] border-b sm:border-b-0 sm:border-r border-white/10 flex flex-col justify-between text-xs shrink-0">
-                <div>
-                  <div className="flex items-center justify-between">
-                    <span
-                      className="font-mono text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5"
-                      style={{ color: track.color }}
-                    >
-                      <span
-                        className="w-2 h-2 rounded-full"
-                        style={{ backgroundColor: track.color }}
-                      />
-                      <span>{`TRK 0${trackIdx + 2}`}</span>
-                      <span>·</span>
-                      <span>{track.type.toUpperCase()}</span>
-                    </span>
-
-                    <div className="flex items-center gap-1.5">
-                      {/* Delete Recorded Vocal Take button (for ANY track that has a take) */}
-                      {track.vocalBlob && (
-                        <button
-                          type="button"
-                          onClick={() => handleClearVocalTake(track.id)}
-                          className="px-1.5 py-0.5 rounded bg-red-500/20 hover:bg-red-500/40 border border-red-500/40 text-red-300 hover:text-white text-[9px] font-mono font-bold flex items-center gap-1 transition-all cursor-pointer shadow-xs"
-                          title={`Delete recorded take from ${track.name} and re-record`}
-                        >
-                          <Trash2 className="h-2.5 w-2.5 text-red-400" />
-                          <span>Delete Take</span>
-                        </button>
-                      )}
-
-                      {/* Remove backup track lane entirely */}
-                      {track.type === 'backup' && (
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveTrack(track.id)}
-                          className="text-gray-500 hover:text-red-400 p-0.5 transition-colors cursor-pointer"
-                          title="Remove backup track lane"
-                        >
-                          <X className="h-3.5 w-3.5" />
-                        </button>
-                      )}
-                    </div>
-                  </div>
-
-                  <input
-                    type="text"
-                    value={track.name}
-                    onChange={(e) => handleTrackNameChange(track.id, e.target.value)}
-                    className="text-xs font-bold text-white bg-transparent border-b border-transparent hover:border-white/20 focus:border-teal-400 focus:outline-none w-full truncate mt-0.5"
-                  />
-                  <div className="flex items-center justify-between text-[10px] text-gray-400 mt-0.5">
-                    <div className="flex items-center gap-1.5">
-                      <span className={track.vocalBlob ? 'text-teal-300 font-semibold' : ''}>
-                        {track.vocalBlob ? `Recorded (${track.durationSeconds.toFixed(1)}s)` : 'Ready'}
+              {/* Track Headers List */}
+              <div className="divide-y divide-[#1f2229]/60">
+                {/* Track 01: Drum Machine / Backing Beat */}
+                <div
+                  onClick={() => setSelectedTrackTab('trk_beat')}
+                  className={`p-3 transition-colors cursor-pointer ${selectedTrackTab === 'trk_beat' ? 'bg-[#181b24]' : 'hover:bg-white/[0.02]'}`}
+                >
+                  {/* Title row with Golden brown accent bar */}
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="w-1.5 h-3.5 rounded-full bg-[#d97706]" />
+                      <Disc3 className="h-3.5 w-3.5 text-[#d97706] shrink-0" />
+                      <span className="text-xs font-bold text-gray-200 truncate">
+                        01 Drum Machine
                       </span>
-                      {track.vocalBlob && (
-                        <button
-                          type="button"
-                          onClick={() => handleClearVocalTake(track.id)}
-                          className="text-[9px] font-mono text-red-400 hover:text-red-300 underline cursor-pointer"
-                          title="Delete recorded vocal take"
-                        >
-                          Clear
-                        </button>
-                      )}
                     </div>
-                    <span className="font-mono" style={{ color: track.color }}>
-                      PAN: {formatPanLabel(track.pan)}
-                    </span>
+
+                    <div className="flex items-center gap-1">
+                      {/* Mute */}
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); setBeatMuted(!beatMuted); }}
+                        className={`w-6 h-5 rounded text-[10px] font-mono font-bold transition-colors ${beatMuted ? 'bg-[#d97706] text-black' : 'bg-black/40 text-gray-400 hover:text-white'}`}
+                      >
+                        M
+                      </button>
+                      {/* Solo */}
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); setBeatSolo(!beatSolo); }}
+                        className={`w-6 h-5 rounded text-[10px] font-mono font-bold transition-colors ${beatSolo ? 'bg-teal-400 text-black' : 'bg-black/40 text-gray-400 hover:text-white'}`}
+                      >
+                        S
+                      </button>
+                    </div>
                   </div>
-                </div>
 
-                {/* Arm, Mute, Solo, Pan, Volume Controls */}
-                <div className="mt-2.5 space-y-1.5">
-                  <div className="flex items-center gap-1.5">
-                    {/* Record Arm Button */}
+                  {/* Controls row: +Fx, Volume Slider with gold fill, Rotary Pan */}
+                  <div className="flex items-center gap-2 pt-0.5">
                     <button
                       type="button"
-                      onClick={() => handleArmTrack(track.id)}
-                      title={`Arm ${track.name} for recording`}
-                      className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold border transition-colors cursor-pointer ${
-                        isThisTrackArmed
-                          ? 'bg-red-500 text-white border-red-400 shadow-sm shadow-red-500/30'
-                          : 'bg-white/5 border-white/10 text-gray-500 hover:text-gray-300'
-                      }`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setActiveInspectorTab('fx');
+                        setIsConsoleOpen(true);
+                      }}
+                      className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white border border-white/5"
                     >
-                      REC
+                      + Fx
                     </button>
 
-                    {/* Mute */}
-                    <button
-                      type="button"
-                      onClick={() => handleToggleMute(track.id)}
-                      className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold border transition-colors cursor-pointer ${
-                        track.isMuted
-                          ? 'bg-amber-500 text-black border-amber-400'
-                          : 'bg-white/5 border-white/10 text-gray-400 hover:text-white'
-                      }`}
-                    >
-                      M
-                    </button>
+                    {/* Volume Slider with golden fill */}
+                    <div className="flex-1 flex items-center">
+                      <input
+                        type="range"
+                        min="0"
+                        max="1.5"
+                        step="0.01"
+                        value={beatVolume}
+                        onChange={(e) => handleBeatVolumeChange(parseFloat(e.target.value))}
+                        className="w-full accent-[#d97706] h-1 bg-black/60 rounded cursor-pointer"
+                        title="Beat Volume"
+                      />
+                    </div>
 
-                    {/* Solo */}
-                    <button
-                      type="button"
-                      onClick={() => handleToggleSolo(track.id)}
-                      className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold border transition-colors cursor-pointer ${
-                        track.isSolo
-                          ? 'bg-yellow-400 text-black border-yellow-300'
-                          : 'bg-white/5 border-white/10 text-gray-400 hover:text-white'
-                      }`}
-                    >
-                      S
-                    </button>
-
-                    {/* Pan Slider */}
-                    <div className="flex items-center gap-1 ml-auto">
-                      <span className="text-[9px] font-mono text-gray-400">PAN</span>
+                    {/* Rotary Pan Knob (L | R) */}
+                    <div className="flex items-center gap-1 text-[9px] font-mono text-gray-400">
+                      <span>{formatPanLabel(beatPan)}</span>
                       <input
                         type="range"
                         min="-100"
                         max="100"
                         step="5"
-                        value={track.pan}
-                        onChange={(e) => handleTrackPanChange(track.id, parseInt(e.target.value, 10))}
-                        aria-label={`${track.name} Pan`}
-                        className="w-16 accent-teal-400 h-1 bg-black/40 rounded cursor-pointer"
+                        value={beatPan}
+                        onChange={(e) => setBeatPan(parseInt(e.target.value, 10))}
+                        className="w-10 accent-[#d97706] h-1 bg-black/60 rounded cursor-pointer"
+                        title="Beat Pan"
                       />
-                      <span className="text-[9px] font-mono text-teal-300 w-6 text-right">
-                        {formatPanLabel(track.pan)}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Volume Slider */}
-                  <div className="flex items-center gap-2">
-                    <Volume2 className="h-3 w-3 text-gray-400 shrink-0" />
-                    <input
-                      type="range"
-                      min="0"
-                      max="1.5"
-                      step="0.01"
-                      value={track.volume}
-                      onChange={(e) => handleTrackVolumeChange(track.id, parseFloat(e.target.value))}
-                      aria-label={`${track.name} Volume Fader`}
-                      className="w-full accent-teal-400 h-1.5 bg-black/40 rounded-lg cursor-pointer"
-                    />
-                    <span className="text-[10px] font-mono text-gray-400 w-8 text-right">
-                      {track.isMuted ? 'MUTE' : `${Math.round(track.volume * 100)}%`}
-                    </span>
-                  </div>
-
-                  {/* Vocal Latency Sync Offset Nudge */}
-                  <div className="flex items-center justify-between text-[9px] font-mono bg-black/40 px-2 py-1 rounded border border-white/5 mt-1">
-                    <span className="text-gray-400 flex items-center gap-1 font-bold">
-                      <Clock className="h-2.5 w-2.5 text-teal-400" />
-                      <span>VOCAL SYNC</span>
-                    </span>
-                    <div className="flex items-center gap-1">
-                      <button
-                        type="button"
-                        onClick={() => handleSetLatency(track.id, 60)}
-                        title="Auto-Align phone mic delay (60ms)"
-                        className="px-1.5 py-0.5 rounded bg-teal-500/20 text-teal-300 hover:bg-teal-500/30 font-bold text-[9px] cursor-pointer"
-                      >
-                        ⚡ Snap 60ms
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleNudgeLatency(track.id, -10)}
-                        title="Nudge vocal earlier by 10ms (compensates for mic lag)"
-                        className="px-1 py-0.5 rounded bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white cursor-pointer"
-                      >
-                        -10ms
-                      </button>
-                      <span className="w-11 text-center font-bold text-teal-300">
-                        -{track.latencyOffsetMs !== undefined ? track.latencyOffsetMs : globalLatencyMs}ms
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => handleNudgeLatency(track.id, 10)}
-                        title="Nudge vocal later by 10ms"
-                        className="px-1 py-0.5 rounded bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white cursor-pointer"
-                      >
-                        +10ms
-                      </button>
                     </div>
                   </div>
                 </div>
-              </div>
 
-              {/* Right Lane: Live Recording Waveform or Recorded Waveform (Full Width) */}
-              <div
-                onClick={handleTimelineSeek}
-                className="relative flex-1 h-20 bg-[#080B12] p-2 flex items-center justify-center cursor-pointer select-none overflow-hidden"
-              >
-                {isThisRecording ? (
-                  /* Live Waveform drawing for currently recording track */
-                  <div className="w-full h-full flex items-center justify-center gap-1">
-                    {liveWaveformHistory.map((val, idx) => (
-                      <div
-                        key={idx}
-                        className="w-1.5 bg-red-500 rounded-full transition-all"
-                        style={{ height: `${Math.min(95, val)}%` }}
-                      />
-                    ))}
-                    <div className="w-2 h-10 bg-red-400 animate-ping rounded-full ml-1" />
-                  </div>
-                ) : track.vocalBlob ? (
-                  /* Recorded waveform clip — proportional to recorded duration vs total beat length */
-                  (() => {
-                    const beatDuration = selectedTrack?.durationSeconds || 180;
-                    // Clip width % = how much of the beat the recording covers
-                    const clipPct = track.durationSeconds > 0
-                      ? Math.min(100, (track.durationSeconds / beatDuration) * 100)
-                      : 100; // fallback: full width if duration unknown
-                    return (
-                      <div className="relative w-full h-full flex items-start">
-                        {/* Proportional clip region — ends where recording stopped */}
-                        <div
-                          className="relative h-full flex items-center gap-0.5 overflow-hidden"
-                          style={{ width: `${clipPct}%`, minWidth: '40px' }}
-                        >
-                          {/* Clip background */}
-                          <div
-                            className="absolute inset-0 rounded-r-sm"
-                            style={{ backgroundColor: `${track.color}14` }}
+                {/* Track 02+: Voice/Audio Tracks */}
+                {vocalTracks.map((trk, idx) => {
+                  const isSelected = selectedTrackTab === trk.id;
+                  const isArmed = trk.isArmed;
+
+                  return (
+                    <div
+                      key={trk.id}
+                      onClick={() => setSelectedTrackTab(trk.id)}
+                      className={`p-3 transition-colors cursor-pointer ${isSelected ? 'bg-[#181b24]' : 'hover:bg-white/[0.02]'}`}
+                    >
+                      {/* Title row with Copper/Orange accent bar */}
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span
+                            className="w-1.5 h-3.5 rounded-full"
+                            style={{ backgroundColor: trk.color || '#ea580c' }}
                           />
-                          {/* Waveform bars */}
-                          <div className="relative w-full flex items-center justify-between gap-0.5 h-14 opacity-90 px-0.5">
-                            {Array.from({ length: Math.max(12, Math.round(clipPct * 0.7)) }).map((_, i) => {
-                              const seed = trackIdx * 17;
-                              const h = 15 + Math.sin(i * 0.5 + seed) * 40 + Math.cos(i * 1.2 + seed) * 20;
-                              return (
-                                <div
-                                  key={i}
-                                  className="flex-1 rounded-xs"
-                                  style={{
-                                    height: `${Math.max(8, Math.min(95, h))}%`,
-                                    backgroundColor: track.color
-                                  }}
-                                />
-                              );
-                            })}
-                          </div>
-                          {/* Clip end marker — vertical line showing where recording stopped */}
-                          <div
-                            className="absolute top-0 right-0 bottom-0 w-0.5 z-10"
-                            style={{ backgroundColor: track.color }}
-                          />
-                          {/* Duration badge */}
-                          <div
-                            className="absolute bottom-1 left-1 text-[8px] font-mono font-bold px-1 py-0.5 rounded z-10"
-                            style={{ backgroundColor: `${track.color}33`, color: track.color }}
-                          >
-                            {track.durationSeconds.toFixed(1)}s
-                          </div>
+                          <Mic className="h-3.5 w-3.5 shrink-0" style={{ color: trk.color || '#ea580c' }} />
+                          <span className="text-xs font-bold text-gray-200 truncate">
+                            {`0${idx + 2} ${trk.name}`}
+                          </span>
+                          {isArmed && (
+                            <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse shrink-0" title="Armed for Recording" />
+                          )}
                         </div>
 
-                        {/* Empty region after the clip */}
-                        {clipPct < 100 && (
-                          <div className="flex-1 h-full bg-transparent" />
-                        )}
+                        <div className="flex items-center gap-1">
+                          {/* Arm for record */}
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); handleArmTrack(trk.id); }}
+                            title="Arm Track for Recording"
+                            className={`w-5 h-5 rounded text-[9px] font-mono font-bold flex items-center justify-center ${isArmed ? 'bg-red-500 text-white' : 'bg-black/40 text-gray-500 hover:text-red-400'}`}
+                          >
+                            ⏺
+                          </button>
+                          {/* Mute */}
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); handleToggleMute(trk.id); }}
+                            className={`w-6 h-5 rounded text-[10px] font-mono font-bold transition-colors ${trk.isMuted ? 'bg-[#ea580c] text-black' : 'bg-black/40 text-gray-400 hover:text-white'}`}
+                          >
+                            M
+                          </button>
+                          {/* Solo */}
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); handleToggleSolo(trk.id); }}
+                            className={`w-6 h-5 rounded text-[10px] font-mono font-bold transition-colors ${trk.isSolo ? 'bg-teal-400 text-black' : 'bg-black/40 text-gray-400 hover:text-white'}`}
+                          >
+                            S
+                          </button>
+                        </div>
+                      </div>
 
-                        {/* Delete Take overlay — always visible on hover inside clip area */}
+                      {/* Controls row: +Fx, Volume Slider, Rotary Pan */}
+                      <div className="flex items-center gap-2 pt-0.5">
                         <button
                           type="button"
                           onClick={(e) => {
                             e.stopPropagation();
-                            handleClearVocalTake(track.id);
+                            setSelectedTrackTab(trk.id);
+                            setActiveInspectorTab('autopitch');
+                            setIsConsoleOpen(true);
                           }}
-                          className="absolute top-1 right-2 px-2.5 py-1 rounded-md bg-black/85 hover:bg-red-600/90 text-red-400 hover:text-white border border-red-500/40 text-[9px] font-mono font-bold flex items-center gap-1.5 z-30 transition-all cursor-pointer backdrop-blur shadow-sm"
-                          title="Delete this recorded vocal take"
+                          className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white border border-white/5"
                         >
-                          <Trash2 className="h-2.5 w-2.5" />
-                          <span>Delete Take</span>
+                          + Fx
                         </button>
+
+                        {/* Volume Slider with orange fill */}
+                        <div className="flex-1 flex items-center">
+                          <input
+                            type="range"
+                            min="0"
+                            max="1.5"
+                            step="0.01"
+                            value={trk.volume}
+                            onChange={(e) => handleTrackVolumeChange(trk.id, parseFloat(e.target.value))}
+                            className="w-full h-1 bg-black/60 rounded cursor-pointer"
+                            style={{ accentColor: trk.color || '#ea580c' }}
+                            title="Track Volume"
+                          />
+                        </div>
+
+                        {/* Rotary Pan Knob */}
+                        <div className="flex items-center gap-1 text-[9px] font-mono text-gray-400">
+                          <span>{formatPanLabel(trk.pan)}</span>
+                          <input
+                            type="range"
+                            min="-100"
+                            max="100"
+                            step="5"
+                            value={trk.pan}
+                            onChange={(e) => handleTrackPanChange(trk.id, parseInt(e.target.value, 10))}
+                            className="w-10 h-1 bg-black/60 rounded cursor-pointer"
+                            style={{ accentColor: trk.color || '#ea580c' }}
+                            title="Track Pan"
+                          />
+                        </div>
                       </div>
-                    );
-                  })()
-                ) : (
-                  /* Empty Track Prompt */
-                  <div className="text-center text-gray-500 text-xs flex items-center gap-2 font-mono">
-                    <Mic className="h-4 w-4 text-gray-600" />
-                    <span>
-                      {isThisTrackArmed
-                        ? 'Track Armed · Press red [RECORD] above to record into this track'
-                        : `Click [REC] on the left to arm ${track.name}`}
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* AutoMix AI Button at bottom of tracks */}
+              <div className="p-3 mt-auto border-t border-[#1f2229] bg-[#0c0d10]">
+                <button
+                  type="button"
+                  onClick={handleAutoMixAI}
+                  disabled={isAutoMixRunning}
+                  className="w-full py-2 rounded-xl bg-gradient-to-r from-[#181b24] to-[#242833] hover:from-[#202533] hover:to-[#2d3342] border border-white/10 text-xs font-bold text-gray-200 flex items-center justify-between px-3 transition-all cursor-pointer group shadow"
+                >
+                  <div className="flex items-center gap-2">
+                    <Wand2 className="h-3.5 w-3.5 text-teal-400 group-hover:rotate-12 transition-transform" />
+                    <span>AutoMix AI</span>
+                    <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-teal-400/20 text-teal-300 font-bold">
+                      AI 🤖
                     </span>
+                  </div>
+                  {autoMixSuccess ? (
+                    <span className="text-[10px] text-teal-300 font-bold">Level Balanced!</span>
+                  ) : (
+                    <ChevronRight className="h-3.5 w-3.5 text-gray-500 group-hover:text-white" />
+                  )}
+                </button>
+              </div>
+            </div>
+
+            {/* Right: Timeline & Arrangement Grid */}
+            <div
+              ref={rulerRef}
+              onClick={handleTimelineSeek}
+              className="flex-1 bg-[#14161d] overflow-x-auto relative flex flex-col cursor-pointer select-none"
+            >
+              {/* Top Timeline Ruler Bar (1, 2, 3, 4, 5, 6...) */}
+              <div className="h-7 bg-[#101217] border-b border-[#1f2229] flex items-center relative text-[10px] font-mono text-gray-400 shrink-0">
+                {/* Red Loop Region Bar spanning active bars */}
+                {isLoopEnabled && (
+                  <div
+                    className="absolute top-0 bottom-0 bg-red-500/20 border-b-2 border-red-500 z-10 pointer-events-none"
+                    style={{ left: '0%', width: '35%' }}
+                  >
+                    <span className="text-[9px] font-bold text-red-400 px-1 bg-red-500/30 rounded-br">LOOP REGION</span>
                   </div>
                 )}
 
-                {/* Scrubber Playhead Line */}
+                {/* Bar Ticks */}
+                {Array.from({ length: 32 }).map((_, barIdx) => (
+                  <div
+                    key={barIdx}
+                    className="flex-1 border-r border-white/5 h-full flex items-center pl-1.5 opacity-70"
+                  >
+                    <span>{barIdx + 1}</span>
+                  </div>
+                ))}
+
+                {/* Vertical Playhead Cursor */}
                 {selectedTrack?.durationSeconds && (
                   <div
-                    className="absolute top-0 bottom-0 w-0.5 bg-teal-400 z-20 pointer-events-none"
+                    className="absolute top-0 bottom-0 w-0.5 bg-red-500 z-30 pointer-events-none shadow-[0_0_8px_rgba(239,68,68,0.9)]"
+                    style={{
+                      left: `${Math.min(100, (playheadTime / selectedTrack.durationSeconds) * 100)}%`
+                    }}
+                  >
+                    <div className="w-2.5 h-2 bg-red-500 -ml-1 -top-0 absolute rounded-b" />
+                  </div>
+                )}
+              </div>
+
+              {/* Arrangement Clips Canvas */}
+              <div className="flex-1 flex flex-col divide-y divide-[#1f2229]/40 relative overflow-y-auto">
+                {/* Playhead Line down through all track lanes */}
+                {selectedTrack?.durationSeconds && (
+                  <div
+                    className="absolute top-0 bottom-0 w-0.5 bg-red-500/80 z-20 pointer-events-none"
                     style={{
                       left: `${Math.min(100, (playheadTime / selectedTrack.durationSeconds) * 100)}%`
                     }}
                   />
                 )}
-              </div>
-            </div>
-          );
-        })}
 
-        {/* Add Backup Vocal Track Quick Trigger Banner */}
-        <div className="pt-1">
-          <button
-            type="button"
-            onClick={handleAddBackupVocalTrack}
-            className="w-full py-2.5 rounded-xl border border-dashed border-white/10 hover:border-teal-500/40 bg-white/[0.01] hover:bg-teal-500/5 text-gray-400 hover:text-teal-300 text-xs font-mono font-bold flex items-center justify-center gap-2 transition-colors cursor-pointer"
-          >
-            <Plus className="h-4 w-4 text-teal-400" />
-            <span>+ Add Another Backup Vocal / Harmony Track (Stereo Panned)</span>
-          </button>
-        </div>
-      </div>
-
-      {/* =========================================================================
-          4. BOTTOM DAW DSP EFFECTS RACK & STUDIO CONSOLE
-         ========================================================================= */}
-      <div className="w-full bg-[#0B0E17] border-t border-white/10 flex flex-col text-xs shrink-0">
-        {/* Console Navigation Tabs + Collapse Toggle */}
-        <div className="px-4 py-1.5 bg-[#0F131E] border-b border-white/10 flex items-center justify-between">
-          <div className="flex items-center gap-2 flex-wrap">
-            {/* Collapse / Expand toggle — especially useful on mobile */}
-            <button
-              type="button"
-              onClick={() => setIsConsoleOpen((prev) => !prev)}
-              title={isConsoleOpen ? 'Collapse FX Rack' : 'Expand FX Rack'}
-              className="flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-bold text-gray-400 hover:text-teal-300 hover:bg-teal-500/10 transition-colors cursor-pointer border border-transparent hover:border-teal-500/20"
-            >
-              <ChevronDown
-                className={`h-3.5 w-3.5 transition-transform duration-200 ${isConsoleOpen ? 'rotate-180' : ''}`}
-              />
-              <span className="hidden sm:inline">{isConsoleOpen ? 'Hide' : 'Show'} FX</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => { setActiveConsoleTab('fx'); setIsConsoleOpen(true); }}
-              className={`px-3 py-1 rounded-md text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5 ${
-                activeConsoleTab === 'fx' && isConsoleOpen
-                  ? 'bg-teal-500/20 text-teal-300 border border-teal-500/30'
-                  : 'text-gray-400 hover:text-white'
-              }`}
-            >
-              <Sliders className="h-3.5 w-3.5" />
-              <span>DSP Effects Rack</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => { setActiveConsoleTab('lyrics'); setIsConsoleOpen(true); }}
-              className={`px-3 py-1 rounded-md text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5 ${
-                activeConsoleTab === 'lyrics' && isConsoleOpen
-                  ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30'
-                  : 'text-gray-400 hover:text-white'
-              }`}
-            >
-              <FileText className="h-3.5 w-3.5" />
-              <span>Lyrics & Teleprompter</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => { setActiveConsoleTab('cloud'); setIsConsoleOpen(true); }}
-              className={`px-3 py-1 rounded-md text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5 ${
-                activeConsoleTab === 'cloud' && isConsoleOpen
-                  ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
-                  : 'text-gray-400 hover:text-white'
-              }`}
-            >
-              <CloudUpload className="h-3.5 w-3.5" />
-              <span>Cloud Sync & Stems</span>
-            </button>
-          </div>
-
-          <div className="text-[10px] font-mono text-gray-500 hidden sm:block">
-            STEREO HARMONY MATRIX: ACTIVE · 48kHz 24-BIT
-          </div>
-        </div>
-
-        {/* Tab 1: DSP Effects Rack */}
-        {isConsoleOpen && activeConsoleTab === 'fx' && (
-          <div className="p-3.5 space-y-3 max-h-[45vh] overflow-y-auto overscroll-contain">
-            {/* Auto-Tune Pro Master Module */}
-            <div className="p-3 rounded-xl bg-gradient-to-r from-teal-950/40 via-black/60 to-purple-950/30 border border-teal-500/20 space-y-2.5">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className={`inline-block w-2.5 h-2.5 rounded-full ${autoTuneEnabled ? 'bg-teal-400 shadow-[0_0_8px_rgba(45,212,191,0.8)] animate-pulse' : 'bg-zinc-600'}`} />
-                  <span className="text-xs font-bold tracking-wider text-teal-300">AUTO-TUNE PRO</span>
-                  <span className={`text-[10px] font-mono px-2 py-0.5 rounded font-bold ${
-                    autoTuneEnabled ? 'bg-teal-500/20 text-teal-200 border border-teal-500/30' : 'bg-zinc-800 text-zinc-500'
-                  }`}>
-                    {autoTuneEnabled ? `${autoTuneSpeed.toUpperCase()} PITCH-LOCK` : 'BYPASS'}
-                  </span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setAutoTuneEnabled(!autoTuneEnabled)}
-                  className={`px-3 py-1 rounded-md text-xs font-bold transition-all cursor-pointer ${
-                    autoTuneEnabled
-                      ? 'bg-teal-400 text-zinc-950 shadow-sm'
-                      : 'bg-zinc-800 text-zinc-400 hover:text-white'
-                  }`}
-                >
-                  {autoTuneEnabled ? 'POWER ON' : 'POWER OFF'}
-                </button>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1">
-                {/* Speed selector */}
-                <div className="space-y-1">
-                  <span className="text-[10px] font-mono text-zinc-400 block">RETUNE SPEED</span>
-                  <div className="grid grid-cols-3 gap-1">
-                    {(['hard', 'fast', 'subtle'] as const).map((spd) => (
-                      <button
-                        key={spd}
-                        type="button"
-                        onClick={() => {
-                          setAutoTuneSpeed(spd);
-                          if (!autoTuneEnabled) setAutoTuneEnabled(true);
-                        }}
-                        className={`py-1 rounded text-[10px] font-bold uppercase transition-colors cursor-pointer ${
-                          autoTuneSpeed === spd && autoTuneEnabled
-                            ? 'bg-teal-500 text-zinc-950 shadow-sm'
-                            : 'bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white'
-                        }`}
-                      >
-                        {spd === 'hard' ? 'Hard' : spd === 'fast' ? 'Fast' : 'Subtle'}
-                      </button>
+                {/* Track 01 Lane (Beat / Drum Machine Clip) */}
+                <div className="h-16 relative flex items-center p-1.5 bg-[#14161d]">
+                  {/* Grid lines */}
+                  <div className="absolute inset-0 flex pointer-events-none opacity-10">
+                    {Array.from({ length: 16 }).map((_, idx) => (
+                      <div key={idx} className="flex-1 border-r border-white" />
                     ))}
                   </div>
-                </div>
 
-                {/* Key selector */}
-                <div className="space-y-1">
-                  <span className="text-[10px] font-mono text-zinc-400 block">SCALE / KEY</span>
-                  <select
-                    value={autoTuneKey}
-                    onChange={(e) => {
-                      setAutoTuneKey(e.target.value);
-                      if (!autoTuneEnabled) setAutoTuneEnabled(true);
-                    }}
-                    className="w-full bg-zinc-900 border border-zinc-800 rounded py-1 px-2 text-[11px] text-zinc-200 focus:outline-none focus:border-teal-500 cursor-pointer"
+                  {/* Golden Audio Clip Container */}
+                  <div
+                    className="h-full rounded-lg bg-gradient-to-r from-[#b45309]/80 via-[#d97706]/75 to-[#b45309]/80 border border-[#f59e0b]/40 shadow-sm relative overflow-hidden flex items-center px-3"
+                    style={{ width: '85%' }}
                   >
-                    <option value="Auto">Auto ({selectedTrack?.musicalKey || 'Beat Key'})</option>
-                    <option value="Chromatic">Chromatic (All Notes)</option>
-                    <option value="C Major">C Major / A Minor</option>
-                    <option value="D Minor">D Minor / F Major</option>
-                    <option value="F Minor">F Minor / Ab Major</option>
-                    <option value="G Major">G Major / E Minor</option>
-                    <option value="Bb Major">Bb Major / G Minor</option>
-                    <option value="Eb Major">Eb Major / C Minor</option>
-                  </select>
-                </div>
+                    {/* Clip Title & Loop Handles */}
+                    <div className="absolute top-1 left-2 text-[10px] font-bold text-amber-100 uppercase tracking-wider flex items-center gap-1.5">
+                      <span>Drum Machine</span>
+                      <span className="opacity-70 font-mono text-[9px]">• {selectedTrack?.genre || 'Afrobeats'}</span>
+                    </div>
 
-                {/* Intensity Slider */}
-                <div className="space-y-1">
-                  <div className="flex justify-between text-[10px] font-mono">
-                    <span className="text-zinc-400">CORRECTION DEPTH</span>
-                    <span className="text-teal-300 font-bold">{Math.round(autoTuneAmount * 100)}%</span>
-                  </div>
-                  <input
-                    type="range"
-                    min="0"
-                    max="1"
-                    step="0.05"
-                    value={autoTuneAmount}
-                    onChange={(e) => {
-                      setAutoTuneAmount(parseFloat(e.target.value));
-                      if (!autoTuneEnabled) setAutoTuneEnabled(true);
-                    }}
-                    className="w-full accent-teal-400 h-1.5 bg-zinc-800 rounded cursor-pointer"
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            {/* Studio Reverb */}
-            <div className="p-2.5 rounded-xl bg-black/40 border border-white/5 space-y-1.5">
-              <div className="flex items-center justify-between text-[11px] font-bold text-teal-300">
-                <span>STUDIO REVERB</span>
-                <span className="font-mono text-[10px]">{Math.round(reverbAmount * 100)}%</span>
-              </div>
-              <input
-                type="range"
-                min="0"
-                max="1"
-                step="0.05"
-                value={reverbAmount}
-                onChange={(e) => setReverbAmount(parseFloat(e.target.value))}
-                className="w-full accent-teal-400 h-1.5 bg-white/10 rounded cursor-pointer"
-              />
-              <div className="text-[10px] text-gray-400">Large Hall space simulation</div>
-            </div>
-
-            {/* Tempo Delay */}
-            <div className="p-2.5 rounded-xl bg-black/40 border border-white/5 space-y-1.5">
-              <div className="flex items-center justify-between text-[11px] font-bold text-amber-300">
-                <span>TEMPO DELAY</span>
-                <span className="font-mono text-[10px]">{Math.round(delayAmount * 100)}%</span>
-              </div>
-              <input
-                type="range"
-                min="0"
-                max="1"
-                step="0.05"
-                value={delayAmount}
-                onChange={(e) => setDelayAmount(parseFloat(e.target.value))}
-                className="w-full accent-amber-400 h-1.5 bg-white/10 rounded cursor-pointer"
-              />
-              <div className="text-[10px] text-gray-400">1/4 note sync delay</div>
-            </div>
-
-            {/* 3-Band EQ */}
-            <div className="p-2.5 rounded-xl bg-black/40 border border-white/5 space-y-1.5">
-              <div className="flex items-center justify-between text-[11px] font-bold text-purple-300">
-                <span>3-BAND VOCAL EQ</span>
-                <span className="font-mono text-[10px]">+{eqMid}dB</span>
-              </div>
-              <div className="grid grid-cols-3 gap-1.5 text-center text-[9px] font-mono">
-                <div>
-                  <span className="text-gray-400 block mb-0.5">LOW</span>
-                  <input
-                    type="range"
-                    min="-6"
-                    max="6"
-                    step="0.5"
-                    value={eqLow}
-                    onChange={(e) => setEqLow(parseFloat(e.target.value))}
-                    className="w-full accent-purple-400 h-1 bg-white/10 rounded"
-                  />
-                </div>
-                <div>
-                  <span className="text-gray-400 block mb-0.5">MID</span>
-                  <input
-                    type="range"
-                    min="-6"
-                    max="6"
-                    step="0.5"
-                    value={eqMid}
-                    onChange={(e) => setEqMid(parseFloat(e.target.value))}
-                    className="w-full accent-purple-400 h-1 bg-white/10 rounded"
-                  />
-                </div>
-                <div>
-                  <span className="text-gray-400 block mb-0.5">HIGH</span>
-                  <input
-                    type="range"
-                    min="-6"
-                    max="6"
-                    step="0.5"
-                    value={eqHigh}
-                    onChange={(e) => setEqHigh(parseFloat(e.target.value))}
-                    className="w-full accent-purple-400 h-1 bg-white/10 rounded"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Studio Dynamics & Filters */}
-            <div className="p-2.5 rounded-xl bg-black/40 border border-white/5 space-y-1.5">
-              <div className="flex items-center justify-between text-[11px] font-bold text-white">
-                <span>STUDIO DYNAMICS</span>
-                <span className="text-[9px] font-mono px-1 rounded bg-teal-400/20 text-teal-300">
-                  OPTICAL
-                </span>
-              </div>
-              <div className="flex items-center justify-between">
-                <label className="flex items-center gap-2 cursor-pointer text-xs">
-                  <input
-                    type="checkbox"
-                    checked={compressorEnabled}
-                    onChange={(e) => setCompressorEnabled(e.target.checked)}
-                    className="rounded accent-teal-400"
-                  />
-                  <span>Opto Compressor</span>
-                </label>
-                <label className="flex items-center gap-2 cursor-pointer text-xs">
-                  <input
-                    type="checkbox"
-                    checked={lowCutEnabled}
-                    onChange={(e) => setLowCutEnabled(e.target.checked)}
-                    className="rounded accent-teal-400"
-                  />
-                  <span>80Hz Low-Cut</span>
-                </label>
-              </div>
-              <div className="text-[10px] text-gray-400">Warm vocal leveling</div>
-            </div>
-          </div>
-        </div>
-      )}
-
-        {/* Tab 2: Lyrics & Teleprompter */}
-        {isConsoleOpen && activeConsoleTab === 'lyrics' && (
-          <div className="p-3 max-h-[45vh] overflow-y-auto overscroll-contain">
-            <textarea
-              value={lyricsText}
-              onChange={(e) => setLyricsText(e.target.value)}
-              placeholder="Write your lyrics, verses, and harmonies here..."
-              rows={4}
-              className="w-full p-2.5 rounded-xl bg-black/50 border border-white/10 text-xs font-mono text-gray-200 focus:outline-none focus:border-purple-400 resize-none leading-relaxed"
-            />
-          </div>
-        )}
-
-        {/* Tab 3: Cloud Sync & Stems */}
-        {isConsoleOpen && activeConsoleTab === 'cloud' && (
-          <div className="p-3 space-y-2 max-h-[45vh] overflow-y-auto overscroll-contain">
-            {cloudSaveResult ? (
-              <div className="p-3 rounded-xl bg-teal-500/10 border border-teal-500/30 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
-                <div className="flex items-center gap-2.5">
-                  <CheckCircle2 className="h-5 w-5 text-teal-400 shrink-0" />
-                  <div>
-                    <p className="font-bold text-teal-300">
-                      All Stems & Master Mix Saved to Studio Cloud!
-                    </p>
-                    <p className="text-[11px] text-gray-300">
-                      {cloudSaveResult.vocalStems?.length || 0} vocal stems + stereo master WAV archived.
-                    </p>
+                    {/* Pattern Cells [A][B][A][B] & Waveform Peaks */}
+                    <div className="w-full flex items-center justify-between gap-1 pt-3 opacity-90">
+                      {Array.from({ length: 48 }).map((_, i) => {
+                        const h = 25 + Math.sin(i * 0.45) * 35 + Math.cos(i * 0.8) * 20;
+                        return (
+                          <div
+                            key={i}
+                            className="flex-1 bg-amber-950/70 rounded-xs"
+                            style={{ height: `${Math.max(15, Math.min(85, h))}%` }}
+                          />
+                        );
+                      })}
+                    </div>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2 shrink-0">
+                {/* Track 02+ Lanes (Voice/Audio Vocal Takes) */}
+                {vocalTracks.map((trk) => {
+                  const hasTake = trk.vocalBlob !== null;
+                  const isThisRecording = isRecording && trk.isArmed;
+
+                  return (
+                    <div key={trk.id} className="h-16 relative flex items-center p-1.5 bg-[#14161d]">
+                      {/* Grid lines */}
+                      <div className="absolute inset-0 flex pointer-events-none opacity-10">
+                        {Array.from({ length: 16 }).map((_, idx) => (
+                          <div key={idx} className="flex-1 border-r border-white" />
+                        ))}
+                      </div>
+
+                      {/* Clip representation */}
+                      {isThisRecording ? (
+                        /* Live recording pulsating clip */
+                        <div
+                          className="h-full rounded-lg bg-red-950/80 border-2 border-red-500 shadow-lg shadow-red-500/20 relative overflow-hidden flex items-center px-3 animate-pulse"
+                          style={{
+                            width: `${Math.max(15, Math.min(100, (recordingSeconds / (selectedTrack?.durationSeconds || 180)) * 100))}%`
+                          }}
+                        >
+                          <div className="absolute top-1 left-2 text-[10px] font-bold text-red-200 uppercase flex items-center gap-1">
+                            <span className="w-2 h-2 rounded-full bg-red-500 animate-ping" />
+                            <span>RECORDING: {trk.name} ({recordingSeconds}s)</span>
+                          </div>
+                          <div className="w-full flex items-center gap-1 pt-3">
+                            {liveWaveformHistory.slice(-32).map((val, idx) => (
+                              <div
+                                key={idx}
+                                className="flex-1 bg-red-400 rounded-xs"
+                                style={{ height: `${Math.max(10, val * 85)}%` }}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      ) : hasTake ? (
+                        /* Recorded vocal clip */
+                        <div
+                          className="h-full rounded-lg bg-gradient-to-r from-[#9a3412]/80 via-[#ea580c]/70 to-[#9a3412]/80 border border-[#f97316]/40 shadow-sm relative overflow-hidden flex items-center px-3"
+                          style={{
+                            width: `${Math.min(100, Math.max(20, (trk.durationSeconds / (selectedTrack?.durationSeconds || 180)) * 100))}%`
+                          }}
+                        >
+                          <div className="absolute top-1 left-2 text-[10px] font-bold text-orange-100 uppercase tracking-wider flex items-center gap-1">
+                            <span>{trk.name}</span>
+                            <span className="opacity-70 font-mono text-[9px]">• Take 1 ({trk.durationSeconds.toFixed(1)}s)</span>
+                          </div>
+                          <div className="w-full flex items-center justify-between gap-1 pt-3 opacity-90">
+                            {Array.from({ length: 48 }).map((_, i) => {
+                              const h = 20 + Math.sin(i * 0.6) * 30 + Math.cos(i * 1.1) * 20;
+                              return (
+                                <div
+                                  key={i}
+                                  className="flex-1 bg-orange-950/70 rounded-xs"
+                                  style={{ height: `${Math.max(15, Math.min(85, h))}%` }}
+                                />
+                              );
+                            })}
+                          </div>
+                        </div>
+                      ) : (
+                        /* Empty Ready Lane */
+                        <div className="h-full w-full rounded-lg border border-dashed border-white/5 flex items-center px-4 text-gray-500 text-[11px] font-mono">
+                          {trk.isArmed ? (
+                            <span className="text-red-400/80 flex items-center gap-1.5 font-bold">
+                              <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+                              <span>ARMED: Press ⏺ Record (or press R) to capture vocals</span>
+                            </span>
+                          ) : (
+                            <span className="text-gray-600">Track Ready</span>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+
+                {/* Empty Drop Area (Drop a loop or an audio/MIDI/video file) */}
+                <div
+                  onClick={() => setBeatPickerOpen(true)}
+                  className="p-6 m-3 rounded-2xl border-2 border-dashed border-white/10 hover:border-teal-500/40 bg-white/[0.01] hover:bg-white/[0.03] transition-colors flex flex-col items-center justify-center gap-2 text-gray-400 hover:text-white cursor-pointer"
+                >
+                  <Music2 className="h-6 w-6 text-gray-500" />
+                  <span className="text-xs font-medium">Drop a loop or an audio/MIDI/video file</span>
+                  <span className="text-[10px] text-gray-500 font-mono">Click to browse Caution Studio beat catalog</span>
+                </div>
+              </div>
+
+              {/* Floating Bottom-Right Toolbar (Magnet & Zoom) */}
+              <div className="absolute bottom-3 right-3 flex items-center gap-1 bg-[#101217]/90 p-1 rounded-xl border border-white/10 shadow-xl backdrop-blur-md z-30">
+                <button
+                  type="button"
+                  onClick={() => setSnapToGrid(!snapToGrid)}
+                  title="Snap to Grid"
+                  className={`p-1.5 rounded-lg transition-colors cursor-pointer ${snapToGrid ? 'text-teal-400 bg-teal-400/10' : 'text-gray-400 hover:text-white'}`}
+                >
+                  <Magnet className="h-3.5 w-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setZoomLevel(Math.max(0.7, zoomLevel - 0.2))}
+                  title="Zoom Out"
+                  className="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-white/5 transition-colors cursor-pointer"
+                >
+                  <ZoomOut className="h-3.5 w-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setZoomLevel(Math.min(2.0, zoomLevel + 0.2))}
+                  title="Zoom In"
+                  className="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-white/5 transition-colors cursor-pointer"
+                >
+                  <ZoomIn className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* =========================================================================
+              3. BOTTOM BANDLAB STUDIO CONSOLE & AUTOPITCH™ (Exact Layout from Screenshot)
+             ========================================================================= */}
+          {isConsoleOpen && (
+            <div className="h-[340px] bg-[#101217] border-t border-[#1f2229] flex flex-col shrink-0 select-none animate-in slide-in-from-bottom-2 duration-150">
+              {/* Console Top Header */}
+              <div className="px-3.5 py-1.5 bg-[#0e1014] border-b border-[#1f2229] flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  {/* Close Cross */}
                   <button
                     type="button"
-                    onClick={copyShareLink}
-                    className="px-3 py-1.5 rounded-lg bg-teal-500/20 hover:bg-teal-500/30 border border-teal-500/40 text-teal-300 font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
+                    onClick={() => setIsConsoleOpen(false)}
+                    title="Close Inspector"
+                    className="p-1 rounded text-gray-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
                   >
-                    <LinkIcon className="h-3.5 w-3.5" />
-                    <span>{linkCopied ? 'Copied!' : 'Copy Demo Link'}</span>
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+
+                  {/* Active Track Title */}
+                  <div className="flex items-center gap-1.5 text-xs font-bold text-gray-200">
+                    <Mic className="h-3.5 w-3.5 text-[#ea580c]" />
+                    <span>Voice/Audio</span>
+                  </div>
+                </div>
+
+                <div className="text-[10px] font-mono text-gray-500">
+                  AUTO-PITCH ENGINE: ACTIVE · 48.0kHz 24-BIT
+                </div>
+              </div>
+
+              {/* Console Content: 3-Column BandLab Layout */}
+              <div className="flex-1 flex overflow-hidden">
+                {/* Column 1: Input & Monitoring Panel */}
+                <div className="w-56 sm:w-64 p-3.5 border-r border-[#1f2229] flex flex-col justify-between shrink-0 bg-[#0e1014]/60">
+                  <div className="space-y-3">
+                    {/* Input Device Dropdown */}
+                    <div className="space-y-1">
+                      <span className="text-[10px] font-mono uppercase text-gray-400 block">Input</span>
+                      <select
+                        value={audioInputDevice}
+                        onChange={(e) => setAudioInputDevice(e.target.value)}
+                        className="w-full bg-[#181b24] border border-white/10 rounded-lg py-1 px-2 text-xs text-gray-200 focus:outline-none focus:border-teal-500 cursor-pointer truncate"
+                      >
+                        <option value="MacBook Pro Microphone (Built-in)">MacBook Pro Microphone (Built-in)</option>
+                        <option value="Default USB Audio Codec">Default USB Audio Codec</option>
+                        <option value="Studio Microphone Array">Studio Microphone Array</option>
+                      </select>
+                    </div>
+
+                    {/* Channel Mode Dropdown */}
+                    <div className="space-y-1">
+                      <select
+                        value={audioInputChannel}
+                        onChange={(e) => setAudioInputChannel(e.target.value as any)}
+                        className="w-full bg-[#181b24] border border-white/10 rounded-lg py-1 px-2 text-xs text-gray-200 focus:outline-none focus:border-teal-500 cursor-pointer"
+                      >
+                        <option value="Channel 1 (Mono)">Channel 1 (Mono)</option>
+                        <option value="Channel 2">Channel 2</option>
+                        <option value="Stereo">Stereo</option>
+                      </select>
+                    </div>
+
+                    {/* Input Level Animated Meter */}
+                    <div className="space-y-1.5 pt-1">
+                      <div className="flex items-center justify-between text-[10px] font-mono text-gray-400">
+                        <span>Input Level</span>
+                        <span className="text-teal-400 font-bold">{Math.round(inputLevelMeter * 100)}%</span>
+                      </div>
+                      <div className="h-2 w-full bg-black/60 rounded-full overflow-hidden p-0.5 border border-white/10">
+                        <div
+                          className="h-full rounded-full bg-gradient-to-r from-emerald-500 via-teal-400 to-amber-400 transition-all duration-75"
+                          style={{ width: `${Math.min(100, Math.max(5, inputLevelMeter * 100))}%` }}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Monitoring Button */}
+                    <button
+                      type="button"
+                      onClick={() => setIsInputMonitoring(!isInputMonitoring)}
+                      className={`w-full py-2 rounded-xl border text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                        isInputMonitoring
+                          ? 'bg-teal-500/20 border-teal-500/50 text-teal-300 shadow-sm'
+                          : 'bg-[#181b24] border-white/10 text-gray-400 hover:text-white'
+                      }`}
+                    >
+                      <Headphones className="h-3.5 w-3.5" />
+                      <span>{isInputMonitoring ? 'Monitoring: ON' : 'Monitoring'}</span>
+                    </button>
+                  </div>
+
+                  {/* Armed indicator */}
+                  <div className="pt-2 border-t border-white/5 flex items-center justify-between text-[10px] font-mono text-gray-500">
+                    <span>MIC STATUS:</span>
+                    <span className="text-emerald-400 font-bold">READY</span>
+                  </div>
+                </div>
+
+                {/* Column 2: BandLab AutoPitch™ Unit Centerpiece */}
+                {activeInspectorTab === 'autopitch' ? (
+                  <div className="flex-1 p-4 flex flex-col justify-between overflow-y-auto bg-[#101217]">
+                    {/* Top Row: Power Switch + Title + AutoDetect Key */}
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        {/* Power Toggle Switch */}
+                        <button
+                          type="button"
+                          onClick={() => setAutoTuneEnabled(!autoTuneEnabled)}
+                          className={`w-9 h-5 rounded-full transition-colors relative cursor-pointer ${
+                            autoTuneEnabled ? 'bg-teal-400' : 'bg-gray-700'
+                          }`}
+                        >
+                          <span
+                            className={`w-4 h-4 rounded-full bg-white absolute top-0.5 transition-transform ${
+                              autoTuneEnabled ? 'translate-x-4' : 'translate-x-0.5'
+                            }`}
+                          />
+                        </button>
+
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-sm font-black text-white tracking-wide">AutoPitch™</span>
+                        </div>
+                      </div>
+
+                      {/* AutoDetect Key Button */}
+                      <button
+                        type="button"
+                        onClick={handleAutoDetectKey}
+                        className="px-3 py-1 rounded-lg bg-[#181b24] hover:bg-[#202533] border border-white/10 text-gray-200 text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-sm hover:border-teal-500/40"
+                      >
+                        <span>AutoDetect Key</span>
+                        <Sparkles className="h-3 w-3 text-teal-400" />
+                      </button>
+                    </div>
+
+                    {/* Category & Scale Selectors */}
+                    <div className="grid grid-cols-2 gap-6 pt-2 max-w-xl">
+                      <div>
+                        <span className="text-[10px] font-mono text-gray-400 block mb-1">Category</span>
+                        <select
+                          value={autoPitchCategory}
+                          onChange={(e) => setAutoPitchCategory(e.target.value as any)}
+                          className="w-full bg-[#181b24] border border-white/10 rounded-lg py-1 px-2.5 text-xs text-white focus:outline-none focus:border-teal-400 cursor-pointer"
+                        >
+                          <option value="Essentials">Essentials</option>
+                          <option value="Modern Rap">Modern Rap</option>
+                          <option value="Afrobeat">Afrobeat Glow</option>
+                          <option value="Pop">Pop Polish</option>
+                          <option value="R&B">R&B Velvet</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <span className="text-[10px] font-mono text-gray-400 block mb-1">Scale</span>
+                        <select
+                          value={autoTuneKey}
+                          onChange={(e) => {
+                            setAutoTuneKey(e.target.value);
+                            if (!autoTuneEnabled) setAutoTuneEnabled(true);
+                          }}
+                          className="w-full bg-[#181b24] border border-white/10 rounded-lg py-1 px-2.5 text-xs text-white focus:outline-none focus:border-teal-400 cursor-pointer"
+                        >
+                          <option value="D Minor">D Minor</option>
+                          <option value="F Minor">F Minor</option>
+                          <option value="C Major">C Major</option>
+                          <option value="A Minor">A Minor</option>
+                          <option value="G Major">G Major</option>
+                          <option value="Chromatic">Chromatic (All)</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    {/* Middle Section: Preset Grid + Big Central Rotary Dial + Piano Notes */}
+                    <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-center pt-2">
+                      {/* 6 Preset Cards (2x3 Grid) */}
+                      <div className="md:col-span-4 grid grid-cols-3 gap-2">
+                        {(['Classic', 'Duet', 'Big Harmony', 'Natural', 'Third', 'Octave'] as const).map((pst) => {
+                          const isActive = autoPitchPreset === pst && autoTuneEnabled;
+                          return (
+                            <button
+                              key={pst}
+                              type="button"
+                              onClick={() => handleSelectAutoPitchPreset(pst)}
+                              className={`h-12 rounded-xl border flex flex-col items-center justify-center p-1 text-center transition-all cursor-pointer ${
+                                isActive
+                                  ? 'bg-teal-500/20 border-teal-400 text-teal-300 shadow-[0_0_12px_rgba(45,212,191,0.25)]'
+                                  : 'bg-[#181b24] border-white/5 text-gray-400 hover:text-white hover:bg-[#202533]'
+                              }`}
+                            >
+                              <span className="text-[10px] font-bold truncate w-full">{pst}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+
+                      {/* Centerpiece Big Radial Rotary Dial ("Heaviest") */}
+                      <div className="md:col-span-4 flex flex-col items-center justify-center">
+                        <div
+                          className="relative w-28 h-28 flex items-center justify-center cursor-pointer group"
+                          onClick={() => {
+                            // Cycle through values on click: 30% -> 60% -> 85% -> 100%
+                            const next = autoPitchPercent >= 90 ? 35 : autoPitchPercent + 25;
+                            setAutoTuneAmount(next / 100);
+                            if (!autoTuneEnabled) setAutoTuneEnabled(true);
+                          }}
+                          title="Click to cycle Pitch Depth / Drag slider"
+                        >
+                          {/* Radial SVG Dial with Tick Marks */}
+                          <svg className="w-full h-full -rotate-90" viewBox="0 0 100 100">
+                            {/* Background Track Circle */}
+                            <circle
+                              cx="50"
+                              cy="50"
+                              r="40"
+                              stroke="#232733"
+                              strokeWidth="6"
+                              fill="transparent"
+                              strokeDasharray="251.2"
+                              strokeDashoffset="62.8"
+                            />
+                            {/* Active Teal Arc */}
+                            <circle
+                              cx="50"
+                              cy="50"
+                              r="40"
+                              stroke={autoTuneEnabled ? '#2dd4bf' : '#4b5563'}
+                              strokeWidth="6"
+                              fill="transparent"
+                              strokeDasharray="251.2"
+                              strokeDashoffset={251.2 - (autoPitchPercent / 100) * 188.4}
+                              strokeLinecap="round"
+                              className="transition-all duration-150"
+                            />
+                          </svg>
+
+                          {/* Inner Metallic Center Cap */}
+                          <div className="absolute w-18 h-18 rounded-full bg-gradient-to-b from-[#242938] via-[#141721] to-[#0c0d12] border border-white/15 flex flex-col items-center justify-center shadow-inner">
+                            <span className="text-xs font-black text-white font-mono">{autoPitchPercent}%</span>
+                            <div className="w-1.5 h-1.5 rounded-full bg-teal-400 mt-0.5" />
+                          </div>
+                        </div>
+
+                        {/* Dial Label underneath */}
+                        <span className="text-xs font-bold text-gray-300 mt-1 uppercase tracking-wider font-mono">
+                          {getAutoPitchDialLabel(autoPitchPercent)}
+                        </span>
+                      </div>
+
+                      {/* 12-Note Piano Key Matrix Grid */}
+                      <div className="md:col-span-4 flex flex-col gap-1.5 p-2 rounded-xl bg-[#141721] border border-white/5">
+                        <span className="text-[10px] font-mono text-gray-400 uppercase text-center block">Active Scale Notes</span>
+                        {/* Naturals (C D E F G A B) */}
+                        <div className="grid grid-cols-7 gap-1">
+                          {['C', 'D', 'E', 'F', 'G', 'A', 'B'].map((note) => {
+                            const inScale = activeScaleNotes.has(note) && !mutedScaleNotes.includes(note);
+                            return (
+                              <button
+                                key={note}
+                                type="button"
+                                onClick={() => toggleScaleNote(note)}
+                                className={`h-8 rounded font-mono text-xs font-bold transition-all ${
+                                  inScale
+                                    ? 'bg-teal-400 text-black shadow-sm'
+                                    : 'bg-[#1e2230] text-gray-500 hover:text-white'
+                                }`}
+                              >
+                                {note}
+                              </button>
+                            );
+                          })}
+                        </div>
+                        {/* Accidentals (C# D# F# G# A#) */}
+                        <div className="grid grid-cols-5 gap-1.5 pt-1">
+                          {['C#', 'D#', 'F#', 'G#', 'A#'].map((note) => {
+                            const inScale = activeScaleNotes.has(note) && !mutedScaleNotes.includes(note);
+                            return (
+                              <button
+                                key={note}
+                                type="button"
+                                onClick={() => toggleScaleNote(note)}
+                                className={`h-7 rounded font-mono text-[10px] font-bold transition-all ${
+                                  inScale
+                                    ? 'bg-amber-400 text-black shadow-sm'
+                                    : 'bg-[#181b24] text-gray-600 hover:text-white'
+                                }`}
+                              >
+                                {note}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ) : activeInspectorTab === 'fx' ? (
+                  /* Tab 2: Fx Effects Rack (Reverb, Delay, EQ, Compressor) */
+                  <div className="flex-1 p-4 grid grid-cols-2 sm:grid-cols-4 gap-3 overflow-y-auto bg-[#101217]">
+                    {/* Reverb */}
+                    <div className="p-3 rounded-xl bg-[#141721] border border-white/5 space-y-2">
+                      <div className="flex justify-between text-xs font-bold text-teal-300">
+                        <span>STUDIO REVERB</span>
+                        <span className="font-mono">{Math.round(reverbAmount * 100)}%</span>
+                      </div>
+                      <input
+                        type="range"
+                        min="0"
+                        max="1"
+                        step="0.05"
+                        value={reverbAmount}
+                        onChange={(e) => setReverbAmount(parseFloat(e.target.value))}
+                        className="w-full accent-teal-400 h-1.5 bg-black/60 rounded cursor-pointer"
+                      />
+                      <span className="text-[10px] text-gray-500">Convolver Hall simulation</span>
+                    </div>
+
+                    {/* Delay */}
+                    <div className="p-3 rounded-xl bg-[#141721] border border-white/5 space-y-2">
+                      <div className="flex justify-between text-xs font-bold text-amber-300">
+                        <span>TEMPO DELAY</span>
+                        <span className="font-mono">{Math.round(delayAmount * 100)}%</span>
+                      </div>
+                      <input
+                        type="range"
+                        min="0"
+                        max="1"
+                        step="0.05"
+                        value={delayAmount}
+                        onChange={(e) => setDelayAmount(parseFloat(e.target.value))}
+                        className="w-full accent-amber-400 h-1.5 bg-black/60 rounded cursor-pointer"
+                      />
+                      <span className="text-[10px] text-gray-500">1/4 note tempo sync</span>
+                    </div>
+
+                    {/* 3-Band EQ */}
+                    <div className="p-3 rounded-xl bg-[#141721] border border-white/5 space-y-2">
+                      <div className="flex justify-between text-xs font-bold text-purple-300">
+                        <span>3-BAND EQ</span>
+                        <span className="font-mono">+{eqMid}dB</span>
+                      </div>
+                      <div className="grid grid-cols-3 gap-1 text-[9px] font-mono text-center">
+                        <div>
+                          <span className="text-gray-400">LOW</span>
+                          <input
+                            type="range"
+                            min="-6"
+                            max="6"
+                            step="0.5"
+                            value={eqLow}
+                            onChange={(e) => setEqLow(parseFloat(e.target.value))}
+                            className="w-full accent-purple-400 h-1 bg-black/60 rounded"
+                          />
+                        </div>
+                        <div>
+                          <span className="text-gray-400">MID</span>
+                          <input
+                            type="range"
+                            min="-6"
+                            max="6"
+                            step="0.5"
+                            value={eqMid}
+                            onChange={(e) => setEqMid(parseFloat(e.target.value))}
+                            className="w-full accent-purple-400 h-1 bg-black/60 rounded"
+                          />
+                        </div>
+                        <div>
+                          <span className="text-gray-400">HI</span>
+                          <input
+                            type="range"
+                            min="-6"
+                            max="6"
+                            step="0.5"
+                            value={eqHigh}
+                            onChange={(e) => setEqHigh(parseFloat(e.target.value))}
+                            className="w-full accent-purple-400 h-1 bg-black/60 rounded"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Dynamics */}
+                    <div className="p-3 rounded-xl bg-[#141721] border border-white/5 space-y-2">
+                      <div className="flex justify-between text-xs font-bold text-white">
+                        <span>DYNAMICS</span>
+                        <span className="text-[9px] font-mono px-1 bg-teal-400/20 text-teal-300 rounded">OPTO</span>
+                      </div>
+                      <label className="flex items-center gap-2 cursor-pointer text-xs text-gray-300">
+                        <input
+                          type="checkbox"
+                          checked={compressorEnabled}
+                          onChange={(e) => setCompressorEnabled(e.target.checked)}
+                          className="rounded accent-teal-400"
+                        />
+                        <span>Compressor</span>
+                      </label>
+                      <label className="flex items-center gap-2 cursor-pointer text-xs text-gray-300">
+                        <input
+                          type="checkbox"
+                          checked={lowCutEnabled}
+                          onChange={(e) => setLowCutEnabled(e.target.checked)}
+                          className="rounded accent-teal-400"
+                        />
+                        <span>80Hz Low-Cut</span>
+                      </label>
+                    </div>
+                  </div>
+                ) : (
+                  /* Tab 3: Editor / Lyrics & Notepad */
+                  <div className="flex-1 p-4 overflow-y-auto bg-[#101217] space-y-2">
+                    <span className="text-[10px] font-mono uppercase text-gray-400 block">Lyrics & Song Notes</span>
+                    <textarea
+                      value={lyricsText}
+                      onChange={(e) => setLyricsText(e.target.value)}
+                      placeholder="Type your verses, harmonies, and recording cues here..."
+                      rows={5}
+                      className="w-full p-3 rounded-xl bg-black/50 border border-white/10 text-xs text-white font-mono resize-none focus:outline-none focus:border-teal-400 leading-relaxed"
+                    />
+                  </div>
+                )}
+
+                {/* Column 3: Track Output Strip (Right) */}
+                <div className="w-40 sm:w-48 p-3.5 border-l border-[#1f2229] flex flex-col items-center justify-between shrink-0 bg-[#0e1014]/60">
+                  <span className="text-[10px] font-mono uppercase text-gray-400">Volume</span>
+
+                  {/* Vertical Channel Fader with Decibel Marks */}
+                  <div className="flex items-center gap-2 h-36">
+                    {/* dB Marks */}
+                    <div className="flex flex-col justify-between text-[9px] font-mono text-gray-500 h-full py-1">
+                      <span>+6</span>
+                      <span>0</span>
+                      <span>-6</span>
+                      <span>-12</span>
+                      <span>-24</span>
+                    </div>
+
+                    {/* Vertical Slider */}
+                    <div className="h-full flex items-center relative">
+                      <input
+                        type="range"
+                        min="0"
+                        max="1.5"
+                        step="0.01"
+                        value={armedTrack?.volume || 1.0}
+                        onChange={(e) => armedTrack && handleTrackVolumeChange(armedTrack.id, parseFloat(e.target.value))}
+                        className="h-28 w-2 accent-teal-400 cursor-pointer -rotate-90"
+                      />
+                    </div>
+
+                    {/* Peak Level LED meter */}
+                    <div className="w-2 h-28 bg-black/60 rounded-full overflow-hidden p-0.5 border border-white/10 flex flex-col justify-end">
+                      <div
+                        className="w-full bg-gradient-to-t from-emerald-500 via-teal-400 to-amber-400 rounded-full transition-all duration-75"
+                        style={{ height: `${Math.min(100, Math.max(5, (armedTrack?.volume || 1) * 60))}%` }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Rotary Pan & Reverb Knobs */}
+                  <div className="grid grid-cols-2 gap-2 w-full pt-1 text-center">
+                    <div>
+                      <span className="text-[9px] font-mono text-gray-400 block">Pan</span>
+                      <span className="text-[10px] font-mono text-teal-300">{formatPanLabel(armedTrack?.pan || 0)}</span>
+                    </div>
+                    <div>
+                      <span className="text-[9px] font-mono text-gray-400 block">Reverb</span>
+                      <span className="text-[10px] font-mono text-amber-300">{Math.round(reverbAmount * 100)}%</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Bottom Tab Switcher Footer */}
+              <div className="h-9 bg-[#0c0d10] border-t border-[#1f2229] flex items-center justify-between px-3 text-xs shrink-0 select-none">
+                {/* Left Tabs */}
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setActiveInspectorTab('autopitch')}
+                    className={`px-3 py-1 rounded-md text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5 ${
+                      activeInspectorTab === 'autopitch'
+                        ? 'bg-teal-500/20 text-teal-300 border border-teal-500/30'
+                        : 'text-gray-400 hover:text-white'
+                    }`}
+                  >
+                    <Sliders className="h-3.5 w-3.5" />
+                    <span>AutoPitch™</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setActiveInspectorTab('fx')}
+                    className={`px-3 py-1 rounded-md text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5 ${
+                      activeInspectorTab === 'fx'
+                        ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                        : 'text-gray-400 hover:text-white'
+                    }`}
+                  >
+                    <Sparkles className="h-3.5 w-3.5" />
+                    <span>Fx Effects</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setActiveInspectorTab('editor')}
+                    className={`px-3 py-1 rounded-md text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5 ${
+                      activeInspectorTab === 'editor'
+                        ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30'
+                        : 'text-gray-400 hover:text-white'
+                    }`}
+                  >
+                    <Scissors className="h-3.5 w-3.5" />
+                    <span>Editor</span>
+                  </button>
+                </div>
+
+                {/* Right Action Shortcuts */}
+                <div className="flex items-center gap-2 text-gray-400">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActiveInspectorTab('editor');
+                      setIsConsoleOpen(true);
+                    }}
+                    className="hover:text-white flex items-center gap-1 text-[11px] font-medium"
+                  >
+                    <FileText className="h-3 w-3" />
+                    <span>Lyrics/Notes</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setBeatPickerOpen(true)}
+                    className="hover:text-white flex items-center gap-1 text-[11px] font-medium"
+                  >
+                    <Disc3 className="h-3 w-3 text-amber-400" />
+                    <span>Beats</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setIsShortcutsModalOpen(true)}
+                    className="hover:text-white flex items-center gap-1 text-[11px] font-medium"
+                  >
+                    <Keyboard className="h-3 w-3" />
+                    <span>Shortcuts</span>
                   </button>
                 </div>
               </div>
-            ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div>
-                  <label className="block text-[10px] font-mono uppercase text-gray-400 mb-1">
-                    Artist / Stage Name
-                  </label>
-                  <input
-                    type="text"
-                    value={artistName}
-                    onChange={(e) => setArtistName(e.target.value)}
-                    placeholder="Your artist name"
-                    className="w-full h-8 px-3 rounded-lg bg-black/50 border border-white/10 text-xs text-white focus:outline-none focus:border-teal-400"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-[10px] font-mono uppercase text-gray-400 mb-1">
-                    Instagram / X (@handle)
-                  </label>
-                  <input
-                    type="text"
-                    value={socialHandle}
-                    onChange={(e) => setSocialHandle(e.target.value)}
-                    placeholder="@yourhandle"
-                    className="w-full h-8 px-3 rounded-lg bg-black/50 border border-white/10 text-xs text-white focus:outline-none focus:border-teal-400"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-[10px] font-mono uppercase text-gray-400 mb-1">
-                    WhatsApp / Contact
-                  </label>
-                  <input
-                    type="text"
-                    value={contactPhone}
-                    onChange={(e) => setContactPhone(e.target.value)}
-                    placeholder="+234..."
-                    className="w-full h-8 px-3 rounded-lg bg-black/50 border border-white/10 text-xs text-white focus:outline-none focus:border-teal-400"
-                  />
-                </div>
-              </div>
-            )}
-          </div>
-        )}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* =========================================================================
-          STUDIO EXPORT AUDIO MIXDOWN MODAL DIALOG
+          4. MODALS & DRAWERS (Beat Catalog, Export Dialog, Shortcuts)
          ========================================================================= */}
-      {isExportDialogOpen && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="w-full max-w-lg bg-[#0F131E] border border-white/15 rounded-2xl p-5 shadow-2xl space-y-4 animate-in fade-in zoom-in-95 duration-150">
-            {/* Modal Header */}
-            <div className="flex items-center justify-between border-b border-white/10 pb-3">
+
+      {/* Beat Picker Modal */}
+      {beatPickerOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
+          <div
+            className="relative w-full max-w-2xl rounded-2xl bg-[#0F131C] border border-white/10 p-6 shadow-2xl flex flex-col max-h-[85vh] text-white"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between pb-3 border-b border-white/10">
               <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-lg bg-teal-500/20 border border-teal-500/30 flex items-center justify-center">
-                  <Download className="h-4 w-4 text-teal-300" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-bold text-white uppercase tracking-wider">
-                    Export Audio Mixdown
-                  </h3>
-                  <p className="text-[10px] text-gray-400 font-mono">
-                    Studio locator range engine · High-definition WAV bounce
-                  </p>
-                </div>
+                <Disc3 className="h-5 w-5 text-amber-400" />
+                <h3 className="text-base font-bold text-white">Load Backing Instrumental Beat</h3>
               </div>
               <button
                 type="button"
-                onClick={() => setIsExportDialogOpen(false)}
-                className="p-1 rounded-lg text-gray-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                onClick={() => setBeatPickerOpen(false)}
+                className="p-1.5 rounded-full text-gray-400 hover:text-white hover:bg-white/10"
               >
                 <X className="h-4 w-4" />
               </button>
             </div>
 
-            {/* Export Range Options */}
-            <div className="space-y-2">
-              <label className="block text-[11px] font-mono uppercase text-gray-400 font-bold">
-                1. Select Export Range (Where Should Export Stop?)
-              </label>
-
-              {/* Option A: Recorded Song Length (Auto) */}
-              <div
-                onClick={() => {
-                  setExportRangeMode('recorded');
-                  setCustomExportEndSeconds(null);
-                }}
-                className={`p-3 rounded-xl border cursor-pointer transition-all flex items-start gap-3 ${
-                  exportRangeMode === 'recorded'
-                    ? 'bg-teal-500/15 border-teal-400/60 ring-1 ring-teal-400/30'
-                    : 'bg-black/30 border-white/5 hover:border-white/20'
-                }`}
-              >
+            <div className="py-3 flex gap-2">
+              <div className="relative flex-1">
+                <Search className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
                 <input
-                  type="radio"
-                  name="exportRange"
-                  checked={exportRangeMode === 'recorded'}
-                  onChange={() => {
-                    setExportRangeMode('recorded');
-                    setCustomExportEndSeconds(null);
-                  }}
-                  className="accent-teal-400 mt-1 cursor-pointer"
+                  type="text"
+                  value={beatSearchQuery}
+                  onChange={(e) => setBeatSearchQuery(e.target.value)}
+                  placeholder="Search beats by title, producer, genre..."
+                  className="w-full pl-9 pr-3 py-2 rounded-xl bg-black/50 border border-white/10 text-xs text-white focus:outline-none focus:border-teal-400"
                 />
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between">
-                    <p className="text-xs font-bold text-white flex items-center gap-1.5">
-                      <span>Recorded Song Length (Auto)</span>
-                      <span className="text-[9px] font-mono px-1.5 py-0.2 rounded-full bg-teal-400/20 text-teal-300 font-bold">
-                        RECOMMENDED
-                      </span>
-                    </p>
-                    <span className="text-xs font-mono font-bold text-teal-300">
-                      {maxRecordedVocalDuration > 0 ? `${maxRecordedVocalDuration.toFixed(1)}s` : 'Full'}
-                    </span>
-                  </div>
-                  <p className="text-[11px] text-gray-400 mt-0.5">
-                    Automatically stops export where your recorded vocals end. No trailing dead silence!
-                  </p>
-                </div>
-              </div>
-
-              {/* Option B: Right Locator [R] / Custom Stop Marker */}
-              <div
-                onClick={() => setExportRangeMode('custom')}
-                className={`p-3 rounded-xl border cursor-pointer transition-all flex flex-col gap-2 ${
-                  exportRangeMode === 'custom'
-                    ? 'bg-amber-500/15 border-amber-400/60 ring-1 ring-amber-400/30'
-                    : 'bg-black/30 border-white/5 hover:border-white/20'
-                }`}
-              >
-                <div className="flex items-start gap-3">
-                  <input
-                    type="radio"
-                    name="exportRange"
-                    checked={exportRangeMode === 'custom'}
-                    onChange={() => setExportRangeMode('custom')}
-                    className="accent-amber-400 mt-1 cursor-pointer"
-                  />
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between">
-                      <p className="text-xs font-bold text-white flex items-center gap-1.5">
-                        <span className="px-1 py-0.2 rounded bg-amber-400 text-black text-[9px] font-mono font-black">
-                          [R]
-                        </span>
-                        <span>Right Locator / Custom Stop Point</span>
-                      </p>
-                      <span className="text-xs font-mono font-bold text-amber-300">
-                        {effectiveExportDuration.toFixed(1)}s ({formatTimecode(effectiveExportDuration)})
-                      </span>
-                    </div>
-                    <p className="text-[11px] text-gray-400 mt-0.5">
-                      Choose exactly where the song ends (e.g. leave room for beat outro fade).
-                    </p>
-                  </div>
-                </div>
-
-                {/* Custom Stop Point Slider & Input */}
-                {exportRangeMode === 'custom' && (
-                  <div className="mt-1 pt-2 border-t border-white/10 space-y-2 pl-6">
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="text-gray-400 text-[10px] font-mono">STOP TIME:</span>
-                      <div className="flex items-center gap-1.5">
-                        <input
-                          type="number"
-                          min="1"
-                          max={Math.round(selectedTrack?.durationSeconds || 300)}
-                          step="0.5"
-                          value={customExportEndSeconds || effectiveExportDuration}
-                          onChange={(e) => {
-                            const val = parseFloat(e.target.value);
-                            if (!isNaN(val) && val > 0) {
-                              setCustomExportEndSeconds(val);
-                            }
-                          }}
-                          className="w-16 px-1.5 py-0.5 text-center font-mono text-xs font-bold rounded bg-black/60 border border-amber-400 text-amber-300 focus:outline-none"
-                        />
-                        <span className="text-gray-400 text-[10px] font-mono">sec</span>
-                      </div>
-                    </div>
-
-                    <input
-                      type="range"
-                      min="1"
-                      max={Math.round(selectedTrack?.durationSeconds || 180)}
-                      step="0.5"
-                      value={customExportEndSeconds || effectiveExportDuration}
-                      onChange={(e) => setCustomExportEndSeconds(parseFloat(e.target.value))}
-                      className="w-full accent-amber-400 h-1.5 bg-black/50 rounded cursor-pointer"
-                    />
-
-                    <div className="flex items-center justify-between">
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setCustomExportEndSeconds(Math.max(1, playheadTime));
-                        }}
-                        className="px-2 py-0.5 rounded bg-white/5 hover:bg-white/10 border border-white/10 text-gray-300 text-[9px] font-mono flex items-center gap-1 cursor-pointer"
-                      >
-                        <Target className="h-2.5 w-2.5 text-amber-400" />
-                        <span>Snap to Playhead ({formatTimecode(playheadTime)})</span>
-                      </button>
-
-                      {maxRecordedVocalDuration > 0 && (
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setCustomExportEndSeconds(maxRecordedVocalDuration);
-                          }}
-                          className="px-2 py-0.5 rounded bg-white/5 hover:bg-white/10 border border-white/10 text-gray-300 text-[9px] font-mono cursor-pointer"
-                        >
-                          Snap to Vocals ({maxRecordedVocalDuration.toFixed(1)}s)
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Option C: Entire Backing Beat */}
-              <div
-                onClick={() => {
-                  setExportRangeMode('full');
-                  setCustomExportEndSeconds(null);
-                }}
-                className={`p-3 rounded-xl border cursor-pointer transition-all flex items-start gap-3 ${
-                  exportRangeMode === 'full'
-                    ? 'bg-purple-500/15 border-purple-400/60 ring-1 ring-purple-400/30'
-                    : 'bg-black/30 border-white/5 hover:border-white/20'
-                }`}
-              >
-                <input
-                  type="radio"
-                  name="exportRange"
-                  checked={exportRangeMode === 'full'}
-                  onChange={() => {
-                    setExportRangeMode('full');
-                    setCustomExportEndSeconds(null);
-                  }}
-                  className="accent-purple-400 mt-1 cursor-pointer"
-                />
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between">
-                    <p className="text-xs font-bold text-white">Full Backing Beat Duration</p>
-                    <span className="text-xs font-mono font-bold text-purple-300">
-                      {selectedTrack?.durationSeconds ? `${Math.round(selectedTrack.durationSeconds)}s` : '180s'}
-                    </span>
-                  </div>
-                  <p className="text-[11px] text-gray-400 mt-0.5">
-                    Exports the complete instrumental track from start to finish.
-                  </p>
-                </div>
               </div>
             </div>
 
-            {/* Technical Mixdown Specs Summary */}
-            <div className="p-3 rounded-xl bg-black/40 border border-white/5 space-y-1 font-mono text-[10px]">
-              <div className="flex items-center justify-between text-gray-400">
-                <span>FORMAT & SAMPLE RATE:</span>
-                <span className="text-white font-bold">16-Bit PCM WAV · 44.1 kHz Stereo</span>
-              </div>
-              <div className="flex items-center justify-between text-gray-400">
-                <span>INCLUDED STEMS:</span>
-                <span className="text-teal-300 font-bold">
-                  Track 01 (Beat) + {vocalTracks.filter((t) => t.vocalBlob).length} Vocal Takes
-                </span>
-              </div>
-              <div className="flex items-center justify-between text-gray-400">
-                <span>EXPORT DURATION:</span>
-                <span className="text-amber-300 font-bold text-xs">
-                  {effectiveExportDuration.toFixed(1)} seconds ({formatTimecode(effectiveExportDuration)})
-                </span>
-              </div>
-            </div>
+            <div className="flex-1 overflow-y-auto space-y-2 py-2 pr-1">
+              {filteredBeats.map((b) => (
+                <div
+                  key={b.id}
+                  onClick={() => {
+                    handleSelectBeat(b);
+                    setBeatPickerOpen(false);
+                  }}
+                  className={`p-2.5 rounded-xl border flex items-center justify-between gap-3 cursor-pointer transition-colors ${
+                    selectedTrack?.id === b.id
+                      ? 'bg-teal-500/15 border-teal-500/40 text-teal-300'
+                      : 'bg-white/[0.02] border-white/5 hover:bg-white/5 text-gray-200'
+                  }`}
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <img src={b.coverUrl} alt={b.title} className="w-10 h-10 rounded-lg object-cover" />
+                    <div className="min-w-0">
+                      <p className="text-xs font-bold truncate text-white">{b.title}</p>
+                      <p className="text-[11px] text-gray-400 truncate">{b.artist} • {b.bpm || 110} BPM • {b.genre}</p>
+                    </div>
+                  </div>
 
-            {/* Modal Actions */}
-            <div className="flex items-center justify-end gap-2 pt-2">
+                  <button
+                    type="button"
+                    className="px-3 py-1 rounded-lg bg-teal-500 text-black text-xs font-bold shrink-0 hover:bg-teal-400"
+                  >
+                    Load
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Export / Render Dialog Modal */}
+      {isExportDialogOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
+          <div
+            className="relative w-full max-w-md rounded-2xl bg-[#0F131C] border border-white/10 p-6 shadow-2xl text-white space-y-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between pb-2 border-b border-white/10">
+              <div className="flex items-center gap-2">
+                <Download className="h-5 w-5 text-teal-400" />
+                <h3 className="text-base font-bold text-white">Publish & Export Track</h3>
+              </div>
               <button
                 type="button"
                 onClick={() => setIsExportDialogOpen(false)}
-                className="px-3.5 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-xs font-bold text-gray-300 transition-colors cursor-pointer"
+                className="p-1.5 rounded-full text-gray-400 hover:text-white hover:bg-white/10"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <p className="text-xs text-gray-300">
+              Render your full arrangement into a studio-grade 24-Bit WAV master ready for distribution on Spotify, Apple Music, and Audiomack.
+            </p>
+
+            <div className="p-3 rounded-xl bg-black/40 border border-white/5 space-y-1 font-mono text-[10px]">
+              <div className="flex justify-between text-gray-400">
+                <span>FORMAT:</span>
+                <span className="text-white font-bold">16-Bit PCM WAV · 44.1kHz Stereo</span>
+              </div>
+              <div className="flex justify-between text-gray-400">
+                <span>ACTIVE TRACKS:</span>
+                <span className="text-teal-300 font-bold">{vocalTracks.length + 1} Stems</span>
+              </div>
+            </div>
+
+            <div className="flex gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setIsExportDialogOpen(false)}
+                className="flex-1 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-xs font-bold text-gray-300"
               >
                 Cancel
               </button>
-
               <button
                 type="button"
                 onClick={() => handleExportWav()}
                 disabled={isExportingWav}
-                className="px-4 py-2 rounded-xl bg-teal-500 hover:bg-teal-400 text-black text-xs font-bold flex items-center gap-2 transition-all cursor-pointer shadow-lg shadow-teal-500/20 disabled:opacity-50"
+                className="flex-1 py-2.5 rounded-xl bg-teal-500 hover:bg-teal-400 text-black text-xs font-bold flex items-center justify-center gap-1.5 shadow-lg shadow-teal-500/20"
               >
                 <Download className="h-4 w-4" />
-                <span>
-                  {isExportingWav
-                    ? 'Rendering Master WAV...'
-                    : `Render & Download WAV (${effectiveExportDuration.toFixed(1)}s)`}
-                </span>
+                <span>{isExportingWav ? 'Rendering...' : 'Download WAV'}</span>
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Keyboard Shortcuts Modal */}
+      {isShortcutsModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
+          <div
+            className="relative w-full max-w-sm rounded-2xl bg-[#0F131C] border border-white/10 p-5 shadow-2xl text-white space-y-3 font-sans"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between pb-2 border-b border-white/10">
+              <div className="flex items-center gap-2">
+                <Keyboard className="h-4 w-4 text-teal-400" />
+                <h3 className="text-sm font-bold text-white">Keyboard Shortcuts</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsShortcutsModalOpen(false)}
+                className="p-1 rounded-full text-gray-400 hover:text-white"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+
+            <div className="space-y-2 text-xs font-mono">
+              <div className="flex justify-between py-1 border-b border-white/5">
+                <span className="text-gray-400">Play / Pause</span>
+                <span className="px-2 py-0.5 rounded bg-white/10 text-white font-bold">Space</span>
+              </div>
+              <div className="flex justify-between py-1 border-b border-white/5">
+                <span className="text-gray-400">Record into Armed Track</span>
+                <span className="px-2 py-0.5 rounded bg-red-500/20 text-red-300 font-bold">R</span>
+              </div>
+              <div className="flex justify-between py-1 border-b border-white/5">
+                <span className="text-gray-400">Return to Zero (00:00)</span>
+                <span className="px-2 py-0.5 rounded bg-white/10 text-white font-bold">Return</span>
+              </div>
+              <div className="flex justify-between py-1 border-b border-white/5">
+                <span className="text-gray-400">Toggle Loop Mode</span>
+                <span className="px-2 py-0.5 rounded bg-white/10 text-white font-bold">L</span>
+              </div>
             </div>
           </div>
         </div>
