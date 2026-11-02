@@ -31,7 +31,7 @@ import {
 export function isFreeBeat(track?: TrackItem | null): boolean {
   if (!track) return false;
   if (track.isFree === true) return true;
-  if (track.priceNgn === 0 || (track.priceNgn !== undefined && track.priceNgn <= 0.01)) return true;
+  if (track.priceNgn === 0 || (track.priceNgn !== undefined && track.priceNgn <= 1)) return true;
   if (track.category === 'free') return true;
   if (
     Array.isArray(track.tags) &&
@@ -159,9 +159,17 @@ export function UserMarketplaceView({
         if (!matchesTitle && !matchesArtist && !matchesGenre && !matchesTags) return false;
       }
 
-      // 2. Genre Filter
-      if (selectedGenre !== 'All Genres') {
-        if ((track.genre || '').toLowerCase() !== selectedGenre.toLowerCase()) return false;
+      // 2. Genre Filter (normalized for singular/plural e.g. Afrobeat vs Afrobeats)
+      if (selectedGenre !== 'All Genres' && selectedGenre !== 'All') {
+        const normSelected = selectedGenre.toLowerCase().replace(/s$/, '').trim();
+        const trackGenre = (track.genre || '').toLowerCase().replace(/s$/, '').trim();
+        const matchesGenre =
+          trackGenre === normSelected ||
+          trackGenre.includes(normSelected) ||
+          normSelected.includes(trackGenre) ||
+          (Array.isArray(track.tags) &&
+            track.tags.some((t) => t.toLowerCase().replace(/s$/, '').includes(normSelected)));
+        if (!matchesGenre) return false;
       }
 
       // 3. BPM Range Filter
@@ -655,18 +663,8 @@ export function UserMarketplaceView({
                       </button>
                     )}
 
-                    {/* Action Button: Free Download vs "Get Beat" with Selected Tier */}
-                    {isFree ? (
-                      <button
-                        type="button"
-                        onClick={(e) => handleDownload(row, e)}
-                        title="Download Free Beat"
-                        className="px-3 py-1.5 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/40 text-emerald-300 text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 transition-transform hover:scale-105 shadow-sm cursor-pointer"
-                      >
-                        <Download className="h-3 w-3 stroke-[2.5]" />
-                        <span>Get Beat for Free</span>
-                      </button>
-                    ) : (
+                    {/* Action Button: Free beats have no "Get Beat" button (only download & mic icons). Paid beats show "Get Beat" */}
+                    {!isFree && (
                       <button
                         type="button"
                         onClick={(e) => {

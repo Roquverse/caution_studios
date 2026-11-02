@@ -53,6 +53,8 @@ export default function BeatUploadPage() {
     titleStr: string,
     authToken?: string
   ): Promise<string> => {
+    const targetContentType = file.type || (type === 'audio' ? 'audio/wav' : type === 'stems' ? 'application/zip' : 'image/jpeg');
+
     // 1. Request presigned upload URL
     const presignRes = await fetch('/api/beats/presigned-url', {
       method: 'POST',
@@ -62,7 +64,7 @@ export default function BeatUploadPage() {
       },
       body: JSON.stringify({
         filename: file.name,
-        contentType: file.type || (type === 'audio' ? 'audio/wav' : type === 'stems' ? 'application/zip' : 'image/jpeg'),
+        contentType: targetContentType,
         type,
         title: titleStr
       })
@@ -84,9 +86,7 @@ export default function BeatUploadPage() {
     await new Promise<void>((resolve, reject) => {
       const xhr = new XMLHttpRequest();
       xhr.open('PUT', presignJson.uploadUrl, true);
-      if (file.type) {
-        xhr.setRequestHeader('Content-Type', file.type);
-      }
+      xhr.setRequestHeader('Content-Type', targetContentType);
 
       xhr.upload.onprogress = (evt) => {
         if (evt.lengthComputable) {
@@ -331,8 +331,15 @@ export default function BeatUploadPage() {
                 </span>
                 <input
                   type="file"
-                  accept=".zip,.rar,.tar,application/zip,application/x-zip-compressed"
-                  onChange={(e) => setStemsFileObj(e.target.files?.[0] || null)}
+                  accept=".zip,.rar,.tar,application/zip,application/x-zip-compressed,multipart/x-zip,application/octet-stream"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f && f.size > 1024 * 1024 * 1024) {
+                      alert('Stems archive exceeds maximum allowed size of 1GB.');
+                      return;
+                    }
+                    setStemsFileObj(f || null);
+                  }}
                   className="sr-only"
                   id="stems-zip-input"
                 />

@@ -53,17 +53,23 @@ export async function POST(req: NextRequest) {
     const ext = filename.split('.').pop()?.toLowerCase() || (type === 'audio' ? 'wav' : type === 'stems' ? 'zip' : 'jpg');
 
     let key = '';
+    let finalContentType = contentType;
     if (type === 'audio') {
       key = `masters/${safeTitleSlug}_${Date.now()}.${ext}`;
+      if (!finalContentType) finalContentType = 'audio/wav';
     } else if (type === 'stems') {
-      key = `stems/${safeTitleSlug}_${Date.now()}.${ext}`;
+      const stemExt = ext.includes('zip') || ext.includes('rar') || ext.includes('tar') ? ext : 'zip';
+      key = `stems/${safeTitleSlug}_${Date.now()}.${stemExt}`;
+      if (!finalContentType || finalContentType === 'application/octet-stream') finalContentType = 'application/zip';
     } else if (type === 'cover') {
       key = `covers/${safeTitleSlug}_${Date.now()}.${ext}`;
+      if (!finalContentType) finalContentType = 'image/jpeg';
     } else {
       key = `uploads/${safeTitleSlug}_${Date.now()}.${ext}`;
+      if (!finalContentType) finalContentType = 'application/octet-stream';
     }
 
-    const uploadUrl = await getPresignedUploadUrl(key, contentType || 'application/octet-stream');
+    const uploadUrl = await getPresignedUploadUrl(key, finalContentType);
 
     return NextResponse.json({
       uploadUrl,

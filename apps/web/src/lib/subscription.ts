@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from './supabaseClient';
 
-export const FREE_PREVIEW_LIMIT_SECONDS = 15;
+export const FREE_PREVIEW_LIMIT_SECONDS = 30;
 
 export function isPlanSubscribed(plan?: string | null): boolean {
   if (!plan) return false;

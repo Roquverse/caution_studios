@@ -38,19 +38,19 @@ export default async function UserPortalPage() {
         } else {
           audioUrl = '/api/media/masters/alex-morgan-afrobeat-instrumental-summer-groove-573648-hubz_1791151613114.mp3';
         }
-        const basicLic = b.licenses?.find((l: any) => l.type === 'basic');
-        const exclusiveLic = b.licenses?.find((l: any) => l.type === 'exclusive');
+        const basicLic = b.licenses?.find((l: any) => l.type === 'basic') || b.beat_licenses?.find((l: any) => l.type === 'basic');
+        const exclusiveLic = b.licenses?.find((l: any) => l.type === 'exclusive') || b.beat_licenses?.find((l: any) => l.type === 'exclusive');
         const beatTags: string[] = Array.isArray(b.tags) ? b.tags : [];
         const isFreeTagged =
-          (basicLic?.price_cents !== undefined && basicLic.price_cents <= 1) ||
-          b.is_free_stream_enabled === true ||
+          (basicLic?.price_cents !== undefined && basicLic.price_cents <= 100) ||
+          b.category === 'free' ||
+          b.is_free_beat === true ||
           beatTags.some((t: string) => t.toLowerCase() === 'free' || t.toLowerCase() === 'free download') ||
           b.title?.toLowerCase().includes('(free)') ||
-          b.title?.toLowerCase().includes('[free]') ||
-          b.category === 'free';
+          b.title?.toLowerCase().includes('[free]');
 
-        const rawPrice = basicLic?.price_cents ? basicLic.price_cents / 100 : 3000;
-        const priceNgn = isFreeTagged || rawPrice <= 0.01 ? 0 : rawPrice;
+        const rawPrice = basicLic?.price_cents ? basicLic.price_cents / 100 : (isFreeTagged ? 0 : 3000);
+        const priceNgn = isFreeTagged || rawPrice <= 1 ? 0 : rawPrice;
         const exclusivePriceNgn = isFreeTagged
           ? 0
           : exclusiveLic?.price_cents

@@ -97,6 +97,9 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
   const [isAdModalOpen, setIsAdModalOpen] = useState(false);
   const [isDownloadLimitModalOpen, setIsDownloadLimitModalOpen] = useState(false);
   const [rewardNotification, setRewardNotification] = useState<string | null>(null);
+  const [paidBeatPurchaseTrack, setPaidBeatPurchaseTrack] = useState<TrackItem | null>(null);
+  const [purchaseTier, setPurchaseTier] = useState<'basic' | 'premium' | 'exclusive'>('basic');
+  const [purchaseComplete, setPurchaseComplete] = useState(false);
   const downloadQuota = useDailyDownloadQuota();
   const router = useRouter();
 
@@ -288,19 +291,19 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
             } else {
               audioUrl = '/api/media/masters/alex-morgan-afrobeat-instrumental-summer-groove-573648-hubz_1791151613114.mp3';
             }
-            const basicLic = b.licenses?.find((l: any) => l.type === 'basic');
-            const exclusiveLic = b.licenses?.find((l: any) => l.type === 'exclusive');
+            const basicLic = b.licenses?.find((l: any) => l.type === 'basic') || b.beat_licenses?.find((l: any) => l.type === 'basic');
+            const exclusiveLic = b.licenses?.find((l: any) => l.type === 'exclusive') || b.beat_licenses?.find((l: any) => l.type === 'exclusive');
             const beatTags: string[] = Array.isArray(b.tags) ? b.tags : [];
             const isFreeBeatItem =
-              (basicLic?.price_cents !== undefined && basicLic.price_cents <= 1) ||
-              b.is_free_stream_enabled === true ||
+              (basicLic?.price_cents !== undefined && basicLic.price_cents <= 100) ||
+              b.category === 'free' ||
+              b.is_free_beat === true ||
               beatTags.some((t: string) => t.toLowerCase() === 'free' || t.toLowerCase() === 'free download') ||
               b.title?.toLowerCase().includes('(free)') ||
-              b.title?.toLowerCase().includes('[free]') ||
-              b.category === 'free';
+              b.title?.toLowerCase().includes('[free]');
 
-            const rawPrice = basicLic?.price_cents ? basicLic.price_cents / 100 : 3000;
-            const priceNgn = isFreeBeatItem || rawPrice <= 0.01 ? 0 : rawPrice;
+            const rawPrice = basicLic?.price_cents ? basicLic.price_cents / 100 : (isFreeBeatItem ? 0 : 3000);
+            const priceNgn = isFreeBeatItem || rawPrice <= 1 ? 0 : rawPrice;
             const exclusivePriceNgn = isFreeBeatItem
               ? 0
               : exclusiveLic?.price_cents
@@ -701,10 +704,17 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
   const filteredRows = useMemo(() => {
     let rows = playlistRows;
 
-    if (selectedGenre && selectedGenre !== 'All') {
-      rows = rows.filter(
-        (r) => r.genre && r.genre.trim().toLowerCase() === selectedGenre.toLowerCase()
-      );
+    if (selectedGenre && selectedGenre !== 'All' && selectedGenre !== 'All Genres') {
+      const normSelected = selectedGenre.toLowerCase().replace(/s$/, '').trim();
+      rows = rows.filter((r) => {
+        const trackGenre = (r.genre || '').toLowerCase().replace(/s$/, '').trim();
+        return (
+          trackGenre === normSelected ||
+          trackGenre.includes(normSelected) ||
+          normSelected.includes(trackGenre) ||
+          (Array.isArray(r.tags) && r.tags.some(t => t.toLowerCase().replace(/s$/, '').includes(normSelected)))
+        );
+      });
     }
 
     if (searchQuery.trim()) {
@@ -752,7 +762,8 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
         }}
         onTimeUpdate={(e) => {
           const sec = e.currentTarget.currentTime;
-          const limit = isSubscribed
+          const isPaid = !isFreeBeat(currentTrack);
+          const limit = isSubscribed || !isPaid
             ? currentTrack.durationSeconds
             : Math.min(FREE_PREVIEW_LIMIT_SECONDS, currentTrack.durationSeconds);
 
@@ -762,16 +773,14 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
             recordTrackListen(currentTrack);
           }
 
-          if (sec >= limit) {
+          if (isPaid && !isSubscribed && sec >= limit) {
             e.currentTarget.pause();
             e.currentTarget.currentTime = 0;
             setCurrentTime(0);
             setIsPlaying(false);
             audioSynth.stop();
-            if (!isSubscribed && !hasTriggeredUpgradeModalRef.current) {
-              hasTriggeredUpgradeModalRef.current = true;
-              setShowUpgradeModal(true);
-            }
+            setPaidBeatPurchaseTrack(currentTrack);
+            setRewardNotification('30-second preview ended. Purchase a license to unlock full playback.');
           } else {
             setCurrentTime(Math.floor(sec));
           }
@@ -2191,7 +2200,8 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
                     const rect = e.currentTarget.getBoundingClientRect();
                     const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
                     const targetSec = Math.round(ratio * currentTrack.durationSeconds);
-                    if (!isSubscribed && targetSec > FREE_PREVIEW_LIMIT_SECONDS) {
+                    const isPaid = !isFreeBeat(currentTrack);
+                    if (!isSubscribed && isPaid && targetSec > FREE_PREVIEW_LIMIT_SECONDS) {
                       setCurrentTime(0);
                       if (audioRef.current) {
                         audioRef.current.currentTime = 0;
@@ -2199,8 +2209,8 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
                       }
                       audioSynth.stop();
                       setIsPlaying(false);
-                      hasTriggeredUpgradeModalRef.current = true;
-                      setShowUpgradeModal(true);
+                      setPaidBeatPurchaseTrack(currentTrack);
+                      setRewardNotification('30-second preview limit. Purchase this beat to unlock full listening.');
                       return;
                     }
                     setCurrentTime(targetSec);
@@ -2214,7 +2224,7 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
                     className="h-full bg-[#e53935] transition-all"
                     style={{ width: `${progressRatio}%` }}
                   />
-                  {!isSubscribed && (
+                  {!isSubscribed && !isFreeBeat(currentTrack) && (
                     <div
                       className="absolute top-0 bottom-0 w-0.5 bg-amber-400/80 z-10"
                       style={{ left: `${Math.min(100, (FREE_PREVIEW_LIMIT_SECONDS / currentTrack.durationSeconds) * 100)}%` }}
@@ -2223,7 +2233,7 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
                 </div>
 
                 <span className="text-[9px] font-mono text-gray-400 shrink-0 tabular-nums">
-                  {formatTime(currentTime)} / {!isSubscribed ? '0:15' : currentTrack.duration}
+                  {formatTime(currentTime)} / {!isSubscribed && !isFreeBeat(currentTrack) ? '0:30' : currentTrack.duration}
                 </span>
               </div>
             </div>
@@ -2427,7 +2437,8 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
                   const rect = e.currentTarget.getBoundingClientRect();
                   const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
                   const targetSec = Math.round(ratio * currentTrack.durationSeconds);
-                  if (!isSubscribed && targetSec > FREE_PREVIEW_LIMIT_SECONDS) {
+                  const isPaid = !isFreeBeat(currentTrack);
+                  if (!isSubscribed && isPaid && targetSec > FREE_PREVIEW_LIMIT_SECONDS) {
                     setCurrentTime(0);
                     if (audioRef.current) {
                       audioRef.current.currentTime = 0;
@@ -2435,8 +2446,8 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
                     }
                     audioSynth.stop();
                     setIsPlaying(false);
-                    hasTriggeredUpgradeModalRef.current = true;
-                    setShowUpgradeModal(true);
+                    setPaidBeatPurchaseTrack(currentTrack);
+                    setRewardNotification('30-second preview limit. Purchase this beat to unlock full listening.');
                     return;
                   }
                   setCurrentTime(targetSec);
@@ -2450,16 +2461,16 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
                   className="h-full bg-gradient-to-r from-[#04564f] to-[#2dd4bf] transition-all"
                   style={{ width: `${progressRatio}%` }}
                 />
-                {!isSubscribed && (
+                {!isSubscribed && !isFreeBeat(currentTrack) && (
                   <div
                     className="absolute top-0 bottom-0 w-0.5 bg-amber-400/80 z-10"
                     style={{ left: `${Math.min(100, (FREE_PREVIEW_LIMIT_SECONDS / currentTrack.durationSeconds) * 100)}%` }}
-                    title="15-second free preview limit"
+                    title="30-second preview limit on paid beats"
                   />
                 )}
               </div>
               <span className="text-[10px] font-mono text-gray-500 w-8 shrink-0">
-                {!isSubscribed ? '0:15' : currentTrack.duration}
+                {!isSubscribed && !isFreeBeat(currentTrack) ? '0:30' : currentTrack.duration}
               </span>
             </div>
           </div>
@@ -2740,6 +2751,129 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
           setTimeout(() => setRewardNotification(null), 6000);
         }}
       />
+
+      {/* 30-SECOND PREVIEW PURCHASE MODAL FOR PAID BEATS */}
+      {paidBeatPurchaseTrack && !isFreeBeat(paidBeatPurchaseTrack) && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-200">
+          <div
+            className="relative w-full max-w-lg rounded-2xl bg-[#0F131C] border border-white/10 p-6 sm:p-7 shadow-2xl text-white overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              type="button"
+              onClick={() => {
+                setPaidBeatPurchaseTrack(null);
+                setPurchaseComplete(false);
+              }}
+              className="absolute top-4 right-4 p-1.5 rounded-full text-gray-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+            >
+              <X className="h-4 w-4" />
+            </button>
+
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-xs font-mono text-amber-300 mb-3">
+              <Sparkles className="h-3.5 w-3.5 text-amber-300" />
+              <span>30-Second Preview Ended · Commercial Beat</span>
+            </div>
+
+            <h2 className="text-xl font-black text-white truncate">
+              {paidBeatPurchaseTrack.title}
+            </h2>
+            <p className="text-xs text-gray-400 mt-0.5">
+              Produced by {paidBeatPurchaseTrack.artist} · {paidBeatPurchaseTrack.bpm || 110} BPM · {paidBeatPurchaseTrack.genre}
+            </p>
+
+            <div className="mt-5 space-y-2.5">
+              <div
+                onClick={() => setPurchaseTier('basic')}
+                className={`p-3 rounded-xl border transition-all cursor-pointer flex items-center justify-between ${
+                  purchaseTier === 'basic'
+                    ? 'bg-teal-500/15 border-teal-500/40 text-teal-300'
+                    : 'bg-white/[0.02] border-white/5 hover:bg-white/[0.05] text-gray-300'
+                }`}
+              >
+                <div>
+                  <span className="text-xs font-black text-white block">Standard Commercial Lease</span>
+                  <span className="text-[11px] text-gray-400">MP3 & WAV Master · 50,000 Streams · 1 Commercial Music Video</span>
+                </div>
+                <span className="text-sm font-black text-teal-400">
+                  ₦{(paidBeatPurchaseTrack.priceNgn || 3000).toLocaleString()}
+                </span>
+              </div>
+
+              <div
+                onClick={() => setPurchaseTier('premium')}
+                className={`p-3 rounded-xl border transition-all cursor-pointer flex items-center justify-between ${
+                  purchaseTier === 'premium'
+                    ? 'bg-amber-500/15 border-amber-500/40 text-amber-300'
+                    : 'bg-white/[0.02] border-white/5 hover:bg-white/[0.05] text-gray-300'
+                }`}
+              >
+                <div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs font-black text-white">Premium WAV + Stems</span>
+                    <span className="px-1.5 py-0.2 rounded-full text-[9px] font-mono font-bold bg-amber-400/20 text-amber-300">
+                      MOST POPULAR
+                    </span>
+                  </div>
+                  <span className="text-[11px] text-gray-400">24-Bit WAV Master + Trackout ZIP Stems · 500,000 Streams</span>
+                </div>
+                <span className="text-sm font-black text-amber-400">
+                  ₦{Math.max(15000, (paidBeatPurchaseTrack.priceNgn || 3000) * 3).toLocaleString()}
+                </span>
+              </div>
+
+              <div
+                onClick={() => setPurchaseTier('exclusive')}
+                className={`p-3 rounded-xl border transition-all cursor-pointer flex items-center justify-between ${
+                  purchaseTier === 'exclusive'
+                    ? 'bg-purple-500/15 border-purple-500/40 text-purple-300'
+                    : 'bg-white/[0.02] border-white/5 hover:bg-white/[0.05] text-gray-300'
+                }`}
+              >
+                <div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs font-black text-white">100% Exclusive Ownership</span>
+                    <span className="px-1.5 py-0.2 rounded-full text-[9px] font-mono font-bold bg-purple-400/20 text-purple-300">
+                      SOLE BUYOUT
+                    </span>
+                  </div>
+                  <span className="text-[11px] text-gray-400">Unlimited Streams · Sole Master Rights · Retired from Store</span>
+                </div>
+                <span className="text-sm font-black text-purple-400">
+                  ₦{(paidBeatPurchaseTrack.exclusivePriceNgn || 50000).toLocaleString()}
+                </span>
+              </div>
+            </div>
+
+            <div className="mt-6">
+              {purchaseComplete ? (
+                <div className="p-3.5 rounded-xl bg-emerald-500/20 border border-emerald-500/40 text-center space-y-1">
+                  <p className="text-xs font-bold text-emerald-300">License Acquired Successfully!</p>
+                  <p className="text-[11px] text-gray-300">Beat master unlocked for full streaming & downloads.</p>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPurchaseComplete(true);
+                    setTimeout(() => {
+                      setPaidBeatPurchaseTrack(null);
+                      setPurchaseComplete(false);
+                      setRewardNotification('Beat license confirmed! Full audio unlocked.');
+                    }, 1800);
+                  }}
+                  className="w-full py-3 rounded-xl bg-[#E8B896] hover:bg-[#d8a886] text-black font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-transform hover:scale-[1.01] shadow-lg shadow-[#E8B896]/20 cursor-pointer"
+                >
+                  <ShoppingBag className="h-4 w-4" />
+                  <span>
+                    Confirm & License {purchaseTier === 'basic' ? `₦${(paidBeatPurchaseTrack.priceNgn || 3000).toLocaleString()}` : purchaseTier === 'premium' ? `₦${Math.max(15000, (paidBeatPurchaseTrack.priceNgn || 3000) * 3).toLocaleString()}` : `₦${(paidBeatPurchaseTrack.exclusivePriceNgn || 50000).toLocaleString()}`}
+                  </span>
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
