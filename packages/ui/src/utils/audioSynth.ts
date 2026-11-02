@@ -122,6 +122,33 @@ class WebAudioSynth {
     this.intervalId = setInterval(playStep, 250);
   }
 
+  playPreviewWatermark() {
+    if (typeof window === 'undefined') return;
+    this.initContext();
+    if (!this.ctx) return;
+    const now = this.ctx.currentTime;
+    try {
+      const osc1 = this.ctx.createOscillator();
+      const osc2 = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc1.type = 'sine';
+      osc2.type = 'triangle';
+      osc1.frequency.setValueAtTime(880, now);
+      osc1.frequency.exponentialRampToValueAtTime(1320, now + 0.15);
+      osc2.frequency.setValueAtTime(440, now);
+      osc2.frequency.exponentialRampToValueAtTime(660, now + 0.15);
+      gain.gain.setValueAtTime(0.2, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
+      osc1.connect(gain);
+      osc2.connect(gain);
+      gain.connect(this.ctx.destination);
+      osc1.start(now);
+      osc2.start(now);
+      osc1.stop(now + 0.4);
+      osc2.stop(now + 0.4);
+    } catch (e) {}
+  }
+
   setVolume(volume: number) {
     if (this.masterGain && this.ctx) {
       this.masterGain.gain.setValueAtTime(Math.max(0, Math.min(1, volume * 0.3)), this.ctx.currentTime);
