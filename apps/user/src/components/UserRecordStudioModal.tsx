@@ -2123,17 +2123,83 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
 
   const activeScaleNotes = useMemo(() => {
     const allNotes = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+    if (autoTuneKey.toLowerCase().includes('chromatic')) {
+      return new Set(allNotes);
+    }
     const rootIdx = allNotes.findIndex((n) => n.toLowerCase() === scaleKeyRoot.toLowerCase());
     const validRoot = rootIdx >= 0 ? rootIdx : 2; // Default D
     const intervals = isMinorScale ? [0, 2, 3, 5, 7, 8, 10] : [0, 2, 4, 5, 7, 9, 11];
-    const notesInScale = new Set(intervals.map((i) => allNotes[(validRoot + i) % 12]));
-    return notesInScale;
-  }, [scaleKeyRoot, isMinorScale]);
+    return new Set(intervals.map((i) => allNotes[(validRoot + i) % 12]));
+  }, [scaleKeyRoot, isMinorScale, autoTuneKey]);
+
+  // Reset custom muted notes when key/scale changes
+  useEffect(() => {
+    setMutedScaleNotes([]);
+  }, [autoTuneKey]);
+
+  // Audio tone synthesizer for scale note buttons
+  const playNoteTone = useCallback((note: string) => {
+    try {
+      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+      if (!AudioCtx) return;
+      const ctx = playCtxRef.current || new AudioCtx();
+      if (ctx.state === 'suspended') {
+        ctx.resume().catch(() => {});
+      }
+      const noteFrequencies: Record<string, number> = {
+        'C': 261.63, 'C#': 277.18, 'D': 293.66, 'D#': 311.13,
+        'E': 329.63, 'F': 349.23, 'F#': 369.99, 'G': 392.00,
+        'G#': 415.30, 'A': 440.00, 'A#': 466.16, 'B': 493.88
+      };
+      const freq = noteFrequencies[note] || 440;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(freq, ctx.currentTime);
+      gain.gain.setValueAtTime(0.25, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.35);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.36);
+    } catch (_) {}
+  }, []);
 
   const toggleScaleNote = (note: string) => {
+    playNoteTone(note);
     setMutedScaleNotes((prev) =>
       prev.includes(note) ? prev.filter((n) => n !== note) : [...prev, note]
     );
+  };
+
+  // Currently focused track for the console strip fader & controls
+  const activeSelectedTrack = useMemo(() => {
+    if (selectedTrackTab === 'trk_beat') {
+      return {
+        id: 'trk_beat',
+        name: 'Instrumental',
+        volume: beatVolume,
+        pan: beatPan,
+        isBeat: true
+      };
+    }
+    const v = vocalTracks.find((t) => t.id === selectedTrackTab) || vocalTracks.find((t) => t.isArmed) || vocalTracks[0];
+    return {
+      id: v?.id || 'trk_lead',
+      name: v?.name || 'Lead Vocal',
+      volume: v?.volume ?? 1.0,
+      pan: v?.pan ?? 0,
+      isBeat: false
+    };
+  }, [selectedTrackTab, beatVolume, beatPan, vocalTracks]);
+
+  const handleActiveVolumeChange = (newVol: number) => {
+    const clamped = Math.max(0, Math.min(1.5, Number(newVol.toFixed(2))));
+    if (activeSelectedTrack.isBeat) {
+      handleBeatVolumeChange(clamped);
+    } else if (activeSelectedTrack.id) {
+      handleTrackVolumeChange(activeSelectedTrack.id, clamped);
+    }
   };
   return (
     <div
@@ -2879,18 +2945,19 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
                   <div className="flex-1 p-3 flex flex-col justify-between overflow-y-auto bg-[#191b20]">
                     {/* Top Row: Power Switch + Title + AutoDetect Key */}
                     <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-2.5">
                         {/* Power Toggle Switch */}
                         <button
                           type="button"
                           onClick={() => setAutoTuneEnabled(!autoTuneEnabled)}
-                          className={`w-9 h-5 rounded-full transition-colors relative cursor-pointer ${
-                            autoTuneEnabled ? 'bg-teal-400' : 'bg-gray-700'
+                          aria-label="Toggle pitch correction"
+                          className={`w-10 h-5 rounded-full transition-colors relative shrink-0 cursor-pointer p-0.5 flex items-center ${
+                            autoTuneEnabled ? 'bg-[#2bbbad]' : 'bg-[#2a2d34]'
                           }`}
                         >
                           <span
-                            className={`w-4 h-4 rounded-full bg-white absolute top-0.5 transition-transform ${
-                              autoTuneEnabled ? 'translate-x-4' : 'translate-x-0.5'
+                            className={`block w-4 h-4 rounded-full bg-white shadow-sm transition-transform duration-150 ${
+                              autoTuneEnabled ? 'translate-x-5' : 'translate-x-0'
                             }`}
                           />
                         </button>
@@ -2917,7 +2984,7 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
                     {/* Category & Scale Selectors */}
                     <div className="grid grid-cols-2 gap-6 pt-2 max-w-xl">
                       <div>
-                        <span className="text-[10px] font-mono text-gray-400 block mb-1">Category</span>
+                        <span className="text-[10px] text-gray-400 block mb-1">Category</span>
                         <select
                           value={autoPitchCategory}
                           onChange={(e) => setAutoPitchCategory(e.target.value as any)}
@@ -2932,7 +2999,7 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
                       </div>
 
                       <div>
-                        <span className="text-[10px] font-mono text-gray-400 block mb-1">Scale</span>
+                        <span className="text-[10px] text-gray-400 block mb-1">Scale</span>
                         <select
                           value={autoTuneKey}
                           onChange={(e) => {
@@ -2942,12 +3009,18 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
                           className="w-full bg-[#1c1e24] border border-[#2a2d34] rounded py-1 px-2 text-xs text-white focus:outline-none cursor-pointer"
                         >
                           <option value="D Minor">D Minor</option>
-                          <option value="F Minor">F Minor</option>
                           <option value="C Major">C Major</option>
                           <option value="A Minor">A Minor</option>
                           <option value="G Major">G Major</option>
+                          <option value="E Minor">E Minor</option>
+                          <option value="F Major">F Major</option>
+                          <option value="F Minor">F Minor</option>
+                          <option value="B Minor">B Minor</option>
+                          <option value="Bb Major">Bb Major</option>
+                          <option value="Eb Major">Eb Major</option>
                           <option value="Chromatic">Chromatic (All)</option>
-                        </select>                      </div>
+                        </select>
+                      </div>
                     </div>
 
                     {/* Middle Section: Preset Grid + Big Central Rotary Dial + Piano Notes */}
@@ -3039,9 +3112,10 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
                                 key={note}
                                 type="button"
                                 onClick={() => toggleScaleNote(note)}
-                                className={`h-8 rounded font-mono text-xs font-bold transition-all ${
+                                title={`Click to play & toggle ${note}`}
+                                className={`h-8 rounded font-mono text-xs font-bold transition-all active:scale-95 cursor-pointer ${
                                   inScale
-                                    ? 'bg-[#2bbbad] text-black'
+                                    ? 'bg-[#2bbbad] text-black shadow-sm'
                                     : 'bg-[#1e2230] text-gray-500 hover:text-white'
                                 }`}
                               >
@@ -3059,7 +3133,8 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
                                 key={note}
                                 type="button"
                                 onClick={() => toggleScaleNote(note)}
-                                className={`h-7 rounded font-mono text-[10px] font-bold transition-all ${
+                                title={`Click to play & toggle ${note}`}
+                                className={`h-7 rounded font-mono text-[10px] font-bold transition-all active:scale-95 cursor-pointer ${
                                   inScale
                                     ? 'bg-amber-400 text-black shadow-sm'
                                     : 'bg-[#181b24] text-gray-600 hover:text-white'
@@ -3201,12 +3276,19 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
 
                 {/* Column 3: Track Output Strip (Right) */}
                 <div className="w-36 sm:w-44 p-3 border-l border-[#2a2d34] flex flex-col items-center justify-between shrink-0 bg-[#16181c]">
-                  <span className="text-[10px] text-[#8b8f98]">Volume</span>
+                  <div className="flex flex-col items-center text-center max-w-[120px]">
+                    <span className="text-[10px] font-semibold text-[#eceef2] truncate w-full">
+                      {activeSelectedTrack.name}
+                    </span>
+                    <span className="text-[9px] text-[#8b8f98]">
+                      {Math.round(activeSelectedTrack.volume * 100)}%
+                    </span>
+                  </div>
 
-                  {/* Vertical Channel Fader with Decibel Marks */}
-                  <div className="flex items-center gap-2 h-36">
+                  {/* Vertical Channel Fader with Decibel Marks & Meter */}
+                  <div className="flex items-center gap-2.5 h-36">
                     {/* dB Marks */}
-                    <div className="flex flex-col justify-between text-[9px] font-mono text-gray-500 h-full py-1">
+                    <div className="flex flex-col justify-between text-[9px] font-mono text-gray-500 h-full py-1 select-none">
                       <span>+6</span>
                       <span>0</span>
                       <span>-6</span>
@@ -3214,24 +3296,52 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
                       <span>-24</span>
                     </div>
 
-                    {/* Vertical Slider */}
-                    <div className="h-full flex items-center relative">
-                      <input
-                        type="range"
-                        min="0"
-                        max="1.5"
-                        step="0.01"
-                        value={armedTrack?.volume || 1.0}
-                        onChange={(e) => armedTrack && handleTrackVolumeChange(armedTrack.id, parseFloat(e.target.value))}
-                        className="h-28 w-2 accent-teal-400 cursor-pointer -rotate-90"
-                      />
+                    {/* Interactive Vertical Fader */}
+                    <div
+                      className="h-28 w-8 flex items-center justify-center relative cursor-pointer touch-none select-none"
+                      title={`Volume: ${Math.round(activeSelectedTrack.volume * 100)}%`}
+                      onPointerDown={(e) => {
+                        const el = e.currentTarget;
+                        el.setPointerCapture(e.pointerId);
+                        const updateVol = (clientY: number) => {
+                          const rect = el.getBoundingClientRect();
+                          const norm = Math.max(0, Math.min(1, (rect.bottom - clientY) / rect.height));
+                          handleActiveVolumeChange(norm * 1.5);
+                        };
+                        updateVol(e.clientY);
+                        const onMove = (ev: PointerEvent) => updateVol(ev.clientY);
+                        const onUp = (ev: PointerEvent) => {
+                          try { el.releasePointerCapture(ev.pointerId); } catch (_) {}
+                          window.removeEventListener('pointermove', onMove);
+                          window.removeEventListener('pointerup', onUp);
+                        };
+                        window.addEventListener('pointermove', onMove);
+                        window.addEventListener('pointerup', onUp);
+                      }}
+                    >
+                      {/* Slot Track */}
+                      <div className="w-2 h-full bg-[#0d0e11] rounded-full border border-[#2a2d34] relative overflow-hidden">
+                        <div
+                          className="w-full bg-[#2bbbad] absolute bottom-0"
+                          style={{ height: `${Math.min(100, (activeSelectedTrack.volume / 1.5) * 100)}%` }}
+                        />
+                      </div>
+                      {/* Fader Thumb Handle */}
+                      <div
+                        className="absolute w-7 h-4 rounded-md bg-[#252830] border border-[#4a4e57] shadow-lg flex items-center justify-center pointer-events-none"
+                        style={{
+                          bottom: `calc(${Math.min(100, Math.max(0, (activeSelectedTrack.volume / 1.5) * 100))}% - 8px)`
+                        }}
+                      >
+                        <div className="w-3.5 h-0.5 bg-white/70 rounded-full" />
+                      </div>
                     </div>
 
                     {/* Peak Level LED meter */}
                     <div className="w-2 h-28 bg-black/60 rounded-full overflow-hidden p-0.5 border border-white/10 flex flex-col justify-end">
                       <div
                         className="w-full bg-gradient-to-t from-emerald-500 via-teal-400 to-amber-400 rounded-full transition-all duration-75"
-                        style={{ height: `${Math.min(100, Math.max(5, (armedTrack?.volume || 1) * 60))}%` }}
+                        style={{ height: `${Math.min(100, Math.max(5, (activeSelectedTrack.volume || 1) * 60))}%` }}
                       />
                     </div>
                   </div>
@@ -3240,7 +3350,7 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
                   <div className="grid grid-cols-2 gap-2 w-full pt-1 text-center">
                     <div>
                       <span className="text-[9px] font-mono text-gray-400 block">Pan</span>
-                      <span className="text-[10px] font-mono text-teal-300">{formatPanLabel(armedTrack?.pan || 0)}</span>
+                      <span className="text-[10px] font-mono text-teal-300">{formatPanLabel(activeSelectedTrack.pan || 0)}</span>
                     </div>
                     <div>
                       <span className="text-[9px] font-mono text-gray-400 block">Reverb</span>
