@@ -34,7 +34,6 @@ export default function BeatUploadPage() {
   const [bpm, setBpm] = useState('110');
   const [musicalKey, setMusicalKey] = useState('F Minor');
   const [tags, setTags] = useState('Burnaboy, Asake, Wizkid, Summer');
-  const [priceBasic, setPriceBasic] = useState('20000');
   const [pricePremium, setPricePremium] = useState('30000');
   const [priceExclusive, setPriceExclusive] = useState('100000');
   const [enableFreeStreaming, setEnableFreeStreaming] = useState(true);
@@ -180,7 +179,6 @@ export default function BeatUploadPage() {
         musicalKey,
         tags,
         isFreeBeat,
-        priceBasic: isFreeBeat ? '0' : priceBasic,
         pricePremium: isFreeBeat ? '0' : pricePremium,
         priceExclusive: isFreeBeat ? '0' : priceExclusive,
         enableFreeStreaming: isFreeBeat ? true : enableFreeStreaming,
@@ -496,30 +494,6 @@ export default function BeatUploadPage() {
               </p>
 
               <div className="space-y-3">
-                {/* Starter / Basic */}
-                <div className="p-3 rounded-md bg-zinc-950 border border-zinc-800">
-                  <div className="flex justify-between items-center mb-1">
-                    <label className="text-xs font-bold text-zinc-200">
-                      Starter / Basic MP3 Lease
-                    </label>
-                    <span className="text-[10px] text-zinc-400 font-mono">100k streams</span>
-                  </div>
-                  <div className="relative flex items-center">
-                    <span className="absolute left-3 text-xs text-zinc-400 font-mono pointer-events-none">₦</span>
-                    <input
-                      type="number"
-                      min="1000"
-                      value={priceBasic}
-                      onChange={(e) => setPriceBasic(e.target.value)}
-                      className="w-full bg-zinc-900 border border-zinc-800 rounded-md py-1.5 pl-7 pr-8 text-xs text-zinc-100 font-mono focus:outline-none focus:border-zinc-700"
-                    />
-                    <span className="absolute right-3 text-sm font-bold text-[#2dd4bf] pointer-events-none">+</span>
-                  </div>
-                  <span className="text-[10px] text-zinc-500 mt-1 block">
-                    Your cut (80%): ₦{((Number(priceBasic) || 0) * 0.8).toLocaleString()} · min price, artist pays ₦{Number(priceBasic).toLocaleString()}+
-                  </span>
-                </div>
-
                 {/* Premium */}
                 <div className="p-3 rounded-md bg-zinc-950 border border-[#2dd4bf]/30">
                   <div className="flex justify-between items-center mb-1">

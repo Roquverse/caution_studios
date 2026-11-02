@@ -219,7 +219,7 @@ export function UserMarketplaceView({
           </h1>
 
           <p className="text-xs sm:text-sm text-gray-300 leading-relaxed">
-            Free streamable beats, commercial standard leases, and sole exclusive buyouts.
+            Free streamable beats, premium WAV + stems leases, and sole exclusive buyouts.
             Stream artist spotlight songs through ads to unlock bonus daily downloads.
           </p>
         </div>
@@ -493,7 +493,7 @@ export function UserMarketplaceView({
                         <span>Free · ₦0.00</span>
                       </span>
                     ) : (
-                      /* Beat with Price Tag: Dropdown selector between Standard and Exclusive */
+                      /* Beat with Price Tag: Dropdown selector between Premium and Exclusive */
                       <div className="relative">
                         <button
                           type="button"
