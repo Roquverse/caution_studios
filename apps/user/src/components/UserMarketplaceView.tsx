@@ -398,7 +398,7 @@ export function UserMarketplaceView({
           <div className="w-28 text-left">BPM / Key</div>
           <div className="w-24 text-left">Genre</div>
           <div className="w-44 text-left">License Tiers</div>
-          <div className="w-48 text-right">Get Beat & Options</div>
+          <div className="min-w-[190px] text-right">Get Beat & Options</div>
         </div>
 
         {filteredTracks.length === 0 ? (
@@ -616,7 +616,7 @@ export function UserMarketplaceView({
                   </div>
 
                   {/* Actions & "Get Beat" */}
-                  <div className="flex items-center gap-2 shrink-0 w-48 justify-end">
+                  <div className="flex items-center gap-2 shrink-0 min-w-[190px] justify-end">
                     {/* Favorite */}
                     <button
                       type="button"
@@ -674,8 +674,8 @@ export function UserMarketplaceView({
                       </button>
                     )}
 
-                    {/* Record Studio DAW Trigger */}
-                    {openStudioHandler && (
+                    {/* Record Studio DAW Trigger (Free Beats Only) */}
+                    {openStudioHandler && isFree && (
                       <button
                         type="button"
                         onClick={(e) => {

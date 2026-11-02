@@ -38,8 +38,8 @@ export async function getStudioBeats(): Promise<{ beats: TrackItem[]; producers:
         const exclusiveLic = b.licenses?.find((l: any) => l.type === 'exclusive');
         const beatTags: string[] = Array.isArray(b.tags) ? b.tags : [];
         const isFreeTagged =
-          (basicLic?.price_cents !== undefined && basicLic.price_cents <= 1) ||
-          b.is_free_stream_enabled === true ||
+          (basicLic?.price_cents !== undefined && basicLic.price_cents <= 100) ||
+          b.is_free_beat === true ||
           beatTags.some((t: string) => t.toLowerCase() === 'free' || t.toLowerCase() === 'free download') ||
           b.title?.toLowerCase().includes('(free)') ||
           b.title?.toLowerCase().includes('[free]') ||
@@ -78,7 +78,7 @@ export async function getStudioBeats(): Promise<{ beats: TrackItem[]; producers:
           tags: beatTags,
           playCount: b.play_count || 0
         };
-      });
+      }).filter((b) => b.isFree || !b.priceNgn || b.priceNgn <= 0.01);
     }
 
     const { data: dbProfiles } = await supabase

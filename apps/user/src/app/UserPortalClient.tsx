@@ -109,6 +109,11 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
     audioSynth.stop();
     setIsPlaying(false);
     const targetBeat = track || currentTrack;
+    if (targetBeat?.id && !isFreeBeat(targetBeat)) {
+      setPaidBeatPurchaseTrack(targetBeat);
+      setRewardNotification('Only free beats can be loaded into Studio. Purchase this beat to unlock.');
+      return;
+    }
     if (targetBeat?.id) {
       router.push(`/studio?beatId=${encodeURIComponent(targetBeat.id)}`);
     } else {
@@ -2394,15 +2399,17 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
               <SkipForward className="h-4 w-4" />
             </button>
 
-            <button
-              type="button"
-              onClick={() => handleOpenRecordStudio(currentTrack)}
-              className="p-1.5 text-teal-400 hover:text-teal-300 transition-colors cursor-pointer"
-              aria-label="Open Record Studio DAW"
-              title="Record Studio (DAW)"
-            >
-              <Mic className="h-4 w-4 text-teal-400" />
-            </button>
+            {isFreeBeat(currentTrack) && (
+              <button
+                type="button"
+                onClick={() => handleOpenRecordStudio(currentTrack)}
+                className="p-1.5 text-teal-400 hover:text-teal-300 transition-colors cursor-pointer"
+                aria-label="Open Record Studio DAW"
+                title="Record Studio (DAW)"
+              >
+                <Mic className="h-4 w-4 text-teal-400" />
+              </button>
+            )}
 
             <button
               type="button"
@@ -2540,15 +2547,17 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
                 </button>
               )}
 
-              <button
-                type="button"
-                onClick={() => handleOpenRecordStudio(currentTrack)}
-                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#e53935] hover:bg-[#d32f2f] text-white text-[11px] font-semibold ml-1"
-                title="Open Studio"
-              >
-                <Mic className="h-3 w-3" />
-                <span className="hidden lg:inline">Studio</span>
-              </button>
+              {isFreeBeat(currentTrack) && (
+                <button
+                  type="button"
+                  onClick={() => handleOpenRecordStudio(currentTrack)}
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#e53935] hover:bg-[#d32f2f] text-white text-[11px] font-semibold ml-1"
+                  title="Open Studio"
+                >
+                  <Mic className="h-3 w-3" />
+                  <span className="hidden lg:inline">Studio</span>
+                </button>
+              )}
             </div>
 
             <div className="w-full flex items-center gap-3">
