@@ -434,13 +434,11 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
       if (preselectedTrack && preselectedTrack.id !== lastPreselectedIdRef.current) {
         lastPreselectedIdRef.current = preselectedTrack.id;
         setSelectedTrack(preselectedTrack);
-      } else if (!selectedTrack && availableTracks.length > 0) {
-        setSelectedTrack(availableTracks[0]);
       }
     } else {
       lastPreselectedIdRef.current = null;
     }
-  }, [isOpen, preselectedTrack, availableTracks, selectedTrack]);
+  }, [isOpen, preselectedTrack]);
 
   // Metronome tick generator
   const playMetronomeTick = useCallback((accent: boolean = false) => {
@@ -2499,20 +2497,20 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
           {/* Upper Half: Arrangement Tracks (Split TCP Left + Timeline Grid Right) */}
           <div className="flex-1 flex overflow-hidden relative">
             {/* Track Control Panels (TCP) on the Left */}
-            <div className="w-64 sm:w-72 bg-[#1c1e24] border-r border-[#2a2d34] flex flex-col shrink-0 overflow-y-auto">
+            <div className="w-36 sm:w-48 md:w-64 lg:w-72 bg-[#1c1e24] border-r border-[#2a2d34] flex flex-col shrink-0 overflow-y-auto">
               <div className="h-7 px-2 border-b border-[#2a2d34] flex items-center justify-between bg-[#191b20]">
                 <button
                   type="button"
                   onClick={handleAddBackupVocalTrack}
-                  className="h-5 px-2 rounded text-[11px] font-semibold text-white bg-white/8 hover:bg-white/12 flex items-center gap-1"
+                  className="h-5 px-2 rounded text-[11px] font-semibold text-white bg-white/8 hover:bg-white/12 flex items-center gap-1 shrink-0"
                 >
                   <Plus className="h-3 w-3" />
-                  Add track
+                  <span className="hidden sm:inline">Add track</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => setBeatPickerOpen(true)}
-                  className="text-[11px] text-[#8b8f98] hover:text-white truncate max-w-[120px]"
+                  className="text-[11px] text-[#8b8f98] hover:text-white truncate max-w-[90px] sm:max-w-[120px]"
                 >
                   {selectedTrack?.genre || 'Afrobeats'}
                 </button>
@@ -2536,10 +2534,10 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
                       title="Select instrumental beat"
                     >
                       <span className="text-[12px] font-semibold text-[#eceef2] group-hover:text-white truncate">
-                        Instrumental
+                        {selectedTrack ? selectedTrack.title : 'Instrumental'}
                       </span>
                       <span className="text-[9px] px-1 py-0.5 rounded bg-white/10 text-[#2bbbad] group-hover:bg-[#2bbbad] group-hover:text-black transition-colors shrink-0 font-medium">
-                        {selectedTrack ? 'Change' : 'Select'}
+                        {selectedTrack ? 'Change' : '+ Choose'}
                       </span>
                     </button>
                     <div className="flex items-center gap-0.5 shrink-0">
@@ -2722,7 +2720,7 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
                 )}
               </div>
 
-              <div className="flex-1 flex flex-col divide-y divide-[#2a2d34] relative overflow-y-auto">
+              <div className="flex-1 flex flex-col divide-y divide-[#2a2d34] relative overflow-y-auto overflow-x-auto min-w-0">
                 {selectedTrack?.durationSeconds && (
                   <div
                     className="absolute top-0 bottom-0 w-px bg-[#e53935] z-20 pointer-events-none"
@@ -2733,29 +2731,43 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
                 )}
 
                 <div className="daw-lane flex items-center px-1.5">
-                  <div
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setBeatPickerOpen(true);
-                    }}
-                    className="daw-clip flex items-end gap-px px-2 pb-1.5 pt-4 cursor-pointer hover:brightness-105 transition-all"
-                    style={{ width: '85%', background: 'linear-gradient(180deg, #c67a1a 0%, #9a5a12 100%)' }}
-                    title="Click to select or change instrumental"
-                  >
-                    <span className="absolute top-0.5 left-1.5 text-[10px] font-medium text-black/80 truncate max-w-[90%]">
-                      {selectedTrack ? `Instrumental · ${selectedTrack.title}` : 'Instrumental (Click to select beat)'}
-                    </span>
-                    {Array.from({ length: 64 }).map((_, i) => {
-                      const h = 22 + Math.sin(i * 0.45) * 28 + Math.cos(i * 0.8) * 16;
-                      return (
-                        <div
-                          key={i}
-                          className="flex-1 bg-black/35"
-                          style={{ height: `${Math.max(12, Math.min(90, h))}%` }}
-                        />
-                      );
-                    })}
-                  </div>
+                  {selectedTrack ? (
+                    <div
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setBeatPickerOpen(true);
+                      }}
+                      className="daw-clip flex items-end gap-px px-2 pb-1.5 pt-4 cursor-pointer hover:brightness-105 transition-all"
+                      style={{ width: '85%', background: 'linear-gradient(180deg, #c67a1a 0%, #9a5a12 100%)' }}
+                      title="Click to select or change instrumental"
+                    >
+                      <span className="absolute top-0.5 left-1.5 text-[10px] font-medium text-black/80 truncate max-w-[90%]">
+                        Instrumental · {selectedTrack.title}
+                      </span>
+                      {Array.from({ length: 64 }).map((_, i) => {
+                        const h = 22 + Math.sin(i * 0.45) * 28 + Math.cos(i * 0.8) * 16;
+                        return (
+                          <div
+                            key={i}
+                            className="flex-1 bg-black/35"
+                            style={{ height: `${Math.max(12, Math.min(90, h))}%` }}
+                          />
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setBeatPickerOpen(true);
+                      }}
+                      className="w-full h-10 border border-dashed border-white/20 hover:border-[#2bbbad]/60 hover:bg-[#2bbbad]/5 rounded-md flex items-center justify-center gap-2 text-xs text-gray-400 hover:text-white transition-all cursor-pointer"
+                    >
+                      <Plus className="h-3.5 w-3.5 text-[#2bbbad]" />
+                      <span>Choose Instrumental Beat to record over</span>
+                    </button>
+                  )}
                 </div>
 
                 {/* Track 02+ Lanes (Voice/Audio Vocal Takes) */}
@@ -2874,8 +2886,8 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
                 <span className="text-[10px] tabular-nums text-[#8b8f98]">48 kHz · 24-bit</span>
               </div>
 
-              {/* Console Content: 3-Column BandLab Layout */}
-              <div className="flex-1 flex overflow-hidden">
+              {/* Console Content: 3-Column BandLab Layout (Horizontally scrollable on mobile) */}
+              <div className="flex-1 flex overflow-x-auto overflow-y-hidden md:overflow-hidden">
                 {/* Column 1: Input & Monitoring Panel */}
                 <div className="w-52 sm:w-60 p-3 border-r border-[#2a2d34] flex flex-col justify-between shrink-0 bg-[#16181c]">
                   <div className="space-y-3">

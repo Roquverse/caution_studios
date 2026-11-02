@@ -18,13 +18,13 @@ export default function StudioPageClient({
 }: StudioPageClientProps) {
   const router = useRouter();
 
-  // Find preselected beat matching URL param, or default to first beat
+  // Find preselected beat matching URL param, or null if entering Studio fresh
   const preselectedTrack = React.useMemo(() => {
     if (beatIdParam) {
       const match = initialBeats.find((b) => b.id === beatIdParam);
       if (match) return match;
     }
-    return initialBeats.length > 0 ? initialBeats[0] : null;
+    return null;
   }, [initialBeats, beatIdParam]);
 
   const handleExitStudio = () => {

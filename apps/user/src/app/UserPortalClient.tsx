@@ -108,14 +108,13 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
     if (audioRef.current) audioRef.current.pause();
     audioSynth.stop();
     setIsPlaying(false);
-    const targetBeat = track || currentTrack;
-    if (targetBeat?.id && !isFreeBeat(targetBeat)) {
-      setPaidBeatPurchaseTrack(targetBeat);
-      setRewardNotification('Only free beats can be loaded into Studio. Purchase this beat to unlock.');
-      return;
-    }
-    if (targetBeat?.id) {
-      router.push(`/studio?beatId=${encodeURIComponent(targetBeat.id)}`);
+    if (track) {
+      if (!isFreeBeat(track)) {
+        setPaidBeatPurchaseTrack(track);
+        setRewardNotification('Only free beats can be loaded into Studio. Purchase this beat to unlock.');
+        return;
+      }
+      router.push(`/studio?beatId=${encodeURIComponent(track.id)}`);
     } else {
       router.push('/studio');
     }
