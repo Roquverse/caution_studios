@@ -2,9 +2,112 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --daw-bg: #111214;
+  --daw-chrome: #16181c;
+  --daw-panel: #1c1e24;
+  --daw-lane: #15171b;
+  --daw-border: #2a2d34;
+  --daw-muted: #8b8f98;
+  --daw-text: #eceef2;
+  --daw-rec: #e53935;
+  --daw-live: #2bbbad;
+}
+
 body {
-  color: #f8fafc;
-  background: #07090d;
+  color: #eceef2;
+  background: #111214;
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   -webkit-font-smoothing: antialiased;
+}
+
+/* Compact DAW controls — BandLab-style density, no glow */
+.daw-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  color: #a8adb6;
+  background: transparent;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+.daw-icon-btn:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: #fff;
+}
+.daw-icon-btn.is-on {
+  color: #2bbbad;
+  background: rgba(43, 187, 173, 0.12);
+}
+
+.daw-pill {
+  height: 28px;
+  padding: 0 10px;
+  border-radius: 6px;
+  background: #1c1e24;
+  border: 1px solid #2a2d34;
+  color: #d7dbe2;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.daw-clip {
+  position: relative;
+  height: 100%;
+  border-radius: 4px;
+  overflow: hidden;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.25);
+}
+
+.daw-lane {
+  height: 72px;
+  position: relative;
+  background-image: repeating-linear-gradient(
+    to right,
+    transparent 0,
+    transparent calc(100% / 16 - 1px),
+    rgba(255, 255, 255, 0.04) calc(100% / 16 - 1px),
+    rgba(255, 255, 255, 0.04) calc(100% / 16)
+  );
+}
+
+.daw-fader::-webkit-slider-thumb {
+  appearance: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #eceef2;
+  border: 0;
+}
+.daw-fader::-moz-range-thumb {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #eceef2;
+  border: 0;
+}
+
+.daw-ms {
+  width: 22px;
+  height: 18px;
+  border-radius: 3px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  background: #0e1013;
+  color: #7d828c;
+}
+.daw-ms.is-m {
+  background: #c9842a;
+  color: #111;
+}
+.daw-ms.is-s {
+  background: #2bbbad;
+  color: #111;
+}
+.daw-ms.is-arm {
+  background: #e53935;
+  color: #fff;
 }

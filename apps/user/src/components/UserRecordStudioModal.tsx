@@ -249,7 +249,7 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
   const [autoTuneEnabled, setAutoTuneEnabled] = useState(true);
   const [autoTuneSpeed, setAutoTuneSpeed] = useState<'hard' | 'fast' | 'subtle'>('fast');
   const [autoTuneAmount, setAutoTuneAmount] = useState(0.85); // 0 to 1
-  const [autoTuneKey, setAutoTuneKey] = useState('Auto'); // 'Auto' | 'Chromatic' | 'C Major' | 'D Minor' | 'G Major' | 'F Major' | 'A Minor'
+  const [autoTuneKey, setAutoTuneKey] = useState('D Minor'); // canonical key string, e.g. 'D Minor', 'C Major'
   const [reverbAmount, setReverbAmount] = useState(0.2);
   const [delayAmount, setDelayAmount] = useState(0.15);
   const [eqLow, setEqLow] = useState(0); // dB
@@ -489,6 +489,61 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
       if (playheadIntervalRef.current) clearInterval(playheadIntervalRef.current);
     };
   }, []);
+
+  // Live Microphone Analyser for Input Level RMS Meter
+  useEffect(() => {
+    let animId: number;
+    let localStream: MediaStream | null = null;
+    let localCtx: AudioContext | null = null;
+
+    async function initLiveMicAnalyser() {
+      try {
+        if (typeof window === 'undefined' || !navigator?.mediaDevices?.getUserMedia) return;
+        const stream = await navigator.mediaDevices.getUserMedia({
+          audio: { echoCancellation: true, noiseSuppression: true }
+        });
+        localStream = stream;
+        const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+        const ctx = new AudioCtx();
+        localCtx = ctx;
+        const source = ctx.createMediaStreamSource(stream);
+        const analyser = ctx.createAnalyser();
+        analyser.fftSize = 256;
+        source.connect(analyser);
+
+        const dataArray = new Uint8Array(analyser.frequencyBinCount);
+        const measure = () => {
+          analyser.getByteTimeDomainData(dataArray);
+          let sumSquares = 0;
+          for (let i = 0; i < dataArray.length; i++) {
+            const norm = (dataArray[i] - 128) / 128;
+            sumSquares += norm * norm;
+          }
+          const rms = Math.sqrt(sumSquares / dataArray.length);
+          const scaledRms = Math.min(1, Math.max(0, rms * 3.5 * inputGain));
+          setInputLevelMeter(scaledRms);
+          animId = requestAnimationFrame(measure);
+        };
+        measure();
+      } catch (e) {
+        // Microphone permission will prompt on gesture
+      }
+    }
+
+    if (isOpen) {
+      initLiveMicAnalyser();
+    }
+
+    return () => {
+      if (animId) cancelAnimationFrame(animId);
+      if (localStream) {
+        localStream.getTracks().forEach((t) => t.stop());
+      }
+      if (localCtx) {
+        localCtx.close().catch(() => {});
+      }
+    };
+  }, [isOpen, inputGain]);
 
   // Audition track preview inside beat switcher
   const handleAuditionToggle = (track: TrackItem) => {
@@ -1995,11 +2050,11 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
   const autoPitchPercent = Math.round(autoTuneAmount * 100);
 
   const getAutoPitchDialLabel = (val: number) => {
-    if (!autoTuneEnabled || val === 0) return 'Bypass';
-    if (val >= 80) return 'Heaviest';
-    if (val >= 55) return 'Heavy';
-    if (val >= 30) return 'Medium';
-    return 'Subtle';
+    if (!autoTuneEnabled) return 'Bypass';
+    if (val >= 80) return `Strength ${val}%`;
+    if (val >= 55) return `Strength ${val}%`;
+    if (val >= 30) return `Strength ${val}%`;
+    return `Strength ${val}%`;
   };
 
   const handleSelectAutoPitchPreset = (preset: 'Classic' | 'Duet' | 'Big Harmony' | 'Natural' | 'Third' | 'Octave') => {
@@ -2057,15 +2112,14 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
 
   // Determine active scale notes for key matrix
   const scaleKeyRoot = useMemo(() => {
-    const raw = autoTuneKey.replace('Auto', '').trim() || (selectedTrack?.musicalKey || 'D Minor');
-    const firstPart = raw.split(' ')[0] || 'D';
-    return firstPart.toUpperCase();
-  }, [autoTuneKey, selectedTrack?.musicalKey]);
+    // Parse "D Minor" -> "D", "C Major" -> "C", etc.
+    const parts = autoTuneKey.trim().split(' ');
+    return (parts[0] || 'D').toUpperCase();
+  }, [autoTuneKey]);
 
   const isMinorScale = useMemo(() => {
-    const raw = (autoTuneKey + ' ' + (selectedTrack?.musicalKey || '')).toLowerCase();
-    return raw.includes('minor') || raw.includes('min');
-  }, [autoTuneKey, selectedTrack?.musicalKey]);
+    return autoTuneKey.toLowerCase().includes('minor') || autoTuneKey.toLowerCase().includes('min');
+  }, [autoTuneKey]);
 
   const activeScaleNotes = useMemo(() => {
     const allNotes = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
@@ -2087,8 +2141,7 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
         isStandalonePage
           ? 'w-full min-h-screen h-screen'
           : 'fixed inset-0 z-50 w-screen h-screen'
-      } bg-[#0c0d10] text-[#e5e7eb] flex flex-col font-sans select-none overflow-hidden`}
-      style={{ backgroundColor: '#0c0d10', color: '#e5e7eb' }}
+      } bg-[#111214] text-[#eceef2] flex flex-col font-sans select-none overflow-hidden`}
     >
       {/* Hidden Playback Track Audio Elements */}
       {selectedTrack && (
@@ -2139,86 +2192,66 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
       )}
       <audio ref={auditionAudioRef} onEnded={() => setIsAuditioningId(null)} />
 
-      {/* =========================================================================
-          1. TOP BANDLAB HEADER & TRANSPORT BAR (Exact Layout from Screenshot)
-         ========================================================================= */}
-      <header className="h-13 min-h-[52px] bg-[#0c0d10] border-b border-[#1f2229] flex items-center justify-between px-3 text-xs shrink-0 select-none z-30">
-        {/* Left Section: Menu + Caution/BandLab Brand + Undo/Redo + Project Settings */}
-        <div className="flex items-center gap-2 sm:gap-2.5 min-w-0">
-          {/* Hamburger Menu / Exit */}
+      <header className="h-12 bg-[#16181c] border-b border-[#2a2d34] flex items-center justify-between px-2 sm:px-3 text-[12px] shrink-0 z-30">
+        <div className="flex items-center gap-1.5 min-w-0">
           <button
             type="button"
             onClick={onClose || (() => window.history.back())}
-            title="Menu / Exit Studio"
-            className="w-8 h-8 rounded-lg bg-white/5 hover:bg-white/10 flex items-center justify-center text-gray-300 hover:text-white transition-colors cursor-pointer"
+            title="Exit Studio"
+            className="daw-icon-btn"
           >
             <Menu className="h-4 w-4" />
           </button>
 
-          {/* Brand Logo & Star Badge */}
-          <div className="flex items-center gap-2 pl-1">
-            <div className="flex items-center gap-1.5 font-black text-white tracking-tight text-sm">
-              <span className="w-2.5 h-2.5 rounded-full bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.8)] animate-pulse" />
-              <span>BandLab</span>
-            </div>
-            <button
-              type="button"
-              onClick={() => setIsExportDialogOpen(true)}
-              className="px-2 py-0.5 rounded-md bg-[#241a0e] border border-[#f59e0b]/40 text-[#f59e0b] text-[10px] font-bold flex items-center gap-1 hover:bg-[#382613] transition-colors cursor-pointer"
-            >
-              <Star className="h-2.5 w-2.5 fill-current" />
-              <span>Get Pro</span>
-            </button>
+          <div className="flex items-center gap-2 pl-0.5 pr-1">
+            <img src="/logo.png" alt="Caution Studio" className="h-5 w-auto object-contain brightness-0 invert max-w-[92px]" />
+            <span className="hidden sm:inline text-[11px] font-semibold text-[#8b8f98]">Studio</span>
           </div>
 
-          {/* Undo / Redo */}
-          <div className="hidden md:flex items-center gap-0.5 pl-2">
-            <button
-              type="button"
-              onClick={handleReturnToZero}
-              title="Undo (Ctrl+Z)"
-              className="w-7 h-7 rounded-md hover:bg-white/10 flex items-center justify-center text-gray-400 hover:text-white transition-colors cursor-pointer"
-            >
+          <div className="hidden md:flex items-center">
+            <button type="button" onClick={handleReturnToZero} title="Undo" className="daw-icon-btn">
               <Undo2 className="h-3.5 w-3.5" />
             </button>
-            <button
-              type="button"
-              onClick={handleReturnToZero}
-              title="Redo (Ctrl+Y)"
-              className="w-7 h-7 rounded-md hover:bg-white/10 flex items-center justify-center text-gray-400 hover:text-white transition-colors cursor-pointer"
-            >
+            <button type="button" onClick={handleReturnToZero} title="Redo" className="daw-icon-btn">
               <Redo2 className="h-3.5 w-3.5" />
             </button>
           </div>
 
-          {/* Project Settings Pills (Metronome / BPM, 4/4 Time Signature, Key) */}
-          <div className="hidden lg:flex items-center gap-1.5 pl-1.5">
-            {/* Metronome toggle + BPM Pill */}
+          <button
+            type="button"
+            onClick={() => setIsMetronomeEnabled(!isMetronomeEnabled)}
+            title="Metronome"
+            className={`daw-icon-btn hidden lg:inline-flex ${isMetronomeEnabled ? 'is-on' : ''}`}
+          >
+            <Disc3 className="h-3.5 w-3.5" />
+          </button>
+
+          <div className="hidden lg:flex items-center gap-1">
             <div className="relative">
               <button
                 type="button"
                 onClick={() => setBpmInputOpen(!bpmInputOpen)}
-                className="h-7 px-2.5 rounded-md bg-[#16181f] border border-white/5 hover:border-white/20 text-gray-200 text-xs font-mono font-medium flex items-center gap-1.5 transition-colors cursor-pointer"
-                title="Project Tempo / Tap BPM"
+                className="daw-pill flex items-center gap-1.5 hover:border-[#4a4e57]"
+                title="Tempo"
               >
-                <SlidersHorizontal className="h-3 w-3 text-gray-400" />
-                <span>{sessionBpm} bpm</span>
+                <span>{sessionBpm}</span>
+                <span className="text-[#8b8f98]">BPM</span>
               </button>
               {bpmInputOpen && (
-                <div className="absolute top-full left-0 mt-1 w-44 p-2.5 rounded-xl bg-[#16181f] border border-white/15 shadow-2xl z-50 text-xs space-y-2">
-                  <span className="text-[10px] font-mono text-gray-400 uppercase block">Tempo (BPM)</span>
+                <div className="absolute top-full left-0 mt-1 w-40 p-2 rounded-md bg-[#1c1e24] border border-[#2a2d34] shadow-xl z-50 space-y-2">
+                  <span className="text-[10px] text-[#8b8f98] block">Tempo</span>
                   <input
                     type="number"
                     min="50"
                     max="220"
                     value={sessionBpm}
                     onChange={(e) => setSessionBpm(parseInt(e.target.value, 10) || 120)}
-                    className="w-full bg-black/60 border border-white/10 rounded px-2 py-1 text-white font-mono text-xs focus:outline-none focus:border-teal-400"
+                    className="w-full bg-[#111214] border border-[#2a2d34] rounded px-2 py-1 text-white text-xs focus:outline-none"
                   />
                   <button
                     type="button"
                     onClick={() => setBpmInputOpen(false)}
-                    className="w-full py-1 rounded bg-teal-500 text-black font-bold text-[11px]"
+                    className="w-full py-1 rounded bg-[#2bbbad] text-black text-[11px] font-semibold"
                   >
                     Done
                   </button>
@@ -2226,25 +2259,24 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
               )}
             </div>
 
-            {/* Time Signature */}
             <div className="relative">
               <button
                 type="button"
                 onClick={() => setTimeSigDropdownOpen(!timeSigDropdownOpen)}
-                className="h-7 px-2 rounded-md bg-[#16181f] border border-white/5 hover:border-white/20 text-gray-200 text-xs font-mono flex items-center gap-1 transition-colors cursor-pointer"
-                title="Time Signature"
+                className="daw-pill flex items-center gap-1 hover:border-[#4a4e57]"
+                title="Time signature"
               >
                 <span>{timeSignature}</span>
-                <ChevronDown className="h-3 w-3 text-gray-400" />
+                <ChevronDown className="h-3 w-3 text-[#8b8f98]" />
               </button>
               {timeSigDropdownOpen && (
-                <div className="absolute top-full left-0 mt-1 w-24 p-1 rounded-lg bg-[#16181f] border border-white/15 shadow-2xl z-50 text-xs space-y-0.5 font-mono">
+                <div className="absolute top-full left-0 mt-1 w-20 p-1 rounded-md bg-[#1c1e24] border border-[#2a2d34] shadow-xl z-50">
                   {(['4/4', '3/4', '6/8'] as const).map((sig) => (
                     <button
                       key={sig}
                       type="button"
                       onClick={() => { setTimeSignature(sig); setTimeSigDropdownOpen(false); }}
-                      className={`w-full text-left px-2 py-1 rounded hover:bg-white/10 ${timeSignature === sig ? 'text-teal-300 font-bold' : 'text-gray-300'}`}
+                      className={`w-full text-left px-2 py-1 rounded text-xs hover:bg-white/5 ${timeSignature === sig ? 'text-[#2bbbad]' : 'text-[#d7dbe2]'}`}
                     >
                       {sig}
                     </button>
@@ -2253,21 +2285,19 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
               )}
             </div>
 
-            {/* Key / Scale Signature */}
             <div className="relative">
               <button
                 type="button"
                 onClick={() => setKeyDropdownOpen(!keyDropdownOpen)}
-                className="h-7 px-2.5 rounded-md bg-[#16181f] border border-white/5 hover:border-white/20 text-gray-200 text-xs font-mono flex items-center gap-1.5 transition-colors cursor-pointer"
-                title="Musical Key / Scale"
+                className="daw-pill flex items-center gap-1 hover:border-[#4a4e57]"
+                title="Key"
               >
                 <span>{scaleKeyRoot} {isMinorScale ? 'min' : 'maj'}</span>
-                <ChevronDown className="h-3 w-3 text-gray-400" />
+                <ChevronDown className="h-3 w-3 text-[#8b8f98]" />
               </button>
               {keyDropdownOpen && (
-                <div className="absolute top-full left-0 mt-1 w-44 p-2 rounded-xl bg-[#16181f] border border-white/15 shadow-2xl z-50 text-xs space-y-1 font-mono max-h-56 overflow-y-auto">
-                  <div className="text-[10px] text-gray-400 px-1.5 py-0.5">Scale Key</div>
-                  {['D min', 'F min', 'C maj', 'A min', 'G maj', 'Bb min', 'Eb maj'].map((k) => (
+                <div className="absolute top-full left-0 mt-1 w-36 p-1 rounded-md bg-[#1c1e24] border border-[#2a2d34] shadow-xl z-50 max-h-56 overflow-y-auto">
+                  {['D Minor', 'F Minor', 'C Major', 'A Minor', 'G Major', 'Bb Minor', 'Eb Major'].map((k) => (
                     <button
                       key={k}
                       type="button"
@@ -2275,7 +2305,7 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
                         setAutoTuneKey(k);
                         setKeyDropdownOpen(false);
                       }}
-                      className="w-full text-left px-2 py-1 rounded hover:bg-white/10 text-gray-200"
+                      className="w-full text-left px-2 py-1 rounded text-xs hover:bg-white/5 text-[#d7dbe2]"
                     >
                       {k}
                     </button>
@@ -2286,100 +2316,73 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
           </div>
         </div>
 
-        {/* Center Section: Session Title + Transport Controls */}
-        <div className="flex items-center gap-3">
-          {/* Editable Session Title */}
-          <div className="hidden xl:flex items-center gap-1">
-            <input
-              type="text"
-              value={projectTitle}
-              onChange={(e) => setProjectTitle(e.target.value)}
-              placeholder="New Project"
-              className="bg-transparent border-b border-transparent hover:border-white/20 focus:border-teal-400 text-xs text-white font-medium focus:outline-none px-1.5 py-0.5 w-36 text-center truncate"
-            />
-          </div>
+        <div className="flex items-center gap-2">
+          <input
+            type="text"
+            value={projectTitle}
+            onChange={(e) => setProjectTitle(e.target.value)}
+            placeholder="Untitled project"
+            className="hidden xl:block bg-transparent text-[13px] text-white font-medium focus:outline-none px-2 py-0.5 w-40 text-center truncate rounded hover:bg-white/[0.04] focus:bg-white/[0.06]"
+          />
 
-          {/* Transport Controls Cluster */}
-          <div className="flex items-center gap-1 bg-[#16181f] p-1 rounded-xl border border-white/5 shadow-inner">
-            {/* Rewind to Beginning */}
-            <button
-              type="button"
-              onClick={handleReturnToZero}
-              title="Rewind to Start (Return to Zero)"
-              className="w-7 h-7 rounded-lg hover:bg-white/10 text-gray-300 hover:text-white flex items-center justify-center transition-colors cursor-pointer"
-            >
+          <div className="flex items-center gap-0.5">
+            <button type="button" onClick={handleReturnToZero} title="Return to start" className="daw-icon-btn">
               <SkipBack className="h-3.5 w-3.5" />
             </button>
-
-            {/* Play / Pause Button */}
             <button
               type="button"
               onClick={togglePlayCombinedPreview}
               disabled={isRecording}
-              title="Play / Pause (Space)"
-              className="w-8 h-8 rounded-lg bg-white hover:bg-gray-100 text-black flex items-center justify-center transition-transform hover:scale-105 shadow cursor-pointer"
+              title="Play / Pause"
+              className="w-8 h-8 rounded-full bg-white text-black flex items-center justify-center hover:bg-[#f2f2f2] disabled:opacity-50"
             >
               {isPlaying ? (
-                <Pause className="h-4 w-4 fill-current text-black" />
+                <Pause className="h-3.5 w-3.5 fill-current" />
               ) : (
-                <Play className="h-4 w-4 fill-current text-black ml-0.5" />
+                <Play className="h-3.5 w-3.5 fill-current ml-0.5" />
               )}
             </button>
-
-            {/* Big Iconic Red Record Button */}
             <button
               type="button"
               onClick={handleRecordTrigger}
-              title={`Record into: ${armedTrack?.name || 'Vocal Track'} (R)`}
-              className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all cursor-pointer ${
-                isRecording
-                  ? 'bg-red-500 text-white shadow-[0_0_15px_rgba(239,68,68,0.8)] animate-pulse'
-                  : 'bg-red-500/20 hover:bg-red-500/30 text-red-400 border border-red-500/30'
-              }`}
+              title={`Record: ${armedTrack?.name || 'Vocal'} (R)`}
+              className="w-8 h-8 rounded-full flex items-center justify-center"
             >
-              <span className={`w-3.5 h-3.5 rounded-full bg-red-500 border-2 border-[#16181f] ${isRecording ? 'animate-ping' : ''}`} />
+              <span className={`block w-4 h-4 rounded-full ${isRecording ? 'bg-[#e53935] ring-2 ring-[#e53935]/40' : 'bg-[#e53935]'}`} />
             </button>
-
-            {/* Loop Toggle */}
             <button
               type="button"
               onClick={() => setIsLoopEnabled(!isLoopEnabled)}
-              title="Cycle Loop Mode (L)"
-              className={`w-7 h-7 rounded-lg flex items-center justify-center transition-colors cursor-pointer ${
-                isLoopEnabled ? 'bg-teal-500/20 text-teal-300' : 'text-gray-400 hover:text-white hover:bg-white/5'
-              }`}
+              title="Loop"
+              className={`daw-icon-btn ${isLoopEnabled ? 'is-on' : ''}`}
             >
               <Repeat className="h-3.5 w-3.5" />
             </button>
-
-            {/* Timecode LCD Display (00:00.0) */}
-            <div className="px-2 py-0.5 font-mono text-xs font-bold text-gray-200 bg-black/40 rounded border border-white/5 tracking-wider">
+            <span className="ml-1 font-mono text-[12px] tabular-nums text-[#d7dbe2] w-[58px]">
               {formatTimecode(playheadTime)}
-            </div>
+            </span>
           </div>
         </div>
 
-        {/* Right Section: Mastering + Master Volume + Save & Publish */}
-        <div className="flex items-center gap-2 sm:gap-2.5">
-          {/* Mastering Selector Dropdown */}
+        <div className="flex items-center gap-1.5">
           <div className="relative hidden md:block">
             <button
               type="button"
               onClick={() => setMasteringDropdownOpen(!masteringDropdownOpen)}
-              className="h-7 px-2.5 rounded-md bg-[#16181f] border border-white/5 hover:border-white/20 text-gray-300 hover:text-white text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer"
+              className="daw-pill flex items-center gap-1.5 hover:border-[#4a4e57]"
             >
-              <Sparkles className="h-3 w-3 text-amber-400" />
-              <span className="text-[11px]">Mastering: <strong className="text-white">{masteringPreset}</strong></span>
-              <ChevronDown className="h-3 w-3 text-gray-400" />
+              <span className="text-[#8b8f98]">Master</span>
+              <span className="font-medium">{masteringPreset}</span>
+              <ChevronDown className="h-3 w-3 text-[#8b8f98]" />
             </button>
             {masteringDropdownOpen && (
-              <div className="absolute top-full right-0 mt-1 w-44 p-1.5 rounded-xl bg-[#16181f] border border-white/15 shadow-2xl z-50 text-xs space-y-0.5 font-sans">
+              <div className="absolute top-full right-0 mt-1 w-40 p-1 rounded-md bg-[#1c1e24] border border-[#2a2d34] shadow-xl z-50">
                 {(['Universal', 'Warm', 'Clarity', 'Bass Boost', 'Select Preset'] as const).map((pst) => (
                   <button
                     key={pst}
                     type="button"
                     onClick={() => { setMasteringPreset(pst as any); setMasteringDropdownOpen(false); }}
-                    className={`w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-white/10 ${masteringPreset === pst ? 'text-amber-300 font-bold bg-amber-400/10' : 'text-gray-300'}`}
+                    className={`w-full text-left px-2.5 py-1.5 rounded text-xs hover:bg-white/5 ${masteringPreset === pst ? 'text-[#2bbbad]' : 'text-[#d7dbe2]'}`}
                   >
                     {pst}
                   </button>
@@ -2388,9 +2391,8 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
             )}
           </div>
 
-          {/* Master Volume Fader with Speaker Icon */}
-          <div className="hidden xl:flex items-center gap-1.5 bg-[#16181f] px-2.5 py-1 rounded-lg border border-white/5">
-            <Volume2 className="h-3.5 w-3.5 text-gray-400 shrink-0" />
+          <div className="hidden xl:flex items-center gap-1.5 px-1">
+            <Volume2 className="h-3.5 w-3.5 text-[#8b8f98]" />
             <input
               type="range"
               min="0"
@@ -2398,43 +2400,25 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
               step="0.02"
               value={masterVolume}
               onChange={(e) => setMasterVolume(parseFloat(e.target.value))}
-              className="w-16 accent-teal-400 h-1 bg-black/60 rounded cursor-pointer"
-              title="Master Output Gain"
+              className="daw-fader w-16 h-1 accent-[#eceef2] cursor-pointer"
+              title="Master"
             />
-            <span className="text-[10px] font-mono text-gray-400 w-10 text-right">
-              {masterVolume >= 1 ? `+${((masterVolume - 1) * 6).toFixed(1)}dB` : `-${((1 - masterVolume) * 24).toFixed(1)}dB`}
-            </span>
           </div>
 
-          {/* Save Button (Pill) */}
           <button
             type="button"
             onClick={() => handleSaveToCloud()}
             disabled={isSavingToCloud}
-            className="px-3.5 py-1.5 rounded-full bg-white/5 hover:bg-white/10 border border-white/15 text-gray-200 hover:text-white text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5"
+            className="h-8 px-3 rounded-full border border-[#3a3e46] text-[12px] font-semibold text-[#eceef2] hover:bg-white/5"
           >
-            <CloudUpload className="h-3.5 w-3.5 text-teal-400" />
-            <span>{isSavingToCloud ? 'Saving...' : 'Save'}</span>
+            {isSavingToCloud ? 'Saving…' : 'Save'}
           </button>
-
-          {/* Publish / Export Master Button (Solid White Pill with Black text) */}
           <button
             type="button"
             onClick={() => setIsExportDialogOpen(true)}
-            className="px-4 py-1.5 rounded-full bg-white hover:bg-gray-100 text-black text-xs font-black uppercase tracking-wider transition-all hover:scale-105 shadow-md shadow-white/10 cursor-pointer flex items-center gap-1.5"
+            className="h-8 px-3.5 rounded-full bg-white text-black text-[12px] font-semibold hover:bg-[#f2f2f2]"
           >
-            <Download className="h-3.5 w-3.5 stroke-[2.5]" />
-            <span>Publish</span>
-          </button>
-
-          {/* Bell Notification Icon */}
-          <button
-            type="button"
-            title="Notifications"
-            className="w-8 h-8 rounded-full bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white flex items-center justify-center transition-colors relative"
-          >
-            <Bell className="h-3.5 w-3.5" />
-            <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-red-500" />
+            Publish
           </button>
         </div>
       </header>
@@ -2444,69 +2428,53 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
          ========================================================================= */}
       <div className="flex-1 flex overflow-hidden relative">
         {/* Leftmost Vertical Slim App Toolbar */}
-        <aside className="w-12 bg-[#0c0d10] border-r border-[#1f2229] flex flex-col items-center py-3 justify-between shrink-0 select-none z-20">
-          <div className="flex flex-col items-center gap-4 text-gray-400">
-            {/* Mixer icon */}
+        <aside className="w-11 bg-[#16181c] border-r border-[#2a2d34] flex flex-col items-center py-2 justify-between shrink-0 z-20">
+          <div className="flex flex-col items-center gap-1">
             <button
               type="button"
               onClick={() => setIsConsoleOpen(!isConsoleOpen)}
-              title="Toggle Console / Inspector"
-              className={`p-2 rounded-xl transition-colors cursor-pointer ${isConsoleOpen ? 'text-teal-400 bg-teal-400/10' : 'hover:text-white hover:bg-white/5'}`}
+              title="Mix"
+              className={`daw-icon-btn ${isConsoleOpen ? 'is-on' : ''}`}
             >
               <Sliders className="h-4 w-4" />
             </button>
-
-            {/* Folder / Sounds icon */}
             <button
               type="button"
               onClick={() => setBeatPickerOpen(true)}
-              title="Open Beat & Loops Library"
-              className="p-2 rounded-xl hover:text-white hover:bg-white/5 transition-colors cursor-pointer"
+              title="Sounds"
+              className="daw-icon-btn"
             >
               <Folder className="h-4 w-4" />
             </button>
-
-            {/* Disc library icon */}
             <button
               type="button"
               onClick={() => setBeatPickerOpen(true)}
-              title="Caution Beat Catalog"
-              className="p-2 rounded-xl hover:text-white hover:bg-white/5 transition-colors cursor-pointer"
+              title="Beats"
+              className="daw-icon-btn"
             >
-              <Disc3 className="h-4 w-4" />
+              <Music2 className="h-4 w-4" />
             </button>
-
-            {/* AI Assistant */}
             <button
               type="button"
               onClick={handleAutoMixAI}
-              title="AI Vocal AutoMix"
-              className={`p-2 rounded-xl transition-colors cursor-pointer ${isAutoMixRunning ? 'text-teal-400 animate-spin' : 'hover:text-teal-300 hover:bg-white/5'}`}
+              title="AutoMix"
+              className={`daw-icon-btn ${isAutoMixRunning ? 'is-on' : ''}`}
             >
-              <Sparkles className="h-4 w-4" />
+              <Wand2 className="h-4 w-4" />
             </button>
           </div>
-
-          <div className="flex flex-col items-center gap-3 text-gray-500">
-            {/* Keyboard Shortcuts */}
-            <button
-              type="button"
-              onClick={() => setIsShortcutsModalOpen(true)}
-              title="Keyboard Shortcuts"
-              className="p-2 rounded-xl hover:text-white hover:bg-white/5 transition-colors cursor-pointer"
-            >
+          <div className="flex flex-col items-center gap-1">
+            <button type="button" onClick={() => setIsShortcutsModalOpen(true)} title="Shortcuts" className="daw-icon-btn">
               <Keyboard className="h-4 w-4" />
             </button>
-
-            {/* Lyrics Drawer */}
             <button
               type="button"
               onClick={() => {
                 setActiveInspectorTab('editor');
                 setIsConsoleOpen(true);
               }}
-              title="Lyrics & Notepad"
-              className="p-2 rounded-xl hover:text-white hover:bg-white/5 transition-colors cursor-pointer"
+              title="Notes"
+              className="daw-icon-btn"
             >
               <FileText className="h-4 w-4" />
             </button>
@@ -2518,67 +2486,52 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
           {/* Upper Half: Arrangement Tracks (Split TCP Left + Timeline Grid Right) */}
           <div className="flex-1 flex overflow-hidden relative">
             {/* Track Control Panels (TCP) on the Left */}
-            <div className="w-72 sm:w-80 bg-[#12141a] border-r border-[#1f2229] flex flex-col shrink-0 overflow-y-auto">
-              {/* "+ Add Track" Button at the Top */}
-              <div className="p-2.5 border-b border-[#1f2229] flex items-center justify-between bg-[#0e1014]">
+            <div className="w-64 sm:w-72 bg-[#1c1e24] border-r border-[#2a2d34] flex flex-col shrink-0 overflow-y-auto">
+              <div className="h-7 px-2 border-b border-[#2a2d34] flex items-center justify-between bg-[#191b20]">
                 <button
                   type="button"
                   onClick={handleAddBackupVocalTrack}
-                  className="px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-white font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
+                  className="h-5 px-2 rounded text-[11px] font-semibold text-white bg-white/8 hover:bg-white/12 flex items-center gap-1"
                 >
-                  <Plus className="h-3.5 w-3.5 text-teal-400" />
-                  <span>+ Add Track</span>
+                  <Plus className="h-3 w-3" />
+                  Add track
                 </button>
-
                 <button
                   type="button"
                   onClick={() => setBeatPickerOpen(true)}
-                  className="text-[11px] text-gray-400 hover:text-white flex items-center gap-1 font-mono transition-colors"
+                  className="text-[11px] text-[#8b8f98] hover:text-white truncate max-w-[120px]"
                 >
-                  <Music className="h-3 w-3 text-amber-400" />
-                  <span className="truncate max-w-[110px]">{selectedTrack?.title || 'Load Beat'}</span>
+                  {selectedTrack?.genre || 'Afrobeats'}
                 </button>
               </div>
 
               {/* Track Headers List */}
-              <div className="divide-y divide-[#1f2229]/60">
-                {/* Track 01: Drum Machine / Backing Beat */}
+              <div className="divide-y divide-[#2a2d34]">
                 <div
                   onClick={() => setSelectedTrackTab('trk_beat')}
-                  className={`p-3 transition-colors cursor-pointer ${selectedTrackTab === 'trk_beat' ? 'bg-[#181b24]' : 'hover:bg-white/[0.02]'}`}
+                  className={`h-[72px] px-2 py-1.5 flex flex-col justify-center cursor-pointer relative ${selectedTrackTab === 'trk_beat' ? 'bg-[#252830]' : 'hover:bg-white/[0.03]'}`}
                 >
-                  {/* Title row with Golden brown accent bar */}
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <span className="w-1.5 h-3.5 rounded-full bg-[#d97706]" />
-                      <Disc3 className="h-3.5 w-3.5 text-[#d97706] shrink-0" />
-                      <span className="text-xs font-bold text-gray-200 truncate">
-                        01 Drum Machine
-                      </span>
-                    </div>
-
-                    <div className="flex items-center gap-1">
-                      {/* Mute */}
+                  <span className="absolute left-0 top-0 bottom-0 w-[3px] bg-[#d97706]" />
+                  <div className="flex items-center justify-between pl-1.5">
+                    <span className="text-[12px] font-semibold text-[#eceef2] truncate">Drum Machine</span>
+                    <div className="flex items-center gap-0.5">
                       <button
                         type="button"
                         onClick={(e) => { e.stopPropagation(); setBeatMuted(!beatMuted); }}
-                        className={`w-6 h-5 rounded text-[10px] font-mono font-bold transition-colors ${beatMuted ? 'bg-[#d97706] text-black' : 'bg-black/40 text-gray-400 hover:text-white'}`}
+                        className={`daw-ms ${beatMuted ? 'is-m' : ''}`}
                       >
                         M
                       </button>
-                      {/* Solo */}
                       <button
                         type="button"
                         onClick={(e) => { e.stopPropagation(); setBeatSolo(!beatSolo); }}
-                        className={`w-6 h-5 rounded text-[10px] font-mono font-bold transition-colors ${beatSolo ? 'bg-teal-400 text-black' : 'bg-black/40 text-gray-400 hover:text-white'}`}
+                        className={`daw-ms ${beatSolo ? 'is-s' : ''}`}
                       >
                         S
                       </button>
                     </div>
                   </div>
-
-                  {/* Controls row: +Fx, Volume Slider with gold fill, Rotary Pan */}
-                  <div className="flex items-center gap-2 pt-0.5">
+                  <div className="flex items-center gap-2 pl-1.5 mt-1.5">
                     <button
                       type="button"
                       onClick={(e) => {
@@ -2586,44 +2539,36 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
                         setActiveInspectorTab('fx');
                         setIsConsoleOpen(true);
                       }}
-                      className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white border border-white/5"
+                      className="text-[10px] font-semibold text-[#8b8f98] hover:text-white"
                     >
-                      + Fx
+                      FX
                     </button>
-
-                    {/* Volume Slider with golden fill */}
-                    <div className="flex-1 flex items-center">
-                      <input
-                        type="range"
-                        min="0"
-                        max="1.5"
-                        step="0.01"
-                        value={beatVolume}
-                        onChange={(e) => handleBeatVolumeChange(parseFloat(e.target.value))}
-                        className="w-full accent-[#d97706] h-1 bg-black/60 rounded cursor-pointer"
-                        title="Beat Volume"
-                      />
-                    </div>
-
-                    {/* Rotary Pan Knob (L | R) */}
-                    <div className="flex items-center gap-1 text-[9px] font-mono text-gray-400">
-                      <span>{formatPanLabel(beatPan)}</span>
-                      <input
-                        type="range"
-                        min="-100"
-                        max="100"
-                        step="5"
-                        value={beatPan}
-                        onChange={(e) => setBeatPan(parseInt(e.target.value, 10))}
-                        className="w-10 accent-[#d97706] h-1 bg-black/60 rounded cursor-pointer"
-                        title="Beat Pan"
-                      />
-                    </div>
+                    <input
+                      type="range"
+                      min="0"
+                      max="1.5"
+                      step="0.01"
+                      value={beatVolume}
+                      onChange={(e) => handleBeatVolumeChange(parseFloat(e.target.value))}
+                      className="daw-fader flex-1 h-1 accent-[#d97706] cursor-pointer"
+                      title="Volume"
+                    />
+                    <span className="text-[9px] tabular-nums text-[#8b8f98] w-7">{formatPanLabel(beatPan)}</span>
+                    <input
+                      type="range"
+                      min="-100"
+                      max="100"
+                      step="5"
+                      value={beatPan}
+                      onChange={(e) => setBeatPan(parseInt(e.target.value, 10))}
+                      className="daw-fader w-10 h-1 accent-[#d97706] cursor-pointer"
+                      title="Pan"
+                    />
                   </div>
                 </div>
 
                 {/* Track 02+: Voice/Audio Tracks */}
-                {vocalTracks.map((trk, idx) => {
+                {vocalTracks.map((trk) => {
                   const isSelected = selectedTrackTab === trk.id;
                   const isArmed = trk.isArmed;
 
@@ -2631,55 +2576,37 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
                     <div
                       key={trk.id}
                       onClick={() => setSelectedTrackTab(trk.id)}
-                      className={`p-3 transition-colors cursor-pointer ${isSelected ? 'bg-[#181b24]' : 'hover:bg-white/[0.02]'}`}
+                      className={`h-[72px] px-2 py-1.5 flex flex-col justify-center cursor-pointer relative ${isSelected ? 'bg-[#252830]' : 'hover:bg-white/[0.03]'}`}
                     >
-                      {/* Title row with Copper/Orange accent bar */}
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center gap-2 min-w-0">
-                          <span
-                            className="w-1.5 h-3.5 rounded-full"
-                            style={{ backgroundColor: trk.color || '#ea580c' }}
-                          />
-                          <Mic className="h-3.5 w-3.5 shrink-0" style={{ color: trk.color || '#ea580c' }} />
-                          <span className="text-xs font-bold text-gray-200 truncate">
-                            {`0${idx + 2} ${trk.name}`}
-                          </span>
-                          {isArmed && (
-                            <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse shrink-0" title="Armed for Recording" />
-                          )}
-                        </div>
-
-                        <div className="flex items-center gap-1">
-                          {/* Arm for record */}
+                      <span className="absolute left-0 top-0 bottom-0 w-[3px]" style={{ backgroundColor: trk.color || '#ea580c' }} />
+                      <div className="flex items-center justify-between pl-1.5 gap-1">
+                        <span className="text-[12px] font-semibold text-[#eceef2] truncate">{trk.name}</span>
+                        <div className="flex items-center gap-0.5 shrink-0">
                           <button
                             type="button"
                             onClick={(e) => { e.stopPropagation(); handleArmTrack(trk.id); }}
-                            title="Arm Track for Recording"
-                            className={`w-5 h-5 rounded text-[9px] font-mono font-bold flex items-center justify-center ${isArmed ? 'bg-red-500 text-white' : 'bg-black/40 text-gray-500 hover:text-red-400'}`}
+                            title={isArmed ? (isRecording ? 'Recording' : 'Armed — press R to record') : 'Arm track'}
+                            className={`daw-ms ${isArmed && isRecording ? 'is-arm animate-pulse' : isArmed ? 'is-arm' : ''}`}
                           >
-                            ⏺
+                            R
                           </button>
-                          {/* Mute */}
                           <button
                             type="button"
                             onClick={(e) => { e.stopPropagation(); handleToggleMute(trk.id); }}
-                            className={`w-6 h-5 rounded text-[10px] font-mono font-bold transition-colors ${trk.isMuted ? 'bg-[#ea580c] text-black' : 'bg-black/40 text-gray-400 hover:text-white'}`}
+                            className={`daw-ms ${trk.isMuted ? 'is-m' : ''}`}
                           >
                             M
                           </button>
-                          {/* Solo */}
                           <button
                             type="button"
                             onClick={(e) => { e.stopPropagation(); handleToggleSolo(trk.id); }}
-                            className={`w-6 h-5 rounded text-[10px] font-mono font-bold transition-colors ${trk.isSolo ? 'bg-teal-400 text-black' : 'bg-black/40 text-gray-400 hover:text-white'}`}
+                            className={`daw-ms ${trk.isSolo ? 'is-s' : ''}`}
                           >
                             S
                           </button>
                         </div>
                       </div>
-
-                      {/* Controls row: +Fx, Volume Slider, Rotary Pan */}
-                      <div className="flex items-center gap-2 pt-0.5">
+                      <div className="flex items-center gap-2 pl-1.5 mt-1.5">
                         <button
                           type="button"
                           onClick={(e) => {
@@ -2688,67 +2615,48 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
                             setActiveInspectorTab('autopitch');
                             setIsConsoleOpen(true);
                           }}
-                          className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white border border-white/5"
+                          className="text-[10px] font-semibold text-[#8b8f98] hover:text-white"
                         >
-                          + Fx
+                          FX
                         </button>
-
-                        {/* Volume Slider with orange fill */}
-                        <div className="flex-1 flex items-center">
-                          <input
-                            type="range"
-                            min="0"
-                            max="1.5"
-                            step="0.01"
-                            value={trk.volume}
-                            onChange={(e) => handleTrackVolumeChange(trk.id, parseFloat(e.target.value))}
-                            className="w-full h-1 bg-black/60 rounded cursor-pointer"
-                            style={{ accentColor: trk.color || '#ea580c' }}
-                            title="Track Volume"
-                          />
-                        </div>
-
-                        {/* Rotary Pan Knob */}
-                        <div className="flex items-center gap-1 text-[9px] font-mono text-gray-400">
-                          <span>{formatPanLabel(trk.pan)}</span>
-                          <input
-                            type="range"
-                            min="-100"
-                            max="100"
-                            step="5"
-                            value={trk.pan}
-                            onChange={(e) => handleTrackPanChange(trk.id, parseInt(e.target.value, 10))}
-                            className="w-10 h-1 bg-black/60 rounded cursor-pointer"
-                            style={{ accentColor: trk.color || '#ea580c' }}
-                            title="Track Pan"
-                          />
-                        </div>
+                        <input
+                          type="range"
+                          min="0"
+                          max="1.5"
+                          step="0.01"
+                          value={trk.volume}
+                          onChange={(e) => handleTrackVolumeChange(trk.id, parseFloat(e.target.value))}
+                          className="daw-fader flex-1 h-1 cursor-pointer"
+                          style={{ accentColor: trk.color || '#ea580c' }}
+                          title="Volume"
+                        />
+                        <span className="text-[9px] tabular-nums text-[#8b8f98] w-7">{formatPanLabel(trk.pan)}</span>
+                        <input
+                          type="range"
+                          min="-100"
+                          max="100"
+                          step="5"
+                          value={trk.pan}
+                          onChange={(e) => handleTrackPanChange(trk.id, parseInt(e.target.value, 10))}
+                          className="daw-fader w-10 h-1 cursor-pointer"
+                          style={{ accentColor: trk.color || '#ea580c' }}
+                          title="Pan"
+                        />
                       </div>
                     </div>
                   );
                 })}
               </div>
 
-              {/* AutoMix AI Button at bottom of tracks */}
-              <div className="p-3 mt-auto border-t border-[#1f2229] bg-[#0c0d10]">
+              <div className="p-2 mt-auto border-t border-[#2a2d34]">
                 <button
                   type="button"
                   onClick={handleAutoMixAI}
                   disabled={isAutoMixRunning}
-                  className="w-full py-2 rounded-xl bg-gradient-to-r from-[#181b24] to-[#242833] hover:from-[#202533] hover:to-[#2d3342] border border-white/10 text-xs font-bold text-gray-200 flex items-center justify-between px-3 transition-all cursor-pointer group shadow"
+                  className="w-full h-8 rounded-md bg-[#252830] hover:bg-[#2c303a] text-[12px] font-semibold text-[#d7dbe2] flex items-center justify-between px-2.5"
                 >
-                  <div className="flex items-center gap-2">
-                    <Wand2 className="h-3.5 w-3.5 text-teal-400 group-hover:rotate-12 transition-transform" />
-                    <span>AutoMix AI</span>
-                    <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-teal-400/20 text-teal-300 font-bold">
-                      AI 🤖
-                    </span>
-                  </div>
-                  {autoMixSuccess ? (
-                    <span className="text-[10px] text-teal-300 font-bold">Level Balanced!</span>
-                  ) : (
-                    <ChevronRight className="h-3.5 w-3.5 text-gray-500 group-hover:text-white" />
-                  )}
+                  <span>AutoMix</span>
+                  <span className="text-[10px] text-[#8b8f98]">{autoMixSuccess ? 'Balanced' : 'Levels'}</span>
                 </button>
               </div>
             </div>
@@ -2757,88 +2665,63 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
             <div
               ref={rulerRef}
               onClick={handleTimelineSeek}
-              className="flex-1 bg-[#14161d] overflow-x-auto relative flex flex-col cursor-pointer select-none"
+              className="flex-1 bg-[#15171b] overflow-x-auto relative flex flex-col cursor-pointer select-none"
             >
-              {/* Top Timeline Ruler Bar (1, 2, 3, 4, 5, 6...) */}
-              <div className="h-7 bg-[#101217] border-b border-[#1f2229] flex items-center relative text-[10px] font-mono text-gray-400 shrink-0">
-                {/* Red Loop Region Bar spanning active bars */}
+              <div className="h-7 bg-[#191b20] border-b border-[#2a2d34] flex items-center relative text-[10px] tabular-nums text-[#8b8f98] shrink-0">
                 {isLoopEnabled && (
                   <div
-                    className="absolute top-0 bottom-0 bg-red-500/20 border-b-2 border-red-500 z-10 pointer-events-none"
+                    className="absolute top-0 bottom-0 bg-[#e53935]/15 border-b-2 border-[#e53935] z-10 pointer-events-none"
                     style={{ left: '0%', width: '35%' }}
-                  >
-                    <span className="text-[9px] font-bold text-red-400 px-1 bg-red-500/30 rounded-br">LOOP REGION</span>
-                  </div>
+                  />
                 )}
-
-                {/* Bar Ticks */}
                 {Array.from({ length: 32 }).map((_, barIdx) => (
                   <div
                     key={barIdx}
-                    className="flex-1 border-r border-white/5 h-full flex items-center pl-1.5 opacity-70"
+                    className="flex-1 border-r border-white/[0.06] h-full flex items-center pl-1.5"
                   >
                     <span>{barIdx + 1}</span>
                   </div>
                 ))}
-
-                {/* Vertical Playhead Cursor */}
                 {selectedTrack?.durationSeconds && (
                   <div
-                    className="absolute top-0 bottom-0 w-0.5 bg-red-500 z-30 pointer-events-none shadow-[0_0_8px_rgba(239,68,68,0.9)]"
+                    className="absolute top-0 bottom-0 w-px bg-[#e53935] z-30 pointer-events-none"
                     style={{
                       left: `${Math.min(100, (playheadTime / selectedTrack.durationSeconds) * 100)}%`
                     }}
                   >
-                    <div className="w-2.5 h-2 bg-red-500 -ml-1 -top-0 absolute rounded-b" />
+                    <div className="w-2 h-2 bg-[#e53935] -ml-[3.5px] top-0 absolute" style={{ clipPath: 'polygon(50% 100%, 0 0, 100% 0)' }} />
                   </div>
                 )}
               </div>
 
-              {/* Arrangement Clips Canvas */}
-              <div className="flex-1 flex flex-col divide-y divide-[#1f2229]/40 relative overflow-y-auto">
-                {/* Playhead Line down through all track lanes */}
+              <div className="flex-1 flex flex-col divide-y divide-[#2a2d34] relative overflow-y-auto">
                 {selectedTrack?.durationSeconds && (
                   <div
-                    className="absolute top-0 bottom-0 w-0.5 bg-red-500/80 z-20 pointer-events-none"
+                    className="absolute top-0 bottom-0 w-px bg-[#e53935] z-20 pointer-events-none"
                     style={{
                       left: `${Math.min(100, (playheadTime / selectedTrack.durationSeconds) * 100)}%`
                     }}
                   />
                 )}
 
-                {/* Track 01 Lane (Beat / Drum Machine Clip) */}
-                <div className="h-16 relative flex items-center p-1.5 bg-[#14161d]">
-                  {/* Grid lines */}
-                  <div className="absolute inset-0 flex pointer-events-none opacity-10">
-                    {Array.from({ length: 16 }).map((_, idx) => (
-                      <div key={idx} className="flex-1 border-r border-white" />
-                    ))}
-                  </div>
-
-                  {/* Golden Audio Clip Container */}
+                <div className="daw-lane flex items-center px-1.5">
                   <div
-                    className="h-full rounded-lg bg-gradient-to-r from-[#b45309]/80 via-[#d97706]/75 to-[#b45309]/80 border border-[#f59e0b]/40 shadow-sm relative overflow-hidden flex items-center px-3"
-                    style={{ width: '85%' }}
+                    className="daw-clip flex items-end gap-px px-2 pb-1.5 pt-4"
+                    style={{ width: '85%', background: 'linear-gradient(180deg, #c67a1a 0%, #9a5a12 100%)' }}
                   >
-                    {/* Clip Title & Loop Handles */}
-                    <div className="absolute top-1 left-2 text-[10px] font-bold text-amber-100 uppercase tracking-wider flex items-center gap-1.5">
-                      <span>Drum Machine</span>
-                      <span className="opacity-70 font-mono text-[9px]">• {selectedTrack?.genre || 'Afrobeats'}</span>
-                    </div>
-
-                    {/* Pattern Cells [A][B][A][B] & Waveform Peaks */}
-                    <div className="w-full flex items-center justify-between gap-1 pt-3 opacity-90">
-                      {Array.from({ length: 48 }).map((_, i) => {
-                        const h = 25 + Math.sin(i * 0.45) * 35 + Math.cos(i * 0.8) * 20;
-                        return (
-                          <div
-                            key={i}
-                            className="flex-1 bg-amber-950/70 rounded-xs"
-                            style={{ height: `${Math.max(15, Math.min(85, h))}%` }}
-                          />
-                        );
-                      })}
-                    </div>
+                    <span className="absolute top-0.5 left-1.5 text-[10px] font-medium text-black/70">
+                      {selectedTrack?.title || 'Drum Machine'}
+                    </span>
+                    {Array.from({ length: 64 }).map((_, i) => {
+                      const h = 22 + Math.sin(i * 0.45) * 28 + Math.cos(i * 0.8) * 16;
+                      return (
+                        <div
+                          key={i}
+                          className="flex-1 bg-black/35"
+                          style={{ height: `${Math.max(12, Math.min(90, h))}%` }}
+                        />
+                      );
+                    })}
                   </div>
                 </div>
 
@@ -2848,73 +2731,51 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
                   const isThisRecording = isRecording && trk.isArmed;
 
                   return (
-                    <div key={trk.id} className="h-16 relative flex items-center p-1.5 bg-[#14161d]">
-                      {/* Grid lines */}
-                      <div className="absolute inset-0 flex pointer-events-none opacity-10">
-                        {Array.from({ length: 16 }).map((_, idx) => (
-                          <div key={idx} className="flex-1 border-r border-white" />
-                        ))}
-                      </div>
-
-                      {/* Clip representation */}
+                    <div key={trk.id} className="daw-lane flex items-center px-1.5">
                       {isThisRecording ? (
-                        /* Live recording pulsating clip */
                         <div
-                          className="h-full rounded-lg bg-red-950/80 border-2 border-red-500 shadow-lg shadow-red-500/20 relative overflow-hidden flex items-center px-3 animate-pulse"
+                          className="daw-clip flex items-end gap-px px-2 pb-1.5 pt-4"
                           style={{
-                            width: `${Math.max(15, Math.min(100, (recordingSeconds / (selectedTrack?.durationSeconds || 180)) * 100))}%`
+                            width: `${Math.max(15, Math.min(100, (recordingSeconds / (selectedTrack?.durationSeconds || 180)) * 100))}%`,
+                            background: '#8b1e1e'
                           }}
                         >
-                          <div className="absolute top-1 left-2 text-[10px] font-bold text-red-200 uppercase flex items-center gap-1">
-                            <span className="w-2 h-2 rounded-full bg-red-500 animate-ping" />
-                            <span>RECORDING: {trk.name} ({recordingSeconds}s)</span>
-                          </div>
-                          <div className="w-full flex items-center gap-1 pt-3">
-                            {liveWaveformHistory.slice(-32).map((val, idx) => (
-                              <div
-                                key={idx}
-                                className="flex-1 bg-red-400 rounded-xs"
-                                style={{ height: `${Math.max(10, val * 85)}%` }}
-                              />
-                            ))}
-                          </div>
+                          <span className="absolute top-0.5 left-1.5 text-[10px] font-medium text-white/80">
+                            Recording · {recordingSeconds}s
+                          </span>
+                          {liveWaveformHistory.slice(-48).map((val, idx) => (
+                            <div
+                              key={idx}
+                              className="flex-1 bg-white/50"
+                              style={{ height: `${Math.max(8, val * 85)}%` }}
+                            />
+                          ))}
                         </div>
                       ) : hasTake ? (
-                        /* Recorded vocal clip */
                         <div
-                          className="h-full rounded-lg bg-gradient-to-r from-[#9a3412]/80 via-[#ea580c]/70 to-[#9a3412]/80 border border-[#f97316]/40 shadow-sm relative overflow-hidden flex items-center px-3"
+                          className="daw-clip flex items-end gap-px px-2 pb-1.5 pt-4"
                           style={{
-                            width: `${Math.min(100, Math.max(20, (trk.durationSeconds / (selectedTrack?.durationSeconds || 180)) * 100))}%`
+                            width: `${Math.min(100, Math.max(20, (trk.durationSeconds / (selectedTrack?.durationSeconds || 180)) * 100))}%`,
+                            background: `linear-gradient(180deg, ${trk.color}cc 0%, ${trk.color}99 100%)`
                           }}
                         >
-                          <div className="absolute top-1 left-2 text-[10px] font-bold text-orange-100 uppercase tracking-wider flex items-center gap-1">
-                            <span>{trk.name}</span>
-                            <span className="opacity-70 font-mono text-[9px]">• Take 1 ({trk.durationSeconds.toFixed(1)}s)</span>
-                          </div>
-                          <div className="w-full flex items-center justify-between gap-1 pt-3 opacity-90">
-                            {Array.from({ length: 48 }).map((_, i) => {
-                              const h = 20 + Math.sin(i * 0.6) * 30 + Math.cos(i * 1.1) * 20;
-                              return (
-                                <div
-                                  key={i}
-                                  className="flex-1 bg-orange-950/70 rounded-xs"
-                                  style={{ height: `${Math.max(15, Math.min(85, h))}%` }}
-                                />
-                              );
-                            })}
-                          </div>
+                          <span className="absolute top-0.5 left-1.5 text-[10px] font-medium text-black/70">
+                            {trk.name}
+                          </span>
+                          {Array.from({ length: 56 }).map((_, i) => {
+                            const h = 18 + Math.sin(i * 0.6) * 26 + Math.cos(i * 1.1) * 16;
+                            return (
+                              <div
+                                key={i}
+                                className="flex-1 bg-black/30"
+                                style={{ height: `${Math.max(12, Math.min(88, h))}%` }}
+                              />
+                            );
+                          })}
                         </div>
                       ) : (
-                        /* Empty Ready Lane */
-                        <div className="h-full w-full rounded-lg border border-dashed border-white/5 flex items-center px-4 text-gray-500 text-[11px] font-mono">
-                          {trk.isArmed ? (
-                            <span className="text-red-400/80 flex items-center gap-1.5 font-bold">
-                              <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-                              <span>ARMED: Press ⏺ Record (or press R) to capture vocals</span>
-                            </span>
-                          ) : (
-                            <span className="text-gray-600">Track Ready</span>
-                          )}
+                        <div className="h-[calc(100%-8px)] w-full my-1 rounded border border-dashed border-white/[0.08] flex items-center px-3 text-[11px] text-[#6b7078]">
+                          {trk.isArmed ? 'Armed — press R to record' : ''}
                         </div>
                       )}
                     </div>
@@ -2924,21 +2785,19 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
                 {/* Empty Drop Area (Drop a loop or an audio/MIDI/video file) */}
                 <div
                   onClick={() => setBeatPickerOpen(true)}
-                  className="p-6 m-3 rounded-2xl border-2 border-dashed border-white/10 hover:border-teal-500/40 bg-white/[0.01] hover:bg-white/[0.03] transition-colors flex flex-col items-center justify-center gap-2 text-gray-400 hover:text-white cursor-pointer"
+                  className="h-14 m-2 rounded border border-dashed border-[#2a2d34] hover:border-[#4a4e57] flex items-center justify-center gap-2 text-[#8b8f98] hover:text-white cursor-pointer text-[12px]"
                 >
-                  <Music2 className="h-6 w-6 text-gray-500" />
-                  <span className="text-xs font-medium">Drop a loop or an audio/MIDI/video file</span>
-                  <span className="text-[10px] text-gray-500 font-mono">Click to browse Caution Studio beat catalog</span>
+                  <Plus className="h-3.5 w-3.5" />
+                  Drop a loop or audio file
                 </div>
               </div>
 
-              {/* Floating Bottom-Right Toolbar (Magnet & Zoom) */}
-              <div className="absolute bottom-3 right-3 flex items-center gap-1 bg-[#101217]/90 p-1 rounded-xl border border-white/10 shadow-xl backdrop-blur-md z-30">
+              <div className="absolute bottom-2 right-2 flex items-center gap-0.5 bg-[#191b20] p-0.5 rounded border border-[#2a2d34] z-30">
                 <button
                   type="button"
                   onClick={() => setSnapToGrid(!snapToGrid)}
                   title="Snap to Grid"
-                  className={`p-1.5 rounded-lg transition-colors cursor-pointer ${snapToGrid ? 'text-teal-400 bg-teal-400/10' : 'text-gray-400 hover:text-white'}`}
+                  className={`daw-icon-btn ${snapToGrid ? 'is-on' : ''}`}
                 >
                   <Magnet className="h-3.5 w-3.5" />
                 </button>
@@ -2946,7 +2805,7 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
                   type="button"
                   onClick={() => setZoomLevel(Math.max(0.7, zoomLevel - 0.2))}
                   title="Zoom Out"
-                  className="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-white/5 transition-colors cursor-pointer"
+                  className="daw-icon-btn"
                 >
                   <ZoomOut className="h-3.5 w-3.5" />
                 </button>
@@ -2954,7 +2813,7 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
                   type="button"
                   onClick={() => setZoomLevel(Math.min(2.0, zoomLevel + 0.2))}
                   title="Zoom In"
-                  className="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-white/5 transition-colors cursor-pointer"
+                  className="daw-icon-btn"
                 >
                   <ZoomIn className="h-3.5 w-3.5" />
                 </button>
@@ -2966,44 +2825,34 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
               3. BOTTOM BANDLAB STUDIO CONSOLE & AUTOPITCH™ (Exact Layout from Screenshot)
              ========================================================================= */}
           {isConsoleOpen && (
-            <div className="h-[340px] bg-[#101217] border-t border-[#1f2229] flex flex-col shrink-0 select-none animate-in slide-in-from-bottom-2 duration-150">
-              {/* Console Top Header */}
-              <div className="px-3.5 py-1.5 bg-[#0e1014] border-b border-[#1f2229] flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  {/* Close Cross */}
+            <div className="h-[300px] bg-[#191b20] border-t border-[#2a2d34] flex flex-col shrink-0">
+              <div className="h-8 px-3 bg-[#16181c] border-b border-[#2a2d34] flex items-center justify-between">
+                <div className="flex items-center gap-2">
                   <button
                     type="button"
                     onClick={() => setIsConsoleOpen(false)}
-                    title="Close Inspector"
-                    className="p-1 rounded text-gray-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                    title="Close"
+                    className="daw-icon-btn !w-6 !h-6"
                   >
                     <X className="h-3.5 w-3.5" />
                   </button>
-
-                  {/* Active Track Title */}
-                  <div className="flex items-center gap-1.5 text-xs font-bold text-gray-200">
-                    <Mic className="h-3.5 w-3.5 text-[#ea580c]" />
-                    <span>Voice/Audio</span>
-                  </div>
+                  <span className="text-[12px] font-semibold text-[#eceef2]">Voice / Audio</span>
                 </div>
-
-                <div className="text-[10px] font-mono text-gray-500">
-                  AUTO-PITCH ENGINE: ACTIVE · 48.0kHz 24-BIT
-                </div>
+                <span className="text-[10px] tabular-nums text-[#8b8f98]">48 kHz · 24-bit</span>
               </div>
 
               {/* Console Content: 3-Column BandLab Layout */}
               <div className="flex-1 flex overflow-hidden">
                 {/* Column 1: Input & Monitoring Panel */}
-                <div className="w-56 sm:w-64 p-3.5 border-r border-[#1f2229] flex flex-col justify-between shrink-0 bg-[#0e1014]/60">
+                <div className="w-52 sm:w-60 p-3 border-r border-[#2a2d34] flex flex-col justify-between shrink-0 bg-[#16181c]">
                   <div className="space-y-3">
                     {/* Input Device Dropdown */}
                     <div className="space-y-1">
-                      <span className="text-[10px] font-mono uppercase text-gray-400 block">Input</span>
+                      <span className="text-[10px] text-[#8b8f98] block">Input</span>
                       <select
                         value={audioInputDevice}
                         onChange={(e) => setAudioInputDevice(e.target.value)}
-                        className="w-full bg-[#181b24] border border-white/10 rounded-lg py-1 px-2 text-xs text-gray-200 focus:outline-none focus:border-teal-500 cursor-pointer truncate"
+                        className="w-full bg-[#1c1e24] border border-[#2a2d34] rounded py-1 px-2 text-xs text-[#eceef2] focus:outline-none cursor-pointer truncate"
                       >
                         <option value="MacBook Pro Microphone (Built-in)">MacBook Pro Microphone (Built-in)</option>
                         <option value="Default USB Audio Codec">Default USB Audio Codec</option>
@@ -3016,7 +2865,7 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
                       <select
                         value={audioInputChannel}
                         onChange={(e) => setAudioInputChannel(e.target.value as any)}
-                        className="w-full bg-[#181b24] border border-white/10 rounded-lg py-1 px-2 text-xs text-gray-200 focus:outline-none focus:border-teal-500 cursor-pointer"
+                        className="w-full bg-[#1c1e24] border border-[#2a2d34] rounded py-1 px-2 text-xs text-[#eceef2] focus:outline-none cursor-pointer"
                       >
                         <option value="Channel 1 (Mono)">Channel 1 (Mono)</option>
                         <option value="Channel 2">Channel 2</option>
@@ -3026,43 +2875,41 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
 
                     {/* Input Level Animated Meter */}
                     <div className="space-y-1.5 pt-1">
-                      <div className="flex items-center justify-between text-[10px] font-mono text-gray-400">
-                        <span>Input Level</span>
-                        <span className="text-teal-400 font-bold">{Math.round(inputLevelMeter * 100)}%</span>
+                      <div className="flex items-center justify-between text-[10px] text-[#8b8f98]">
+                        <span>Input</span>
+                        <span className="tabular-nums">{Math.round(inputLevelMeter * 100)}%</span>
                       </div>
-                      <div className="h-2 w-full bg-black/60 rounded-full overflow-hidden p-0.5 border border-white/10">
+                      <div className="h-1.5 w-full bg-[#0e1013] rounded-sm overflow-hidden">
                         <div
-                          className="h-full rounded-full bg-gradient-to-r from-emerald-500 via-teal-400 to-amber-400 transition-all duration-75"
+                          className="h-full bg-[#2bbbad]"
                           style={{ width: `${Math.min(100, Math.max(5, inputLevelMeter * 100))}%` }}
                         />
                       </div>
                     </div>
 
-                    {/* Monitoring Button */}
                     <button
                       type="button"
                       onClick={() => setIsInputMonitoring(!isInputMonitoring)}
-                      className={`w-full py-2 rounded-xl border text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                      className={`w-full h-8 rounded-md border text-[12px] font-semibold flex items-center justify-center gap-2 ${
                         isInputMonitoring
-                          ? 'bg-teal-500/20 border-teal-500/50 text-teal-300 shadow-sm'
-                          : 'bg-[#181b24] border-white/10 text-gray-400 hover:text-white'
+                          ? 'bg-[#2bbbad]/15 border-[#2bbbad]/40 text-[#2bbbad]'
+                          : 'bg-[#1c1e24] border-[#2a2d34] text-[#8b8f98] hover:text-white'
                       }`}
                     >
                       <Headphones className="h-3.5 w-3.5" />
-                      <span>{isInputMonitoring ? 'Monitoring: ON' : 'Monitoring'}</span>
+                      {isInputMonitoring ? 'Monitoring on' : 'Monitoring'}
                     </button>
                   </div>
 
-                  {/* Armed indicator */}
-                  <div className="pt-2 border-t border-white/5 flex items-center justify-between text-[10px] font-mono text-gray-500">
-                    <span>MIC STATUS:</span>
-                    <span className="text-emerald-400 font-bold">READY</span>
+                  <div className="pt-2 border-t border-[#2a2d34] flex items-center justify-between text-[10px] text-[#8b8f98]">
+                    <span>Mic</span>
+                    <span className="text-[#2bbbad]">Ready</span>
                   </div>
                 </div>
 
                 {/* Column 2: BandLab AutoPitch™ Unit Centerpiece */}
                 {activeInspectorTab === 'autopitch' ? (
-                  <div className="flex-1 p-4 flex flex-col justify-between overflow-y-auto bg-[#101217]">
+                  <div className="flex-1 p-3 flex flex-col justify-between overflow-y-auto bg-[#191b20]">
                     {/* Top Row: Power Switch + Title + AutoDetect Key */}
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
@@ -3082,7 +2929,8 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
                         </button>
 
                         <div className="flex items-center gap-1.5">
-                          <span className="text-sm font-black text-white tracking-wide">AutoPitch™</span>
+                          <span className="text-[13px] font-semibold text-white">Pitch</span>
+                          {!autoTuneEnabled && <span className="text-[11px] text-[#8b8f98]">— bypassed</span>}
                         </div>
                       </div>
 
@@ -3090,12 +2938,14 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
                       <button
                         type="button"
                         onClick={handleAutoDetectKey}
-                        className="px-3 py-1 rounded-lg bg-[#181b24] hover:bg-[#202533] border border-white/10 text-gray-200 text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-sm hover:border-teal-500/40"
+                        className="h-7 px-2.5 rounded-md bg-[#1c1e24] border border-[#2a2d34] text-[#d7dbe2] text-[12px] font-medium hover:bg-[#252830]"
                       >
-                        <span>AutoDetect Key</span>
-                        <Sparkles className="h-3 w-3 text-teal-400" />
+                        Detect key
                       </button>
                     </div>
+
+                    {/* Rest of panel dims when bypassed */}
+                    <div className={`flex flex-col gap-2 transition-opacity duration-150 ${autoTuneEnabled ? 'opacity-100' : 'opacity-40 pointer-events-none'}`}>
 
                     {/* Category & Scale Selectors */}
                     <div className="grid grid-cols-2 gap-6 pt-2 max-w-xl">
@@ -3104,13 +2954,13 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
                         <select
                           value={autoPitchCategory}
                           onChange={(e) => setAutoPitchCategory(e.target.value as any)}
-                          className="w-full bg-[#181b24] border border-white/10 rounded-lg py-1 px-2.5 text-xs text-white focus:outline-none focus:border-teal-400 cursor-pointer"
+                          className="w-full bg-[#1c1e24] border border-[#2a2d34] rounded py-1 px-2 text-xs text-white focus:outline-none cursor-pointer"
                         >
                           <option value="Essentials">Essentials</option>
                           <option value="Modern Rap">Modern Rap</option>
-                          <option value="Afrobeat">Afrobeat Glow</option>
-                          <option value="Pop">Pop Polish</option>
-                          <option value="R&B">R&B Velvet</option>
+                          <option value="Afrobeat">Afrobeats</option>
+                          <option value="Pop">Pop</option>
+                          <option value="R&B">R&B</option>
                         </select>
                       </div>
 
@@ -3122,7 +2972,7 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
                             setAutoTuneKey(e.target.value);
                             if (!autoTuneEnabled) setAutoTuneEnabled(true);
                           }}
-                          className="w-full bg-[#181b24] border border-white/10 rounded-lg py-1 px-2.5 text-xs text-white focus:outline-none focus:border-teal-400 cursor-pointer"
+                          className="w-full bg-[#1c1e24] border border-[#2a2d34] rounded py-1 px-2 text-xs text-white focus:outline-none cursor-pointer"
                         >
                           <option value="D Minor">D Minor</option>
                           <option value="F Minor">F Minor</option>
@@ -3130,8 +2980,7 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
                           <option value="A Minor">A Minor</option>
                           <option value="G Major">G Major</option>
                           <option value="Chromatic">Chromatic (All)</option>
-                        </select>
-                      </div>
+                        </select>                      </div>
                     </div>
 
                     {/* Middle Section: Preset Grid + Big Central Rotary Dial + Piano Notes */}
@@ -3145,10 +2994,10 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
                               key={pst}
                               type="button"
                               onClick={() => handleSelectAutoPitchPreset(pst)}
-                              className={`h-12 rounded-xl border flex flex-col items-center justify-center p-1 text-center transition-all cursor-pointer ${
+                              className={`h-10 rounded-md border flex flex-col items-center justify-center p-1 text-center ${
                                 isActive
-                                  ? 'bg-teal-500/20 border-teal-400 text-teal-300 shadow-[0_0_12px_rgba(45,212,191,0.25)]'
-                                  : 'bg-[#181b24] border-white/5 text-gray-400 hover:text-white hover:bg-[#202533]'
+                                  ? 'bg-[#2bbbad]/15 border-[#2bbbad] text-[#2bbbad]'
+                                  : 'bg-[#1c1e24] border-[#2a2d34] text-[#8b8f98] hover:text-white'
                               }`}
                             >
                               <span className="text-[10px] font-bold truncate w-full">{pst}</span>
@@ -3198,21 +3047,22 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
                           </svg>
 
                           {/* Inner Metallic Center Cap */}
-                          <div className="absolute w-18 h-18 rounded-full bg-gradient-to-b from-[#242938] via-[#141721] to-[#0c0d12] border border-white/15 flex flex-col items-center justify-center shadow-inner">
-                            <span className="text-xs font-black text-white font-mono">{autoPitchPercent}%</span>
-                            <div className="w-1.5 h-1.5 rounded-full bg-teal-400 mt-0.5" />
+                          <div className="absolute w-[4.5rem] h-[4.5rem] rounded-full bg-[#1c1e24] border border-[#2a2d34] flex flex-col items-center justify-center">
+                            <span className="text-xs font-semibold text-white tabular-nums">
+                              {autoTuneEnabled ? `${autoPitchPercent}%` : 'Off'}
+                            </span>
                           </div>
                         </div>
 
                         {/* Dial Label underneath */}
-                        <span className="text-xs font-bold text-gray-300 mt-1 uppercase tracking-wider font-mono">
-                          {getAutoPitchDialLabel(autoPitchPercent)}
+                        <span className="text-[11px] font-medium text-[#8b8f98] mt-1">
+                          {autoTuneEnabled ? `Strength ${autoPitchPercent}%` : 'Bypass'}
                         </span>
                       </div>
 
                       {/* 12-Note Piano Key Matrix Grid */}
-                      <div className="md:col-span-4 flex flex-col gap-1.5 p-2 rounded-xl bg-[#141721] border border-white/5">
-                        <span className="text-[10px] font-mono text-gray-400 uppercase text-center block">Active Scale Notes</span>
+                      <div className="md:col-span-4 flex flex-col gap-1.5 p-2 rounded-md bg-[#16181c] border border-[#2a2d34]">
+                        <span className="text-[10px] text-[#8b8f98] text-center block">Scale notes</span>
                         {/* Naturals (C D E F G A B) */}
                         <div className="grid grid-cols-7 gap-1">
                           {['C', 'D', 'E', 'F', 'G', 'A', 'B'].map((note) => {
@@ -3224,7 +3074,7 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
                                 onClick={() => toggleScaleNote(note)}
                                 className={`h-8 rounded font-mono text-xs font-bold transition-all ${
                                   inScale
-                                    ? 'bg-teal-400 text-black shadow-sm'
+                                    ? 'bg-[#2bbbad] text-black'
                                     : 'bg-[#1e2230] text-gray-500 hover:text-white'
                                 }`}
                               >
@@ -3255,14 +3105,15 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
                         </div>
                       </div>
                     </div>
+                    </div>
                   </div>
                 ) : activeInspectorTab === 'fx' ? (
                   /* Tab 2: Fx Effects Rack (Reverb, Delay, EQ, Compressor) */
-                  <div className="flex-1 p-4 grid grid-cols-2 sm:grid-cols-4 gap-3 overflow-y-auto bg-[#101217]">
+                  <div className="flex-1 p-3 grid grid-cols-2 sm:grid-cols-4 gap-2 overflow-y-auto bg-[#191b20]">
                     {/* Reverb */}
-                    <div className="p-3 rounded-xl bg-[#141721] border border-white/5 space-y-2">
-                      <div className="flex justify-between text-xs font-bold text-teal-300">
-                        <span>STUDIO REVERB</span>
+                    <div className="p-3 rounded-md bg-[#16181c] border border-[#2a2d34] space-y-2">
+                      <div className="flex justify-between text-[12px] font-semibold text-[#2bbbad]">
+                        <span>Reverb</span>
                         <span className="font-mono">{Math.round(reverbAmount * 100)}%</span>
                       </div>
                       <input
@@ -3278,9 +3129,9 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
                     </div>
 
                     {/* Delay */}
-                    <div className="p-3 rounded-xl bg-[#141721] border border-white/5 space-y-2">
-                      <div className="flex justify-between text-xs font-bold text-amber-300">
-                        <span>TEMPO DELAY</span>
+                    <div className="p-3 rounded-md bg-[#16181c] border border-[#2a2d34] space-y-2">
+                      <div className="flex justify-between text-[12px] font-semibold text-[#d7dbe2]">
+                        <span>Delay</span>
                         <span className="font-mono">{Math.round(delayAmount * 100)}%</span>
                       </div>
                       <input
@@ -3296,9 +3147,9 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
                     </div>
 
                     {/* 3-Band EQ */}
-                    <div className="p-3 rounded-xl bg-[#141721] border border-white/5 space-y-2">
-                      <div className="flex justify-between text-xs font-bold text-purple-300">
-                        <span>3-BAND EQ</span>
+                    <div className="p-3 rounded-md bg-[#16181c] border border-[#2a2d34] space-y-2">
+                      <div className="flex justify-between text-[12px] font-semibold text-[#d7dbe2]">
+                        <span>EQ</span>
                         <span className="font-mono">+{eqMid}dB</span>
                       </div>
                       <div className="grid grid-cols-3 gap-1 text-[9px] font-mono text-center">
@@ -3342,10 +3193,10 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
                     </div>
 
                     {/* Dynamics */}
-                    <div className="p-3 rounded-xl bg-[#141721] border border-white/5 space-y-2">
-                      <div className="flex justify-between text-xs font-bold text-white">
-                        <span>DYNAMICS</span>
-                        <span className="text-[9px] font-mono px-1 bg-teal-400/20 text-teal-300 rounded">OPTO</span>
+                    <div className="p-3 rounded-md bg-[#16181c] border border-[#2a2d34] space-y-2">
+                      <div className="flex justify-between text-[12px] font-semibold text-white">
+                        <span>Dynamics</span>
+                        <span className="text-[9px] px-1 text-[#8b8f98]">Opto</span>
                       </div>
                       <label className="flex items-center gap-2 cursor-pointer text-xs text-gray-300">
                         <input
@@ -3369,21 +3220,21 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
                   </div>
                 ) : (
                   /* Tab 3: Editor / Lyrics & Notepad */
-                  <div className="flex-1 p-4 overflow-y-auto bg-[#101217] space-y-2">
-                    <span className="text-[10px] font-mono uppercase text-gray-400 block">Lyrics & Song Notes</span>
+                  <div className="flex-1 p-3 overflow-y-auto bg-[#191b20] space-y-2">
+                    <span className="text-[10px] text-[#8b8f98] block">Lyrics</span>
                     <textarea
                       value={lyricsText}
                       onChange={(e) => setLyricsText(e.target.value)}
-                      placeholder="Type your verses, harmonies, and recording cues here..."
+                      placeholder="Verses, cues, notes…"
                       rows={5}
-                      className="w-full p-3 rounded-xl bg-black/50 border border-white/10 text-xs text-white font-mono resize-none focus:outline-none focus:border-teal-400 leading-relaxed"
+                      className="w-full p-3 rounded-md bg-[#111214] border border-[#2a2d34] text-xs text-white resize-none focus:outline-none leading-relaxed"
                     />
                   </div>
                 )}
 
                 {/* Column 3: Track Output Strip (Right) */}
-                <div className="w-40 sm:w-48 p-3.5 border-l border-[#1f2229] flex flex-col items-center justify-between shrink-0 bg-[#0e1014]/60">
-                  <span className="text-[10px] font-mono uppercase text-gray-400">Volume</span>
+                <div className="w-36 sm:w-44 p-3 border-l border-[#2a2d34] flex flex-col items-center justify-between shrink-0 bg-[#16181c]">
+                  <span className="text-[10px] text-[#8b8f98]">Volume</span>
 
                   {/* Vertical Channel Fader with Decibel Marks */}
                   <div className="flex items-center gap-2 h-36">
@@ -3433,46 +3284,40 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
               </div>
 
               {/* Bottom Tab Switcher Footer */}
-              <div className="h-9 bg-[#0c0d10] border-t border-[#1f2229] flex items-center justify-between px-3 text-xs shrink-0 select-none">
-                {/* Left Tabs */}
-                <div className="flex items-center gap-1.5">
+              <div className="h-8 bg-[#16181c] border-t border-[#2a2d34] flex items-center justify-between px-2 text-[12px] shrink-0">
+                <div className="flex items-center gap-1">
                   <button
                     type="button"
                     onClick={() => setActiveInspectorTab('autopitch')}
-                    className={`px-3 py-1 rounded-md text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5 ${
+                    className={`px-2.5 h-6 rounded text-[12px] font-medium ${
                       activeInspectorTab === 'autopitch'
-                        ? 'bg-teal-500/20 text-teal-300 border border-teal-500/30'
-                        : 'text-gray-400 hover:text-white'
+                        ? 'bg-white/10 text-white'
+                        : 'text-[#8b8f98] hover:text-white'
                     }`}
                   >
-                    <Sliders className="h-3.5 w-3.5" />
-                    <span>AutoPitch™</span>
+                    AutoPitch
                   </button>
-
                   <button
                     type="button"
                     onClick={() => setActiveInspectorTab('fx')}
-                    className={`px-3 py-1 rounded-md text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5 ${
+                    className={`px-2.5 h-6 rounded text-[12px] font-medium ${
                       activeInspectorTab === 'fx'
-                        ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
-                        : 'text-gray-400 hover:text-white'
+                        ? 'bg-white/10 text-white'
+                        : 'text-[#8b8f98] hover:text-white'
                     }`}
                   >
-                    <Sparkles className="h-3.5 w-3.5" />
-                    <span>Fx Effects</span>
+                    FX
                   </button>
-
                   <button
                     type="button"
                     onClick={() => setActiveInspectorTab('editor')}
-                    className={`px-3 py-1 rounded-md text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5 ${
+                    className={`px-2.5 h-6 rounded text-[12px] font-medium ${
                       activeInspectorTab === 'editor'
-                        ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30'
-                        : 'text-gray-400 hover:text-white'
+                        ? 'bg-white/10 text-white'
+                        : 'text-[#8b8f98] hover:text-white'
                     }`}
                   >
-                    <Scissors className="h-3.5 w-3.5" />
-                    <span>Editor</span>
+                    Editor
                   </button>
                 </div>
 
@@ -3520,15 +3365,15 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
 
       {/* Beat Picker Modal */}
       {beatPickerOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70">
           <div
-            className="relative w-full max-w-2xl rounded-2xl bg-[#0F131C] border border-white/10 p-6 shadow-2xl flex flex-col max-h-[85vh] text-white"
+            className="relative w-full max-w-lg rounded-lg bg-[#1c1e24] border border-[#2a2d34] p-4 shadow-2xl flex flex-col max-h-[80vh] text-white"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between pb-3 border-b border-white/10">
+            <div className="flex items-center justify-between pb-3 border-b border-[#2a2d34]">
               <div className="flex items-center gap-2">
-                <Disc3 className="h-5 w-5 text-amber-400" />
-                <h3 className="text-base font-bold text-white">Load Backing Instrumental Beat</h3>
+                <Folder className="h-4 w-4 text-[#8b8f98]" />
+                <h3 className="text-[14px] font-semibold text-white">Sounds</h3>
               </div>
               <button
                 type="button"
@@ -3547,7 +3392,7 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
                   value={beatSearchQuery}
                   onChange={(e) => setBeatSearchQuery(e.target.value)}
                   placeholder="Search beats by title, producer, genre..."
-                  className="w-full pl-9 pr-3 py-2 rounded-xl bg-black/50 border border-white/10 text-xs text-white focus:outline-none focus:border-teal-400"
+                  className="w-full pl-9 pr-3 py-2 rounded-md bg-[#111214] border border-[#2a2d34] text-xs text-white focus:outline-none"
                 />
               </div>
             </div>
@@ -3560,10 +3405,10 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
                     handleSelectBeat(b);
                     setBeatPickerOpen(false);
                   }}
-                  className={`p-2.5 rounded-xl border flex items-center justify-between gap-3 cursor-pointer transition-colors ${
+                  className={`p-2 rounded-md border flex items-center justify-between gap-3 cursor-pointer ${
                     selectedTrack?.id === b.id
-                      ? 'bg-teal-500/15 border-teal-500/40 text-teal-300'
-                      : 'bg-white/[0.02] border-white/5 hover:bg-white/5 text-gray-200'
+                      ? 'bg-[#2bbbad]/12 border-[#2bbbad]/40'
+                      : 'bg-transparent border-transparent hover:bg-white/5 text-[#d7dbe2]'
                   }`}
                 >
                   <div className="flex items-center gap-3 min-w-0">
@@ -3576,7 +3421,7 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
 
                   <button
                     type="button"
-                    className="px-3 py-1 rounded-lg bg-teal-500 text-black text-xs font-bold shrink-0 hover:bg-teal-400"
+                    className="px-3 py-1 rounded-md bg-white text-black text-xs font-semibold shrink-0"
                   >
                     Load
                   </button>
@@ -3589,15 +3434,14 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
 
       {/* Export / Render Dialog Modal */}
       {isExportDialogOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70">
           <div
-            className="relative w-full max-w-md rounded-2xl bg-[#0F131C] border border-white/10 p-6 shadow-2xl text-white space-y-4"
+            className="relative w-full max-w-sm rounded-lg bg-[#1c1e24] border border-[#2a2d34] p-5 shadow-2xl text-white space-y-4"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between pb-2 border-b border-white/10">
+            <div className="flex items-center justify-between pb-2 border-b border-[#2a2d34]">
               <div className="flex items-center gap-2">
-                <Download className="h-5 w-5 text-teal-400" />
-                <h3 className="text-base font-bold text-white">Publish & Export Track</h3>
+                <h3 className="text-[14px] font-semibold text-white">Publish</h3>
               </div>
               <button
                 type="button"
@@ -3608,11 +3452,11 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
               </button>
             </div>
 
-            <p className="text-xs text-gray-300">
-              Render your full arrangement into a studio-grade 24-Bit WAV master ready for distribution on Spotify, Apple Music, and Audiomack.
+            <p className="text-xs text-[#8b8f98]">
+              Bounce a stereo WAV of this mix.
             </p>
 
-            <div className="p-3 rounded-xl bg-black/40 border border-white/5 space-y-1 font-mono text-[10px]">
+            <div className="p-3 rounded-md bg-[#111214] border border-[#2a2d34] space-y-1 text-[11px]">
               <div className="flex justify-between text-gray-400">
                 <span>FORMAT:</span>
                 <span className="text-white font-bold">16-Bit PCM WAV · 44.1kHz Stereo</span>
@@ -3627,7 +3471,7 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
               <button
                 type="button"
                 onClick={() => setIsExportDialogOpen(false)}
-                className="flex-1 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-xs font-bold text-gray-300"
+                className="flex-1 py-2 rounded-md bg-white/5 hover:bg-white/10 text-xs font-semibold text-[#d7dbe2]"
               >
                 Cancel
               </button>
@@ -3635,7 +3479,7 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
                 type="button"
                 onClick={() => handleExportWav()}
                 disabled={isExportingWav}
-                className="flex-1 py-2.5 rounded-xl bg-teal-500 hover:bg-teal-400 text-black text-xs font-bold flex items-center justify-center gap-1.5 shadow-lg shadow-teal-500/20"
+                className="flex-1 py-2 rounded-md bg-white hover:bg-[#f2f2f2] text-black text-xs font-semibold flex items-center justify-center gap-1.5"
               >
                 <Download className="h-4 w-4" />
                 <span>{isExportingWav ? 'Rendering...' : 'Download WAV'}</span>
@@ -3647,9 +3491,9 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
 
       {/* Keyboard Shortcuts Modal */}
       {isShortcutsModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70">
           <div
-            className="relative w-full max-w-sm rounded-2xl bg-[#0F131C] border border-white/10 p-5 shadow-2xl text-white space-y-3 font-sans"
+            className="relative w-full max-w-sm rounded-lg bg-[#1c1e24] border border-[#2a2d34] p-5 shadow-2xl text-white space-y-3"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between pb-2 border-b border-white/10">

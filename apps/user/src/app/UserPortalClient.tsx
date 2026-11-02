@@ -739,7 +739,7 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
   const progressRatio = currentTrack.durationSeconds > 0 ? (currentTime / currentTrack.durationSeconds) * 100 : 0;
 
   return (
-    <div className="min-h-screen bg-[#08090B] text-white flex flex-col font-sans selection:bg-[#04564f] selection:text-white pb-24">
+    <div className="min-h-screen bg-[#111214] text-[#eceef2] flex flex-col font-sans selection:bg-[#2bbbad] selection:text-black pb-20">
       {/* HTML5 Audio Element for Real Streaming from Cloudflare R2 & Database */}
       <audio
         ref={audioRef}
@@ -789,34 +789,32 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
       />
 
       {/* 1. TOP HEADER - MOBILE RESPONSIVE */}
-      <header className="h-16 border-b border-white/[0.06] bg-[#0A0B0E] px-4 sm:px-6 flex items-center justify-between gap-3 sticky top-0 z-40">
-        {/* Far Left: Brand Logo */}
+      <header className="h-14 border-b border-[#2a2d34] bg-[#16181c] px-3 sm:px-4 flex items-center justify-between gap-3 sticky top-0 z-40">
         <div className="flex items-center shrink-0">
           <Link href="/" className="inline-flex items-center">
             <img
               src="/logo.png"
               alt="Caution Studio"
-              className="h-7 sm:h-8 w-auto object-contain brightness-0 invert max-w-[130px] sm:max-w-[190px]"
+              className="h-6 sm:h-7 w-auto object-contain brightness-0 invert max-w-[120px] sm:max-w-[160px]"
             />
           </Link>
         </div>
 
-        {/* Center: Search (Desktop Only) */}
-        <div className="hidden md:flex flex-1 max-w-xl mx-4">
+        <div className="hidden md:flex flex-1 max-w-md mx-4">
           <div className="relative flex items-center w-full">
-            <Search className="h-4 w-4 text-gray-400 absolute left-3.5 pointer-events-none" />
+            <Search className="h-4 w-4 text-[#8b8f98] absolute left-3 pointer-events-none" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search by artists, songs or albums"
-              className="w-full h-10 pl-10 pr-9 rounded-lg bg-[#141518] border border-white/[0.06] text-xs text-white placeholder-gray-500 focus:outline-none focus:border-white/20 transition-colors"
+              placeholder="Search beats, artists, projects"
+              className="w-full h-9 pl-9 pr-8 rounded-full bg-[#111214] border border-[#2a2d34] text-[13px] text-white placeholder-[#6b7078] focus:outline-none focus:border-[#4a4e57]"
             />
             {searchQuery && (
               <button
                 type="button"
                 onClick={() => setSearchQuery('')}
-                className="absolute right-3 text-gray-400 hover:text-white"
+                className="absolute right-3 text-[#8b8f98] hover:text-white"
                 title="Clear search"
               >
                 <X className="h-4 w-4" />
@@ -825,24 +823,14 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
           </div>
         </div>
 
-        {/* Far Right: User Profile & Hamburger on Mobile, Plus Action Buttons on Desktop */}
-        <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-          {/* Desktop-only Action Buttons */}
+        <div className="flex items-center gap-2 sm:gap-2.5 shrink-0">
           <button
             type="button"
-            onClick={() => setShowUpgradeModal(true)}
-            className="hidden md:flex items-center gap-1.5 px-3.5 py-1.5 rounded-full border border-white/20 hover:border-white/40 text-xs font-semibold text-white/90 transition-colors cursor-pointer"
+            onClick={() => handleOpenRecordStudio()}
+            className="hidden md:inline-flex items-center gap-1.5 h-8 px-3.5 rounded-full bg-[#e53935] hover:bg-[#d32f2f] text-white text-[12px] font-semibold"
           >
-            <span>My channel</span>
-            <ChevronRight className="h-3.5 w-3.5 text-gray-400" />
-          </button>
-
-          <button
-            type="button"
-            className="hidden md:flex p-2 text-gray-400 hover:text-white transition-colors"
-            title="Airplay / Cast"
-          >
-            <Cast className="h-4 w-4" />
+            <Mic className="h-3.5 w-3.5" />
+            Create
           </button>
 
           {/* Hamburger Menu Trigger (Mobile only) */}
@@ -862,7 +850,7 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
 
       {/* MOBILE NAVIGATION DRAWER */}
       {mobileMenuOpen && (
-        <div className="fixed inset-0 top-16 z-50 md:hidden bg-[#0A0B0E]/95 backdrop-blur-2xl border-b border-white/10 p-5 overflow-y-auto animate-in fade-in slide-in-from-top-4 duration-200">
+        <div className="fixed inset-0 top-14 z-50 md:hidden bg-[#16181c] border-b border-[#2a2d34] p-4 overflow-y-auto">
           {/* Mobile Search */}
           <div className="relative flex items-center w-full mb-5">
             <Search className="h-4 w-4 text-gray-400 absolute left-3.5 pointer-events-none" />
@@ -901,7 +889,7 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
                 }`}
               >
                 <Activity className={`h-4 w-4 ${activeNav === 'feed' ? 'text-[#2dd4bf]' : 'text-gray-400'}`} />
-                <span className={activeNav === 'feed' ? 'text-[#2dd4bf]' : ''}>Feed</span>
+                <span className={activeNav === 'feed' ? 'text-[#2bbbad]' : ''}>Home</span>
               </button>
 
               <button
@@ -947,22 +935,19 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
                   setMobileMenuOpen(false);
                   handleOpenRecordStudio();
                 }}
-                className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold text-teal-300 bg-teal-500/10 hover:bg-teal-500/20 border border-teal-500/20 transition-all cursor-pointer"
+                className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-lg text-[13px] font-semibold text-white bg-[#e53935] hover:bg-[#d32f2f] cursor-pointer"
               >
                 <div className="flex items-center gap-3">
-                  <Mic className="h-4 w-4 text-teal-400" />
-                  <span>Record Studio (DAW)</span>
+                  <Mic className="h-4 w-4" />
+                  <span>Studio</span>
                 </div>
-                <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-teal-500/30 text-teal-300 uppercase">
-                  Studio
-                </span>
               </button>
             </nav>
 
             {/* YOUR MUSIC */}
             <div>
-              <p className="text-[11px] font-mono uppercase tracking-wider text-gray-500 px-3.5 mb-2">
-                YOUR MUSIC
+              <p className="text-[11px] font-medium text-[#8b8f98] px-3.5 mb-2">
+                Library
               </p>
               <div className="space-y-1">
                 {[
@@ -1009,11 +994,10 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
                   setShowUpgradeModal(true);
                   setMobileMenuOpen(false);
                 }}
-                className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl bg-[#04564f]/30 border border-[#2dd4bf]/20 text-xs font-bold text-[#2dd4bf] hover:bg-[#04564f]/50 transition-colors cursor-pointer"
+                className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-lg bg-white/5 text-[13px] font-medium text-[#d7dbe2] hover:bg-white/8 cursor-pointer"
               >
                 <div className="flex items-center gap-2">
-                  <Sparkles className="h-4 w-4" />
-                  <span>My Channel & Clearances</span>
+                  <span>Channel</span>
                 </div>
                 <ChevronRight className="h-3.5 w-3.5" />
               </button>
@@ -1034,7 +1018,7 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
       {/* 2. BODY CONTENT (3-COLUMN SPLIT) */}
       <div className="flex-1 flex w-full">
         {/* LEFT NAVIGATION SIDEBAR */}
-        <aside className="w-64 border-r border-white/[0.06] bg-[#0A0B0E] p-5 shrink-0 hidden md:flex flex-col justify-between">
+        <aside className="w-56 border-r border-[#2a2d34] bg-[#16181c] px-3 py-4 shrink-0 hidden md:flex flex-col justify-between">
           <div className="space-y-6">
             <nav className="space-y-1">
               <button
@@ -1046,8 +1030,8 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
                     : 'text-gray-400 hover:text-white hover:bg-white/[0.02]'
                 }`}
               >
-                <Activity className={`h-4 w-4 ${activeNav === 'feed' ? 'text-[#2dd4bf]' : 'text-gray-400'}`} />
-                <span className={activeNav === 'feed' ? 'font-semibold text-[#2dd4bf]' : ''}>Feed</span>
+                <Activity className={`h-4 w-4 ${activeNav === 'feed' ? 'text-[#2bbbad]' : 'text-[#8b8f98]'}`} />
+                <span className={activeNav === 'feed' ? 'font-semibold text-white' : ''}>Home</span>
               </button>
 
               <button
@@ -1084,22 +1068,17 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
               <button
                 type="button"
                 onClick={() => handleOpenRecordStudio()}
-                className="w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-semibold text-teal-300 bg-teal-500/10 hover:bg-teal-500/20 border border-teal-500/20 transition-all cursor-pointer mt-1"
-                title="Open Caution Record Studio DAW"
+                className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] font-semibold text-white bg-[#e53935] hover:bg-[#d32f2f] cursor-pointer mt-2"
+                title="Open Studio"
               >
-                <div className="flex items-center gap-3">
-                  <Mic className="h-4 w-4 text-teal-400" />
-                  <span>Record Studio</span>
-                </div>
-                <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-teal-500/30 text-teal-300 uppercase">
-                  DAW
-                </span>
+                <Mic className="h-4 w-4" />
+                <span>Studio</span>
               </button>
             </nav>
 
             <div>
-              <p className="text-[11px] font-mono uppercase tracking-wider text-gray-500 px-3 mb-2">
-                YOUR MUSIC
+              <p className="text-[11px] font-medium text-[#8b8f98] px-3 mb-1">
+                Library
               </p>
               <div className="space-y-0.5">
                 {[
@@ -1136,13 +1115,13 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
             </div>
           </div>
 
-          <div className="pt-4 border-t border-white/[0.06] text-[10px] text-gray-500">
-            <span>Caution Studio v2.4</span>
+          <div className="pt-3 border-t border-[#2a2d34] text-[10px] text-[#6b7078] px-3">
+            Caution Studio
           </div>
         </aside>
 
         {/* CENTER MAIN VIEW */}
-        <main className="flex-1 p-5 sm:p-6 lg:p-7 pb-28 sm:pb-28 overflow-y-auto min-w-0 space-y-6">
+        <main className="flex-1 p-4 sm:p-5 lg:p-6 pb-24 overflow-y-auto min-w-0 space-y-6 bg-[#111214]">
           {activeNav === 'fav' ? (
             <div className="space-y-6">
               <div className="flex items-center justify-between pb-3 border-b border-white/[0.06]">
@@ -1715,202 +1694,43 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
             />
           ) : (
             <>
-              {/* TWO HERO CARDS */}
-              <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
-                {/* Top Rated Song (Updated from Featured Studio Vault) */}
-                <div className="lg:col-span-5 bg-[#121316] border border-white/[0.06] rounded-2xl p-6 flex flex-col justify-between relative overflow-hidden group">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="inline-flex items-center gap-1 text-[11px] font-mono font-bold text-amber-400 bg-amber-400/10 px-2 py-0.5 rounded-full border border-amber-400/20">
-                        <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
-                        5.0
-                      </span>
-                      <p className="text-[11px] font-mono text-gray-400">
-                        • #1 Top Rated • Caution Studio
-                      </p>
-                    </div>
-                    <h2 className="text-xl sm:text-2xl font-black text-white mt-1.5">
-                      Top Rated Song
-                    </h2>
-                  </div>
+              <div className="flex items-end justify-between gap-3">
+                <div>
+                  <h2 className="text-[22px] font-semibold text-white tracking-tight">Home</h2>
+                  <p className="text-[13px] text-[#8b8f98] mt-0.5">Continue a session or pick a beat to record on.</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleOpenRecordStudio(currentTrack)}
+                  className="hidden sm:inline-flex items-center gap-1.5 h-9 px-4 rounded-full bg-[#e53935] hover:bg-[#d32f2f] text-white text-[13px] font-semibold"
+                >
+                  <Mic className="h-3.5 w-3.5" />
+                  Open Studio
+                </button>
+              </div>
 
-                  <div className="my-6 flex justify-center relative">
-                    <div
-                      onClick={() => {
-                        if (topRatedSong) handlePlayToggle(topRatedSong);
-                      }}
-                      className="w-48 h-48 rounded-xl overflow-hidden shadow-2xl relative border border-white/10 group-hover:scale-105 transition-transform duration-500 cursor-pointer"
+              <div className="flex gap-3 overflow-x-auto pb-1 scrollbar-none">
+                {(newReleases.length > 0 ? newReleases : playlistRows.slice(0, 8)).map((item) => {
+                  const isThisPlaying = isPlaying && currentTrack.id === item.id;
+                  return (
+                    <button
+                      key={'rev-' + item.id}
+                      type="button"
+                      onClick={() => handlePlayToggle(item)}
+                      className="w-[148px] shrink-0 text-left group"
                     >
-                      <img
-                        src={topRatedSong?.coverUrl || '/images/album_neon_dj.jpg'}
-                        alt={topRatedSong?.title || 'Top Rated Song'}
-                        className="w-full h-full object-cover"
-                      />
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent" />
-
-                      <div className="absolute top-2.5 left-2.5">
-                        <span className="inline-flex items-center gap-1 text-[9px] font-mono font-bold uppercase tracking-wider bg-black/70 backdrop-blur-md text-amber-300 px-2 py-0.5 rounded-md border border-amber-400/30">
-                          <Sparkles className="h-2.5 w-2.5 text-amber-400" />
-                          Top Rated
+                      <div className="relative aspect-square rounded-md overflow-hidden bg-[#1c1e24]">
+                        <img src={item.coverUrl} alt={item.title} className="w-full h-full object-cover" />
+                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/35 transition-colors" />
+                        <span className="absolute bottom-2 right-2 w-8 h-8 rounded-full bg-white text-black hidden group-hover:flex items-center justify-center">
+                          {isThisPlaying ? <Pause className="h-3.5 w-3.5 fill-current" /> : <Play className="h-3.5 w-3.5 fill-current ml-0.5" />}
                         </span>
                       </div>
-
-                      <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between">
-                        <div className="min-w-0 pr-2">
-                          <p className="text-xs font-bold text-white truncate">
-                            {topRatedSong?.title || 'Neon Overdrive'}
-                          </p>
-                          <p className="text-[10px] text-gray-300 truncate">
-                            {topRatedSong?.artist || 'Arakunrin Cole'}
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-1.5 shrink-0">
-                          {topRatedSong && (
-                            <button
-                              type="button"
-                              onClick={(e) => handleDownload(topRatedSong, e)}
-                              title="Download Song (WAV)"
-                              className="w-7 h-7 rounded-full bg-black/60 hover:bg-[#2dd4bf] hover:text-black text-gray-300 flex items-center justify-center transition-colors cursor-pointer"
-                            >
-                              <Download className="h-3 w-3" />
-                            </button>
-                          )}
-                          <div className="w-8 h-8 rounded-full bg-[#04564f] text-[#2dd4bf] flex items-center justify-center shadow-lg">
-                            {isPlaying && currentTrack.id === topRatedSong?.id ? (
-                              <Pause className="h-3.5 w-3.5 fill-current" />
-                            ) : (
-                              <Play className="h-3.5 w-3.5 fill-current translate-x-0.5" />
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="absolute -bottom-10 left-1/2 -translate-x-1/2 w-48 h-16 bg-[#04564f]/30 blur-2xl pointer-events-none rounded-full" />
-                </div>
-
-                {/* Cinematic Hero Player: Database Master Recording (Desktop only) */}
-                <div className="hidden lg:flex lg:col-span-7 bg-[#121316] border border-white/[0.06] rounded-2xl relative overflow-hidden flex-col justify-between p-6 min-h-[300px]">
-                  <img
-                    src={currentTrack.coverUrl || '/images/cinematic_hero_tunnel.jpg'}
-                    alt={currentTrack.title}
-                    className="absolute inset-0 w-full h-full object-cover transition-all duration-700"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-[#0A0B0E] via-black/40 to-black/60" />
-
-                  <div className="relative z-10 flex items-start justify-between">
-                    <div>
-                      <p className="text-[11px] font-mono text-gray-300 uppercase tracking-wider flex items-center gap-1.5 flex-wrap">
-                        <span>{currentTrack.artist}</span>
-                        <span>•</span>
-                        <span>{currentTrack.date || 'Caution Studio'}</span>
-                        <span>•</span>
-                        <span className="text-[#2dd4bf] font-bold">{(currentTrack.playCount || 0).toLocaleString()} plays</span>
-                      </p>
-                      <h3 className="text-2xl sm:text-3xl font-black text-white mt-1 tracking-tight">
-                        {currentTrack.title}
-                      </h3>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={(e) => handleDownload(currentTrack, e)}
-                        title="Download Song (WAV)"
-                        className={`p-2 rounded-full bg-black/40 backdrop-blur-md border border-white/10 transition-colors cursor-pointer ${
-                          downloadingId === currentTrack.id ? 'text-[#2dd4bf] border-[#2dd4bf]/40' : 'text-white hover:text-[#2dd4bf]'
-                        }`}
-                      >
-                        <Download className="h-4 w-4" />
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => toggleListenLater(currentTrack)}
-                        title={listenLaterIds.includes(currentTrack.id) ? "Remove from Listen Later" : "Add to Listen Later"}
-                        className={`p-2 rounded-full bg-black/40 backdrop-blur-md border border-white/10 transition-colors cursor-pointer ${
-                          listenLaterIds.includes(currentTrack.id)
-                            ? 'text-[#2dd4bf] border-[#2dd4bf]/40'
-                            : 'text-white hover:text-[#2dd4bf]'
-                        }`}
-                      >
-                        <Clock className="h-4 w-4" />
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => toggleLike(currentTrack.id)}
-                        className="p-2 rounded-full bg-black/40 backdrop-blur-md border border-white/10 text-white hover:text-red-500 transition-colors cursor-pointer"
-                      >
-                        <Heart className={`h-4 w-4 ${currentTrack.isLiked || likedTrackIds.includes(currentTrack.id) ? 'fill-red-500 text-red-500' : ''}`} />
-                      </button>
-                      <button
-                        type="button"
-                        className="p-2 rounded-full bg-black/40 backdrop-blur-md border border-white/10 text-white hover:text-gray-300 transition-colors"
-                      >
-                        <MoreVertical className="h-4 w-4" />
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="relative z-10 flex justify-center my-8">
-                    <button
-                      type="button"
-                      onClick={() => handlePlayToggle(currentTrack)}
-                      className="w-16 h-16 rounded-full bg-white/20 backdrop-blur-md border border-white/30 hover:bg-[#04564f] hover:border-[#2dd4bf] text-white flex items-center justify-center transition-all duration-300 hover:scale-110 cursor-pointer shadow-lg"
-                    >
-                      {isPlaying ? (
-                        <Pause className="h-7 w-7 fill-white" />
-                      ) : (
-                        <Play className="h-7 w-7 fill-white translate-x-0.5" />
-                      )}
+                      <p className="mt-2 text-[13px] font-medium text-white truncate">{item.title}</p>
+                      <p className="text-[11px] text-[#8b8f98] truncate">{item.artist}</p>
                     </button>
-                  </div>
-
-                  <div className="relative z-10 pt-2">
-                    <div
-                      onClick={(e) => {
-                        const rect = e.currentTarget.getBoundingClientRect();
-                        const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
-                        const targetSec = Math.round(ratio * currentTrack.durationSeconds);
-                        if (!isSubscribed && targetSec > FREE_PREVIEW_LIMIT_SECONDS) {
-                          setCurrentTime(0);
-                          if (audioRef.current) {
-                            audioRef.current.currentTime = 0;
-                            audioRef.current.pause();
-                          }
-                          audioSynth.stop();
-                          setIsPlaying(false);
-                          hasTriggeredUpgradeModalRef.current = true;
-                          setShowUpgradeModal(true);
-                          return;
-                        }
-                        setCurrentTime(targetSec);
-                        if (audioRef.current) {
-                          audioRef.current.currentTime = targetSec;
-                        }
-                      }}
-                      className="w-full h-1 bg-white/20 rounded-full overflow-hidden mb-2 cursor-pointer relative"
-                    >
-                      <div
-                        className="h-full bg-gradient-to-r from-[#04564f] to-[#2dd4bf] transition-all duration-300"
-                        style={{ width: `${progressRatio}%` }}
-                      />
-                      {!isSubscribed && (
-                        <div
-                          className="absolute top-0 bottom-0 w-0.5 bg-amber-400/80 z-10"
-                          style={{ left: `${Math.min(100, (FREE_PREVIEW_LIMIT_SECONDS / currentTrack.durationSeconds) * 100)}%` }}
-                          title="15-second free preview limit"
-                        />
-                      )}
-                    </div>
-                    <div className="flex items-center justify-between text-[11px] font-mono text-gray-300">
-                      <span>{formatTime(currentTime)}</span>
-                      <span>{currentTrack.duration}</span>
-                    </div>
-                  </div>
-                </div>
+                  );
+                })}
               </div>
 
               {/* MIDDLE GENRE TABS & BEATS TABLE */}
@@ -1924,12 +1744,12 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
                         type="button"
                         onClick={() => setSelectedGenre(genreName)}
                         className={`relative py-1 transition-colors whitespace-nowrap cursor-pointer shrink-0 ${
-                          isActive ? 'text-[#2dd4bf]' : 'text-gray-400 hover:text-white'
+                          isActive ? 'text-white' : 'text-[#8b8f98] hover:text-white'
                         }`}
                       >
                         <span>{genreName}</span>
                         {isActive && (
-                          <span className="absolute -bottom-3 left-0 right-0 h-0.5 bg-[#2dd4bf]" />
+                          <span className="absolute -bottom-3 left-0 right-0 h-0.5 bg-[#e53935]" />
                         )}
                       </button>
                     );
@@ -1965,7 +1785,7 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
                       <div
                         key={row.id}
                         onClick={() => handlePlayToggle(row)}
-                        className="flex items-center justify-between p-2.5 sm:p-3 rounded-xl bg-[#121316] hover:bg-[#181a1f] border border-white/[0.04] hover:border-white/10 transition-all cursor-pointer group"
+                        className="flex items-center justify-between px-2 py-2 rounded-md hover:bg-[#1c1e24] cursor-pointer group"
                       >
                         <div className="flex items-center gap-3.5 min-w-0 w-72 sm:w-80">
                           <div className="w-11 h-11 rounded-lg overflow-hidden bg-black/40 border border-white/10 shrink-0 relative">
@@ -2073,7 +1893,7 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
 
               {/* BOTTOM ROW: PROMO BANNER */}
               {showPromoBanner && (
-                <div className="w-full bg-gradient-to-r from-[#171821] via-[#1a1b24] to-[#1e1724] border border-white/[0.08] rounded-2xl p-6 relative overflow-hidden flex flex-col justify-between">
+                <div className="w-full bg-[#1c1e24] border border-[#2a2d34] rounded-lg p-5 relative overflow-hidden flex flex-col justify-between">
                   <button
                     type="button"
                     onClick={() => setShowPromoBanner(false)}
@@ -2083,8 +1903,8 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
                   </button>
 
                   <div className="max-w-md relative z-10 space-y-2">
-                    <h4 className="text-xl sm:text-2xl font-black text-white leading-tight">
-                      Check the power of Caution Studio
+                    <h4 className="text-lg font-semibold text-white leading-tight">
+                      Unlimited sessions in Studio
                     </h4>
                     <p className="text-xs text-gray-400 leading-relaxed pt-1">
                       Enjoy uninterrupted high-fidelity audio, separated multi-track stem downloads, and commercial sync licenses.
@@ -2093,7 +1913,7 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
                       <button
                         type="button"
                         onClick={() => setShowUpgradeModal(true)}
-                        className="px-5 py-2.5 rounded-full bg-[#04564f] hover:bg-[#03453f] text-white text-xs font-bold tracking-wide uppercase transition-colors cursor-pointer shadow-md"
+                        className="px-4 py-2 rounded-full bg-[#e53935] hover:bg-[#d32f2f] text-white text-[12px] font-semibold"
                       >
                         Upgrade Plan
                       </button>
@@ -2114,11 +1934,11 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
         </main>
 
         {/* RIGHT SIDEBAR */}
-        <aside className="w-72 lg:w-80 border-l border-white/[0.06] bg-[#0A0B0E] p-5 shrink-0 hidden xl:flex flex-col space-y-6 overflow-y-auto">
+        <aside className="w-72 border-l border-[#2a2d34] bg-[#16181c] p-4 shrink-0 hidden xl:flex flex-col space-y-6 overflow-y-auto">
           <div>
             <div className="flex items-center justify-between mb-3">
-              <span className="text-[11px] font-mono uppercase tracking-wider text-gray-400">
-                NEW RELEASES
+              <span className="text-[11px] font-medium text-[#8b8f98]">
+                New releases
               </span>
               <button type="button" className="text-xs text-[#2dd4bf] hover:underline font-semibold">
                 See all
@@ -2154,8 +1974,8 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
           {/* MOST LISTENED BEATS (TOP 5) */}
           <div>
             <div className="flex items-center justify-between mb-3">
-              <span className="text-[11px] font-mono uppercase tracking-wider text-gray-400">
-                MOST LISTENED BEATS
+              <span className="text-[11px] font-medium text-[#8b8f98]">
+                Most played
               </span>
               <span className="text-[10px] font-mono text-[#2dd4bf] font-semibold">
                 TOP 5
@@ -2269,8 +2089,8 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
           {/* VERIFIED STUDIO PRODUCERS */}
           <div>
             <div className="flex items-center justify-between mb-3">
-              <span className="text-[11px] font-mono uppercase tracking-wider text-gray-400">
-                VERIFIED PRODUCERS
+              <span className="text-[11px] font-medium text-[#8b8f98]">
+                Producers
               </span>
               <button type="button" className="text-xs text-[#2dd4bf] hover:underline font-semibold">
                 See all
@@ -2316,7 +2136,7 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
       </div>
 
       {/* 3. BOTTOM PERSISTENT PLAYER BAR */}
-      <footer className="fixed bottom-0 left-0 right-0 h-20 bg-[#0A0B0E]/95 backdrop-blur-xl border-t border-white/[0.08] px-3 sm:px-6 z-50 flex items-center">
+      <footer className="fixed bottom-0 left-0 right-0 h-[72px] bg-[#16181c] border-t border-[#2a2d34] px-3 sm:px-4 z-50 flex items-center">
         {/* MOBILE PLAYER (Viewport < md) */}
         <div className="flex md:hidden w-full items-center justify-between gap-2.5">
           {/* Left: Album Cover + Metadata Column */}
@@ -2391,7 +2211,7 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
                   className="flex-1 h-1 bg-white/15 rounded-full overflow-hidden cursor-pointer relative"
                 >
                   <div
-                    className="h-full bg-gradient-to-r from-[#04564f] to-[#2dd4bf] transition-all"
+                    className="h-full bg-[#e53935] transition-all"
                     style={{ width: `${progressRatio}%` }}
                   />
                   {!isSubscribed && (
@@ -2432,13 +2252,13 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
             <button
               type="button"
               onClick={() => handlePlayToggle(currentTrack)}
-              className="w-8 h-8 rounded-full bg-[#04564f] hover:bg-[#03453f] text-[#2dd4bf] flex items-center justify-center transition-colors shadow-md cursor-pointer"
+              className="w-8 h-8 rounded-full bg-white hover:bg-[#f2f2f2] text-black flex items-center justify-center"
               aria-label={isPlaying ? 'Pause' : 'Play'}
             >
               {isPlaying ? (
-                <Pause className="h-4 w-4 fill-white" />
+                <Pause className="h-4 w-4 fill-current" />
               ) : (
-                <Play className="h-4 w-4 fill-white translate-x-0.5" />
+                <Play className="h-4 w-4 fill-current translate-x-0.5" />
               )}
             </button>
 
@@ -2533,12 +2353,12 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
               <button
                 type="button"
                 onClick={() => handlePlayToggle(currentTrack)}
-                className="w-8 h-8 rounded-full bg-[#04564f] hover:bg-[#03453f] text-[#2dd4bf] flex items-center justify-center transition-colors cursor-pointer"
+                className="w-8 h-8 rounded-full bg-white hover:bg-[#f2f2f2] text-black flex items-center justify-center"
               >
                 {isPlaying ? (
-                  <Pause className="h-4 w-4 fill-white" />
+                  <Pause className="h-4 w-4 fill-current" />
                 ) : (
-                  <Play className="h-4 w-4 fill-white translate-x-0.5" />
+                  <Play className="h-4 w-4 fill-current translate-x-0.5" />
                 )}
               </button>
 
@@ -2590,11 +2410,11 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
               <button
                 type="button"
                 onClick={() => handleOpenRecordStudio(currentTrack)}
-                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-teal-500/15 hover:bg-teal-500/25 border border-teal-500/30 text-teal-300 text-xs font-semibold transition-colors cursor-pointer ml-1"
-                title="Open Record Studio to record vocals and mix over this beat"
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#e53935] hover:bg-[#d32f2f] text-white text-[11px] font-semibold ml-1"
+                title="Open Studio"
               >
-                <Mic className="h-3 w-3 text-teal-400" />
-                <span className="hidden lg:inline text-[11px]">Record Studio</span>
+                <Mic className="h-3 w-3" />
+                <span className="hidden lg:inline">Studio</span>
               </button>
             </div>
 
