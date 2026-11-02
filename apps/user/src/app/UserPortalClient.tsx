@@ -33,7 +33,7 @@ import {
 import { audioSynth } from '@caution/ui';
 import { UserDropdown } from '../components/UserDropdown';
 import { UserAdModal } from '../components/UserAdModal';
-import { UserMarketplaceView } from '../components/UserMarketplaceView';
+import { UserMarketplaceView, isFreeBeat } from '../components/UserMarketplaceView';
 import { UserRecordStudioModal } from '../components/UserRecordStudioModal';
 import { useUserSubscription, FREE_PREVIEW_LIMIT_SECONDS } from '../lib/subscription';
 import { supabase } from '../lib/supabaseClient';
@@ -289,7 +289,23 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
               audioUrl = '/api/media/masters/alex-morgan-afrobeat-instrumental-summer-groove-573648-hubz_1791151613114.mp3';
             }
             const basicLic = b.licenses?.find((l: any) => l.type === 'basic');
-            const priceNgn = basicLic?.price_cents ? basicLic.price_cents / 100 : 3000;
+            const exclusiveLic = b.licenses?.find((l: any) => l.type === 'exclusive');
+            const beatTags: string[] = Array.isArray(b.tags) ? b.tags : [];
+            const isFreeBeatItem =
+              (basicLic?.price_cents !== undefined && basicLic.price_cents <= 1) ||
+              b.is_free_stream_enabled === true ||
+              beatTags.some((t: string) => t.toLowerCase() === 'free' || t.toLowerCase() === 'free download') ||
+              b.title?.toLowerCase().includes('(free)') ||
+              b.title?.toLowerCase().includes('[free]') ||
+              b.category === 'free';
+
+            const rawPrice = basicLic?.price_cents ? basicLic.price_cents / 100 : 3000;
+            const priceNgn = isFreeBeatItem || rawPrice <= 0.01 ? 0 : rawPrice;
+            const exclusivePriceNgn = isFreeBeatItem
+              ? 0
+              : exclusiveLic?.price_cents
+              ? exclusiveLic.price_cents / 100
+              : 50000;
             const durationSec = b.duration_seconds || 180;
             const mins = Math.floor(durationSec / 60);
             const secs = Math.floor(durationSec % 60);
@@ -307,12 +323,15 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
               duration: `${mins}:${secs.toString().padStart(2, '0')}`,
               durationSeconds: durationSec,
               coverUrl: b.cover_url || '/images/album_neon_dj.jpg',
-              category: 'playlists',
+              category: isFreeBeatItem ? 'free' : 'playlists',
               audioUrl,
               bpm: b.bpm || 120,
               genre: b.genre || 'Electronic',
               musicalKey: b.musical_key || 'C Minor',
               priceNgn,
+              exclusivePriceNgn,
+              isFree: isFreeBeatItem,
+              tags: beatTags,
               playCount
             };
           });
@@ -1226,7 +1245,7 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
                           </div>
 
                           <div className="hidden lg:flex items-center text-xs font-mono font-bold text-[#2dd4bf] w-28">
-                            {row.priceNgn ? `₦${row.priceNgn.toLocaleString('en-NG')}` : '₦3,000'}
+                            {isFreeBeat(row) || row.isFree || !row.priceNgn || row.priceNgn <= 0.01 ? '₦0.00' : `₦${row.priceNgn.toLocaleString('en-NG')}`}
                           </div>
 
                           <div className="flex items-center gap-2 shrink-0 w-36 justify-end">
@@ -1393,7 +1412,7 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
                           </div>
 
                           <div className="hidden lg:flex items-center text-xs font-mono font-bold text-[#2dd4bf] w-28">
-                            {row.priceNgn ? `₦${row.priceNgn.toLocaleString('en-NG')}` : '₦3,000'}
+                            {isFreeBeat(row) || row.isFree || !row.priceNgn || row.priceNgn <= 0.01 ? '₦0.00' : `₦${row.priceNgn.toLocaleString('en-NG')}`}
                           </div>
 
                           <div className="flex items-center gap-2 shrink-0 w-36 justify-end">
@@ -1565,7 +1584,7 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
                           </div>
 
                           <div className="hidden lg:flex items-center text-xs font-mono font-bold text-[#2dd4bf] w-28">
-                            {row.priceNgn ? `₦${row.priceNgn.toLocaleString('en-NG')}` : '₦3,000'}
+                            {isFreeBeat(row) || row.isFree || !row.priceNgn || row.priceNgn <= 0.01 ? '₦0.00' : `₦${row.priceNgn.toLocaleString('en-NG')}`}
                           </div>
 
                           <div className="flex items-center gap-2 shrink-0 w-36 justify-end">
@@ -1983,7 +2002,7 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
                         </div>
 
                         <div className="hidden lg:flex items-center text-xs font-mono font-bold text-[#2dd4bf] w-28">
-                          {row.priceNgn ? `₦${row.priceNgn.toLocaleString('en-NG')}` : '₦3,000'}
+                          {isFreeBeat(row) || row.isFree || !row.priceNgn || row.priceNgn <= 0.01 ? '₦0.00' : `₦${row.priceNgn.toLocaleString('en-NG')}`}
                         </div>
 
                         <div className="flex items-center gap-2 shrink-0 w-36 justify-end">

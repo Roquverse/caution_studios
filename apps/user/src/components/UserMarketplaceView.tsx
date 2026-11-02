@@ -28,9 +28,10 @@ import {
   Gift
 } from 'lucide-react';
 
-export function isFreeBeat(track: TrackItem): boolean {
-  if (track.isFree) return true;
-  if (track.priceNgn === 0) return true;
+export function isFreeBeat(track?: TrackItem | null): boolean {
+  if (!track) return false;
+  if (track.isFree === true) return true;
+  if (track.priceNgn === 0 || (track.priceNgn !== undefined && track.priceNgn <= 0.01)) return true;
   if (track.category === 'free') return true;
   if (
     Array.isArray(track.tags) &&
@@ -478,10 +479,10 @@ export function UserMarketplaceView({
                   {/* License Tiers Column */}
                   <div className="hidden sm:flex items-center w-44">
                     {isFree ? (
-                      /* Free Beat: Displays ONLY Free Badge */
+                      /* Free Beat: Displays ONLY Free Badge with ₦0.00 */
                       <span className="px-2.5 py-1 rounded-md text-[11px] font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 flex items-center gap-1.5 shadow-sm shadow-emerald-500/10">
                         <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                        <span>Free</span>
+                        <span>Free · ₦0.00</span>
                       </span>
                     ) : (
                       /* Beat with Price Tag: Dropdown selector between Standard and Exclusive */
@@ -659,10 +660,11 @@ export function UserMarketplaceView({
                       <button
                         type="button"
                         onClick={(e) => handleDownload(row, e)}
+                        title="Download Free Beat"
                         className="px-3 py-1.5 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/40 text-emerald-300 text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 transition-transform hover:scale-105 shadow-sm cursor-pointer"
                       >
                         <Download className="h-3 w-3 stroke-[2.5]" />
-                        <span>Free Beat</span>
+                        <span>Get Beat for Free</span>
                       </button>
                     ) : (
                       <button
@@ -690,8 +692,8 @@ export function UserMarketplaceView({
         )}
       </div>
 
-      {/* 7. "Get Beat" Price Tag Pop-Up Modal */}
-      {licenseModalTrack && (
+      {/* 7. "Get Beat" Price Tag Pop-Up Modal - Only for Paid Commercial Beats */}
+      {licenseModalTrack && !isFreeBeat(licenseModalTrack) && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
           <div
             className="relative w-full max-w-lg rounded-2xl bg-[#0F131C] border border-white/10 p-6 sm:p-7 shadow-2xl overflow-hidden text-white"

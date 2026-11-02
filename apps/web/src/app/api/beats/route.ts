@@ -38,16 +38,33 @@ export async function GET(req: NextRequest) {
     }
 
     const formattedRealBeats: Beat[] = (dbBeats || []).map((b: any) => {
-      // Ensure licenses array has basic, premium, and exclusive defaults if missing
       const rawLicenses = b.licenses || [];
-      const hasBasic = rawLicenses.some((l: any) => l.type === 'basic');
-      const hasPremium = rawLicenses.some((l: any) => l.type === 'premium');
-      const hasExclusive = rawLicenses.some((l: any) => l.type === 'exclusive');
+      const beatTags: string[] = Array.isArray(b.tags) ? b.tags : [];
+      const isFree =
+        b.is_free_stream_enabled === true ||
+        rawLicenses.some((l: any) => l.price_cents <= 1) ||
+        beatTags.some((t: string) => t.toLowerCase() === 'free' || t.toLowerCase() === 'free download') ||
+        b.title?.toLowerCase().includes('(free)') ||
+        b.title?.toLowerCase().includes('[free]');
 
-      const fullLicenses = [...rawLicenses];
-      if (!hasBasic) fullLicenses.push({ beat_id: b.id, type: 'basic', price_cents: 1500000, enabled: true });
-      if (!hasPremium) fullLicenses.push({ beat_id: b.id, type: 'premium', price_cents: 3500000, enabled: true });
-      if (!hasExclusive) fullLicenses.push({ beat_id: b.id, type: 'exclusive', price_cents: 10000000, enabled: true });
+      let fullLicenses = [...rawLicenses];
+
+      if (isFree) {
+        // Free beats only have a free basic license (0 cents / free); no paid license tags
+        fullLicenses = [
+          { beat_id: b.id, type: 'basic', price_cents: 0, enabled: true },
+          { beat_id: b.id, type: 'premium', price_cents: 0, enabled: false },
+          { beat_id: b.id, type: 'exclusive', price_cents: 0, enabled: false }
+        ];
+      } else {
+        const hasBasic = rawLicenses.some((l: any) => l.type === 'basic');
+        const hasPremium = rawLicenses.some((l: any) => l.type === 'premium');
+        const hasExclusive = rawLicenses.some((l: any) => l.type === 'exclusive');
+
+        if (!hasBasic) fullLicenses.push({ beat_id: b.id, type: 'basic', price_cents: 1500000, enabled: true });
+        if (!hasPremium) fullLicenses.push({ beat_id: b.id, type: 'premium', price_cents: 3500000, enabled: true });
+        if (!hasExclusive) fullLicenses.push({ beat_id: b.id, type: 'exclusive', price_cents: 10000000, enabled: true });
+      }
 
       const normalizedGenre = (b.genre || 'Afrobeats').trim();
       const genre = normalizedGenre.toLowerCase() === 'afrobeat' ? 'Afrobeats' : normalizedGenre;

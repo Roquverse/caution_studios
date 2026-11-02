@@ -93,11 +93,16 @@ export async function POST(req: NextRequest) {
     const musicalKey = (bodyData.musicalKey as string) || 'C Minor';
     const tagsRaw = (bodyData.tags as string) || '';
     const tags = Array.isArray(bodyData.tags)
-      ? bodyData.tags
+      ? [...bodyData.tags]
       : tagsRaw.split(',').map((t: string) => t.trim()).filter(Boolean);
     const durationSeconds = parseInt(bodyData.durationSeconds as string, 10) || 180;
     const isFreeBeat = bodyData.isFreeBeat === true || bodyData.isFreeBeat === 'true';
     const enableFreeStreaming = isFreeBeat ? true : (bodyData.enableFreeStreaming !== false && bodyData.enableFreeStreaming !== 'false');
+
+    if (isFreeBeat) {
+      if (!tags.includes('Free')) tags.push('Free');
+      if (!tags.includes('Free Download')) tags.push('Free Download');
+    }
 
     const priceBasic = isFreeBeat ? 0 : (parseInt(bodyData.priceBasic as string, 10) || 3000);
     const pricePremium = isFreeBeat ? 0 : (parseInt(bodyData.pricePremium as string, 10) || 30000);

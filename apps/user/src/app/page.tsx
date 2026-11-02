@@ -42,17 +42,18 @@ export default async function UserPortalPage() {
         const exclusiveLic = b.licenses?.find((l: any) => l.type === 'exclusive');
         const beatTags: string[] = Array.isArray(b.tags) ? b.tags : [];
         const isFreeTagged =
+          (basicLic?.price_cents !== undefined && basicLic.price_cents <= 1) ||
+          b.is_free_stream_enabled === true ||
           beatTags.some((t: string) => t.toLowerCase() === 'free' || t.toLowerCase() === 'free download') ||
           b.title?.toLowerCase().includes('(free)') ||
           b.title?.toLowerCase().includes('[free]') ||
           b.category === 'free';
 
-        const priceNgn = isFreeTagged
+        const rawPrice = basicLic?.price_cents ? basicLic.price_cents / 100 : 3000;
+        const priceNgn = isFreeTagged || rawPrice <= 0.01 ? 0 : rawPrice;
+        const exclusivePriceNgn = isFreeTagged
           ? 0
-          : basicLic?.price_cents
-          ? basicLic.price_cents / 100
-          : 3000;
-        const exclusivePriceNgn = exclusiveLic?.price_cents
+          : exclusiveLic?.price_cents
           ? exclusiveLic.price_cents / 100
           : 50000;
 
