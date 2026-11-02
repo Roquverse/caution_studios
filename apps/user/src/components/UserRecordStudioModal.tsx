@@ -3127,47 +3127,53 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
                         </div>
 
                         {/* Category & Scale Selectors inline */}
-                        <div className={`flex items-center gap-1.5 transition-opacity ${autoTuneEnabled ? 'opacity-100' : 'opacity-40 pointer-events-none'}`}>
-                          <select
-                            value={autoPitchCategory}
-                            onChange={(e) => setAutoPitchCategory(e.target.value as any)}
-                            className="bg-[#141518] border border-[#2a2d34] rounded h-5 px-1.5 text-[10px] text-[#eceef2] focus:outline-none cursor-pointer"
-                            title="Category"
-                          >
-                            <option value="Essentials">Essentials</option>
-                            <option value="Modern Rap">Modern Rap</option>
-                            <option value="Afrobeat">Afrobeats</option>
-                            <option value="Pop">Pop</option>
-                            <option value="R&B">R&B</option>
-                          </select>
+                        <div className={`flex items-center gap-2 transition-opacity ${autoTuneEnabled ? 'opacity-100' : 'opacity-40 pointer-events-none'}`}>
+                          <div className="flex flex-col items-start gap-0.5">
+                            <span className="text-[8px] text-[#8b8f98] leading-none">Category</span>
+                            <select
+                              value={autoPitchCategory}
+                              onChange={(e) => setAutoPitchCategory(e.target.value as any)}
+                              className="bg-[#141518] border border-[#2a2d34] rounded h-5 px-1.5 text-[10px] text-[#eceef2] focus:outline-none cursor-pointer"
+                              title="Category"
+                            >
+                              <option value="Essentials">Essentials</option>
+                              <option value="Modern Rap">Modern Rap</option>
+                              <option value="Afrobeat">Afrobeats</option>
+                              <option value="Pop">Pop</option>
+                              <option value="R&B">R&B</option>
+                            </select>
+                          </div>
 
-                          <select
-                            value={autoTuneKey}
-                            onChange={(e) => {
-                              setAutoTuneKey(e.target.value);
-                              if (!autoTuneEnabled) setAutoTuneEnabled(true);
-                            }}
-                            className="bg-[#141518] border border-[#2a2d34] rounded h-5 px-1.5 text-[10px] text-[#eceef2] focus:outline-none cursor-pointer"
-                            title="Scale"
-                          >
-                            <option value="D Minor">D Minor</option>
-                            <option value="C Major">C Major</option>
-                            <option value="A Minor">A Minor</option>
-                            <option value="G Major">G Major</option>
-                            <option value="E Minor">E Minor</option>
-                            <option value="F Major">F Major</option>
-                            <option value="F Minor">F Minor</option>
-                            <option value="B Minor">B Minor</option>
-                            <option value="Bb Major">Bb Major</option>
-                            <option value="Eb Major">Eb Major</option>
-                            <option value="Chromatic">Chromatic</option>
-                          </select>
+                          <div className="flex flex-col items-start gap-0.5">
+                            <span className="text-[8px] text-[#8b8f98] leading-none">Scale</span>
+                            <select
+                              value={autoTuneKey}
+                              onChange={(e) => {
+                                setAutoTuneKey(e.target.value);
+                                if (!autoTuneEnabled) setAutoTuneEnabled(true);
+                              }}
+                              className="bg-[#141518] border border-[#2a2d34] rounded h-5 px-1.5 text-[10px] text-[#eceef2] focus:outline-none cursor-pointer"
+                              title="Scale"
+                            >
+                              <option value="D Minor">D Minor</option>
+                              <option value="C Major">C Major</option>
+                              <option value="A Minor">A Minor</option>
+                              <option value="G Major">G Major</option>
+                              <option value="E Minor">E Minor</option>
+                              <option value="F Major">F Major</option>
+                              <option value="F Minor">F Minor</option>
+                              <option value="B Minor">B Minor</option>
+                              <option value="Bb Major">Bb Major</option>
+                              <option value="Eb Major">Eb Major</option>
+                              <option value="Chromatic">Chromatic</option>
+                            </select>
+                          </div>
 
                           {/* AutoDetect Key Button */}
                           <button
                             type="button"
                             onClick={handleAutoDetectKey}
-                            className="h-5 px-2 rounded bg-[#141518] border border-[#2a2d34] text-[#d7dbe2] text-[10px] font-medium hover:bg-[#20232a] hover:border-[#383d47] transition-colors"
+                            className="h-5 px-2 rounded bg-[#141518] border border-[#2a2d34] text-[#d7dbe2] text-[10px] font-medium hover:bg-[#20232a] hover:border-[#383d47] transition-colors self-end"
                           >
                             Detect key
                           </button>
@@ -3177,7 +3183,7 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
                       {/* Main Center Area: Presets (left) + Dial (center) + Piano Notes (right) */}
                       <div className={`flex-1 flex items-center justify-between gap-2.5 transition-opacity duration-150 ${autoTuneEnabled ? 'opacity-100' : 'opacity-40 pointer-events-none'}`}>
                         {/* 6 Preset Cards (3 columns x 2 rows) */}
-                        <div className="grid grid-cols-3 gap-1 shrink-0 w-48 sm:w-56">
+                        <div className="grid grid-cols-3 gap-1 shrink-0 w-44 sm:w-52">
                           {(['Classic', 'Duet', 'Big Harmony', 'Natural', 'Third', 'Octave'] as const).map((pst) => {
                             const isActive = autoPitchPreset === pst && autoTuneEnabled;
                             return (
@@ -3185,13 +3191,13 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
                                 key={pst}
                                 type="button"
                                 onClick={() => handleSelectAutoPitchPreset(pst)}
-                                className={`h-6.5 px-1 rounded border flex items-center justify-center text-center transition-all ${
+                                className={`h-7 px-1 rounded border flex items-center justify-center text-center transition-all ${
                                   isActive
                                     ? 'bg-[#2bbbad]/15 border-[#2bbbad] text-[#2bbbad] font-semibold shadow-sm'
                                     : 'bg-[#141518] border-[#2a2d34] text-[#8b8f98] hover:text-white hover:border-[#383d47]'
                                 }`}
                               >
-                                <span className="text-[9px] font-medium truncate w-full tracking-tight">{pst}</span>
+                                <span className="text-[9px] font-medium leading-tight text-center">{pst}</span>
                               </button>
                             );
                           })}
