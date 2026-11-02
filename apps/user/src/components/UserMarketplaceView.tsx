@@ -25,7 +25,8 @@ import {
   Flame,
   CheckCircle2,
   Mic,
-  Gift
+  Gift,
+  Lock
 } from 'lucide-react';
 
 export function isFreeBeat(track?: TrackItem | null): boolean {
@@ -461,9 +462,20 @@ export function UserMarketplaceView({
                       </div>
                     </div>
                     <div className="min-w-0">
-                      <p className={`text-xs font-bold truncate ${isThisPlaying ? 'text-[#E8B896]' : 'text-white'}`}>
-                        {row.title}
-                      </p>
+                      <div className="flex items-center gap-1.5">
+                        <p className={`text-xs font-bold truncate ${isThisPlaying ? 'text-[#E8B896]' : 'text-white'}`}>
+                          {row.title}
+                        </p>
+                        {!isFree ? (
+                          <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30 shrink-0 font-mono">
+                            PAID
+                          </span>
+                        ) : (
+                          <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 shrink-0 font-mono">
+                            FREE
+                          </span>
+                        )}
+                      </div>
                       <p className="text-[11px] text-gray-400 truncate mt-0.5 flex items-center gap-1">
                         <span>{row.artist}</span>
                         <ShieldCheck className="h-3 w-3 text-teal-400 inline shrink-0" />
@@ -635,17 +647,32 @@ export function UserMarketplaceView({
                       <Clock className="h-3.5 w-3.5" />
                     </button>
 
-                    {/* Download button */}
-                    <button
-                      type="button"
-                      onClick={(e) => handleDownload(row, e)}
-                      title="Download Track"
-                      className={`p-1.5 rounded-full transition-colors ${
-                        downloadingId === row.id ? 'text-[#2dd4bf] bg-[#2dd4bf]/10 animate-pulse' : 'text-gray-500 hover:text-white'
-                      }`}
-                    >
-                      <Download className="h-3.5 w-3.5" />
-                    </button>
+                    {/* Download or Lock button */}
+                    {isFree ? (
+                      <button
+                        type="button"
+                        onClick={(e) => handleDownload(row, e)}
+                        title="Download Free Beat (WAV)"
+                        className={`p-1.5 rounded-full transition-colors cursor-pointer ${
+                          downloadingId === row.id ? 'text-[#2dd4bf] bg-[#2dd4bf]/10 animate-pulse' : 'text-gray-500 hover:text-white'
+                        }`}
+                      >
+                        <Download className="h-3.5 w-3.5" />
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedTier(activeTier === 'exclusive' ? 'exclusive' : 'premium');
+                          setLicenseModalTrack(row);
+                        }}
+                        title="Download Locked · License Required"
+                        className="p-1.5 rounded-full text-gray-500 hover:text-amber-400 hover:bg-amber-400/10 transition-colors cursor-pointer"
+                      >
+                        <Lock className="h-3.5 w-3.5" />
+                      </button>
+                    )}
 
                     {/* Record Studio DAW Trigger */}
                     {openStudioHandler && (

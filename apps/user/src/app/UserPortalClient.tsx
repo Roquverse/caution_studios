@@ -28,7 +28,8 @@ import {
   Star,
   Menu,
   ShoppingBag,
-  Mic
+  Mic,
+  Lock
 } from 'lucide-react';
 import { audioSynth } from '@caution/ui';
 import { UserDropdown } from '../components/UserDropdown';
@@ -585,6 +586,14 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
   const handleDownload = (track: TrackItem, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
     if (!track) return;
+
+    // Check if beat is paid (locked behind payment)
+    const isPaid = !isFreeBeat(track);
+    if (isPaid && !isSubscribed) {
+      setPaidBeatPurchaseTrack(track);
+      setRewardNotification('Downloads are locked for paid beats. Purchase a license to download WAV master & stems.');
+      return;
+    }
 
     // Check daily download allowance (base + ad bonus)
     const quotaState = getDailyDownloadState();
@@ -1275,7 +1284,7 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
                               <Heart className="h-3.5 w-3.5 fill-red-500" />
                             </button>
 
-                            {isFreeBeat(row) && (
+                            {isFreeBeat(row) ? (
                               <button
                                 type="button"
                                 onClick={(e) => handleDownload(row, e)}
@@ -1285,6 +1294,18 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
                                 }`}
                               >
                                 <Download className="h-3.5 w-3.5" />
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setPaidBeatPurchaseTrack(row);
+                                }}
+                                title="Download Locked · License Required"
+                                className="p-1.5 rounded-full text-gray-500 hover:text-amber-400 hover:bg-amber-400/10 transition-colors cursor-pointer"
+                              >
+                                <Lock className="h-3.5 w-3.5" />
                               </button>
                             )}
 
@@ -1444,7 +1465,7 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
                               <Heart className={`h-3.5 w-3.5 ${row.isLiked || likedTrackIds.includes(row.id) ? 'fill-red-500 text-red-500' : ''}`} />
                             </button>
 
-                            {isFreeBeat(row) && (
+                            {isFreeBeat(row) ? (
                               <button
                                 type="button"
                                 onClick={(e) => handleDownload(row, e)}
@@ -1454,6 +1475,18 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
                                 }`}
                               >
                                 <Download className="h-3.5 w-3.5" />
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setPaidBeatPurchaseTrack(row);
+                                }}
+                                title="Download Locked · License Required"
+                                className="p-1.5 rounded-full text-gray-500 hover:text-amber-400 hover:bg-amber-400/10 transition-colors cursor-pointer"
+                              >
+                                <Lock className="h-3.5 w-3.5" />
                               </button>
                             )}
 
@@ -1620,7 +1653,7 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
                               <Heart className={`h-3.5 w-3.5 ${row.isLiked || likedTrackIds.includes(row.id) ? 'fill-red-500 text-red-500' : ''}`} />
                             </button>
 
-                            {isFreeBeat(row) && (
+                            {isFreeBeat(row) ? (
                               <button
                                 type="button"
                                 onClick={(e) => handleDownload(row, e)}
@@ -1630,6 +1663,18 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
                                 }`}
                               >
                                 <Download className="h-3.5 w-3.5" />
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setPaidBeatPurchaseTrack(row);
+                                }}
+                                title="Download Locked · License Required"
+                                className="p-1.5 rounded-full text-gray-500 hover:text-amber-400 hover:bg-amber-400/10 transition-colors cursor-pointer"
+                              >
+                                <Lock className="h-3.5 w-3.5" />
                               </button>
                             )}
 
@@ -2108,7 +2153,7 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
                       >
                         <Heart className={`h-3.5 w-3.5 ${track.isLiked || likedTrackIds.includes(track.id) ? 'fill-red-500 text-red-500' : ''}`} />
                       </button>
-                      {isFreeBeat(track) && (
+                      {isFreeBeat(track) ? (
                         <button
                           type="button"
                           onClick={(e) => handleDownload(track, e)}
@@ -2118,6 +2163,18 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
                           title="Download Song (WAV)"
                         >
                           <Download className="h-3.5 w-3.5" />
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setPaidBeatPurchaseTrack(track);
+                          }}
+                          className="p-1 text-gray-500 hover:text-amber-400 transition-colors cursor-pointer"
+                          title="Download Locked · License Required"
+                        >
+                          <Lock className="h-3.5 w-3.5" />
                         </button>
                       )}
                       <button
@@ -2222,16 +2279,28 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
 
               {/* Row below Publisher name: Download icon + Music bar right beside download + Music count on same line */}
               <div className="flex items-center gap-1.5 mt-1 w-full">
-                {isFreeBeat(currentTrack) && (
+                {isFreeBeat(currentTrack) ? (
                   <button
                     type="button"
                     onClick={(e) => handleDownload(currentTrack, e)}
-                    title="Download Song (WAV)"
+                    title="Download Free Beat (WAV)"
                     className={`p-0.5 text-gray-400 hover:text-[#2dd4bf] transition-colors shrink-0 cursor-pointer ${
                       downloadingId === currentTrack.id ? 'text-[#2dd4bf]' : ''
                     }`}
                   >
                     <Download className="h-3 w-3" />
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setPaidBeatPurchaseTrack(currentTrack);
+                    }}
+                    title="Download Locked · License Required"
+                    className="p-0.5 text-gray-500 hover:text-amber-400 transition-colors shrink-0 cursor-pointer"
+                  >
+                    <Lock className="h-3 w-3" />
                   </button>
                 )}
 
@@ -2446,7 +2515,7 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
                 <Clock className="h-3.5 w-3.5" />
               </button>
 
-              {isFreeBeat(currentTrack) && (
+              {isFreeBeat(currentTrack) ? (
                 <button
                   type="button"
                   onClick={(e) => handleDownload(currentTrack, e)}
@@ -2456,6 +2525,18 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
                   title="Download Current Song (WAV)"
                 >
                   <Download className="h-3.5 w-3.5" />
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setPaidBeatPurchaseTrack(currentTrack);
+                  }}
+                  className="p-1 text-gray-500 hover:text-amber-400 transition-colors cursor-pointer"
+                  title="Download Locked · License Required"
+                >
+                  <Lock className="h-3.5 w-3.5" />
                 </button>
               )}
 
