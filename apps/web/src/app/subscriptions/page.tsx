@@ -59,7 +59,7 @@ export default function SubscriptionsPage() {
         } else {
           setProfile({
             id: 'demo-user',
-            handle: 'arakunrincole',
+            handle: 'user',
             display_name: 'Arakunrin Cole',
             avatar_url: '/images/artist_studio_mic.jpg',
             plan: 'free',

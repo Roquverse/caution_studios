@@ -27,45 +27,90 @@ export function UserDropdown() {
   useEffect(() => {
     async function loadUser() {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
+        let session = (await supabase.auth.getSession()).data.session;
+
+        // 1. Check URL hash (e.g. redirected from auth.cautionstudioz.com/login)
+        if (!session?.user && typeof window !== 'undefined' && window.location.hash) {
+          const hashParams = new URLSearchParams(window.location.hash.substring(1));
+          const access_token = hashParams.get('access_token');
+          const refresh_token = hashParams.get('refresh_token');
+          if (access_token && refresh_token) {
+            try {
+              const { data: restored } = await supabase.auth.setSession({ access_token, refresh_token });
+              if (restored?.session?.user) {
+                session = restored.session;
+                window.history.replaceState(null, '', window.location.pathname + window.location.search);
+              }
+            } catch (e) {
+              console.warn('Failed restoring session from hash:', e);
+            }
+          }
+        }
+
+        // 2. Check cookies (shared root-domain cookie from auth.cautionstudioz.com)
+        if (!session?.user && typeof document !== 'undefined') {
+          const matchToken = document.cookie.match(/(?:^|;\s*)sb-token=([^;]*)/);
+          const matchRefresh = document.cookie.match(/(?:^|;\s*)sb-refresh=([^;]*)/);
+          const cookieToken = matchToken ? decodeURIComponent(matchToken[1]) : null;
+          const cookieRefresh = matchRefresh ? decodeURIComponent(matchRefresh[1]) : null;
+
+          if (cookieToken && cookieRefresh) {
+            try {
+              const { data: restored } = await supabase.auth.setSession({
+                access_token: cookieToken,
+                refresh_token: cookieRefresh
+              });
+              if (restored?.session?.user) {
+                session = restored.session;
+              }
+            } catch (e) {
+              console.warn('Failed restoring session from cookie:', e);
+            }
+          }
+        }
+
+        // 3. Fallback to auth.getUser() to verify with server
+        if (!session?.user) {
+          const { data: userData } = await supabase.auth.getUser();
+          if (userData?.user) {
+            session = (await supabase.auth.getSession()).data.session;
+          }
+        }
+
         if (session?.user) {
-          setEmail(session.user.email || '');
+          const user = session.user;
+          const userEmail = user.email || '';
+          setEmail(userEmail);
+
           const { data, error } = await supabase
             .from('profiles')
             .select('*')
-            .eq('id', session.user.id)
+            .eq('id', user.id)
             .maybeSingle();
 
           if (data) {
             setProfile(data);
             setCachedUserPlan(data.plan || 'free');
-            return;
+          } else {
+            const meta = user.user_metadata || {};
+            const fallbackName = meta.full_name || meta.name || meta.display_name || userEmail.split('@')[0] || 'User';
+            const fallbackHandle = meta.handle || meta.username || userEmail.split('@')[0] || 'user';
+            setProfile({
+              id: user.id,
+              handle: fallbackHandle,
+              display_name: fallbackName,
+              avatar_url: meta.avatar_url || null,
+              plan: 'free',
+              bio: null
+            });
+            setCachedUserPlan('free');
           }
+          return;
         }
 
-        // If no active session or record, fetch the primary profile or fallback gracefully
-        const { data: publicProfile } = await supabase
-          .from('profiles')
-          .select('*')
-          .limit(1)
-          .maybeSingle();
-
-        if (publicProfile) {
-          setProfile(publicProfile);
-          setCachedUserPlan(publicProfile.plan || 'free');
-          setEmail('arakunrincole@cautionstudio.com');
-        } else {
-          setProfile({
-            id: 'demo-user',
-            handle: 'arakunrincole',
-            display_name: 'Arakunrin Cole',
-            avatar_url: '/images/artist_studio_mic.jpg',
-            plan: 'free',
-            bio: 'Producer & Audio Engineer at Caution Studio'
-          });
-          setCachedUserPlan('free');
-          setEmail('cole@cautionstudio.com');
-        }
+        // If no active session, do not fabricate fake user profile
+        setProfile(null);
+        setEmail('');
       } catch (err) {
         console.error('Error loading user profile:', err);
       }
@@ -82,16 +127,34 @@ export function UserDropdown() {
           document.cookie = `sb-token=${session.access_token}; path=/; max-age=604800; SameSite=Lax${domainStr}`;
           document.cookie = `sb-refresh=${session.refresh_token}; path=/; max-age=604800; SameSite=Lax${domainStr}`;
         }
-        setEmail(session.user.email || '');
+        const user = session.user;
+        const userEmail = user.email || '';
+        setEmail(userEmail);
         const { data } = await supabase
           .from('profiles')
           .select('*')
-          .eq('id', session.user.id)
+          .eq('id', user.id)
           .maybeSingle();
         if (data) {
           setProfile(data);
           setCachedUserPlan(data.plan || 'free');
+        } else {
+          const meta = user.user_metadata || {};
+          const fallbackName = meta.full_name || meta.name || meta.display_name || userEmail.split('@')[0] || 'User';
+          const fallbackHandle = meta.handle || meta.username || userEmail.split('@')[0] || 'user';
+          setProfile({
+            id: user.id,
+            handle: fallbackHandle,
+            display_name: fallbackName,
+            avatar_url: meta.avatar_url || null,
+            plan: 'free',
+            bio: null
+          });
+          setCachedUserPlan('free');
         }
+      } else {
+        setProfile(null);
+        setEmail('');
       }
     });
 
@@ -156,6 +219,21 @@ export function UserDropdown() {
 
   const isPlus = profile?.plan === 'plus';
 
+  if (!profile && !email) {
+    return (
+      <a
+        href={getAuthLoginUrl()}
+        className="h-8 px-3 rounded-lg bg-[#2bbbad] hover:bg-[#26a69a] text-black text-xs font-semibold flex items-center gap-1.5 transition-all shadow-sm"
+      >
+        <User className="h-3.5 w-3.5" />
+        <span>Sign In</span>
+      </a>
+    );
+  }
+
+  const fallbackDisplayName = email ? email.split('@')[0] : 'User';
+  const fallbackHandle = email ? email.split('@')[0] : 'user';
+
   return (
     <div className="relative" ref={menuRef}>
       {/* Avatar Trigger Button */}
@@ -170,7 +248,7 @@ export function UserDropdown() {
           <div className="w-full h-full rounded-full overflow-hidden bg-black">
             <img
               src={profile?.avatar_url || '/images/artist_studio_mic.jpg'}
-              alt={profile?.display_name || 'User Avatar'}
+              alt={profile?.display_name || fallbackDisplayName}
               className="w-full h-full object-cover"
             />
           </div>
@@ -186,14 +264,14 @@ export function UserDropdown() {
               <div className="w-10 h-10 rounded-full overflow-hidden bg-black border border-white/10 shrink-0">
                 <img
                   src={profile?.avatar_url || '/images/artist_studio_mic.jpg'}
-                  alt={profile?.display_name || 'User Avatar'}
+                  alt={profile?.display_name || fallbackDisplayName}
                   className="w-full h-full object-cover"
                 />
               </div>
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-1.5">
                   <p className="text-xs font-bold text-white truncate">
-                    {profile?.display_name || 'Arakunrin Cole'}
+                    {profile?.display_name || fallbackDisplayName}
                   </p>
                   {isPlus ? (
                     <span className="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-[#04564f] text-[#2dd4bf] border border-[#2dd4bf]/30">
@@ -206,7 +284,7 @@ export function UserDropdown() {
                   )}
                 </div>
                 <p className="text-[11px] text-gray-400 truncate mt-0.5">
-                  @{profile?.handle || 'arakunrincole'}
+                  @{profile?.handle || fallbackHandle}
                 </p>
                 {email && (
                   <p className="text-[10px] text-gray-500 truncate mt-0.5 font-mono">

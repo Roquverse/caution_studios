@@ -346,7 +346,7 @@ export default function ProfilePage() {
                 {profile?.plan === 'plus' ? 'Caution Plus Member' : 'Free Tier'}
               </span>
             </div>
-            <p className="text-xs text-gray-400 font-mono">@{handle || 'arakunrincole'}</p>
+            <p className="text-xs text-gray-400 font-mono">@{handle || (email ? email.split('@')[0] : 'user')}</p>
             <p className="text-xs text-gray-300 leading-relaxed max-w-xl line-clamp-2">
               {bio || 'Producer & Sound Designer at Caution Studio'}
             </p>

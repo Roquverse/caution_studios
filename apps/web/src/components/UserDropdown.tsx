@@ -204,7 +204,7 @@ export function UserDropdown({ initialProfile }: { initialProfile?: UserProfileD
                   )}
                 </div>
                 <p className="text-[11px] text-gray-400 truncate mt-0.5">
-                  @{profile?.handle || 'arakunrincole'}
+                  @{profile?.handle || (email ? email.split('@')[0] : 'user')}
                 </p>
                 {email && (
                   <p className="text-[10px] text-gray-500 truncate mt-0.5 font-mono">

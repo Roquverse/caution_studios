@@ -67,7 +67,26 @@ export default function SubscriptionsPage() {
     async function initUserAndBilling() {
       try {
         let currentUserId: string | undefined;
-        const { data: { session } } = await supabase.auth.getSession();
+        let session = (await supabase.auth.getSession()).data.session;
+
+        // Check shared root-domain cookie
+        if (!session?.user && typeof document !== 'undefined') {
+          const matchToken = document.cookie.match(/(?:^|;\s*)sb-token=([^;]*)/);
+          const matchRefresh = document.cookie.match(/(?:^|;\s*)sb-refresh=([^;]*)/);
+          const cookieToken = matchToken ? decodeURIComponent(matchToken[1]) : null;
+          const cookieRefresh = matchRefresh ? decodeURIComponent(matchRefresh[1]) : null;
+
+          if (cookieToken && cookieRefresh) {
+            try {
+              const { data: restored } = await supabase.auth.setSession({
+                access_token: cookieToken,
+                refresh_token: cookieRefresh
+              });
+              if (restored?.session?.user) session = restored.session;
+            } catch (e) {}
+          }
+        }
+
         if (session?.user) {
           currentUserId = session.user.id;
           const { data } = await supabase
@@ -79,34 +98,23 @@ export default function SubscriptionsPage() {
           if (data) {
             setProfile(data);
             setCurrentPlan(data.plan === 'plus' ? 'plus' : 'free');
-          }
-        }
-
-        if (!currentUserId) {
-          const { data: publicProfile } = await supabase
-            .from('profiles')
-            .select('*')
-            .limit(1)
-            .maybeSingle();
-
-          if (publicProfile) {
-            currentUserId = publicProfile.id;
-            setProfile(publicProfile);
-            setCurrentPlan(publicProfile.plan === 'plus' ? 'plus' : 'free');
           } else {
+            const meta = session.user.user_metadata || {};
             setProfile({
-              id: 'demo-user',
-              handle: 'arakunrincole',
-              display_name: 'Arakunrin Cole',
-              avatar_url: '/images/artist_studio_mic.jpg',
+              id: session.user.id,
+              handle: meta.handle || session.user.email?.split('@')[0] || 'user',
+              display_name: meta.full_name || session.user.email?.split('@')[0] || 'User',
+              avatar_url: meta.avatar_url || null,
               plan: 'free',
-              bio: 'Producer & Sound Designer'
+              bio: null
             });
             setCurrentPlan('free');
           }
         }
 
-        await loadBillingInvoices(currentUserId);
+        if (currentUserId) {
+          await loadBillingInvoices(currentUserId);
+        }
       } catch (err) {
         console.error('Error fetching plan & billing:', err);
       }

@@ -41,9 +41,51 @@ export default function ProfilePage() {
   useEffect(() => {
     async function fetchProfile() {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
+        let session = (await supabase.auth.getSession()).data.session;
+
+        // 1. Check URL hash (when redirected from auth login)
+        if (!session?.user && typeof window !== 'undefined' && window.location.hash) {
+          const hashParams = new URLSearchParams(window.location.hash.substring(1));
+          const access_token = hashParams.get('access_token');
+          const refresh_token = hashParams.get('refresh_token');
+          if (access_token && refresh_token) {
+            try {
+              const { data: restored } = await supabase.auth.setSession({ access_token, refresh_token });
+              if (restored?.session?.user) {
+                session = restored.session;
+                window.history.replaceState(null, '', window.location.pathname + window.location.search);
+              }
+            } catch (e) {
+              console.warn('Failed restoring session from hash:', e);
+            }
+          }
+        }
+
+        // 2. Check cookies
+        if (!session?.user && typeof document !== 'undefined') {
+          const matchToken = document.cookie.match(/(?:^|;\s*)sb-token=([^;]*)/);
+          const matchRefresh = document.cookie.match(/(?:^|;\s*)sb-refresh=([^;]*)/);
+          const cookieToken = matchToken ? decodeURIComponent(matchToken[1]) : null;
+          const cookieRefresh = matchRefresh ? decodeURIComponent(matchRefresh[1]) : null;
+
+          if (cookieToken && cookieRefresh) {
+            try {
+              const { data: restored } = await supabase.auth.setSession({
+                access_token: cookieToken,
+                refresh_token: cookieRefresh
+              });
+              if (restored?.session?.user) {
+                session = restored.session;
+              }
+            } catch (e) {
+              console.warn('Failed restoring session from cookie:', e);
+            }
+          }
+        }
+
         if (session?.user) {
-          setEmail(session.user.email || '');
+          const userEmail = session.user.email || '';
+          setEmail(userEmail);
           const { data } = await supabase
             .from('profiles')
             .select('*')
@@ -52,36 +94,29 @@ export default function ProfilePage() {
 
           if (data) {
             setProfile(data);
-            setDisplayName(data.display_name || '');
-            setHandle(data.handle || '');
+            setDisplayName(data.display_name || userEmail.split('@')[0] || '');
+            setHandle(data.handle || userEmail.split('@')[0] || '');
             setBio(data.bio || '');
             setRoles(data.roles || ['artist']);
+            return;
+          } else {
+            const meta = session.user.user_metadata || {};
+            const fallbackName = meta.full_name || meta.name || userEmail.split('@')[0] || 'User';
+            const fallbackHandle = meta.handle || userEmail.split('@')[0] || 'user';
+            setDisplayName(fallbackName);
+            setHandle(fallbackHandle);
+            setBio('');
+            setRoles(['artist']);
             return;
           }
         }
 
-        // Fallback to primary / demo profile
-        const { data: publicProfile } = await supabase
-          .from('profiles')
-          .select('*')
-          .limit(1)
-          .maybeSingle();
-
-        if (publicProfile) {
-          setProfile(publicProfile);
-          setEmail(publicProfile.email || '');
-          setDisplayName(publicProfile.display_name || '');
-          setHandle(publicProfile.handle || '');
-          setBio(publicProfile.bio || '');
-          setRoles(publicProfile.roles || ['artist']);
-        } else {
-          setProfile(null);
-          setEmail('');
-          setDisplayName('');
-          setHandle('');
-          setBio('');
-          setRoles(['artist']);
-        }
+        setProfile(null);
+        setEmail('');
+        setDisplayName('');
+        setHandle('');
+        setBio('');
+        setRoles(['artist']);
       } catch (err) {
         console.error('Error fetching profile:', err);
       }
@@ -333,13 +368,13 @@ export default function ProfilePage() {
           <div className="min-w-0 flex-1 space-y-1.5">
             <div className="flex flex-wrap items-center gap-2.5">
               <h2 className="text-xl sm:text-2xl font-black text-white truncate">
-                {displayName || 'Arakunrin Cole'}
+                {displayName || (email ? email.split('@')[0] : 'User')}
               </h2>
               <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-[#04564f] text-[#2dd4bf] border border-[#2dd4bf]/30">
                 {profile?.plan === 'plus' ? 'Caution Plus Member' : 'Free Tier'}
               </span>
             </div>
-            <p className="text-xs text-gray-400 font-mono">@{handle || 'arakunrincole'}</p>
+            <p className="text-xs text-gray-400 font-mono">@{handle || (email ? email.split('@')[0] : 'user')}</p>
             <p className="text-xs text-gray-300 leading-relaxed max-w-xl line-clamp-2">
               {bio || 'Producer & Sound Designer at Caution Studio'}
             </p>
