@@ -46,7 +46,32 @@ export function CreatorShell({ children, activePath }: CreatorShellProps) {
       try {
         let session = (await supabase.auth.getSession()).data.session;
 
-        // Restore from cookie if needed
+        // 1. Restore from URL hash if redirected from Auth portal (#access_token=...&refresh_token=...)
+        if (!session?.user && typeof window !== 'undefined' && window.location.hash) {
+          const hashParams = new URLSearchParams(window.location.hash.substring(1));
+          const access_token = hashParams.get('access_token');
+          const refresh_token = hashParams.get('refresh_token');
+          if (access_token && refresh_token) {
+            try {
+              const { data: restored } = await supabase.auth.setSession({
+                access_token,
+                refresh_token
+              });
+              if (restored?.session?.user) {
+                session = restored.session;
+                const isProd = window.location.hostname.includes('cautionstudioz.com');
+                const domainStr = isProd ? '; domain=.cautionstudioz.com' : '';
+                document.cookie = `sb-token=${session.access_token}; path=/; max-age=604800; SameSite=Lax${domainStr}`;
+                document.cookie = `sb-refresh=${session.refresh_token}; path=/; max-age=604800; SameSite=Lax${domainStr}`;
+                window.history.replaceState(null, '', window.location.pathname + window.location.search);
+              }
+            } catch (e) {
+              console.warn('Failed restoring creator session from hash:', e);
+            }
+          }
+        }
+
+        // 2. Restore from cookie if needed
         if (!session?.user && typeof document !== 'undefined') {
           const matchToken = document.cookie.match(/(?:^|;\s*)sb-token=([^;]*)/);
           const matchRefresh = document.cookie.match(/(?:^|;\s*)sb-refresh=([^;]*)/);

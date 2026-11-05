@@ -793,55 +793,6 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
 
         </div>
 
-        {/* Integrated Quick Discovery Search Bar below Hero */}
-        <div className="mt-14 sm:mt-16 max-w-2xl mx-auto">
-          <form
-            onSubmit={handleSearchSubmit}
-            className="relative flex items-center bg-[#101318]/90 rounded-full p-1.5 shadow-2xl shadow-black/80 border border-white/10 hover:border-[#2dd4bf]/40 transition-all backdrop-blur-md"
-          >
-            <div className="pl-4 text-neutral-400 pointer-events-none">
-              <Search className="h-4 w-4" />
-            </div>
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search beats by genre, mood, tempo (e.g. Afrobeats, 105 BPM, Amapiano)..."
-              className="w-full bg-transparent px-3 py-2 text-xs sm:text-sm text-white placeholder:text-neutral-500 focus:outline-none"
-            />
-            <Button
-              type="submit"
-              variant="primary"
-              size="md"
-              pill
-              className="shrink-0 text-xs uppercase font-bold tracking-wider px-5 py-2.5 bg-[#04564f] hover:bg-[#03453f] text-white shadow-md shadow-[#04564f]/40 border border-[#2dd4bf]/20"
-            >
-              Find Beats
-            </Button>
-          </form>
-
-          {/* Quick Trending Tags */}
-          <div className="mt-3 flex flex-wrap items-center justify-center gap-2 text-xs">
-            <span className="text-neutral-500 font-medium mr-1">Trending:</span>
-            {[
-              { label: '🔥 Afrobeats', genre: 'Afrobeats' },
-              { label: '🎹 Amapiano', genre: 'Amapiano' },
-              { label: '🥁 Trap', genre: 'Trap' },
-              { label: '🎷 R&B', genre: 'R&B' },
-              { label: '⚡ Drill', genre: 'Drill' },
-              { label: '🔒 Exclusive Only', genre: 'Exclusive' }
-            ].map((tag) => (
-              <a
-                key={tag.label}
-                href={tag.genre === 'Exclusive' ? `${APP_URL}?tab=marketplace&filter=exclusive` : `${APP_URL}?tab=marketplace&genre=${encodeURIComponent(tag.genre)}`}
-                className="px-3 py-0.5 rounded-full bg-white/[0.05] hover:bg-white/10 border border-white/[0.06] hover:border-[#2dd4bf]/40 text-neutral-400 hover:text-white transition-all text-[11px]"
-              >
-                {tag.label}
-              </a>
-            ))}
-          </div>
-        </div>
-
       </div>
     </section>
   );

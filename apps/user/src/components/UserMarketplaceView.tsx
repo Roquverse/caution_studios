@@ -2,6 +2,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { TrackItem } from '../types/tracks';
+import { TrackRow } from '@caution/ui';
 import {
   Search,
   SlidersHorizontal,
@@ -59,6 +60,8 @@ interface UserMarketplaceViewProps {
   tracks: TrackItem[];
   currentTrack: TrackItem;
   isPlaying: boolean;
+  currentTime?: number;
+  onSeek?: (ratio: number) => void;
   handlePlayToggle: (track: TrackItem) => void;
   likedTrackIds: string[];
   toggleLike: (trackId: string) => void;
@@ -79,6 +82,8 @@ export function UserMarketplaceView({
   tracks,
   currentTrack,
   isPlaying,
+  currentTime = 0,
+  onSeek,
   handlePlayToggle,
   likedTrackIds,
   toggleLike,
@@ -393,14 +398,6 @@ export function UserMarketplaceView({
 
       {/* 6. Beats Table Layout */}
       <div className="p-4 sm:p-5 rounded-2xl bg-[#121316] border border-white/[0.06] space-y-3">
-        <div className="hidden sm:flex items-center justify-between px-3 text-[11px] font-mono uppercase tracking-wider text-gray-500 pb-1 border-b border-white/[0.04]">
-          <div className="w-72">Track / Producer</div>
-          <div className="w-28 text-left">BPM / Key</div>
-          <div className="w-24 text-left">Genre</div>
-          <div className="w-44 text-left">License Tiers</div>
-          <div className="min-w-[190px] text-right">Get Beat & Options</div>
-        </div>
-
         {filteredTracks.length === 0 ? (
           <div className="p-12 text-center space-y-3">
             <Music2 className="h-10 w-10 text-gray-600 mx-auto" />
@@ -424,7 +421,7 @@ export function UserMarketplaceView({
         ) : (
           <div className="space-y-2">
             {filteredTracks.map((row) => {
-              const isThisPlaying = isPlaying && currentTrack.id === row.id;
+              const isCurrent = currentTrack.id === row.id;
               const isLiked = likedTrackIds.includes(row.id);
               const isLater = listenLaterIds.includes(row.id);
               const isFree = isFreeBeat(row);
@@ -436,281 +433,200 @@ export function UserMarketplaceView({
               const isDropdownOpen = openDropdownId === row.id;
 
               return (
-                <div
+                <TrackRow
                   key={'marketplace-' + row.id}
-                  onClick={() => handlePlayToggle(row)}
-                  className={`relative flex items-center justify-between p-3 rounded-xl bg-white/[0.02] hover:bg-white/[0.05] border border-white/[0.04] transition-all cursor-pointer group ${
-                    isDropdownOpen ? 'z-30 border-white/20 bg-white/[0.04]' : 'z-10'
-                  }`}
-                >
-                  {/* Track & Producer */}
-                  <div className="flex items-center gap-3.5 min-w-0 w-72">
-                    <div className="w-11 h-11 rounded-lg overflow-hidden bg-black/40 border border-white/10 shrink-0 relative">
-                      <img
-                        src={row.coverUrl}
-                        alt={row.title}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-                      />
-                      <div className={`absolute inset-0 flex items-center justify-center transition-colors ${
-                        isThisPlaying ? 'bg-black/60' : 'bg-black/30 group-hover:bg-black/50'
-                      }`}>
-                        {isThisPlaying ? (
-                          <Pause className="h-4 w-4 text-[#2dd4bf] fill-current" />
-                        ) : (
-                          <Play className="h-4 w-4 text-white fill-current ml-0.5 opacity-80 group-hover:opacity-100" />
-                        )}
-                      </div>
-                    </div>
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-1.5">
-                        <p className={`text-xs font-bold truncate ${isThisPlaying ? 'text-[#E8B896]' : 'text-white'}`}>
-                          {row.title}
-                        </p>
-                        {!isFree ? (
-                          <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30 shrink-0 font-mono">
-                            PAID
-                          </span>
-                        ) : (
-                          <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 shrink-0 font-mono">
-                            FREE
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-[11px] text-gray-400 truncate mt-0.5 flex items-center gap-1">
-                        <span>{row.artist}</span>
-                        <ShieldCheck className="h-3 w-3 text-teal-400 inline shrink-0" />
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* BPM / Key */}
-                  <div className="hidden sm:block text-xs font-mono text-gray-300 w-28 truncate">
-                    <div>{row.bpm || 110} BPM</div>
-                    <div className="text-[10px] text-gray-500">{row.musicalKey || 'C Minor'}</div>
-                  </div>
-
-                  {/* Genre */}
-                  <div className="hidden sm:block text-xs text-gray-300 w-24 truncate">
-                    <span className="px-2 py-0.5 rounded-md bg-white/5 border border-white/10 text-[11px] font-mono">
-                      {row.genre || 'Afrobeats'}
-                    </span>
-                  </div>
-
-                  {/* License Tiers Column */}
-                  <div className="hidden sm:flex items-center w-44">
-                    {isFree ? (
-                      /* Free Beat: Displays ONLY Free Badge with ₦0.00 */
-                      <span className="px-2.5 py-1 rounded-md text-[11px] font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 flex items-center gap-1.5 shadow-sm shadow-emerald-500/10">
-                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                        <span>Free · ₦0.00</span>
+                  track={row}
+                  variant="dark"
+                  isCurrent={isCurrent}
+                  isPlaying={isCurrent && isPlaying}
+                  currentTime={isCurrent ? currentTime : 0}
+                  isFavorited={isLiked}
+                  isListenLater={isLater}
+                  isDownloading={downloadingId === row.id}
+                  isDownloadLocked={!isFree}
+                  onPlayToggle={handlePlayToggle}
+                  onSeek={onSeek}
+                  onDownload={(t, e) => handleDownload(t, e)}
+                  onLockedDownloadClick={(t) => {
+                    setSelectedTier(activeTier === 'exclusive' ? 'exclusive' : 'premium');
+                    setLicenseModalTrack(t);
+                  }}
+                  onFavoriteToggle={(t) => toggleLike(t.id)}
+                  onListenLaterToggle={(t) => toggleListenLater(t)}
+                  className={isDropdownOpen ? 'relative z-30 border-white/20 bg-white/[0.04]' : 'relative z-10'}
+                  badge={
+                    !isFree ? (
+                      <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30 shrink-0 font-mono">
+                        PAID
                       </span>
                     ) : (
-                      /* Beat with Price Tag: Dropdown selector between Premium and Exclusive */
-                      <div className="relative">
+                      <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 shrink-0 font-mono">
+                        FREE
+                      </span>
+                    )
+                  }
+                  subtitleOverride={
+                    <span className="inline-flex items-center gap-1">
+                      <span>{row.artist}</span>
+                      <ShieldCheck className="h-3 w-3 text-teal-400 inline shrink-0" />
+                      <span>• {row.genre || 'Afrobeats'}</span>
+                      {row.bpm && <span className="hidden md:inline">• {row.bpm} BPM</span>}
+                    </span>
+                  }
+                  rightSlot={
+                    <div className="flex items-center gap-2">
+                      {/* License Tier Pill / Dropdown */}
+                      <div className="hidden lg:flex items-center">
+                        {isFree ? (
+                          <span className="px-2.5 py-1 rounded-md text-[11px] font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 flex items-center gap-1.5 shadow-sm shadow-emerald-500/10">
+                            <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                            <span>Free · ₦0.00</span>
+                          </span>
+                        ) : (
+                          <div className="relative">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setOpenDropdownId(isDropdownOpen ? null : row.id);
+                              }}
+                              title="Select License: Premium Stems or Exclusive"
+                              className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border flex items-center justify-between gap-1.5 transition-all shadow-sm cursor-pointer min-w-[140px] max-w-[165px] ${
+                                activeTier === 'exclusive'
+                                  ? 'bg-purple-500/15 text-purple-300 border-purple-500/30 hover:bg-purple-500/25'
+                                  : 'bg-amber-500/15 text-amber-300 border-amber-500/30 hover:bg-amber-500/25'
+                              }`}
+                            >
+                              <div className="flex items-center gap-1.5 truncate">
+                                {activeTier === 'exclusive' ? (
+                                  <Crown className="h-3 w-3 text-purple-400 shrink-0" />
+                                ) : (
+                                  <ShieldCheck className="h-3 w-3 text-amber-400 shrink-0" />
+                                )}
+                                <span className="truncate">
+                                  {activeTier === 'exclusive' ? 'Exclusive' : 'Premium'}
+                                </span>
+                                <span className="text-[10px] opacity-80 font-mono">
+                                  · {formatPriceBadge(activeTier === 'exclusive' ? exclusivePrice : premiumPrice)}
+                                </span>
+                              </div>
+                              <ChevronDown
+                                className={`h-3 w-3 shrink-0 text-gray-400 transition-transform duration-200 ${
+                                  isDropdownOpen ? 'rotate-180 text-white' : ''
+                                }`}
+                              />
+                            </button>
+
+                            {isDropdownOpen && (
+                              <div
+                                className="absolute top-full right-0 mt-1.5 w-60 p-1.5 rounded-xl bg-[#0F131C] border border-white/10 shadow-2xl z-50 text-white animate-in fade-in zoom-in-95 duration-150"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <div className="px-2 py-1 text-[10px] font-mono uppercase tracking-wider text-gray-400 border-b border-white/5 mb-1">
+                                  Choose License Tier
+                                </div>
+
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setSelectedTiers((prev) => ({ ...prev, [row.id]: 'premium' }));
+                                    setOpenDropdownId(null);
+                                  }}
+                                  className={`w-full p-2 rounded-lg text-left transition-colors flex items-center justify-between cursor-pointer ${
+                                    activeTier === 'premium'
+                                      ? 'bg-amber-500/15 text-amber-300 border border-amber-500/30'
+                                      : 'hover:bg-white/5 text-gray-300'
+                                  }`}
+                                >
+                                  <div className="min-w-0 pr-2">
+                                    <div className="flex items-center gap-1.5 text-xs font-bold text-white">
+                                      <ShieldCheck className="h-3.5 w-3.5 text-amber-400 shrink-0" />
+                                      <span>Premium WAV + Stems</span>
+                                      {activeTier === 'premium' && (
+                                        <Check className="h-3 w-3 text-amber-400 ml-auto" />
+                                      )}
+                                    </div>
+                                    <div className="text-[10px] text-gray-400 mt-0.5 truncate">
+                                      24-Bit WAV Master + Trackout ZIP Stems
+                                    </div>
+                                  </div>
+                                  <span className="text-xs font-black text-amber-300 font-mono shrink-0">
+                                    ₦{premiumPrice.toLocaleString()}
+                                  </span>
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setSelectedTiers((prev) => ({ ...prev, [row.id]: 'exclusive' }));
+                                    setOpenDropdownId(null);
+                                  }}
+                                  className={`w-full p-2 mt-1 rounded-lg text-left transition-colors flex items-center justify-between cursor-pointer ${
+                                    activeTier === 'exclusive'
+                                      ? 'bg-purple-500/15 text-purple-300 border border-purple-500/30'
+                                      : 'hover:bg-white/5 text-gray-300'
+                                  }`}
+                                >
+                                  <div className="min-w-0 pr-2">
+                                    <div className="flex items-center gap-1.5 text-xs font-bold text-white">
+                                      <Crown className="h-3.5 w-3.5 text-purple-400 shrink-0" />
+                                      <span>Exclusive (1-of-1)</span>
+                                      {activeTier === 'exclusive' && (
+                                        <Check className="h-3 w-3 text-purple-400 ml-auto" />
+                                      )}
+                                    </div>
+                                    <div className="text-[10px] text-gray-400 mt-0.5 truncate">
+                                      Sole Ownership · Retired from Store
+                                    </div>
+                                  </div>
+                                  <span className="text-xs font-black text-purple-300 font-mono shrink-0">
+                                    ₦{exclusivePrice.toLocaleString()}
+                                  </span>
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Record Studio DAW Trigger (Free Beats Only) */}
+                      {openStudioHandler && isFree && (
                         <button
                           type="button"
                           onClick={(e) => {
                             e.stopPropagation();
-                            setOpenDropdownId(isDropdownOpen ? null : row.id);
+                            openStudioHandler(row);
                           }}
-                          title="Select License: Premium Stems or Exclusive"
-                          className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border flex items-center justify-between gap-1.5 transition-all shadow-sm cursor-pointer min-w-[145px] max-w-[170px] ${
+                          title="Open Record Studio DAW to record vocals & mix over this beat"
+                          className="px-2.5 py-1.5 rounded-lg bg-teal-500/15 hover:bg-teal-500/25 border border-teal-500/30 text-teal-300 text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 transition-colors cursor-pointer"
+                        >
+                          <Mic className="h-3 w-3 text-teal-400" />
+                          <span className="hidden sm:inline">Record Studio</span>
+                        </button>
+                      )}
+
+                      {/* Paid beats show "Get Beat" */}
+                      {!isFree && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedTier(activeTier === 'exclusive' ? 'exclusive' : 'premium');
+                            setLicenseModalTrack(row);
+                          }}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-black uppercase tracking-wider flex items-center gap-1.5 transition-transform hover:scale-105 shadow-sm cursor-pointer ${
                             activeTier === 'exclusive'
-                              ? 'bg-purple-500/15 text-purple-300 border-purple-500/30 hover:bg-purple-500/25'
-                              : 'bg-amber-500/15 text-amber-300 border-amber-500/30 hover:bg-amber-500/25'
+                              ? 'bg-purple-500 hover:bg-purple-400 text-white'
+                              : 'bg-[#E8B896] hover:bg-[#d8a886] text-black'
                           }`}
                         >
-                          <div className="flex items-center gap-1.5 truncate">
-                            {activeTier === 'exclusive' ? (
-                              <Crown className="h-3 w-3 text-purple-400 shrink-0" />
-                            ) : (
-                              <ShieldCheck className="h-3 w-3 text-amber-400 shrink-0" />
-                            )}
-                            <span className="truncate">
-                              {activeTier === 'exclusive' ? 'Exclusive' : 'Premium Stems'}
-                            </span>
-                            <span className="text-[10px] opacity-80 font-mono">
-                              · {formatPriceBadge(activeTier === 'exclusive' ? exclusivePrice : premiumPrice)}
-                            </span>
-                          </div>
-                          <ChevronDown
-                            className={`h-3 w-3 shrink-0 text-gray-400 transition-transform duration-200 ${
-                              isDropdownOpen ? 'rotate-180 text-white' : ''
-                            }`}
-                          />
+                          <ShoppingBag className="h-3 w-3 stroke-[2.5]" />
+                          <span>Get Beat</span>
                         </button>
-
-                        {/* Dropdown Menu */}
-                        {isDropdownOpen && (
-                          <div
-                            className="absolute top-full left-0 mt-1.5 w-60 p-1.5 rounded-xl bg-[#0F131C] border border-white/10 shadow-2xl z-50 text-white animate-in fade-in zoom-in-95 duration-150"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <div className="px-2 py-1 text-[10px] font-mono uppercase tracking-wider text-gray-400 border-b border-white/5 mb-1">
-                              Choose License Tier
-                            </div>
-
-                            {/* Premium WAV + Stems */}
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setSelectedTiers((prev) => ({ ...prev, [row.id]: 'premium' }));
-                                setOpenDropdownId(null);
-                              }}
-                              className={`w-full p-2 rounded-lg text-left transition-colors flex items-center justify-between cursor-pointer ${
-                                activeTier === 'premium'
-                                  ? 'bg-amber-500/15 text-amber-300 border border-amber-500/30'
-                                  : 'hover:bg-white/5 text-gray-300'
-                              }`}
-                            >
-                              <div className="min-w-0 pr-2">
-                                <div className="flex items-center gap-1.5 text-xs font-bold text-white">
-                                  <ShieldCheck className="h-3.5 w-3.5 text-amber-400 shrink-0" />
-                                  <span>Premium WAV + Stems</span>
-                                  {activeTier === 'premium' && (
-                                    <Check className="h-3 w-3 text-amber-400 ml-auto" />
-                                  )}
-                                </div>
-                                <div className="text-[10px] text-gray-400 mt-0.5 truncate">
-                                  24-Bit WAV Master + Trackout ZIP Stems
-                                </div>
-                              </div>
-                              <span className="text-xs font-black text-amber-300 font-mono shrink-0">
-                                ₦{premiumPrice.toLocaleString()}
-                              </span>
-                            </button>
-
-                            {/* Exclusive Option */}
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setSelectedTiers((prev) => ({ ...prev, [row.id]: 'exclusive' }));
-                                setOpenDropdownId(null);
-                              }}
-                              className={`w-full p-2 mt-1 rounded-lg text-left transition-colors flex items-center justify-between cursor-pointer ${
-                                activeTier === 'exclusive'
-                                  ? 'bg-purple-500/15 text-purple-300 border border-purple-500/30'
-                                  : 'hover:bg-white/5 text-gray-300'
-                              }`}
-                            >
-                              <div className="min-w-0 pr-2">
-                                <div className="flex items-center gap-1.5 text-xs font-bold text-white">
-                                  <Crown className="h-3.5 w-3.5 text-purple-400 shrink-0" />
-                                  <span>Exclusive (1-of-1)</span>
-                                  {activeTier === 'exclusive' && (
-                                    <Check className="h-3 w-3 text-purple-400 ml-auto" />
-                                  )}
-                                </div>
-                                <div className="text-[10px] text-gray-400 mt-0.5 truncate">
-                                  Sole Ownership · Retired from Store
-                                </div>
-                              </div>
-                              <span className="text-xs font-black text-purple-300 font-mono shrink-0">
-                                ₦{exclusivePrice.toLocaleString()}
-                              </span>
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Actions & "Get Beat" */}
-                  <div className="flex items-center gap-2 shrink-0 min-w-[190px] justify-end">
-                    {/* Favorite */}
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        toggleLike(row.id);
-                      }}
-                      title="Add to Favourites"
-                      className={`p-1.5 rounded-full transition-colors ${
-                        isLiked ? 'text-red-500' : 'text-gray-500 hover:text-red-500'
-                      }`}
-                    >
-                      <Heart className={`h-3.5 w-3.5 ${isLiked ? 'fill-red-500' : ''}`} />
-                    </button>
-
-                    {/* Listen Later */}
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        toggleListenLater(row);
-                      }}
-                      title="Listen Later"
-                      className={`p-1.5 rounded-full transition-colors ${
-                        isLater ? 'text-[#2dd4bf]' : 'text-gray-500 hover:text-[#2dd4bf]'
-                      }`}
-                    >
-                      <Clock className="h-3.5 w-3.5" />
-                    </button>
-
-                    {/* Download or Lock button */}
-                    {isFree ? (
-                      <button
-                        type="button"
-                        onClick={(e) => handleDownload(row, e)}
-                        title="Download Free Beat (WAV)"
-                        className={`p-1.5 rounded-full transition-colors cursor-pointer ${
-                          downloadingId === row.id ? 'text-[#2dd4bf] bg-[#2dd4bf]/10 animate-pulse' : 'text-gray-500 hover:text-white'
-                        }`}
-                      >
-                        <Download className="h-3.5 w-3.5" />
-                      </button>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setSelectedTier(activeTier === 'exclusive' ? 'exclusive' : 'premium');
-                          setLicenseModalTrack(row);
-                        }}
-                        title="Download Locked · License Required"
-                        className="p-1.5 rounded-full text-gray-500 hover:text-amber-400 hover:bg-amber-400/10 transition-colors cursor-pointer"
-                      >
-                        <Lock className="h-3.5 w-3.5" />
-                      </button>
-                    )}
-
-                    {/* Record Studio DAW Trigger (Free Beats Only) */}
-                    {openStudioHandler && isFree && (
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          openStudioHandler(row);
-                        }}
-                        title="Open Record Studio DAW to record vocals & mix over this beat"
-                        className="px-2.5 py-1.5 rounded-lg bg-teal-500/15 hover:bg-teal-500/25 border border-teal-500/30 text-teal-300 text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 transition-colors cursor-pointer"
-                      >
-                        <Mic className="h-3 w-3 text-teal-400" />
-                        <span className="hidden sm:inline">Record Studio</span>
-                      </button>
-                    )}
-
-                    {/* Action Button: Free beats have no "Get Beat" button (only download & mic icons). Paid beats show "Get Beat" */}
-                    {!isFree && (
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setSelectedTier(activeTier === 'exclusive' ? 'exclusive' : 'premium');
-                          setLicenseModalTrack(row);
-                        }}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-black uppercase tracking-wider flex items-center gap-1.5 transition-transform hover:scale-105 shadow-sm cursor-pointer ${
-                          activeTier === 'exclusive'
-                            ? 'bg-purple-500 hover:bg-purple-400 text-white'
-                            : 'bg-[#E8B896] hover:bg-[#d8a886] text-black'
-                        }`}
-                      >
-                        <ShoppingBag className="h-3 w-3 stroke-[2.5]" />
-                        <span>Get Beat</span>
-                      </button>
-                    )}
-                  </div>
-                </div>
+                      )}
+                    </div>
+                  }
+                />
               );
             })}
           </div>

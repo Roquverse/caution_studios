@@ -20,9 +20,9 @@ import {
   Music2,
   Headphones
 } from 'lucide-react';
-import { audioSynth } from '@caution/ui';
+import { audioSynth, TrackRow } from '@caution/ui';
 import { useAudio } from './audio/AudioProvider';
-import { useUserSubscription, FREE_PREVIEW_LIMIT_SECONDS } from '../lib/subscription';
+import { useUserSubscription } from '../lib/subscription';
 import { SEEDED_BEATS } from '../lib/seedBeats';
 import { supabase } from '../lib/supabaseClient';
 import { AUTH_LOGIN_URL, AUTH_SIGNUP_URL } from '../lib/urls';
@@ -44,7 +44,7 @@ export interface CatalogTrack {
 }
 
 // Transform seeded beats into initial catalog items
-const FALLBACK_CATALOG_TRACKS: CatalogTrack[] = SEEDED_BEATS.slice(0, 10).map((b, idx) => {
+const FALLBACK_CATALOG_TRACKS: CatalogTrack[] = SEEDED_BEATS.slice(0, 5).map((b, idx) => {
   const dur = b.duration_seconds || 180;
   const mins = Math.floor(dur / 60);
   const secs = dur % 60;
@@ -87,7 +87,7 @@ export const MusicLicensingSection: React.FC<MusicLicensingSectionProps> = ({
   onStartFree,
   onSelectTrack
 }) => {
-  const { isSubscribed } = useUserSubscription();
+  const { isSubscribed, isLoggedIn } = useUserSubscription();
   const { pause: pauseGlobalAudio, isPlaying: isGlobalPlaying } = useAudio();
   const [tracks, setTracks] = useState<CatalogTrack[]>(FALLBACK_CATALOG_TRACKS);
   const [activeTrackId, setActiveTrackId] = useState<string>(FALLBACK_CATALOG_TRACKS[0]?.id || 'beat-1');
@@ -96,8 +96,9 @@ export const MusicLicensingSection: React.FC<MusicLicensingSectionProps> = ({
   const [favorites, setFavorites] = useState<Record<string, boolean>>({ 'beat-1': true });
   const [stars, setStars] = useState<Record<string, boolean>>({ 'beat-1': true });
 
-  // 15-second sign-up prompt modal state
+  // 15-second / download sign-up prompt modal state
   const [showSignUpPrompt, setShowSignUpPrompt] = useState<boolean>(false);
+  const [promptReason, setPromptReason] = useState<'preview' | 'download'>('preview');
   const [promptTrack, setPromptTrack] = useState<CatalogTrack | null>(null);
 
   // Sidebar filter category states
@@ -201,7 +202,7 @@ export const MusicLicensingSection: React.FC<MusicLicensingSectionProps> = ({
     }
   }, []);
 
-  // 15-second limiter ticker
+  // Full-length playback ticker (no 15s/30s cutoff)
   useEffect(() => {
     let interval: NodeJS.Timeout | null = null;
     if (isPlaying) {
@@ -209,18 +210,11 @@ export const MusicLicensingSection: React.FC<MusicLicensingSectionProps> = ({
         setCurrentTime((prev) => {
           const current = tracks.find((t) => t.id === activeTrackId);
           const fullDur = current ? current.duration : 180;
-          const limit = isSubscribed ? fullDur : Math.min(FREE_PREVIEW_LIMIT_SECONDS, fullDur);
 
-          if (prev >= limit) {
-            // Cutoff reached!
+          if (prev >= fullDur) {
             stopAllAudio();
             setIsPlaying(false);
-
-            if (!isSubscribed) {
-              setPromptTrack(current || null);
-              setShowSignUpPrompt(true);
-            }
-            return limit;
+            return 0;
           }
           return prev + 1;
         });
@@ -229,16 +223,9 @@ export const MusicLicensingSection: React.FC<MusicLicensingSectionProps> = ({
     return () => {
       if (interval) clearInterval(interval);
     };
-  }, [isPlaying, activeTrackId, isSubscribed, tracks]);
+  }, [isPlaying, activeTrackId, tracks]);
 
   const handlePlayToggle = (track: CatalogTrack) => {
-    // If not subscribed and preview already exhausted for this session, prompt to sign up
-    if (!isSubscribed && currentTime >= FREE_PREVIEW_LIMIT_SECONDS && activeTrackId === track.id) {
-      setPromptTrack(track);
-      setShowSignUpPrompt(true);
-      return;
-    }
-
     if (activeTrackId === track.id) {
       if (isPlaying) {
         stopAllAudio();
@@ -253,11 +240,11 @@ export const MusicLicensingSection: React.FC<MusicLicensingSectionProps> = ({
           audioRef.current.currentTime = currentTime;
           audioRef.current.play().catch((err: any) => {
             if (err.name !== 'AbortError') {
-              audioSynth.playTrack(track.id, () => {}, isSubscribed ? undefined : FREE_PREVIEW_LIMIT_SECONDS);
+              audioSynth.playTrack(track.id, () => {});
             }
           });
         } else {
-          audioSynth.playTrack(track.id, () => {}, isSubscribed ? undefined : FREE_PREVIEW_LIMIT_SECONDS);
+          audioSynth.playTrack(track.id, () => {});
         }
       }
     } else {
@@ -273,22 +260,42 @@ export const MusicLicensingSection: React.FC<MusicLicensingSectionProps> = ({
         audioRef.current.currentTime = 0;
         audioRef.current.play().catch((err: any) => {
           if (err.name !== 'AbortError') {
-            audioSynth.playTrack(track.id, () => {}, isSubscribed ? undefined : FREE_PREVIEW_LIMIT_SECONDS);
+            audioSynth.playTrack(track.id, () => {});
           }
         });
       } else {
-        audioSynth.playTrack(track.id, () => {}, isSubscribed ? undefined : FREE_PREVIEW_LIMIT_SECONDS);
+        audioSynth.playTrack(track.id, () => {});
       }
     }
 
     if (onSelectTrack) onSelectTrack(track);
   };
 
+  const handleSeek = (ratio: number) => {
+    const current = tracks.find((t) => t.id === activeTrackId);
+    const fullDur = current ? current.duration : 180;
+    const targetSec = Math.round(Math.max(0, Math.min(1, ratio)) * fullDur);
+    setCurrentTime(targetSec);
+    if (audioRef.current && current?.audioUrl) {
+      audioRef.current.currentTime = targetSec;
+    }
+  };
+
   const handleDownloadClick = (track: CatalogTrack, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!isSubscribed) {
+    if (!isLoggedIn) {
+      setPromptReason('download');
       setPromptTrack(track);
       setShowSignUpPrompt(true);
+      return;
+    }
+    if (track.audioUrl) {
+      const a = document.createElement('a');
+      a.href = track.audioUrl;
+      a.download = `${track.title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.wav`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
     } else if (onStartFree) {
       onStartFree();
     }
@@ -317,16 +324,18 @@ export const MusicLicensingSection: React.FC<MusicLicensingSectionProps> = ({
     Instrument: ['All', 'Synthesizer', 'Piano', 'Guitar', 'Strings', 'Drums', 'Bass', 'Log Drum']
   };
 
-  const displayedTracks = tracks.filter((track) => {
-    if (spotlightOnly && !track.isSpotlight) return false;
-    if (selectedFilterValue !== 'All') {
-      if (activeFilterCategory === 'Mood' && track.mood !== selectedFilterValue) return false;
-      if (activeFilterCategory === 'Video Theme' && track.theme !== selectedFilterValue) return false;
-      if (activeFilterCategory === 'Genre' && !track.genre.toLowerCase().includes(selectedFilterValue.toLowerCase())) return false;
-      if (activeFilterCategory === 'Instrument' && track.instrument !== selectedFilterValue) return false;
-    }
-    return true;
-  });
+  const displayedTracks = tracks
+    .filter((track) => {
+      if (spotlightOnly && !track.isSpotlight) return false;
+      if (selectedFilterValue !== 'All') {
+        if (activeFilterCategory === 'Mood' && track.mood !== selectedFilterValue) return false;
+        if (activeFilterCategory === 'Video Theme' && track.theme !== selectedFilterValue) return false;
+        if (activeFilterCategory === 'Genre' && !track.genre.toLowerCase().includes(selectedFilterValue.toLowerCase())) return false;
+        if (activeFilterCategory === 'Instrument' && track.instrument !== selectedFilterValue) return false;
+      }
+      return true;
+    })
+    .slice(0, 5);
 
   return (
     <section className="bg-white py-20 lg:py-28 border-t border-gray-100 text-gray-900 relative">
@@ -466,159 +475,25 @@ export const MusicLicensingSection: React.FC<MusicLicensingSectionProps> = ({
             <div className="flex-1 w-full space-y-1.5 overflow-x-auto">
               {displayedTracks.map((track) => {
                 const isCurrent = track.id === activeTrackId;
-                const isTrackPlaying = isCurrent && isPlaying;
-                const progressRatio = isCurrent ? Math.min(1, currentTime / track.duration) : 0;
                 const isLiked = !!favorites[track.id];
                 const isStarred = !!stars[track.id];
 
                 return (
-                  <div
+                  <TrackRow
                     key={track.id}
-                    onClick={() => handlePlayToggle(track)}
-                    className={`group flex items-center justify-between gap-3 px-3.5 py-2.5 rounded-lg border transition-all cursor-pointer ${
-                      isCurrent
-                        ? 'bg-gray-50/90 border-gray-200 shadow-sm'
-                        : 'bg-white border-transparent hover:bg-gray-50/60 hover:border-gray-150'
-                    }`}
-                  >
-                    {/* Left: Artwork, Play button, Title, Genre */}
-                    <div className="flex items-center gap-3 min-w-[200px] sm:min-w-[280px]">
-                      {/* Thumbnail Cover */}
-                      <div className="relative h-10 w-10 shrink-0 rounded overflow-hidden bg-gray-100 shadow-sm">
-                        <img
-                          src={track.coverUrl}
-                          alt={track.title}
-                          className="h-full w-full object-cover"
-                        />
-                      </div>
-
-                      {/* Play/Pause Button */}
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handlePlayToggle(track);
-                        }}
-                        className={`h-7 w-7 rounded-full flex items-center justify-center shrink-0 transition-colors ${
-                          isTrackPlaying
-                            ? 'text-[#04564f]'
-                            : 'text-gray-500 group-hover:text-black'
-                        }`}
-                      >
-                        {isTrackPlaying ? (
-                          <Pause className="h-4 w-4 fill-current" />
-                        ) : (
-                          <Play className="h-4 w-4 fill-current ml-0.5" />
-                        )}
-                      </button>
-
-                      {/* Title & Artist/Genre */}
-                      <div className="flex flex-col min-w-0 pr-2">
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-xs sm:text-sm font-bold text-gray-900 truncate">
-                            {track.title}
-                          </span>
-                          {!isSubscribed && isCurrent && (
-                            <span className="text-[9px] font-mono font-bold px-1.5 py-0.2 rounded bg-amber-100 text-amber-800 border border-amber-200 shrink-0">
-                              15s
-                            </span>
-                          )}
-                        </div>
-                        <span className="text-[11px] text-gray-400 truncate">
-                          {track.artist} • {track.genre}
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Middle: Live Waveform or Duration */}
-                    <div className="flex-1 max-w-md hidden sm:flex items-center gap-3 px-2">
-                      {isCurrent ? (
-                        <div className="w-full flex items-center gap-2.5">
-                          <Volume2 className="h-3.5 w-3.5 text-[#04564f] shrink-0 animate-pulse" />
-                          <div className="flex-1 flex items-center gap-0.5 h-6">
-                            {track.waveform.map((bar, bIdx) => {
-                              const barRatio = bIdx / track.waveform.length;
-                              const isFilled = barRatio <= progressRatio;
-                              return (
-                                <div
-                                  key={bIdx}
-                                  style={{ height: `${Math.max(15, bar * 100)}%` }}
-                                  className={`w-[2.5px] rounded-full transition-colors ${
-                                    isFilled ? 'bg-[#04564f]' : 'bg-gray-200'
-                                  }`}
-                                />
-                              );
-                            })}
-                          </div>
-                          <span className="text-[11px] font-mono font-medium text-gray-600 shrink-0">
-                            {formatTime(currentTime)} / {!isSubscribed ? '0:15' : track.formattedDuration}
-                          </span>
-                        </div>
-                      ) : (
-                        <div className="w-full flex items-center justify-end">
-                          <span className="text-xs font-mono text-gray-400">
-                            {track.formattedDuration}
-                          </span>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Right: Actions */}
-                    <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0 text-gray-400">
-                      {/* Mobile duration indicator */}
-                      <span className="text-xs font-mono text-gray-400 sm:hidden">
-                        {track.formattedDuration}
-                      </span>
-
-                      {/* Download */}
-                      <button
-                        type="button"
-                        onClick={(e) => handleDownloadClick(track, e)}
-                        title="Download / License"
-                        className="p-1.5 rounded hover:text-black hover:bg-gray-100 transition-colors"
-                      >
-                        <Download className="h-3.5 w-3.5" />
-                      </button>
-
-                      {/* Heart */}
-                      <button
-                        type="button"
-                        onClick={(e) => toggleFavorite(track.id, e)}
-                        title="Favorite"
-                        className={`p-1.5 rounded transition-colors ${
-                          isLiked
-                            ? 'text-red-500 fill-red-500 hover:text-red-600'
-                            : 'hover:text-black hover:bg-gray-100'
-                        }`}
-                      >
-                        <Heart className={`h-3.5 w-3.5 ${isLiked ? 'fill-current' : ''}`} />
-                      </button>
-
-                      {/* Star */}
-                      <button
-                        type="button"
-                        onClick={(e) => toggleStar(track.id, e)}
-                        title="Save track"
-                        className={`p-1.5 rounded transition-colors ${
-                          isStarred
-                            ? 'text-amber-400 fill-amber-400 hover:text-amber-500'
-                            : 'hover:text-black hover:bg-gray-100'
-                        }`}
-                      >
-                        <Star className={`h-3.5 w-3.5 ${isStarred ? 'fill-current' : ''}`} />
-                      </button>
-
-                      {/* More */}
-                      <button
-                        type="button"
-                        onClick={(e) => e.stopPropagation()}
-                        title="More options"
-                        className="p-1.5 rounded hover:text-black hover:bg-gray-100 transition-colors"
-                      >
-                        <MoreVertical className="h-3.5 w-3.5" />
-                      </button>
-                    </div>
-                  </div>
+                    track={track}
+                    variant="light"
+                    isCurrent={isCurrent}
+                    isPlaying={isCurrent && isPlaying}
+                    currentTime={isCurrent ? currentTime : 0}
+                    isFavorited={isLiked}
+                    isStarred={isStarred}
+                    onPlayToggle={handlePlayToggle}
+                    onSeek={handleSeek}
+                    onDownload={handleDownloadClick}
+                    onFavoriteToggle={(t, e) => toggleFavorite(t.id, e)}
+                    onStarToggle={(t, e) => toggleStar(t.id, e)}
+                  />
                 );
               })}
             </div>
@@ -642,19 +517,25 @@ export const MusicLicensingSection: React.FC<MusicLicensingSectionProps> = ({
 
             {/* Glowing Accent Icon */}
             <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-[#04564f]/20 border border-[#2dd4bf]/40 text-[#2dd4bf] shadow-lg shadow-[#04564f]/30">
-              <Headphones className="h-7 w-7" />
+              {promptReason === 'download' ? (
+                <Download className="h-7 w-7" />
+              ) : (
+                <Headphones className="h-7 w-7" />
+              )}
             </div>
 
             {/* Modal Heading */}
             <div className="space-y-1.5">
               <span className="text-[10px] font-mono uppercase tracking-widest text-amber-400 font-bold px-2 py-0.5 rounded bg-amber-400/10 border border-amber-400/20 inline-block mb-1">
-                15-Second Free Preview Ended
+                {promptReason === 'download' ? 'Registration Required' : '15-Second Free Preview Ended'}
               </span>
               <h3 className="text-xl sm:text-2xl font-black text-white tracking-tight">
-                Sign Up to Keep Listening
+                {promptReason === 'download' ? 'Register to Download This Track' : 'Sign Up to Keep Listening'}
               </h3>
               <p className="text-xs text-gray-400 leading-relaxed max-w-sm mx-auto">
-                Create a free account to unlock uninterrupted full-length streaming, curate private playlists, and clear your social media channels for monetization.
+                {promptReason === 'download'
+                  ? 'Song downloads are exclusive to registered members. Create a free account in seconds to download tracks, record in Studio, and manage your library.'
+                  : 'Create a free account to unlock uninterrupted full-length streaming, curate private playlists, and clear your social media channels for monetization.'}
               </p>
             </div>
 

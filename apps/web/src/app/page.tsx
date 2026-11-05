@@ -23,7 +23,7 @@ import { SoundstageModal } from '../components/studio/SoundstageModal';
 import { useAudio } from '../components/audio/AudioProvider';
 import { AudioPlayer, audioSynth, MOCK_TRACKS } from '@caution/ui';
 import { Track } from '@caution/types';
-import { useUserSubscription, FREE_PREVIEW_LIMIT_SECONDS } from '../lib/subscription';
+import { useUserSubscription } from '../lib/subscription';
 import { AUTH_LOGIN_URL, AUTH_SIGNUP_URL, APP_URL } from '../lib/urls';
 
 export default function LandingPage() {
@@ -58,15 +58,12 @@ export default function LandingPage() {
       audioSynth.stop();
       setIsPlaying(false);
     } else {
-      if (!isSubscribed && currentTrack?.id === track.id && currentTime >= FREE_PREVIEW_LIMIT_SECONDS) {
-        setCurrentTime(0);
-      }
       setCurrentTrack(track);
       setIsPlaying(true);
       if (currentTrack?.id !== track.id) {
         setCurrentTime(0);
       }
-      const limit = isSubscribed ? track.duration : Math.min(FREE_PREVIEW_LIMIT_SECONDS, track.duration);
+      const limit = track.duration;
       audioSynth.playTrack(track.id, () => {
         setCurrentTime((prev) => {
           if (prev >= limit) {
@@ -76,7 +73,7 @@ export default function LandingPage() {
           }
           return prev + 0.25;
         });
-      }, isSubscribed ? undefined : FREE_PREVIEW_LIMIT_SECONDS);
+      });
     }
   };
 
@@ -86,11 +83,8 @@ export default function LandingPage() {
       audioSynth.stop();
       setIsPlaying(false);
     } else {
-      if (!isSubscribed && currentTime >= FREE_PREVIEW_LIMIT_SECONDS) {
-        setCurrentTime(0);
-      }
       setIsPlaying(true);
-      const limit = isSubscribed ? currentTrack.duration : Math.min(FREE_PREVIEW_LIMIT_SECONDS, currentTrack.duration);
+      const limit = currentTrack.duration;
       audioSynth.playTrack(currentTrack.id, () => {
         setCurrentTime((prev) => {
           if (prev >= limit) {
@@ -100,15 +94,14 @@ export default function LandingPage() {
           }
           return prev + 0.25;
         });
-      }, isSubscribed ? undefined : FREE_PREVIEW_LIMIT_SECONDS);
+      });
     }
   };
 
   const handleSeek = (ratio: number) => {
     if (!currentTrack) return;
     const rawTime = ratio * currentTrack.duration;
-    const targetSec = !isSubscribed ? Math.min(FREE_PREVIEW_LIMIT_SECONDS, rawTime) : rawTime;
-    setCurrentTime(targetSec);
+    setCurrentTime(rawTime);
   };
 
   const handleNextTrack = () => {

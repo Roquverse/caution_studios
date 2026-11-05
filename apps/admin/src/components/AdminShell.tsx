@@ -47,7 +47,55 @@ export function AdminShell({ children, activePath, onOpenUpload }: AdminShellPro
 
     async function checkAdminSession() {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
+        let session = (await supabase.auth.getSession()).data.session;
+
+        // 1. Restore from URL hash if redirected from Auth portal (#access_token=...&refresh_token=...)
+        if (!session?.user && typeof window !== 'undefined' && window.location.hash) {
+          const hashParams = new URLSearchParams(window.location.hash.substring(1));
+          const access_token = hashParams.get('access_token');
+          const refresh_token = hashParams.get('refresh_token');
+          if (access_token && refresh_token) {
+            try {
+              const { data: restored } = await supabase.auth.setSession({
+                access_token,
+                refresh_token
+              });
+              if (restored?.session?.user) {
+                session = restored.session;
+                const isProd = window.location.hostname.includes('cautionstudioz.com');
+                const domainStr = isProd ? '; domain=.cautionstudioz.com' : '';
+                document.cookie = `sb-token=${session.access_token}; path=/; max-age=604800; SameSite=Lax${domainStr}`;
+                document.cookie = `sb-refresh=${session.refresh_token}; path=/; max-age=604800; SameSite=Lax${domainStr}`;
+                window.history.replaceState(null, '', window.location.pathname + window.location.search);
+              }
+            } catch (e) {
+              console.warn('Failed restoring admin session from hash:', e);
+            }
+          }
+        }
+
+        // 2. Restore from shared cookie if needed
+        if (!session?.user && typeof document !== 'undefined') {
+          const matchToken = document.cookie.match(/(?:^|;\s*)sb-token=([^;]*)/);
+          const matchRefresh = document.cookie.match(/(?:^|;\s*)sb-refresh=([^;]*)/);
+          const cookieToken = matchToken ? decodeURIComponent(matchToken[1]) : null;
+          const cookieRefresh = matchRefresh ? decodeURIComponent(matchRefresh[1]) : null;
+
+          if (cookieToken && cookieRefresh) {
+            try {
+              const { data: restored } = await supabase.auth.setSession({
+                access_token: cookieToken,
+                refresh_token: cookieRefresh
+              });
+              if (restored?.session?.user) {
+                session = restored.session;
+              }
+            } catch (e) {
+              console.warn('Failed restoring admin session from cookie:', e);
+            }
+          }
+        }
+
         if (!session || !session.user) {
           if (isMounted) router.replace('/login');
           return;
@@ -183,6 +231,10 @@ export function AdminShell({ children, activePath, onOpenUpload }: AdminShellPro
         </div>
       </div>
     );
+  }
+
+  if (!adminUser) {
+    return null;
   }
 
   return (

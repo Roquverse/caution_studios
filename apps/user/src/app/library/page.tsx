@@ -12,7 +12,7 @@ import {
   MOCK_TRACKS
 } from '@caution/ui';
 import { Track, FilterState } from '@caution/types';
-import { useUserSubscription, FREE_PREVIEW_LIMIT_SECONDS } from '../../lib/subscription';
+import { useUserSubscription } from '../../lib/subscription';
 
 export default function UserLibraryPage() {
   const { isSubscribed } = useUserSubscription();
@@ -38,15 +38,12 @@ export default function UserLibraryPage() {
       audioSynth.stop();
       setIsPlaying(false);
     } else {
-      if (!isSubscribed && currentTrack?.id === track.id && currentTime >= FREE_PREVIEW_LIMIT_SECONDS) {
-        setCurrentTime(0);
-      }
       setCurrentTrack(track);
       setIsPlaying(true);
       if (currentTrack?.id !== track.id) {
         setCurrentTime(0);
       }
-      const limit = isSubscribed ? track.duration : Math.min(FREE_PREVIEW_LIMIT_SECONDS, track.duration);
+      const limit = track.duration;
       audioSynth.playTrack(track.id, (secs) => {
         setCurrentTime((prev) => {
           if (prev >= limit) {
@@ -56,7 +53,7 @@ export default function UserLibraryPage() {
           }
           return prev + 0.25;
         });
-      }, isSubscribed ? undefined : FREE_PREVIEW_LIMIT_SECONDS);
+      });
     }
   };
 
@@ -146,8 +143,7 @@ export default function UserLibraryPage() {
         onSeek={(r) => {
           if (currentTrack) {
             const raw = r * currentTrack.duration;
-            const targetSec = !isSubscribed ? Math.min(FREE_PREVIEW_LIMIT_SECONDS, raw) : raw;
-            setCurrentTime(targetSec);
+            setCurrentTime(raw);
           }
         }}
         onDownload={(t) => setLicenseModalTrack(t)}

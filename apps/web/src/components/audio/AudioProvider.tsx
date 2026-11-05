@@ -124,7 +124,7 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const duration = currentBeat?.duration_seconds || 180;
 
-  // Initialize Audio element with preview limit handler
+  // Initialize Audio element (full-length playback)
   useEffect(() => {
     if (typeof window !== 'undefined') {
       audioRef.current = new Audio();
@@ -132,18 +132,7 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
       const handleTimeUpdate = () => {
         if (audioRef.current) {
-          const t = audioRef.current.currentTime;
-          if (!isSubscribed && t >= FREE_PREVIEW_LIMIT_SECONDS) {
-            audioRef.current.pause();
-            setIsPlaying(false);
-            if (!isLoggedIn) {
-              setIsSignUpModalOpen(true);
-            } else {
-              setShowUpgradePrompt(true);
-            }
-            return;
-          }
-          setCurrentTime(t);
+          setCurrentTime(audioRef.current.currentTime);
         }
       };
 
@@ -185,12 +174,7 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     if (synthTimerRef.current) clearInterval(synthTimerRef.current);
     audioSynth.stop();
 
-    const limit = isSubscribed ? (beat.duration_seconds || 180) : Math.min(FREE_PREVIEW_LIMIT_SECONDS, beat.duration_seconds || 180);
-
-    if (!isSubscribed && currentTime >= FREE_PREVIEW_LIMIT_SECONDS) {
-      setCurrentTime(0);
-      if (audioRef.current) audioRef.current.currentTime = 0;
-    }
+    const limit = beat.duration_seconds || 180;
 
     // Determine audio URL from storage or beat properties
     const audioKey = beat.audio_url || beat.preview_clean_key || beat.preview_tagged_key || beat.master_wav_key;
@@ -210,16 +194,11 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             if (prev >= limit) {
               audioSynth.stop();
               setIsPlaying(false);
-              if (!isLoggedIn) {
-                setIsSignUpModalOpen(true);
-              } else if (!isSubscribed) {
-                setShowUpgradePrompt(true);
-              }
               return limit;
             }
             return prev + 0.25;
           });
-        }, isSubscribed ? undefined : FREE_PREVIEW_LIMIT_SECONDS);
+        });
       });
     } else {
       // Play with synthetic Web Audio engine if no audio key exists
@@ -228,16 +207,11 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           if (prev >= limit) {
             audioSynth.stop();
             setIsPlaying(false);
-            if (!isLoggedIn) {
-              setIsSignUpModalOpen(true);
-            } else if (!isSubscribed) {
-              setShowUpgradePrompt(true);
-            }
             return limit;
           }
           return prev + 0.25;
         });
-      }, isSubscribed ? undefined : FREE_PREVIEW_LIMIT_SECONDS);
+      });
     }
   };
 
@@ -278,20 +252,6 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const seek = (ratio: number) => {
     const rawTarget = Math.max(0, Math.min(1, ratio)) * duration;
-    if (!isSubscribed && rawTarget > FREE_PREVIEW_LIMIT_SECONDS) {
-      setCurrentTime(FREE_PREVIEW_LIMIT_SECONDS);
-      if (audioRef.current) {
-        audioRef.current.currentTime = FREE_PREVIEW_LIMIT_SECONDS;
-      }
-      audioSynth.stop();
-      setIsPlaying(false);
-      if (!isLoggedIn) {
-        setIsSignUpModalOpen(true);
-      } else {
-        setShowUpgradePrompt(true);
-      }
-      return;
-    }
     setCurrentTime(rawTarget);
     if (audioRef.current) {
       audioRef.current.currentTime = rawTarget;

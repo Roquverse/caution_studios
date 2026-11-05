@@ -219,18 +219,6 @@ export function UserDropdown() {
 
   const isPlus = profile?.plan === 'plus';
 
-  if (!profile && !email) {
-    return (
-      <a
-        href={getAuthLoginUrl()}
-        className="h-8 px-3 rounded-lg bg-[#2bbbad] hover:bg-[#26a69a] text-black text-xs font-semibold flex items-center gap-1.5 transition-all shadow-sm"
-      >
-        <User className="h-3.5 w-3.5" />
-        <span>Sign In</span>
-      </a>
-    );
-  }
-
   const fallbackDisplayName = email ? email.split('@')[0] : 'User';
   const fallbackHandle = email ? email.split('@')[0] : 'user';
 

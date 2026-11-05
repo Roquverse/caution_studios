@@ -31,12 +31,12 @@ import {
   Mic,
   Lock
 } from 'lucide-react';
-import { audioSynth } from '@caution/ui';
+import { audioSynth, TrackRow } from '@caution/ui';
 import { UserDropdown } from '../components/UserDropdown';
 import { UserAdModal } from '../components/UserAdModal';
 import { UserMarketplaceView, isFreeBeat } from '../components/UserMarketplaceView';
 import { UserRecordStudioModal } from '../components/UserRecordStudioModal';
-import { useUserSubscription, FREE_PREVIEW_LIMIT_SECONDS } from '../lib/subscription';
+import { useUserSubscription } from '../lib/subscription';
 import { supabase } from '../lib/supabaseClient';
 import {
   useDailyDownloadQuota,
@@ -198,14 +198,10 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
     if (isPlaying && (!currentTrack.audioUrl || !audioRef.current)) {
       interval = setInterval(() => {
         setCurrentTime((prev) => {
-          const limit = isSubscribed ? currentTrack.durationSeconds : Math.min(FREE_PREVIEW_LIMIT_SECONDS, currentTrack.durationSeconds);
+          const limit = currentTrack.durationSeconds;
           if (prev >= limit) {
             audioSynth.stop();
             setIsPlaying(false);
-            if (!isSubscribed && !hasTriggeredUpgradeModalRef.current) {
-              hasTriggeredUpgradeModalRef.current = true;
-              setShowUpgradeModal(true);
-            }
             return 0;
           }
           return prev + 1;
@@ -213,7 +209,7 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
       }, 1000);
     }
     return () => clearInterval(interval);
-  }, [isPlaying, currentTrack.durationSeconds, isSubscribed, currentTrack.audioUrl]);
+  }, [isPlaying, currentTrack.durationSeconds, currentTrack.audioUrl]);
 
   useEffect(() => {
     if (audioRef.current) {
@@ -455,10 +451,6 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
         if (audioRef.current) audioRef.current.pause();
         setIsPlaying(false);
       } else {
-        if (!isSubscribed && currentTime >= FREE_PREVIEW_LIMIT_SECONDS) {
-          setCurrentTime(0);
-          if (audioRef.current) audioRef.current.currentTime = 0;
-        }
         setIsPlaying(true);
         hasTriggeredUpgradeModalRef.current = false;
         recordListeningHistory(track);
@@ -477,11 +469,11 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
           audioRef.current.play().catch((err) => {
             if (err.name !== 'AbortError') {
               console.warn('Audio playback error:', err);
-              audioSynth.playTrack(track.id, () => {}, isSubscribed ? undefined : FREE_PREVIEW_LIMIT_SECONDS);
+              audioSynth.playTrack(track.id, () => {});
             }
           });
         } else {
-          audioSynth.playTrack(track.id, () => {}, isSubscribed ? undefined : FREE_PREVIEW_LIMIT_SECONDS);
+          audioSynth.playTrack(track.id, () => {});
         }
       }
     } else {
@@ -517,16 +509,24 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
           audioRef.current.play().catch((err) => {
             if (err.name !== 'AbortError') {
               console.warn('Audio playback error:', err);
-              audioSynth.playTrack(track.id, () => {}, isSubscribed ? undefined : FREE_PREVIEW_LIMIT_SECONDS);
+              audioSynth.playTrack(track.id, () => {});
             }
           });
         } else {
           audioRef.current.pause();
-          audioSynth.playTrack(track.id, () => {}, isSubscribed ? undefined : FREE_PREVIEW_LIMIT_SECONDS);
+          audioSynth.playTrack(track.id, () => {});
         }
       } else if (!track.audioUrl) {
-        audioSynth.playTrack(track.id, () => {}, isSubscribed ? undefined : FREE_PREVIEW_LIMIT_SECONDS);
+        audioSynth.playTrack(track.id, () => {});
       }
+    }
+  };
+
+  const handleRowSeek = (ratio: number) => {
+    const targetSec = Math.round(Math.max(0, Math.min(1, ratio)) * currentTrack.durationSeconds);
+    setCurrentTime(targetSec);
+    if (audioRef.current) {
+      audioRef.current.currentTime = targetSec;
     }
   };
 
@@ -780,9 +780,6 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
         onTimeUpdate={(e) => {
           const sec = e.currentTarget.currentTime;
           const isPaid = !isFreeBeat(currentTrack);
-          const limit = isSubscribed || !isPaid
-            ? currentTrack.durationSeconds
-            : Math.min(FREE_PREVIEW_LIMIT_SECONDS, currentTrack.durationSeconds);
 
           // Audio watermark anti-rip protection: watermark pulse at 10s and 22s during paid preview
           if (isPaid && !isSubscribed) {
@@ -798,17 +795,7 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
             recordTrackListen(currentTrack);
           }
 
-          if (isPaid && !isSubscribed && sec >= limit) {
-            e.currentTarget.pause();
-            e.currentTarget.currentTime = 0;
-            setCurrentTime(0);
-            setIsPlaying(false);
-            audioSynth.stop();
-            setPaidBeatPurchaseTrack(currentTrack);
-            setRewardNotification('30-second preview ended. Purchase a license to unlock full playback.');
-          } else {
-            setCurrentTime(Math.floor(sec));
-          }
+          setCurrentTime(Math.floor(sec));
         }}
         onEnded={() => {
           setIsPlaying(false);
@@ -1212,128 +1199,31 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
                   </button>
                 </div>
               ) : (
-                <div className="p-6 rounded-2xl bg-[#121316] border border-white/[0.06] space-y-3">
-                  <div className="hidden sm:flex items-center justify-between px-3 text-[11px] font-mono uppercase tracking-wider text-gray-500 pb-1">
-                    <div className="w-72 sm:w-80">Track / Producer</div>
-                    <div className="w-36 text-left">BPM & Plays</div>
-                    <div className="hidden lg:block w-28">Basic Lease</div>
-                    <div className="w-36 text-right">Actions</div>
-                  </div>
-
-                  <div className="space-y-2">
-                    {favoritesList.map((row) => {
-                      const isThisPlaying = isPlaying && currentTrack.id === row.id;
-                      return (
-                        <div
-                          key={'fav-' + row.id}
-                          onClick={() => handlePlayToggle(row)}
-                          className="flex items-center justify-between p-3 rounded-xl bg-white/[0.02] hover:bg-white/[0.04] border border-white/[0.04] transition-all cursor-pointer group"
-                        >
-                          <div className="flex items-center gap-3.5 min-w-0 w-72 sm:w-80">
-                            <div className="w-11 h-11 rounded-lg overflow-hidden bg-black/40 border border-white/10 shrink-0 relative">
-                              <img
-                                src={row.coverUrl}
-                                alt={row.title}
-                                className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-                              />
-                              {isThisPlaying && (
-                                <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-                                  <span className="h-2 w-2 rounded-full bg-[#2dd4bf] animate-ping" />
-                                </div>
-                              )}
-                            </div>
-                            <div className="min-w-0">
-                              <p className={`text-xs font-bold truncate ${isThisPlaying ? 'text-[#2dd4bf]' : 'text-white'}`}>
-                                {row.title}
-                              </p>
-                              <p className="text-[11px] text-gray-500 truncate mt-0.5">{row.artist}</p>
-                            </div>
-                          </div>
-
-                          <div className="hidden sm:block text-xs font-mono text-gray-400 text-left w-36 truncate">
-                            <p className="truncate">{row.tracksCount || `${row.bpm || 120} BPM • ${row.genre || 'Beat'}`}</p>
-                            <p className="text-[10px] text-[#2dd4bf] font-semibold mt-0.5">
-                              {(row.playCount || 0).toLocaleString()} plays
-                            </p>
-                          </div>
-
-                          <div className="hidden lg:flex items-center text-xs font-mono font-bold text-[#2dd4bf] w-28">
-                            {isFreeBeat(row) || row.isFree || !row.priceNgn || row.priceNgn <= 0.01 ? '₦0.00' : `₦${row.priceNgn.toLocaleString('en-NG')}`}
-                          </div>
-
-                          <div className="flex items-center gap-2 shrink-0 w-36 justify-end">
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                toggleListenLater(row);
-                              }}
-                              title={listenLaterIds.includes(row.id) ? "Remove from Listen Later" : "Add to Listen Later"}
-                              className={`p-1.5 rounded-full transition-colors cursor-pointer ${
-                                listenLaterIds.includes(row.id) ? 'text-[#2dd4bf] bg-[#2dd4bf]/10' : 'text-gray-500 hover:text-[#2dd4bf]'
-                              }`}
-                            >
-                              <Clock className="h-3.5 w-3.5" />
-                            </button>
-
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                toggleLike(row.id);
-                              }}
-                              title="Remove from Favourites"
-                              className="p-1.5 rounded-full text-red-500 hover:text-red-400 bg-red-500/10 hover:bg-red-500/20 transition-colors cursor-pointer"
-                            >
-                              <Heart className="h-3.5 w-3.5 fill-red-500" />
-                            </button>
-
-                            {isFreeBeat(row) ? (
-                              <button
-                                type="button"
-                                onClick={(e) => handleDownload(row, e)}
-                                title="Download Song (WAV)"
-                                className={`p-1.5 rounded-full transition-colors cursor-pointer ${
-                                  downloadingId === row.id ? 'text-[#2dd4bf] bg-[#2dd4bf]/10 animate-pulse' : 'text-gray-500 hover:text-white hover:bg-white/10'
-                                }`}
-                              >
-                                <Download className="h-3.5 w-3.5" />
-                              </button>
-                            ) : (
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setPaidBeatPurchaseTrack(row);
-                                }}
-                                title="Download Locked · License Required"
-                                className="p-1.5 rounded-full text-gray-500 hover:text-amber-400 hover:bg-amber-400/10 transition-colors cursor-pointer"
-                              >
-                                <Lock className="h-3.5 w-3.5" />
-                              </button>
-                            )}
-
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handlePlayToggle(row);
-                              }}
-                              className={`w-7 h-7 rounded-full flex items-center justify-center transition-colors ${
-                                isThisPlaying ? 'bg-[#04564f] text-[#2dd4bf]' : 'bg-white/5 text-gray-400 hover:text-white hover:bg-white/10'
-                              }`}
-                            >
-                              {isThisPlaying ? (
-                                <Pause className="h-3.5 w-3.5 fill-current" />
-                              ) : (
-                                <Play className="h-3.5 w-3.5 fill-current translate-x-0.5" />
-                              )}
-                            </button>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
+                <div className="p-6 rounded-2xl bg-[#121316] border border-white/[0.06] space-y-2">
+                  {favoritesList.map((row) => {
+                    const isCurrent = currentTrack.id === row.id;
+                    const isFree = isFreeBeat(row);
+                    return (
+                      <TrackRow
+                        key={'fav-' + row.id}
+                        track={row}
+                        variant="dark"
+                        isCurrent={isCurrent}
+                        isPlaying={isCurrent && isPlaying}
+                        currentTime={isCurrent ? currentTime : 0}
+                        isFavorited={true}
+                        isListenLater={listenLaterIds.includes(row.id)}
+                        isDownloading={downloadingId === row.id}
+                        isDownloadLocked={!isFree}
+                        onPlayToggle={handlePlayToggle}
+                        onSeek={handleRowSeek}
+                        onDownload={(t, e) => handleDownload(t, e)}
+                        onLockedDownloadClick={(t) => setPaidBeatPurchaseTrack(t)}
+                        onFavoriteToggle={(t) => toggleLike(t.id)}
+                        onListenLaterToggle={(t) => toggleListenLater(t)}
+                      />
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -1393,128 +1283,31 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
                   </button>
                 </div>
               ) : (
-                <div className="p-6 rounded-2xl bg-[#121316] border border-white/[0.06] space-y-3">
-                  <div className="hidden sm:flex items-center justify-between px-3 text-[11px] font-mono uppercase tracking-wider text-gray-500 pb-1">
-                    <div className="w-72 sm:w-80">Track / Producer</div>
-                    <div className="w-36 text-left">BPM & Plays</div>
-                    <div className="hidden lg:block w-28">Basic Lease</div>
-                    <div className="w-36 text-right">Actions</div>
-                  </div>
-
-                  <div className="space-y-2">
-                    {listenLaterList.map((row) => {
-                      const isThisPlaying = isPlaying && currentTrack.id === row.id;
-                      return (
-                        <div
-                          key={'later-' + row.id}
-                          onClick={() => handlePlayToggle(row)}
-                          className="flex items-center justify-between p-3 rounded-xl bg-white/[0.02] hover:bg-white/[0.04] border border-white/[0.04] transition-all cursor-pointer group"
-                        >
-                          <div className="flex items-center gap-3.5 min-w-0 w-72 sm:w-80">
-                            <div className="w-11 h-11 rounded-lg overflow-hidden bg-black/40 border border-white/10 shrink-0 relative">
-                              <img
-                                src={row.coverUrl}
-                                alt={row.title}
-                                className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-                              />
-                              {isThisPlaying && (
-                                <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-                                  <span className="h-2 w-2 rounded-full bg-[#2dd4bf] animate-ping" />
-                                </div>
-                              )}
-                            </div>
-                            <div className="min-w-0">
-                              <p className={`text-xs font-bold truncate ${isThisPlaying ? 'text-[#2dd4bf]' : 'text-white'}`}>
-                                {row.title}
-                              </p>
-                              <p className="text-[11px] text-gray-500 truncate mt-0.5">{row.artist}</p>
-                            </div>
-                          </div>
-
-                          <div className="hidden sm:block text-xs font-mono text-gray-400 text-left w-36 truncate">
-                            <p className="truncate">{row.tracksCount || `${row.bpm || 120} BPM • ${row.genre || 'Beat'}`}</p>
-                            <p className="text-[10px] text-[#2dd4bf] font-semibold mt-0.5">
-                              {(row.playCount || 0).toLocaleString()} plays
-                            </p>
-                          </div>
-
-                          <div className="hidden lg:flex items-center text-xs font-mono font-bold text-[#2dd4bf] w-28">
-                            {isFreeBeat(row) || row.isFree || !row.priceNgn || row.priceNgn <= 0.01 ? '₦0.00' : `₦${row.priceNgn.toLocaleString('en-NG')}`}
-                          </div>
-
-                          <div className="flex items-center gap-2 shrink-0 w-36 justify-end">
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                toggleListenLater(row);
-                              }}
-                              title="Remove from Listen Later"
-                              className="p-1.5 rounded-full text-[#2dd4bf] bg-[#2dd4bf]/15 hover:bg-[#2dd4bf]/25 transition-colors cursor-pointer"
-                            >
-                              <Clock className="h-3.5 w-3.5" />
-                            </button>
-
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                toggleLike(row.id);
-                              }}
-                              title="Favorite"
-                              className={`p-1.5 rounded-full transition-colors cursor-pointer ${
-                                row.isLiked || likedTrackIds.includes(row.id) ? 'text-red-500' : 'text-gray-500 hover:text-red-500'
-                              }`}
-                            >
-                              <Heart className={`h-3.5 w-3.5 ${row.isLiked || likedTrackIds.includes(row.id) ? 'fill-red-500 text-red-500' : ''}`} />
-                            </button>
-
-                            {isFreeBeat(row) ? (
-                              <button
-                                type="button"
-                                onClick={(e) => handleDownload(row, e)}
-                                title="Download Song (WAV)"
-                                className={`p-1.5 rounded-full transition-colors cursor-pointer ${
-                                  downloadingId === row.id ? 'text-[#2dd4bf] bg-[#2dd4bf]/10 animate-pulse' : 'text-gray-500 hover:text-white hover:bg-white/10'
-                                }`}
-                              >
-                                <Download className="h-3.5 w-3.5" />
-                              </button>
-                            ) : (
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setPaidBeatPurchaseTrack(row);
-                                }}
-                                title="Download Locked · License Required"
-                                className="p-1.5 rounded-full text-gray-500 hover:text-amber-400 hover:bg-amber-400/10 transition-colors cursor-pointer"
-                              >
-                                <Lock className="h-3.5 w-3.5" />
-                              </button>
-                            )}
-
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handlePlayToggle(row);
-                              }}
-                              className={`w-7 h-7 rounded-full flex items-center justify-center transition-colors ${
-                                isThisPlaying ? 'bg-[#04564f] text-[#2dd4bf]' : 'bg-white/5 text-gray-400 hover:text-white hover:bg-white/10'
-                              }`}
-                            >
-                              {isThisPlaying ? (
-                                <Pause className="h-3.5 w-3.5 fill-current" />
-                              ) : (
-                                <Play className="h-3.5 w-3.5 fill-current translate-x-0.5" />
-                              )}
-                            </button>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
+                <div className="p-6 rounded-2xl bg-[#121316] border border-white/[0.06] space-y-2">
+                  {listenLaterList.map((row) => {
+                    const isCurrent = currentTrack.id === row.id;
+                    const isFree = isFreeBeat(row);
+                    return (
+                      <TrackRow
+                        key={'later-' + row.id}
+                        track={row}
+                        variant="dark"
+                        isCurrent={isCurrent}
+                        isPlaying={isCurrent && isPlaying}
+                        currentTime={isCurrent ? currentTime : 0}
+                        isFavorited={Boolean(row.isLiked || likedTrackIds.includes(row.id))}
+                        isListenLater={true}
+                        isDownloading={downloadingId === row.id}
+                        isDownloadLocked={!isFree}
+                        onPlayToggle={handlePlayToggle}
+                        onSeek={handleRowSeek}
+                        onDownload={(t, e) => handleDownload(t, e)}
+                        onLockedDownloadClick={(t) => setPaidBeatPurchaseTrack(t)}
+                        onFavoriteToggle={(t) => toggleLike(t.id)}
+                        onListenLaterToggle={(t) => toggleListenLater(t)}
+                      />
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -1578,131 +1371,33 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
                   </button>
                 </div>
               ) : (
-                <div className="p-6 rounded-2xl bg-[#121316] border border-white/[0.06] space-y-3">
-                  <div className="hidden sm:flex items-center justify-between px-3 text-[11px] font-mono uppercase tracking-wider text-gray-500 pb-1">
-                    <div className="w-72 sm:w-80">Track / Producer</div>
-                    <div className="w-36 text-left">Auditioned Time</div>
-                    <div className="hidden lg:block w-28">Basic Lease</div>
-                    <div className="w-36 text-right">Actions</div>
-                  </div>
-
-                  <div className="space-y-2">
-                    {listeningHistory.map((item, idx) => {
-                      const row = item.track;
-                      const isThisPlaying = isPlaying && currentTrack.id === row.id;
-                      return (
-                        <div
-                          key={'hist-' + row.id + '-' + idx}
-                          onClick={() => handlePlayToggle(row)}
-                          className="flex items-center justify-between p-3 rounded-xl bg-white/[0.02] hover:bg-white/[0.04] border border-white/[0.04] transition-all cursor-pointer group"
-                        >
-                          <div className="flex items-center gap-3.5 min-w-0 w-72 sm:w-80">
-                            <div className="w-11 h-11 rounded-lg overflow-hidden bg-black/40 border border-white/10 shrink-0 relative">
-                              <img
-                                src={row.coverUrl}
-                                alt={row.title}
-                                className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-                              />
-                              {isThisPlaying && (
-                                <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-                                  <span className="h-2 w-2 rounded-full bg-[#2dd4bf] animate-ping" />
-                                </div>
-                              )}
-                            </div>
-                            <div className="min-w-0">
-                              <p className={`text-xs font-bold truncate ${isThisPlaying ? 'text-[#2dd4bf]' : 'text-white'}`}>
-                                {row.title}
-                              </p>
-                              <p className="text-[11px] text-gray-500 truncate mt-0.5">{row.artist}</p>
-                            </div>
-                          </div>
-
-                          <div className="hidden sm:block text-xs font-mono text-gray-400 text-left w-36 truncate">
-                            <p className="truncate text-gray-300">{item.listenedAt}</p>
-                            <p className="text-[10px] text-[#2dd4bf] font-semibold mt-0.5">
-                              {(row.playCount || 0).toLocaleString()} total plays
-                            </p>
-                          </div>
-
-                          <div className="hidden lg:flex items-center text-xs font-mono font-bold text-[#2dd4bf] w-28">
-                            {isFreeBeat(row) || row.isFree || !row.priceNgn || row.priceNgn <= 0.01 ? '₦0.00' : `₦${row.priceNgn.toLocaleString('en-NG')}`}
-                          </div>
-
-                          <div className="flex items-center gap-2 shrink-0 w-36 justify-end">
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                toggleListenLater(row);
-                              }}
-                              title={listenLaterIds.includes(row.id) ? "In Listen Later" : "Add to Listen Later"}
-                              className={`p-1.5 rounded-full transition-colors cursor-pointer ${
-                                listenLaterIds.includes(row.id) ? 'text-[#2dd4bf] bg-[#2dd4bf]/10' : 'text-gray-500 hover:text-[#2dd4bf]'
-                              }`}
-                            >
-                              <Clock className="h-3.5 w-3.5" />
-                            </button>
-
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                toggleLike(row.id);
-                              }}
-                              title="Favorite"
-                              className={`p-1.5 rounded-full transition-colors cursor-pointer ${
-                                row.isLiked || likedTrackIds.includes(row.id) ? 'text-red-500' : 'text-gray-500 hover:text-red-500'
-                              }`}
-                            >
-                              <Heart className={`h-3.5 w-3.5 ${row.isLiked || likedTrackIds.includes(row.id) ? 'fill-red-500 text-red-500' : ''}`} />
-                            </button>
-
-                            {isFreeBeat(row) ? (
-                              <button
-                                type="button"
-                                onClick={(e) => handleDownload(row, e)}
-                                title="Download Song (WAV)"
-                                className={`p-1.5 rounded-full transition-colors cursor-pointer ${
-                                  downloadingId === row.id ? 'text-[#2dd4bf] bg-[#2dd4bf]/10 animate-pulse' : 'text-gray-500 hover:text-white hover:bg-white/10'
-                                }`}
-                              >
-                                <Download className="h-3.5 w-3.5" />
-                              </button>
-                            ) : (
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setPaidBeatPurchaseTrack(row);
-                                }}
-                                title="Download Locked · License Required"
-                                className="p-1.5 rounded-full text-gray-500 hover:text-amber-400 hover:bg-amber-400/10 transition-colors cursor-pointer"
-                              >
-                                <Lock className="h-3.5 w-3.5" />
-                              </button>
-                            )}
-
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handlePlayToggle(row);
-                              }}
-                              className={`w-7 h-7 rounded-full flex items-center justify-center transition-colors ${
-                                isThisPlaying ? 'bg-[#04564f] text-[#2dd4bf]' : 'bg-white/5 text-gray-400 hover:text-white hover:bg-white/10'
-                              }`}
-                            >
-                              {isThisPlaying ? (
-                                <Pause className="h-3.5 w-3.5 fill-current" />
-                              ) : (
-                                <Play className="h-3.5 w-3.5 fill-current translate-x-0.5" />
-                              )}
-                            </button>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
+                <div className="p-6 rounded-2xl bg-[#121316] border border-white/[0.06] space-y-2">
+                  {listeningHistory.map((item, idx) => {
+                    const row = item.track;
+                    const isCurrent = currentTrack.id === row.id;
+                    const isFree = isFreeBeat(row);
+                    return (
+                      <TrackRow
+                        key={'hist-' + row.id + '-' + idx}
+                        track={row}
+                        variant="dark"
+                        isCurrent={isCurrent}
+                        isPlaying={isCurrent && isPlaying}
+                        currentTime={isCurrent ? currentTime : 0}
+                        isFavorited={Boolean(row.isLiked || likedTrackIds.includes(row.id))}
+                        isListenLater={listenLaterIds.includes(row.id)}
+                        isDownloading={downloadingId === row.id}
+                        isDownloadLocked={!isFree}
+                        subtitleOverride={`${row.artist} • ${row.genre || 'Afrobeats'} · ${item.listenedAt}`}
+                        onPlayToggle={handlePlayToggle}
+                        onSeek={handleRowSeek}
+                        onDownload={(t, e) => handleDownload(t, e)}
+                        onLockedDownloadClick={(t) => setPaidBeatPurchaseTrack(t)}
+                        onFavoriteToggle={(t) => toggleLike(t.id)}
+                        onListenLaterToggle={(t) => toggleListenLater(t)}
+                      />
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -1755,6 +1450,8 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
               tracks={playlistRows}
               currentTrack={currentTrack}
               isPlaying={isPlaying}
+              currentTime={currentTime}
+              onSeek={handleRowSeek}
               handlePlayToggle={handlePlayToggle}
               likedTrackIds={likedTrackIds}
               toggleLike={toggleLike}
@@ -1832,15 +1529,6 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
                   })}
                 </div>
 
-                {/* Table Header */}
-                <div className="hidden sm:flex items-center justify-between px-3 text-[11px] font-mono uppercase tracking-wider text-gray-500 pb-1">
-                  <div className="w-72 sm:w-80">Track / Producer</div>
-                  <div className="w-36 text-left">BPM & Plays</div>
-                  <div className="hidden md:block w-36">Release Date</div>
-                  <div className="hidden lg:block w-28">Basic Lease</div>
-                  <div className="w-36 text-right">Actions</div>
-                </div>
-
                 <div className="space-y-2">
                   {filteredRows.length === 0 ? (
                     <div className="p-10 text-center rounded-xl bg-[#121316] border border-white/[0.04] space-y-3">
@@ -1856,133 +1544,42 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
                     </div>
                   ) : (
                     filteredRows.map((row) => {
-                    const isThisPlaying = isPlaying && currentTrack.id === row.id;
-                    return (
-                      <div
-                        key={row.id}
-                        onClick={() => handlePlayToggle(row)}
-                        className="flex items-center justify-between px-2 py-2 rounded-md hover:bg-[#1c1e24] cursor-pointer group"
-                      >
-                        <div className="flex items-center gap-3.5 min-w-0 w-72 sm:w-80">
-                          <div className="w-11 h-11 rounded-lg overflow-hidden bg-black/40 border border-white/10 shrink-0 relative">
-                            <img
-                              src={row.coverUrl}
-                              alt={row.title}
-                              className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-                            />
-                            {isThisPlaying && (
-                              <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-                                <span className="h-2 w-2 rounded-full bg-[#2dd4bf] animate-ping" />
-                              </div>
-                            )}
-                          </div>
-                          <div className="min-w-0">
-                            <div className="flex items-center gap-1.5">
-                              <p className={`text-xs font-bold truncate ${isThisPlaying ? 'text-[#2dd4bf]' : 'text-white'}`}>
-                                {row.title}
-                              </p>
-                              {!isFreeBeat(row) ? (
-                                <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30 shrink-0 font-mono">
-                                  PAID
-                                </span>
-                              ) : (
-                                <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 shrink-0 font-mono">
-                                  FREE
-                                </span>
-                              )}
-                            </div>
-                            <p className="text-[11px] text-gray-500 truncate mt-0.5 flex items-center gap-1.5">
-                              <span>{row.artist}</span>
-                              {!isFreeBeat(row) && row.priceNgn && (
-                                <span className="text-[10px] text-amber-400 font-mono font-bold">
-                                  · ₦{row.priceNgn.toLocaleString()}
-                                </span>
-                              )}
-                            </p>
-                          </div>
-                        </div>
-
-                        <div className="hidden sm:block text-xs font-mono text-gray-400 text-left w-36 truncate">
-                          <p className="truncate">{row.tracksCount || `${row.bpm || 120} BPM • ${row.genre || 'Beat'}`}</p>
-                          <p className="text-[10px] text-[#2dd4bf] font-semibold mt-0.5">
-                            {(row.playCount || 0).toLocaleString()} plays
-                          </p>
-                        </div>
-
-                        <div className="hidden md:block text-xs text-gray-500 w-36 truncate">
-                          {row.date}
-                        </div>
-
-                        <div className="hidden lg:flex items-center text-xs font-mono font-bold text-[#2dd4bf] w-28">
-                          {isFreeBeat(row) || row.isFree || !row.priceNgn || row.priceNgn <= 0.01 ? '₦0.00' : `₦${row.priceNgn.toLocaleString('en-NG')}`}
-                        </div>
-
-                        <div className="flex items-center gap-2 shrink-0 w-36 justify-end">
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              toggleListenLater(row);
-                            }}
-                            title={listenLaterIds.includes(row.id) ? "Remove from Listen Later" : "Add to Listen Later"}
-                            className={`p-1.5 rounded-full transition-colors cursor-pointer ${
-                              listenLaterIds.includes(row.id) ? 'text-[#2dd4bf] bg-[#2dd4bf]/10' : 'text-gray-500 hover:text-[#2dd4bf]'
-                            }`}
-                          >
-                            <Clock className="h-3.5 w-3.5" />
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              toggleLike(row.id);
-                            }}
-                            title="Favorite"
-                            className={`p-1.5 rounded-full transition-colors cursor-pointer ${
-                              row.isLiked || likedTrackIds.includes(row.id) ? 'text-red-500' : 'text-gray-500 hover:text-red-500'
-                            }`}
-                          >
-                            <Heart className={`h-3.5 w-3.5 ${row.isLiked || likedTrackIds.includes(row.id) ? 'fill-red-500 text-red-500' : ''}`} />
-                          </button>
-
-                          {isFreeBeat(row) && (
-                            <button
-                              type="button"
-                              onClick={(e) => handleDownload(row, e)}
-                              title="Download Song (WAV)"
-                              className={`p-1.5 rounded-full transition-colors cursor-pointer ${
-                                downloadingId === row.id ? 'text-[#2dd4bf] bg-[#2dd4bf]/10 animate-pulse' : 'text-gray-500 hover:text-white hover:bg-white/10'
-                              }`}
-                            >
-                              <Download className="h-3.5 w-3.5" />
-                            </button>
-                          )}
-
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handlePlayToggle(row);
-                            }}
-                            className={`w-7 h-7 rounded-full flex items-center justify-center transition-colors ${
-                              isThisPlaying
-                                ? 'bg-[#04564f] text-[#2dd4bf]'
-                                : 'bg-white/5 text-gray-400 hover:text-white hover:bg-white/10'
-                            }`}
-                          >
-                            {isThisPlaying ? (
-                              <Pause className="h-3.5 w-3.5 fill-current" />
+                      const isCurrent = currentTrack.id === row.id;
+                      const isFree = isFreeBeat(row);
+                      return (
+                        <TrackRow
+                          key={row.id}
+                          track={row}
+                          variant="dark"
+                          isCurrent={isCurrent}
+                          isPlaying={isCurrent && isPlaying}
+                          currentTime={isCurrent ? currentTime : 0}
+                          isFavorited={Boolean(row.isLiked || likedTrackIds.includes(row.id))}
+                          isListenLater={listenLaterIds.includes(row.id)}
+                          isDownloading={downloadingId === row.id}
+                          isDownloadLocked={!isFree}
+                          badge={
+                            !isFree ? (
+                              <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30 shrink-0 font-mono">
+                                PAID
+                              </span>
                             ) : (
-                              <Play className="h-3.5 w-3.5 fill-current translate-x-0.5" />
-                            )}
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })
-                )}
-              </div>
+                              <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 shrink-0 font-mono">
+                                FREE
+                              </span>
+                            )
+                          }
+                          onPlayToggle={handlePlayToggle}
+                          onSeek={handleRowSeek}
+                          onDownload={(t, e) => handleDownload(t, e)}
+                          onLockedDownloadClick={(t) => setPaidBeatPurchaseTrack(t)}
+                          onFavoriteToggle={(t) => toggleLike(t.id)}
+                          onListenLaterToggle={(t) => toggleListenLater(t)}
+                        />
+                      );
+                    })
+                  )}
+                </div>
               </div>
 
               {/* BOTTOM ROW: PROMO BANNER */}
@@ -2269,11 +1866,6 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
                 <p className="text-[11px] font-bold text-white truncate max-w-[130px] sm:max-w-[170px]" title={currentTrack.title}>
                   {currentTrack.title}
                 </p>
-                {!isSubscribed && (
-                  <span className="px-1 py-0.2 rounded text-[8px] font-mono font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30 shrink-0">
-                    30s
-                  </span>
-                )}
               </div>
 
               {/* Publisher name */}
@@ -2313,19 +1905,6 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
                     const rect = e.currentTarget.getBoundingClientRect();
                     const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
                     const targetSec = Math.round(ratio * currentTrack.durationSeconds);
-                    const isPaid = !isFreeBeat(currentTrack);
-                    if (!isSubscribed && isPaid && targetSec > FREE_PREVIEW_LIMIT_SECONDS) {
-                      setCurrentTime(0);
-                      if (audioRef.current) {
-                        audioRef.current.currentTime = 0;
-                        audioRef.current.pause();
-                      }
-                      audioSynth.stop();
-                      setIsPlaying(false);
-                      setPaidBeatPurchaseTrack(currentTrack);
-                      setRewardNotification('30-second preview limit. Purchase this beat to unlock full listening.');
-                      return;
-                    }
                     setCurrentTime(targetSec);
                     if (audioRef.current) {
                       audioRef.current.currentTime = targetSec;
@@ -2337,16 +1916,10 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
                     className="h-full bg-[#e53935] transition-all"
                     style={{ width: `${progressRatio}%` }}
                   />
-                  {!isSubscribed && !isFreeBeat(currentTrack) && (
-                    <div
-                      className="absolute top-0 bottom-0 w-0.5 bg-amber-400/80 z-10"
-                      style={{ left: `${Math.min(100, (FREE_PREVIEW_LIMIT_SECONDS / currentTrack.durationSeconds) * 100)}%` }}
-                    />
-                  )}
                 </div>
 
                 <span className="text-[9px] font-mono text-gray-400 shrink-0 tabular-nums">
-                  {formatTime(currentTime)} / {!isSubscribed && !isFreeBeat(currentTrack) ? '0:30' : currentTrack.duration}
+                  {formatTime(currentTime)} / {currentTrack.duration}
                 </span>
               </div>
             </div>
@@ -2440,16 +2013,6 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
             <div className="min-w-0">
               <div className="flex items-center gap-2">
                 <p className="text-xs font-bold text-white truncate">{currentTrack.title}</p>
-                {!isSubscribed && (
-                  <button
-                    type="button"
-                    onClick={() => setShowUpgradeModal(true)}
-                    className="px-1.5 py-0.5 rounded-full text-[9px] font-mono font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30 hover:bg-amber-500/30 transition-colors shrink-0 cursor-pointer"
-                    title="Free preview is limited to 15 seconds. Click to upgrade for full tracks."
-                  >
-                    15s Preview
-                  </button>
-                )}
               </div>
               <p className="text-[11px] text-gray-400 truncate mt-0.5">{currentTrack.artist}</p>
             </div>
@@ -2568,19 +2131,6 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
                   const rect = e.currentTarget.getBoundingClientRect();
                   const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
                   const targetSec = Math.round(ratio * currentTrack.durationSeconds);
-                  const isPaid = !isFreeBeat(currentTrack);
-                  if (!isSubscribed && isPaid && targetSec > FREE_PREVIEW_LIMIT_SECONDS) {
-                    setCurrentTime(0);
-                    if (audioRef.current) {
-                      audioRef.current.currentTime = 0;
-                      audioRef.current.pause();
-                    }
-                    audioSynth.stop();
-                    setIsPlaying(false);
-                    setPaidBeatPurchaseTrack(currentTrack);
-                    setRewardNotification('30-second preview limit. Purchase this beat to unlock full listening.');
-                    return;
-                  }
                   setCurrentTime(targetSec);
                   if (audioRef.current) {
                     audioRef.current.currentTime = targetSec;
@@ -2592,16 +2142,9 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
                   className="h-full bg-gradient-to-r from-[#04564f] to-[#2dd4bf] transition-all"
                   style={{ width: `${progressRatio}%` }}
                 />
-                {!isSubscribed && !isFreeBeat(currentTrack) && (
-                  <div
-                    className="absolute top-0 bottom-0 w-0.5 bg-amber-400/80 z-10"
-                    style={{ left: `${Math.min(100, (FREE_PREVIEW_LIMIT_SECONDS / currentTrack.durationSeconds) * 100)}%` }}
-                    title="30-second preview limit on paid beats"
-                  />
-                )}
               </div>
               <span className="text-[10px] font-mono text-gray-500 w-8 shrink-0">
-                {!isSubscribed && !isFreeBeat(currentTrack) ? '0:30' : currentTrack.duration}
+                {currentTrack.duration}
               </span>
             </div>
           </div>
@@ -2726,9 +2269,7 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
             </div>
 
             <p className="text-xs text-gray-400 leading-relaxed">
-              {!isSubscribed
-                ? "You've reached the 15-second preview limit for free accounts. Upgrade to Caution Plus to unlock unlimited full-length streaming, WAV stem downloads, and commercial licensing."
-                : "Unlock unlimited 24-bit lossless streaming, stem downloads, multi-track separation, and automated synchronization clearance for commercial releases."}
+              Unlock unlimited 24-bit lossless streaming, stem downloads, multi-track separation, and automated synchronization clearance for commercial releases.
             </p>
 
             <div className="p-4 rounded-xl bg-white/[0.03] border border-white/[0.06] space-y-2.5 text-xs text-gray-300">
@@ -2903,7 +2444,7 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
 
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-xs font-mono text-amber-300 mb-3">
               <Sparkles className="h-3.5 w-3.5 text-amber-300" />
-              <span>30-Second Preview Ended · Commercial Beat</span>
+              <span>Commercial Beat · License & Stems</span>
             </div>
 
             <h2 className="text-xl font-black text-white truncate">

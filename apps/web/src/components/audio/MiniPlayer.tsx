@@ -145,22 +145,6 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({ variant = 'persistent' }
       aria-label="Floating audio navigation player"
       className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 w-[calc(100%-2rem)] max-w-4xl bg-[#0A0D14]/95 backdrop-blur-xl border border-white/[0.12] rounded-full px-4 sm:px-6 py-2.5 shadow-[0_20px_50px_rgba(0,0,0,0.85)] select-none transition-all duration-300 animate-in fade-in slide-in-from-bottom-5"
     >
-      {/* Floating 15-second preview prompt */}
-      {showUpgradePrompt && (
-        <div className="absolute -top-10 left-1/2 -translate-x-1/2 bg-[#121316] border border-[#2dd4bf]/40 px-3.5 py-1 rounded-full text-[11px] font-medium text-white shadow-xl flex items-center gap-2 whitespace-nowrap animate-in fade-in slide-in-from-bottom-2 z-50">
-          <span className="text-amber-300 font-mono">15s preview ended</span>
-          <Link href="/subscriptions" className="text-[#2dd4bf] hover:underline font-bold uppercase tracking-wider text-[10px]">
-            Upgrade to Plus →
-          </Link>
-          <button
-            type="button"
-            onClick={() => setShowUpgradePrompt(false)}
-            className="text-gray-400 hover:text-white ml-1 p-0.5 cursor-pointer"
-          >
-            <X className="h-3 w-3" />
-          </button>
-        </div>
-      )}
       <div className="flex items-center justify-between gap-3 sm:gap-4">
         {/* Left: Beat Artwork & Info */}
         <div className="flex items-center gap-2.5 sm:gap-3 min-w-0 shrink-0">
@@ -184,15 +168,6 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({ variant = 'persistent' }
               >
                 {currentBeat.title}
               </Link>
-              {!isSubscribed && (
-                <Link
-                  href="/subscriptions"
-                  className="px-1.5 py-0.5 rounded text-[8px] font-mono font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30 hover:bg-amber-500/30 transition-colors shrink-0"
-                  title="Free preview is limited to 15 seconds"
-                >
-                  15s
-                </Link>
-              )}
             </div>
             <div className="flex items-center gap-1.5 text-[10px] text-gray-400 font-mono truncate mt-0.5">
               <span className="truncate">{currentBeat.producer?.display_name || 'Caution'}</span>
@@ -259,7 +234,7 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({ variant = 'persistent' }
 
           {/* Total Duration */}
           <span className="text-[10px] font-mono text-gray-400 w-8 shrink-0 hidden md:block">
-            {!isSubscribed ? '0:15' : formatTime(duration)}
+            {formatTime(duration)}
           </span>
         </div>
 
