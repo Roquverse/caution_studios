@@ -49,26 +49,54 @@ export default function LoginPage() {
         ? CREATOR_PORTAL_URL
         : USER_PORTAL_URL;
 
-      let targetUrl = redirectParam || defaultTarget;
+      let targetUrl = defaultTarget;
+      if (redirectParam) {
+        try {
+          const parsedRedirect = new URL(redirectParam, window.location.href);
+          const isAuthOrigin =
+            parsedRedirect.origin === window.location.origin ||
+            parsedRedirect.hostname.startsWith('auth.');
+          const isAuthPath =
+            parsedRedirect.pathname.startsWith('/login') ||
+            parsedRedirect.pathname.startsWith('/register') ||
+            parsedRedirect.pathname.startsWith('/signin') ||
+            parsedRedirect.pathname.startsWith('/signup');
+          if (!isAuthOrigin && !isAuthPath) {
+            targetUrl = parsedRedirect.toString();
+          }
+        } catch {
+          targetUrl = defaultTarget;
+        }
+      }
 
       if (data?.session) {
         const session = data.session;
         if (typeof document !== 'undefined') {
           const isProd = window.location.hostname.includes('cautionstudioz.com');
-          const domainStr = isProd ? '; domain=.cautionstudioz.com' : '';
-          document.cookie = `sb-token=${session.access_token}; path=/; max-age=604800; SameSite=Lax${domainStr}`;
-          document.cookie = `sb-refresh=${session.refresh_token}; path=/; max-age=604800; SameSite=Lax${domainStr}`;
+          const domainStr = isProd ? '; domain=.cautionstudioz.com; Secure' : '';
+          document.cookie = `sb-token=${encodeURIComponent(session.access_token)}; path=/; max-age=604800; SameSite=Lax${domainStr}`;
+          document.cookie = `sb-refresh=${encodeURIComponent(session.refresh_token)}; path=/; max-age=604800; SameSite=Lax${domainStr}`;
         }
         try {
-          const targetOrigin = new URL(targetUrl, window.location.href).origin;
-          if (targetOrigin !== window.location.origin) {
-            const separator = targetUrl.includes('#') ? '&' : '#';
-            targetUrl = `${targetUrl}${separator}access_token=${session.access_token}&refresh_token=${session.refresh_token}&token_type=bearer`;
-          }
+          const url = new URL(targetUrl, window.location.href);
+          if (!url.pathname) url.pathname = '/';
+          url.searchParams.set('sb_token', session.access_token);
+          url.searchParams.set('sb_refresh', session.refresh_token);
+
+          const expiresIn = session.expires_in || 3600;
+          const expiresAt = session.expires_at || Math.floor(Date.now() / 1000) + expiresIn;
+          const hashParams = new URLSearchParams();
+          hashParams.set('access_token', session.access_token);
+          hashParams.set('refresh_token', session.refresh_token);
+          hashParams.set('expires_in', String(expiresIn));
+          hashParams.set('expires_at', String(expiresAt));
+          hashParams.set('token_type', 'bearer');
+          url.hash = hashParams.toString();
+          targetUrl = url.toString();
         } catch (e) {}
       }
 
-      window.location.href = targetUrl;
+      window.location.replace(targetUrl);
     } catch (err: any) {
       setErrorMessage(err?.message || 'Failed to sign in. Please try again.');
       setIsLoading(false);

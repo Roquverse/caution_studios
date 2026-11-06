@@ -3,6 +3,27 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabaseClient';
 
+// Capture URL tokens immediately when script loads before GoTrueClient can clear window.location.hash
+const initialUrlTokens: { access_token: string | null; refresh_token: string | null } = (() => {
+  if (typeof window === 'undefined') {
+    return { access_token: null, refresh_token: null };
+  }
+  const hashParams = new URLSearchParams(window.location.hash ? window.location.hash.substring(1) : '');
+  const searchParams = new URLSearchParams(window.location.search || '');
+  return {
+    access_token:
+      hashParams.get('access_token') ||
+      searchParams.get('sb_token') ||
+      searchParams.get('access_token') ||
+      null,
+    refresh_token:
+      hashParams.get('refresh_token') ||
+      searchParams.get('sb_refresh') ||
+      searchParams.get('refresh_token') ||
+      null
+  };
+})();
+
 function getAuthLoginRedirectUrl(): string {
   const authBase =
     process.env.NEXT_PUBLIC_AUTH_URL ||
@@ -11,10 +32,37 @@ function getAuthLoginRedirectUrl(): string {
       : 'http://localhost:3001');
 
   if (typeof window !== 'undefined') {
-    const currentUrl = window.location.origin + window.location.pathname + window.location.search;
+    const cleanSearch = new URLSearchParams(window.location.search);
+    cleanSearch.delete('sb_token');
+    cleanSearch.delete('sb_refresh');
+    cleanSearch.delete('access_token');
+    cleanSearch.delete('refresh_token');
+    const queryStr = cleanSearch.toString();
+    const currentUrl =
+      window.location.origin + window.location.pathname + (queryStr ? `?${queryStr}` : '');
     return `${authBase.replace(/\/$/, '')}/login?redirect=${encodeURIComponent(currentUrl)}`;
   }
   return `${authBase.replace(/\/$/, '')}/login`;
+}
+
+function persistAuthCookies(accessToken: string, refreshToken: string) {
+  if (typeof document === 'undefined' || typeof window === 'undefined') return;
+  const isProd = window.location.hostname.includes('cautionstudioz.com');
+  const domainStr = isProd ? '; domain=.cautionstudioz.com; Secure' : '';
+  document.cookie = `sb-token=${encodeURIComponent(accessToken)}; path=/; max-age=604800; SameSite=Lax${domainStr}`;
+  document.cookie = `sb-refresh=${encodeURIComponent(refreshToken)}; path=/; max-age=604800; SameSite=Lax${domainStr}`;
+}
+
+function cleanAuthUrlParams() {
+  if (typeof window === 'undefined') return;
+  const cleanSearch = new URLSearchParams(window.location.search);
+  cleanSearch.delete('sb_token');
+  cleanSearch.delete('sb_refresh');
+  cleanSearch.delete('access_token');
+  cleanSearch.delete('refresh_token');
+  const queryStr = cleanSearch.toString();
+  const nextUrl = window.location.pathname + (queryStr ? `?${queryStr}` : '');
+  window.history.replaceState(null, '', nextUrl);
 }
 
 export function UserAuthGuard({ children }: { children: React.ReactNode }) {
@@ -28,12 +76,27 @@ export function UserAuthGuard({ children }: { children: React.ReactNode }) {
       try {
         let session = (await supabase.auth.getSession()).data.session;
 
-        // 1. Restore session from URL hash if redirected from Auth portal (#access_token=...&refresh_token=...)
-        if (!session?.user && typeof window !== 'undefined' && window.location.hash) {
-          const hashParams = new URLSearchParams(window.location.hash.substring(1));
-          const access_token = hashParams.get('access_token');
-          const refresh_token = hashParams.get('refresh_token');
+        // 1. Restore session from URL hash / query params (or captured initialUrlTokens)
+        if (!session?.user && typeof window !== 'undefined') {
+          const hashParams = new URLSearchParams(
+            window.location.hash ? window.location.hash.substring(1) : ''
+          );
+          const searchParams = new URLSearchParams(window.location.search || '');
+          const access_token =
+            hashParams.get('access_token') ||
+            searchParams.get('sb_token') ||
+            searchParams.get('access_token') ||
+            initialUrlTokens.access_token;
+          const refresh_token =
+            hashParams.get('refresh_token') ||
+            searchParams.get('sb_refresh') ||
+            searchParams.get('refresh_token') ||
+            initialUrlTokens.refresh_token;
+
           if (access_token && refresh_token) {
+            // Clear captured tokens so they are only consumed once
+            initialUrlTokens.access_token = null;
+            initialUrlTokens.refresh_token = null;
             try {
               const { data: restored } = await supabase.auth.setSession({
                 access_token,
@@ -41,14 +104,11 @@ export function UserAuthGuard({ children }: { children: React.ReactNode }) {
               });
               if (restored?.session?.user) {
                 session = restored.session;
-                const isProd = window.location.hostname.includes('cautionstudioz.com');
-                const domainStr = isProd ? '; domain=.cautionstudioz.com' : '';
-                document.cookie = `sb-token=${session.access_token}; path=/; max-age=604800; SameSite=Lax${domainStr}`;
-                document.cookie = `sb-refresh=${session.refresh_token}; path=/; max-age=604800; SameSite=Lax${domainStr}`;
-                window.history.replaceState(null, '', window.location.pathname + window.location.search);
+                persistAuthCookies(session.access_token, session.refresh_token);
+                cleanAuthUrlParams();
               }
             } catch (e) {
-              console.warn('Failed restoring user session from hash:', e);
+              console.warn('Failed restoring user session from URL tokens:', e);
             }
           }
         }
@@ -68,6 +128,7 @@ export function UserAuthGuard({ children }: { children: React.ReactNode }) {
               });
               if (restored?.session?.user) {
                 session = restored.session;
+                persistAuthCookies(session.access_token, session.refresh_token);
               }
             } catch (e) {
               console.warn('Failed restoring user session from cookie:', e);
@@ -84,6 +145,8 @@ export function UserAuthGuard({ children }: { children: React.ReactNode }) {
         }
 
         if (session?.user) {
+          persistAuthCookies(session.access_token, session.refresh_token);
+          cleanAuthUrlParams();
           if (isMounted) {
             setIsAuthenticated(true);
             setCheckingAuth(false);
@@ -91,7 +154,7 @@ export function UserAuthGuard({ children }: { children: React.ReactNode }) {
           return;
         }
 
-        // Unauthenticated -> redirect immediately to Auth portal login
+        // Unauthenticated -> redirect to Auth portal login
         if (typeof window !== 'undefined') {
           window.location.replace(getAuthLoginRedirectUrl());
         }
@@ -108,16 +171,17 @@ export function UserAuthGuard({ children }: { children: React.ReactNode }) {
     const {
       data: { subscription }
     } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === 'SIGNED_OUT' || !session?.user) {
+      if (session?.user && isMounted) {
+        persistAuthCookies(session.access_token, session.refresh_token);
+        setIsAuthenticated(true);
+        setCheckingAuth(false);
+      } else if (event === 'SIGNED_OUT') {
         if (isMounted) {
           setIsAuthenticated(false);
         }
         if (typeof window !== 'undefined') {
           window.location.replace(getAuthLoginRedirectUrl());
         }
-      } else if (session?.user && isMounted) {
-        setIsAuthenticated(true);
-        setCheckingAuth(false);
       }
     });
 

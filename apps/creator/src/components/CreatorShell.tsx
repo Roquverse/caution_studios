@@ -46,11 +46,18 @@ export function CreatorShell({ children, activePath }: CreatorShellProps) {
       try {
         let session = (await supabase.auth.getSession()).data.session;
 
-        // 1. Restore from URL hash if redirected from Auth portal (#access_token=...&refresh_token=...)
-        if (!session?.user && typeof window !== 'undefined' && window.location.hash) {
-          const hashParams = new URLSearchParams(window.location.hash.substring(1));
-          const access_token = hashParams.get('access_token');
-          const refresh_token = hashParams.get('refresh_token');
+        // 1. Restore from URL hash or query params if redirected from Auth portal
+        if (!session?.user && typeof window !== 'undefined' && (window.location.hash || window.location.search)) {
+          const hashParams = new URLSearchParams(window.location.hash ? window.location.hash.substring(1) : '');
+          const searchParams = new URLSearchParams(window.location.search || '');
+          const access_token =
+            hashParams.get('access_token') ||
+            searchParams.get('sb_token') ||
+            searchParams.get('access_token');
+          const refresh_token =
+            hashParams.get('refresh_token') ||
+            searchParams.get('sb_refresh') ||
+            searchParams.get('refresh_token');
           if (access_token && refresh_token) {
             try {
               const { data: restored } = await supabase.auth.setSession({
@@ -60,13 +67,19 @@ export function CreatorShell({ children, activePath }: CreatorShellProps) {
               if (restored?.session?.user) {
                 session = restored.session;
                 const isProd = window.location.hostname.includes('cautionstudioz.com');
-                const domainStr = isProd ? '; domain=.cautionstudioz.com' : '';
-                document.cookie = `sb-token=${session.access_token}; path=/; max-age=604800; SameSite=Lax${domainStr}`;
-                document.cookie = `sb-refresh=${session.refresh_token}; path=/; max-age=604800; SameSite=Lax${domainStr}`;
-                window.history.replaceState(null, '', window.location.pathname + window.location.search);
+                const domainStr = isProd ? '; domain=.cautionstudioz.com; Secure' : '';
+                document.cookie = `sb-token=${encodeURIComponent(session.access_token)}; path=/; max-age=604800; SameSite=Lax${domainStr}`;
+                document.cookie = `sb-refresh=${encodeURIComponent(session.refresh_token)}; path=/; max-age=604800; SameSite=Lax${domainStr}`;
+                const cleanSearch = new URLSearchParams(window.location.search);
+                cleanSearch.delete('sb_token');
+                cleanSearch.delete('sb_refresh');
+                cleanSearch.delete('access_token');
+                cleanSearch.delete('refresh_token');
+                const q = cleanSearch.toString();
+                window.history.replaceState(null, '', window.location.pathname + (q ? `?${q}` : ''));
               }
             } catch (e) {
-              console.warn('Failed restoring creator session from hash:', e);
+              console.warn('Failed restoring creator session from URL:', e);
             }
           }
         }

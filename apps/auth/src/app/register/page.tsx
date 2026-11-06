@@ -81,12 +81,36 @@ export default function RegisterPage() {
         return;
       }
 
-      const destinationUrl = isProducer
+      let destinationUrl = isProducer
         ? `${CREATOR_PORTAL_URL}/login?registered=true&email=${encodeURIComponent(email)}`
         : USER_PORTAL_URL;
 
       if (data?.session) {
-        window.location.href = destinationUrl;
+        const session = data.session;
+        if (typeof document !== 'undefined') {
+          const isProd = window.location.hostname.includes('cautionstudioz.com');
+          const domainStr = isProd ? '; domain=.cautionstudioz.com; Secure' : '';
+          document.cookie = `sb-token=${encodeURIComponent(session.access_token)}; path=/; max-age=604800; SameSite=Lax${domainStr}`;
+          document.cookie = `sb-refresh=${encodeURIComponent(session.refresh_token)}; path=/; max-age=604800; SameSite=Lax${domainStr}`;
+        }
+        try {
+          const url = new URL(destinationUrl, window.location.href);
+          if (!url.pathname) url.pathname = '/';
+          url.searchParams.set('sb_token', session.access_token);
+          url.searchParams.set('sb_refresh', session.refresh_token);
+
+          const expiresIn = session.expires_in || 3600;
+          const expiresAt = session.expires_at || Math.floor(Date.now() / 1000) + expiresIn;
+          const hashParams = new URLSearchParams();
+          hashParams.set('access_token', session.access_token);
+          hashParams.set('refresh_token', session.refresh_token);
+          hashParams.set('expires_in', String(expiresIn));
+          hashParams.set('expires_at', String(expiresAt));
+          hashParams.set('token_type', 'bearer');
+          url.hash = hashParams.toString();
+          destinationUrl = url.toString();
+        } catch (e) {}
+        window.location.replace(destinationUrl);
         return;
       }
 
@@ -213,21 +237,31 @@ export default function RegisterPage() {
         const session = data.session;
         if (typeof document !== 'undefined') {
           const isProd = window.location.hostname.includes('cautionstudioz.com');
-          const domainStr = isProd ? '; domain=.cautionstudioz.com' : '';
-          document.cookie = `sb-token=${session.access_token}; path=/; max-age=604800; SameSite=Lax${domainStr}`;
-          document.cookie = `sb-refresh=${session.refresh_token}; path=/; max-age=604800; SameSite=Lax${domainStr}`;
+          const domainStr = isProd ? '; domain=.cautionstudioz.com; Secure' : '';
+          document.cookie = `sb-token=${encodeURIComponent(session.access_token)}; path=/; max-age=604800; SameSite=Lax${domainStr}`;
+          document.cookie = `sb-refresh=${encodeURIComponent(session.refresh_token)}; path=/; max-age=604800; SameSite=Lax${domainStr}`;
         }
         try {
-          const targetOrigin = new URL(destinationUrl, window.location.href).origin;
-          if (targetOrigin !== window.location.origin) {
-            const separator = destinationUrl.includes('#') ? '&' : '#';
-            destinationUrl = `${destinationUrl}${separator}access_token=${session.access_token}&refresh_token=${session.refresh_token}&token_type=bearer`;
-          }
+          const url = new URL(destinationUrl, window.location.href);
+          if (!url.pathname) url.pathname = '/';
+          url.searchParams.set('sb_token', session.access_token);
+          url.searchParams.set('sb_refresh', session.refresh_token);
+
+          const expiresIn = session.expires_in || 3600;
+          const expiresAt = session.expires_at || Math.floor(Date.now() / 1000) + expiresIn;
+          const hashParams = new URLSearchParams();
+          hashParams.set('access_token', session.access_token);
+          hashParams.set('refresh_token', session.refresh_token);
+          hashParams.set('expires_in', String(expiresIn));
+          hashParams.set('expires_at', String(expiresAt));
+          hashParams.set('token_type', 'bearer');
+          url.hash = hashParams.toString();
+          destinationUrl = url.toString();
         } catch (e) {}
       }
 
       setTimeout(() => {
-        window.location.href = destinationUrl;
+        window.location.replace(destinationUrl);
       }, 1200);
     } catch (err: any) {
       setErrorMessage(err?.message || 'Verification failed. Please try again.');
