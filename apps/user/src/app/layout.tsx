@@ -4,7 +4,12 @@ import { UserAuthGuard } from '../components/UserAuthGuard';
 
 export const metadata: Metadata = {
   title: 'Creator Portal | Caution Studio',
-  description: 'Manage your royalty-free music licenses, downloads, and channel clearances.'
+  description: 'Manage your royalty-free music licenses, downloads, and channel clearances.',
+  icons: {
+    icon: '/logo.png',
+    shortcut: '/logo.png',
+    apple: '/logo.png'
+  }
 };
 
 export default function RootLayout({

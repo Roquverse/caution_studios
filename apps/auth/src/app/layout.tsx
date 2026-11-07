@@ -3,7 +3,12 @@ import './globals.css';
 
 export const metadata: Metadata = {
   title: 'Caution Studio Auth | Creator Sign In & Registration',
-  description: 'Sign in to access your royalty-free music downloads and licenses.'
+  description: 'Sign in to access your royalty-free music downloads and licenses.',
+  icons: {
+    icon: '/logo.png',
+    shortcut: '/logo.png',
+    apple: '/logo.png'
+  }
 };
 
 export default function RootLayout({

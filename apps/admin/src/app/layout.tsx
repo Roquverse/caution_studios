@@ -3,7 +3,12 @@ import './globals.css';
 
 export const metadata: Metadata = {
   title: 'Caution Studio | Admin Dashboard',
-  description: 'Executive audio management, catalog distribution, and subscriber telemetry.'
+  description: 'Executive audio management, catalog distribution, and subscriber telemetry.',
+  icons: {
+    icon: '/logo.png',
+    shortcut: '/logo.png',
+    apple: '/logo.png'
+  }
 };
 
 export default function RootLayout({

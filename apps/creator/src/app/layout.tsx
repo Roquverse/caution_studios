@@ -3,7 +3,12 @@ import './globals.css';
 
 export const metadata: Metadata = {
   title: 'Creator Studio | Caution Studio',
-  description: 'Manage beat catalog, track sales & streaming royalties, Paystack payouts, and artist collaborations.'
+  description: 'Manage beat catalog, track sales & streaming royalties, Paystack payouts, and artist collaborations.',
+  icons: {
+    icon: '/logo.png',
+    shortcut: '/logo.png',
+    apple: '/logo.png'
+  }
 };
 
 export default function RootLayout({

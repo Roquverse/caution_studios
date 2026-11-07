@@ -15,7 +15,12 @@ export const metadata: Metadata = {
     'exclusive beat license',
     'music producer marketplace',
     'caution studio'
-  ]
+  ],
+  icons: {
+    icon: '/logo.png',
+    shortcut: '/logo.png',
+    apple: '/logo.png'
+  }
 };
 
 export default function RootLayout({
