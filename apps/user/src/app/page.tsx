@@ -30,13 +30,22 @@ export default async function UserPortalPage() {
       .order('created_at', { ascending: false });
 
     if (dbBeats && dbBeats.length > 0) {
+      const r2Cdn = process.env.NEXT_PUBLIC_R2_PUBLIC_URL?.replace(/\/$/, '');
       initialBeats = dbBeats.map((b) => {
         const audioKey = b.master_wav_key || b.preview_clean_key || b.preview_tagged_key;
         let audioUrl = '';
         if (audioKey) {
-          audioUrl = audioKey.startsWith('http') || audioKey.startsWith('/') ? audioKey : `/api/media/${audioKey}`;
+          if (audioKey.startsWith('http') || audioKey.startsWith('/')) {
+            audioUrl = audioKey;
+          } else if (r2Cdn) {
+            audioUrl = `${r2Cdn}/${audioKey}`;
+          } else {
+            audioUrl = `/api/media/${audioKey}`;
+          }
         } else {
-          audioUrl = '/api/media/masters/alex-morgan-afrobeat-instrumental-summer-groove-573648-hubz_1791151613114.mp3';
+          audioUrl = r2Cdn
+            ? `${r2Cdn}/masters/alex-morgan-afrobeat-instrumental-summer-groove-573648-hubz_1791151613114.mp3`
+            : '/api/media/masters/alex-morgan-afrobeat-instrumental-summer-groove-573648-hubz_1791151613114.mp3';
         }
         const basicLic = b.licenses?.find((l: any) => l.type === 'basic') || b.beat_licenses?.find((l: any) => l.type === 'basic');
         const exclusiveLic = b.licenses?.find((l: any) => l.type === 'exclusive') || b.beat_licenses?.find((l: any) => l.type === 'exclusive');

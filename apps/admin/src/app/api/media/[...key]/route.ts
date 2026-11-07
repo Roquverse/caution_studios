@@ -11,6 +11,14 @@ export async function GET(
       return NextResponse.json({ error: 'Missing object key' }, { status: 400 });
     }
 
+    // If an R2 public CDN / custom domain is configured, redirect directly to Cloudflare
+    // to bypass Vercel Fast Origin Transfer completely (0 Vercel bandwidth used).
+    const publicR2 = process.env.NEXT_PUBLIC_R2_PUBLIC_URL || process.env.R2_PUBLIC_URL;
+    if (publicR2) {
+      const targetCdnUrl = `${publicR2.replace(/\/$/, '')}/${fullKey}`;
+      return NextResponse.redirect(targetCdnUrl, { status: 307 });
+    }
+
     const object = await getFromR2(fullKey);
     if (!object.Body) {
       return NextResponse.json({ error: 'Media file empty' }, { status: 404 });

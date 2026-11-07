@@ -67,7 +67,11 @@ const FALLBACK_CATALOG_TRACKS: CatalogTrack[] = SEEDED_BEATS.slice(0, 5).map((b,
       b.tags.find((t) =>
         ['Guitar', 'Piano', 'Synthesizer', 'Strings', 'Drums', 'Bass', 'Log Drum'].includes(t)
       ) || 'Synthesizer',
-    audioUrl: audioKey ? `/api/media/${audioKey}` : '',
+    audioUrl: audioKey
+      ? process.env.NEXT_PUBLIC_R2_PUBLIC_URL
+        ? `${process.env.NEXT_PUBLIC_R2_PUBLIC_URL.replace(/\/$/, '')}/${audioKey}`
+        : `/api/media/${audioKey}`
+      : '',
     isSpotlight: idx % 3 === 0
   };
 });
@@ -166,7 +170,11 @@ export const MusicLicensingSection: React.FC<MusicLicensingSectionProps> = ({
               mood: (b.moods && b.moods[0]) || 'Vibrant',
               theme: (b.tags && b.tags[0]) || 'Commercial',
               instrument: 'Synthesizer',
-              audioUrl: audioKey ? `/api/media/${audioKey}` : '',
+              audioUrl: audioKey
+      ? process.env.NEXT_PUBLIC_R2_PUBLIC_URL
+        ? `${process.env.NEXT_PUBLIC_R2_PUBLIC_URL.replace(/\/$/, '')}/${audioKey}`
+        : `/api/media/${audioKey}`
+      : '',
               isSpotlight: idx % 3 === 0
             };
           });

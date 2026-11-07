@@ -69,13 +69,14 @@ export async function GET(req: NextRequest) {
       const normalizedGenre = (b.genre || 'Afrobeats').trim();
       const genre = normalizedGenre.toLowerCase() === 'afrobeat' ? 'Afrobeats' : normalizedGenre;
 
+      const r2Cdn = process.env.NEXT_PUBLIC_R2_PUBLIC_URL?.replace(/\/$/, '') || process.env.R2_PUBLIC_URL?.replace(/\/$/, '');
       let coverUrl = b.cover_url || '/images/studio_mixing_console.jpg';
       if (coverUrl && !coverUrl.startsWith('http') && !coverUrl.startsWith('/')) {
-        coverUrl = `/api/media/${coverUrl}`;
+        coverUrl = r2Cdn ? `${r2Cdn}/${coverUrl}` : `/api/media/${coverUrl}`;
       }
 
       const audioKey = b.preview_clean_key || b.preview_tagged_key || b.master_wav_key;
-      const audioUrl = audioKey ? `/api/media/${audioKey}` : null;
+      const audioUrl = audioKey ? (r2Cdn ? `${r2Cdn}/${audioKey}` : `/api/media/${audioKey}`) : null;
 
       return {
         id: b.id,

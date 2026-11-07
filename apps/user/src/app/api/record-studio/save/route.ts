@@ -17,6 +17,7 @@ export async function POST(req: NextRequest) {
 
     const safeArtist = artistName.toLowerCase().replace(/[^a-z0-9]/g, '-').slice(0, 30) || 'artist';
     const timestamp = Date.now();
+    const publicR2 = process.env.NEXT_PUBLIC_R2_PUBLIC_URL?.replace(/\/$/, '') || process.env.R2_PUBLIC_URL?.replace(/\/$/, '');
 
     // 1. Upload All Vocal Stems (Lead + Multiple Backup Vocals)
     const vocalStemEntries: { name: string; url: string; pan?: number; volume?: number }[] = [];
@@ -39,7 +40,7 @@ export async function POST(req: NextRequest) {
           await uploadToR2(key, buf, 'audio/wav');
           vocalStemEntries.push({
             name: trackName,
-            url: `/api/media/${key}`,
+            url: publicR2 ? `${publicR2}/${key}` : `/api/media/${key}`,
             pan,
             volume: vol
           });
@@ -61,7 +62,7 @@ export async function POST(req: NextRequest) {
           await uploadToR2(key, buf, 'audio/wav');
           vocalStemEntries.push({
             name: 'Lead Vocal',
-            url: `/api/media/${key}`,
+            url: publicR2 ? `${publicR2}/${key}` : `/api/media/${key}`,
             pan: 0,
             volume: 1
           });
@@ -81,7 +82,7 @@ export async function POST(req: NextRequest) {
 
       try {
         await uploadToR2(masterKey, masterBuffer, 'audio/wav');
-        masterR2Url = `/api/media/${masterKey}`;
+        masterR2Url = publicR2 ? `${publicR2}/${masterKey}` : `/api/media/${masterKey}`;
       } catch (uploadErr) {
         console.warn('R2 master demo upload warning:', uploadErr);
       }

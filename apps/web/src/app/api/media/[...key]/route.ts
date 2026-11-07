@@ -17,6 +17,14 @@ export async function GET(
       return NextResponse.json({ error: 'Invalid path' }, { status: 400 });
     }
 
+    // If an R2 public CDN / custom domain is configured, redirect directly to Cloudflare
+    // to bypass Vercel Fast Origin Transfer completely (0 Vercel bandwidth used).
+    const publicR2 = process.env.NEXT_PUBLIC_R2_PUBLIC_URL || process.env.R2_PUBLIC_URL;
+    if (publicR2) {
+      const targetCdnUrl = `${publicR2.replace(/\/$/, '')}/${cleanKey}`;
+      return NextResponse.redirect(targetCdnUrl, { status: 307 });
+    }
+
     const object = await getFromR2(cleanKey);
     if (!object.Body) {
       return NextResponse.json({ error: 'File not found' }, { status: 404 });
