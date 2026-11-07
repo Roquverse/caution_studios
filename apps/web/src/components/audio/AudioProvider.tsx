@@ -121,6 +121,7 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const synthTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const pendingBeatRef = useRef<Beat | null>(null);
 
   const duration = currentBeat?.duration_seconds || 180;
 
@@ -152,17 +153,7 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   }, [isSubscribed, isLoggedIn]);
 
-  const play = (beat: Beat) => {
-    if (beat.status === 'sold') return; // Cannot stream exclusive sold beat if locked
-
-    // Check 3-song unskippable audio ad threshold (Audiomack / Spotify model: after listening to 3 songs an ad comes in and can't be skipped)
-    const nextPlayed = beatsPlayedCount + 1;
-    setBeatsPlayedCount(nextPlayed);
-
-    if (!isSubscribed && nextPlayed > 0 && nextPlayed % 3 === 0) {
-      setIsAdModalOpen(true);
-    }
-
+  const executePlayBeat = (beat: Beat) => {
     const isDifferentBeat = !currentBeat || currentBeat.id !== beat.id;
     setCurrentBeat(beat);
     setIsPlaying(true);
@@ -214,6 +205,24 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         });
       });
     }
+  };
+
+  const play = (beat: Beat) => {
+    if (beat.status === 'sold') return; // Cannot stream exclusive sold beat if locked
+
+    // Check 3-song unskippable audio ad threshold (Audiomack / Spotify model: after listening to 3 songs an ad comes in and can't be skipped)
+    const nextPlayed = beatsPlayedCount + 1;
+    setBeatsPlayedCount(nextPlayed);
+
+    if (!isSubscribed && nextPlayed > 0 && nextPlayed % 3 === 0) {
+      // Hold the intended beat, pause any current music, and open the ad modal
+      pause();
+      pendingBeatRef.current = beat;
+      setIsAdModalOpen(true);
+      return; // DO NOT PLAY THE INTENDED BEAT! THE AD PLAYS INSTEAD!
+    }
+
+    executePlayBeat(beat);
   };
 
   const pause = () => {
@@ -358,10 +367,17 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         beat={currentBeat}
       />
 
-      {/* Promoted Artist Audio Ad Modal (Pops up every 5 beats) */}
+      {/* Promoted Artist Audio Ad Modal (Pops up every 3 songs) */}
       <ArtistAdModal
         isOpen={isAdModalOpen}
-        onClose={() => setIsAdModalOpen(false)}
+        onClose={() => {
+          setIsAdModalOpen(false);
+          if (pendingBeatRef.current) {
+            const beatToResume = pendingBeatRef.current;
+            pendingBeatRef.current = null;
+            executePlayBeat(beatToResume);
+          }
+        }}
       />
 
       {/* Rewarded Ad-Supported Beat Download Modal (Stream 2 songs to download 1 beat) */}

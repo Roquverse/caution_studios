@@ -103,29 +103,34 @@ export const UserAdModal: React.FC<UserAdModalProps> = ({ isOpen, onClose, onRew
               body: JSON.stringify({ campaignId: randomPick.id })
             }).catch(() => {});
 
-            // Play audio if available
-            if (randomPick.audio_url) {
-              const audio = new Audio(randomPick.audio_url);
-              audioRef.current = audio;
-              audio.play().catch((e) => {
-                console.warn('Real audio play prevented, fallback to synth:', e);
-                try {
-                  audioSynth.playTrack(randomPick.id, () => {}, 15);
-                } catch {}
-              });
-              return;
-            }
+            // Always play the actual ad commercial audio (not the user's intended song)
+            const adAudioSrc = randomPick.audio_url || 'https://media.cautionstudioz.com/masters/alex-morgan-afrobeat-instrumental-summer-groove-573648-hubz_1791151613114.mp3';
+            const audio = new Audio(adAudioSrc);
+            audioRef.current = audio;
+            audio.volume = 0.85;
+            audio.play().catch((e) => {
+              console.warn('Ad audio autoplay blocked, fallback to synth:', e);
+              try {
+                audioSynth.playTrack(randomPick.id, () => {}, 15);
+              } catch {}
+            });
+            return;
           }
         }
       } catch (err) {
         console.warn('Could not load dynamic active ad:', err);
       }
 
-      // Default synth playback
+      // Fallback commercial audio if dynamic API fails
       try {
-        audioSynth.playTrack(DEFAULT_AD.id, () => {}, 15);
+        const fallbackAudio = new Audio('https://media.cautionstudioz.com/masters/alex-morgan-afrobeat-instrumental-summer-groove-573648-hubz_1791151613114.mp3');
+        audioRef.current = fallbackAudio;
+        fallbackAudio.volume = 0.85;
+        fallbackAudio.play().catch(() => {
+          audioSynth.playTrack(DEFAULT_AD.id, () => {}, 15);
+        });
       } catch (e) {
-        console.warn('User ad synth:', e);
+        console.warn('Fallback user ad audio failed:', e);
       }
     }
 

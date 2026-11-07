@@ -135,6 +135,7 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const activeListenSessionRef = useRef<string | null>(null);
   const hasTriggeredUpgradeModalRef = useRef(false);
+  const pendingTrackRef = useRef<TrackItem | null>(null);
 
   const handleCloseUpgradeModal = () => {
     setShowUpgradeModal(false);
@@ -452,6 +453,37 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
     });
   };
 
+  const executePlayTrack = (track: TrackItem) => {
+    setCurrentTrack(track);
+    setIsPlaying(true);
+    hasTriggeredUpgradeModalRef.current = false;
+    setCurrentTime(0);
+    recordListeningHistory(track);
+
+    // Record play count for this newly started song
+    activeListenSessionRef.current = track.id;
+    recordTrackListen(track);
+
+    if (audioRef.current) {
+      if (track.audioUrl) {
+        audioRef.current.src = track.audioUrl;
+        audioRef.current.volume = isMuted ? 0 : volume;
+        audioRef.current.load();
+        audioRef.current.play().catch((err) => {
+          if (err.name !== 'AbortError') {
+            console.warn('Audio playback error:', err);
+            audioSynth.playTrack(track.id, () => {});
+          }
+        });
+      } else {
+        audioRef.current.pause();
+        audioSynth.playTrack(track.id, () => {});
+      }
+    } else if (!track.audioUrl) {
+      audioSynth.playTrack(track.id, () => {});
+    }
+  };
+
   const handlePlayToggle = (track: TrackItem) => {
     // 1. Immediately stop any active synth
     audioSynth.stop();
@@ -498,37 +530,14 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
       const nextCount = songsPlayedCount + 1;
       setSongsPlayedCount(nextCount);
       if (!isSubscribed && nextCount > 0 && nextCount % 3 === 0) {
+        // Hold the intended track, stop music playback, and open the ad modal
+        setIsPlaying(false);
+        pendingTrackRef.current = track;
         setIsAdModalOpen(true);
+        return; // DO NOT PLAY THE INTENDED SONG! THE AD PLAYS INSTEAD!
       }
 
-      setCurrentTrack(track);
-      setIsPlaying(true);
-      hasTriggeredUpgradeModalRef.current = false;
-      setCurrentTime(0);
-      recordListeningHistory(track);
-
-      // Record play count for this newly started song
-      activeListenSessionRef.current = track.id;
-      recordTrackListen(track);
-
-      if (audioRef.current) {
-        if (track.audioUrl) {
-          audioRef.current.src = track.audioUrl;
-          audioRef.current.volume = isMuted ? 0 : volume;
-          audioRef.current.load();
-          audioRef.current.play().catch((err) => {
-            if (err.name !== 'AbortError') {
-              console.warn('Audio playback error:', err);
-              audioSynth.playTrack(track.id, () => {});
-            }
-          });
-        } else {
-          audioRef.current.pause();
-          audioSynth.playTrack(track.id, () => {});
-        }
-      } else if (!track.audioUrl) {
-        audioSynth.playTrack(track.id, () => {});
-      }
+      executePlayTrack(track);
     }
   };
 
@@ -2453,7 +2462,14 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
       {/* 3-Song Unskippable Audio Ad (Audiomack / Spotify Model) */}
       <UserAdModal
         isOpen={isAdModalOpen}
-        onClose={() => setIsAdModalOpen(false)}
+        onClose={() => {
+          setIsAdModalOpen(false);
+          if (pendingTrackRef.current) {
+            const trackToResume = pendingTrackRef.current;
+            pendingTrackRef.current = null;
+            executePlayTrack(trackToResume);
+          }
+        }}
         onRewardEarned={(bonusCount) => {
           setRewardNotification(
             `You streamed the sponsored artist song! +1 bonus beat download has been credited for today (total bonus: ${bonusCount}).`

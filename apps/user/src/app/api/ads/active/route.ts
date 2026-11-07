@@ -65,3 +65,4 @@ export async function GET() {
     return NextResponse.json({ error: 'Failed to fetch ads', ads: [] }, { status: 500 });
   }
 }
+
