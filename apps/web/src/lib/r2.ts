@@ -10,7 +10,7 @@ export interface R2UploadUrlParams {
 }
 
 export function getR2PublicUrl(key: string): string {
-  const domain = process.env.NEXT_PUBLIC_R2_DOMAIN;
+  const domain = process.env.NEXT_PUBLIC_R2_DOMAIN || 'media.cautionstudioz.com';
   if (domain) {
     return `https://${domain}/${key}`;
   }

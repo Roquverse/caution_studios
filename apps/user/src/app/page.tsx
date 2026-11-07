@@ -30,9 +30,9 @@ export default async function UserPortalPage() {
       .order('created_at', { ascending: false });
 
     if (dbBeats && dbBeats.length > 0) {
-      const r2Cdn = process.env.NEXT_PUBLIC_R2_PUBLIC_URL?.replace(/\/$/, '');
+      const r2Cdn = process.env.NEXT_PUBLIC_R2_PUBLIC_URL?.replace(/\/$/, '') || 'https://media.cautionstudioz.com';
       initialBeats = dbBeats.map((b) => {
-        const audioKey = b.master_wav_key || b.preview_clean_key || b.preview_tagged_key;
+        const audioKey = b.preview_clean_key || b.preview_tagged_key || b.master_wav_key;
         let audioUrl = '';
         if (audioKey) {
           if (audioKey.startsWith('http') || audioKey.startsWith('/')) {

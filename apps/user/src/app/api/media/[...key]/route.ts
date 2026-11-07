@@ -18,7 +18,7 @@ export async function GET(
 
     // If an R2 public CDN / custom domain is configured, redirect directly to Cloudflare
     // to bypass Vercel Fast Origin Transfer completely (0 Vercel bandwidth used).
-    const publicR2 = process.env.NEXT_PUBLIC_R2_PUBLIC_URL || process.env.R2_PUBLIC_URL;
+    const publicR2 = process.env.NEXT_PUBLIC_R2_PUBLIC_URL || process.env.R2_PUBLIC_URL || 'https://media.cautionstudioz.com';
     if (publicR2) {
       const targetCdnUrl = `${publicR2.replace(/\/$/, '')}/${fullKey}`;
       return NextResponse.redirect(targetCdnUrl, { status: 307 });

@@ -284,9 +284,9 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
           const savedCounts = localStorage.getItem('caution_beat_play_counts');
           const localCounts: Record<string, number> = savedCounts ? JSON.parse(savedCounts) : {};
 
-          const r2Cdn = process.env.NEXT_PUBLIC_R2_PUBLIC_URL?.replace(/\/$/, '');
+          const r2Cdn = process.env.NEXT_PUBLIC_R2_PUBLIC_URL?.replace(/\/$/, '') || 'https://media.cautionstudioz.com';
           const mapped: TrackItem[] = dbBeats.map((b) => {
-            const audioKey = b.master_wav_key || b.preview_clean_key || b.preview_tagged_key;
+            const audioKey = b.preview_clean_key || b.preview_tagged_key || b.master_wav_key;
             let audioUrl = '';
             if (audioKey) {
               if (audioKey.startsWith('http') || audioKey.startsWith('/')) {
@@ -473,6 +473,7 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
         if (track.audioUrl && audioRef.current) {
           if (audioRef.current.src !== track.audioUrl && !audioRef.current.src.endsWith(track.audioUrl)) {
             audioRef.current.src = track.audioUrl;
+            audioRef.current.load();
           }
           audioRef.current.volume = isMuted ? 0 : volume;
           audioRef.current.play().catch((err) => {
@@ -489,7 +490,6 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
       // 2. Switching to a completely different track: Stop previous audio immediately
       if (audioRef.current) {
         audioRef.current.pause();
-        audioRef.current.currentTime = 0;
       }
       audioSynth.stop();
 
@@ -513,8 +513,8 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
       if (audioRef.current) {
         if (track.audioUrl) {
           audioRef.current.src = track.audioUrl;
-          audioRef.current.currentTime = 0;
           audioRef.current.volume = isMuted ? 0 : volume;
+          audioRef.current.load();
           audioRef.current.play().catch((err) => {
             if (err.name !== 'AbortError') {
               console.warn('Audio playback error:', err);

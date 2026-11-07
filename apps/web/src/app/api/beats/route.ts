@@ -69,7 +69,7 @@ export async function GET(req: NextRequest) {
       const normalizedGenre = (b.genre || 'Afrobeats').trim();
       const genre = normalizedGenre.toLowerCase() === 'afrobeat' ? 'Afrobeats' : normalizedGenre;
 
-      const r2Cdn = process.env.NEXT_PUBLIC_R2_PUBLIC_URL?.replace(/\/$/, '') || process.env.R2_PUBLIC_URL?.replace(/\/$/, '');
+      const r2Cdn = process.env.NEXT_PUBLIC_R2_PUBLIC_URL?.replace(/\/$/, '') || process.env.R2_PUBLIC_URL?.replace(/\/$/, '') || 'https://media.cautionstudioz.com';
       let coverUrl = b.cover_url || '/images/studio_mixing_console.jpg';
       if (coverUrl && !coverUrl.startsWith('http') && !coverUrl.startsWith('/')) {
         coverUrl = r2Cdn ? `${r2Cdn}/${coverUrl}` : `/api/media/${coverUrl}`;

@@ -176,14 +176,15 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
     const limit = beat.duration_seconds || 180;
 
-    // Determine audio URL from storage or beat properties
-    const audioKey = beat.audio_url || beat.preview_clean_key || beat.preview_tagged_key || beat.master_wav_key;
-    const resolvedUrl = audioKey ? (audioKey.startsWith('/') || audioKey.startsWith('http') ? audioKey : `/api/media/${audioKey}`) : null;
+    // Determine audio URL from storage or beat properties (prioritize preview keys over heavy master WAV)
+    const audioKey = beat.preview_clean_key || beat.preview_tagged_key || beat.audio_url || beat.master_wav_key;
+    const r2Cdn = process.env.NEXT_PUBLIC_R2_PUBLIC_URL?.replace(/\/$/, '') || 'https://media.cautionstudioz.com';
+    const resolvedUrl = audioKey ? (audioKey.startsWith('/') || audioKey.startsWith('http') ? audioKey : `${r2Cdn}/${audioKey}`) : null;
 
     if (resolvedUrl && audioRef.current) {
       if (audioRef.current.src !== resolvedUrl && !audioRef.current.src.endsWith(resolvedUrl)) {
         audioRef.current.src = resolvedUrl;
-        audioRef.current.currentTime = 0;
+        audioRef.current.load();
       }
       audioRef.current.volume = volume;
       audioRef.current.play().catch((err) => {

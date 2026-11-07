@@ -68,9 +68,7 @@ const FALLBACK_CATALOG_TRACKS: CatalogTrack[] = SEEDED_BEATS.slice(0, 5).map((b,
         ['Guitar', 'Piano', 'Synthesizer', 'Strings', 'Drums', 'Bass', 'Log Drum'].includes(t)
       ) || 'Synthesizer',
     audioUrl: audioKey
-      ? process.env.NEXT_PUBLIC_R2_PUBLIC_URL
-        ? `${process.env.NEXT_PUBLIC_R2_PUBLIC_URL.replace(/\/$/, '')}/${audioKey}`
-        : `/api/media/${audioKey}`
+      ? (process.env.NEXT_PUBLIC_R2_PUBLIC_URL?.replace(/\/$/, '') || 'https://media.cautionstudioz.com') + `/${audioKey}`
       : '',
     isSpotlight: idx % 3 === 0
   };
@@ -171,9 +169,7 @@ export const MusicLicensingSection: React.FC<MusicLicensingSectionProps> = ({
               theme: (b.tags && b.tags[0]) || 'Commercial',
               instrument: 'Synthesizer',
               audioUrl: audioKey
-      ? process.env.NEXT_PUBLIC_R2_PUBLIC_URL
-        ? `${process.env.NEXT_PUBLIC_R2_PUBLIC_URL.replace(/\/$/, '')}/${audioKey}`
-        : `/api/media/${audioKey}`
+      ? (process.env.NEXT_PUBLIC_R2_PUBLIC_URL?.replace(/\/$/, '') || 'https://media.cautionstudioz.com') + `/${audioKey}`
       : '',
               isSpotlight: idx % 3 === 0
             };

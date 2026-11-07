@@ -17,7 +17,7 @@ export async function POST(req: NextRequest) {
 
     const safeArtist = artistName.toLowerCase().replace(/[^a-z0-9]/g, '-').slice(0, 30) || 'artist';
     const timestamp = Date.now();
-    const publicR2 = process.env.NEXT_PUBLIC_R2_PUBLIC_URL?.replace(/\/$/, '') || process.env.R2_PUBLIC_URL?.replace(/\/$/, '');
+    const publicR2 = process.env.NEXT_PUBLIC_R2_PUBLIC_URL?.replace(/\/$/, '') || process.env.R2_PUBLIC_URL?.replace(/\/$/, '') || 'https://media.cautionstudioz.com';
 
     // 1. Upload All Vocal Stems (Lead + Multiple Backup Vocals)
     const vocalStemEntries: { name: string; url: string; pan?: number; volume?: number }[] = [];

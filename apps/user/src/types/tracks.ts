@@ -46,8 +46,8 @@ export const FALLBACK_BEATS: TrackItem[] = [
     date: '4 Oct, 2026',
     duration: '2:23',
     durationSeconds: 143,
-    coverUrl: '/api/media/covers/alex-morgan-afrobeat-instrumental-summer-groove-573648-hubz_1791151618223.png',
-    audioUrl: '/api/media/masters/alex-morgan-afrobeat-instrumental-summer-groove-573648-hubz_1791151613114.mp3',
+    coverUrl: 'https://media.cautionstudioz.com/covers/alex-morgan-afrobeat-instrumental-summer-groove-573648-hubz_1791151618223.png',
+    audioUrl: 'https://media.cautionstudioz.com/masters/alex-morgan-afrobeat-instrumental-summer-groove-573648-hubz_1791151613114.mp3',
     bpm: 120,
     genre: 'Cinematic',
     musicalKey: 'C Minor',
@@ -65,7 +65,7 @@ export const FALLBACK_BEATS: TrackItem[] = [
     duration: '3:00',
     durationSeconds: 180,
     coverUrl: '/images/album_neon_dj.jpg',
-    audioUrl: '/api/media/masters/neon-overdrive-dh82_1791150039349.wav',
+    audioUrl: 'https://media.cautionstudioz.com/masters/neon-overdrive-dh82_1791150039349.wav',
     bpm: 128,
     genre: 'Electronic',
     musicalKey: 'F Minor',
@@ -80,7 +80,7 @@ export const FALLBACK_PRODUCERS: ProducerItem[] = [
     rank: 1,
     name: 'Arakunrin Cole',
     subscribers: '@arakunrincole • Verified Producer',
-    coverUrl: '/api/media/avatars/64d47dcb-3d1f-41dd-8400-46f39c5b0750-1791132868902.jpg',
+    coverUrl: 'https://media.cautionstudioz.com/avatars/64d47dcb-3d1f-41dd-8400-46f39c5b0750-1791132868902.jpg',
     handle: 'arakunrincole'
   },
   {
