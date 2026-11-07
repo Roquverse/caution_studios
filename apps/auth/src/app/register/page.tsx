@@ -81,6 +81,18 @@ export default function RegisterPage() {
         return;
       }
 
+      // Dispatch notification to support@cautionstudioz.com (fire and forget)
+      fetch('/api/notify/registration', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email,
+          name,
+          role: primaryRole,
+          plan: initialPlan
+        })
+      }).catch((e) => console.warn('Registration notification failed:', e));
+
       let destinationUrl = isProducer
         ? `${CREATOR_PORTAL_URL}/login?registered=true&email=${encodeURIComponent(email)}`
         : USER_PORTAL_URL;

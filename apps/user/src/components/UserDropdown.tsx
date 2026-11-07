@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { User, Settings, CreditCard, LogOut, ChevronRight, Sparkles } from 'lucide-react';
+import { User, Settings, CreditCard, LogOut, ChevronRight, Sparkles, Megaphone } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
 import { setCachedUserPlan } from '../lib/subscription';
 
@@ -324,6 +324,23 @@ export function UserDropdown() {
                     Upgrade
                   </span>
                 )}
+                <ChevronRight className="h-3.5 w-3.5 text-gray-600 group-hover:text-gray-400 transition-colors" />
+              </div>
+            </Link>
+
+            <Link
+              href="/promote"
+              onClick={() => setIsOpen(false)}
+              className="flex items-center justify-between p-2.5 rounded-lg text-xs font-medium text-amber-300 hover:text-white hover:bg-white/[0.06] transition-colors group"
+            >
+              <div className="flex items-center gap-2.5">
+                <Megaphone className="h-4 w-4 text-amber-400 group-hover:text-[#2dd4bf] transition-colors" />
+                <span>Promote Music</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-500/20 text-amber-300">
+                  Ads
+                </span>
                 <ChevronRight className="h-3.5 w-3.5 text-gray-600 group-hover:text-gray-400 transition-colors" />
               </div>
             </Link>

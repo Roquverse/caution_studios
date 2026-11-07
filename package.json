@@ -23,9 +23,11 @@
     "lint": "turbo run lint"
   },
   "devDependencies": {
+    "@types/nodemailer": "^8.0.2",
     "turbo": "^2.4.4"
   },
   "dependencies": {
-    "@aws-sdk/s3-request-presigner": "^3.1161.0"
+    "@aws-sdk/s3-request-presigner": "^3.1161.0",
+    "nodemailer": "^10.3.1"
   }
 }

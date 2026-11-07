@@ -203,6 +203,21 @@ export default function PayoutsPage() {
       setPendingClearanceNgn((prev) => prev + amountToWithdraw);
 
       if (payout) {
+        // Dispatch email notification to support@cautionstudioz.com
+        fetch('/api/notify/payout', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            payoutId: payout.id,
+            producerId: userId,
+            amountNgn: amountToWithdraw,
+            netNgn: net,
+            bankName,
+            accountNumber,
+            accountName
+          })
+        }).catch((e) => console.warn('Payout notification failed:', e));
+
         setPayoutHistory((prev) => [
           {
             id: payout.id,

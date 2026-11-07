@@ -25,63 +25,145 @@ export const ArtistAdModal: React.FC<ArtistAdModalProps> = ({
   onClose,
   promotedSong
 }) => {
-  const song = promotedSong || SEEDED_PROMOTED_SONGS[0];
+  const [currentSong, setCurrentSong] = useState<any>(promotedSong || SEEDED_PROMOTED_SONGS[0]);
   const [secondsRemaining, setSecondsRemaining] = useState(15);
   const [canSkip, setCanSkip] = useState(false);
   const [isPlaying, setIsPlaying] = useState(true);
-  const [isMuted, setIsMuted] = useState(false);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
-    if (isOpen) {
-      setSecondsRemaining(15);
-      setCanSkip(false);
-      setIsPlaying(true);
+    if (!isOpen) {
+      if (timerRef.current) clearInterval(timerRef.current);
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+      audioSynth.stop();
+      return;
+    }
 
-      // Play audio snippet via synth
+    setSecondsRemaining(15);
+    setCanSkip(false);
+    setIsPlaying(true);
+
+    async function loadDynamicAd() {
       try {
-        audioSynth.playTrack(song.id, () => {}, 15);
+        const res = await fetch('/api/ads/active');
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data.ads) && data.ads.length > 0) {
+            const randomPick = data.ads[Math.floor(Math.random() * data.ads.length)];
+            const formatted = {
+              id: randomPick.id,
+              title: randomPick.song_title,
+              artist_name: randomPick.artist_name,
+              genre: randomPick.genre || 'Afrobeats',
+              cover_url: randomPick.cover_url || '/images/hero_boombox.jpg',
+              audio_url: randomPick.audio_url || null,
+              tagline: randomPick.campaign_name || `Stream "${randomPick.song_title}" out now on all major DSPs!`,
+              streaming_links: {
+                spotify: randomPick.spotify_url || 'https://open.spotify.com',
+                apple_music: randomPick.apple_music_url || 'https://music.apple.com',
+                audiomack: randomPick.audiomack_url || 'https://audiomack.com',
+                youtube: randomPick.youtube_url || 'https://youtube.com'
+              }
+            };
+            setCurrentSong(formatted);
+
+            // Send impression telemetry
+            fetch('/api/ads/impression', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ campaignId: randomPick.id })
+            }).catch(() => {});
+
+            // Play real audio if available
+            if (randomPick.audio_url) {
+              const audio = new Audio(randomPick.audio_url);
+              audioRef.current = audio;
+              audio.play().catch((e) => {
+                console.warn('Real ad audio play prevented, synth fallback:', e);
+                try {
+                  audioSynth.playTrack(randomPick.id, () => {}, 15);
+                } catch {}
+              });
+              return;
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('Could not load dynamic ad for web:', err);
+      }
+
+      // Default synth playback
+      try {
+        audioSynth.playTrack(promotedSong?.id || 'seeded-ad-1', () => {}, 15);
       } catch (e) {
         console.warn('Audio ad synth:', e);
       }
-
-      timerRef.current = setInterval(() => {
-        setSecondsRemaining((prev) => {
-          if (prev <= 1) {
-            if (timerRef.current) clearInterval(timerRef.current);
-            setCanSkip(true);
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
-    } else {
-      if (timerRef.current) clearInterval(timerRef.current);
-      audioSynth.stop();
     }
+
+    loadDynamicAd();
+
+    timerRef.current = setInterval(() => {
+      setSecondsRemaining((prev) => {
+        if (prev <= 1) {
+          if (timerRef.current) clearInterval(timerRef.current);
+          setCanSkip(true);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
 
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
       audioSynth.stop();
     };
-  }, [isOpen, song.id]);
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
   const handleClose = () => {
-    if (!canSkip && secondsRemaining > 0) return; // Cannot be skipped while ad is active
+    if (!canSkip && secondsRemaining > 0) return;
     if (timerRef.current) clearInterval(timerRef.current);
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
+    }
     audioSynth.stop();
     onClose();
   };
 
   const toggleAudio = () => {
     if (isPlaying) {
+      if (audioRef.current) {
+        audioRef.current.pause();
+      }
       audioSynth.stop();
       setIsPlaying(false);
     } else {
-      audioSynth.playTrack(song.id, () => {}, secondsRemaining);
+      if (audioRef.current) {
+        audioRef.current.play().catch(() => {});
+      } else {
+        audioSynth.playTrack(currentSong.id, () => {}, secondsRemaining);
+      }
       setIsPlaying(true);
+    }
+  };
+
+  const handleDspClick = () => {
+    if (currentSong?.id) {
+      fetch('/api/ads/click', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ campaignId: currentSong.id })
+      }).catch(() => {});
     }
   };
 
@@ -89,7 +171,7 @@ export const ArtistAdModal: React.FC<ArtistAdModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90 backdrop-blur-md animate-fade-in">
-      <div className="w-full max-w-md bg-[#0B0E14] border border-white/10 rounded-xl overflow-hidden shadow-2xl relative">
+      <div className="w-full max-w-md bg-[#0B0E14] border border-white/10 rounded-xl overflow-hidden shadow-2xl relative text-white">
         {/* Top Header Tag */}
         <div className="px-4 py-2.5 bg-[#0F131C] border-b border-white/10 flex items-center justify-between text-xs">
           <div className="flex items-center gap-1.5 text-amber-300 font-semibold">
@@ -128,15 +210,15 @@ export const ArtistAdModal: React.FC<ArtistAdModalProps> = ({
         <div className="p-6 text-center flex flex-col items-center">
           <div className="relative w-36 h-36 rounded-lg overflow-hidden shadow-2xl border border-white/10 mb-4 group">
             <img
-              src={song.cover_url}
-              alt={song.title}
+              src={currentSong.cover_url || '/images/hero_boombox.jpg'}
+              alt={currentSong.title}
               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
             />
             <div className="absolute inset-0 bg-black/30 flex items-center justify-center">
               <button
                 type="button"
                 onClick={toggleAudio}
-                className="w-12 h-12 rounded-full bg-[#04564f]/90 hover:bg-[#04564f] text-white flex items-center justify-center shadow-lg transition-transform hover:scale-105"
+                className="w-12 h-12 rounded-full bg-[#04564f]/90 hover:bg-[#04564f] text-white flex items-center justify-center shadow-lg transition-transform hover:scale-105 cursor-pointer"
                 aria-label={isPlaying ? 'Pause preview' : 'Play preview'}
               >
                 {isPlaying ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5 ml-0.5" />}
@@ -148,12 +230,12 @@ export const ArtistAdModal: React.FC<ArtistAdModalProps> = ({
           </div>
 
           <span className="px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-[10px] font-mono text-amber-300 mb-1.5 uppercase">
-            {song.genre}
+            {currentSong.genre || 'Afrobeats'}
           </span>
-          <h3 className="text-lg font-black text-white tracking-tight">{song.title}</h3>
-          <p className="text-xs text-gray-400 font-medium mt-0.5">by {song.artist_name}</p>
+          <h3 className="text-lg font-black text-white tracking-tight">{currentSong.title}</h3>
+          <p className="text-xs text-gray-400 font-medium mt-0.5">by {currentSong.artist_name}</p>
           <p className="text-xs text-gray-300 mt-2 max-w-xs leading-relaxed italic">
-            "{song.tagline}"
+            &ldquo;{currentSong.tagline}&rdquo;
           </p>
 
           {/* Streaming DSP Links */}
@@ -163,9 +245,10 @@ export const ArtistAdModal: React.FC<ArtistAdModalProps> = ({
             </span>
             <div className="grid grid-cols-2 gap-2">
               <a
-                href={song.streaming_links.spotify}
+                href={currentSong.streaming_links?.spotify || 'https://open.spotify.com'}
                 target="_blank"
                 rel="noopener noreferrer"
+                onClick={handleDspClick}
                 className="h-9 px-3 rounded-md bg-[#1DB954]/15 hover:bg-[#1DB954]/25 border border-[#1DB954]/40 text-[#1DB954] text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors"
               >
                 <span>Spotify</span>
@@ -173,9 +256,10 @@ export const ArtistAdModal: React.FC<ArtistAdModalProps> = ({
               </a>
 
               <a
-                href={song.streaming_links.apple_music}
+                href={currentSong.streaming_links?.apple_music || 'https://music.apple.com'}
                 target="_blank"
                 rel="noopener noreferrer"
+                onClick={handleDspClick}
                 className="h-9 px-3 rounded-md bg-[#FC3C44]/15 hover:bg-[#FC3C44]/25 border border-[#FC3C44]/40 text-[#FC3C44] text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors"
               >
                 <span>Apple Music</span>
@@ -183,9 +267,10 @@ export const ArtistAdModal: React.FC<ArtistAdModalProps> = ({
               </a>
 
               <a
-                href={song.streaming_links.audiomack}
+                href={currentSong.streaming_links?.audiomack || 'https://audiomack.com'}
                 target="_blank"
                 rel="noopener noreferrer"
+                onClick={handleDspClick}
                 className="h-9 px-3 rounded-md bg-[#FFA200]/15 hover:bg-[#FFA200]/25 border border-[#FFA200]/40 text-[#FFA200] text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors"
               >
                 <span>Audiomack</span>
@@ -193,9 +278,10 @@ export const ArtistAdModal: React.FC<ArtistAdModalProps> = ({
               </a>
 
               <a
-                href={song.streaming_links.youtube}
+                href={currentSong.streaming_links?.youtube || 'https://youtube.com'}
                 target="_blank"
                 rel="noopener noreferrer"
+                onClick={handleDspClick}
                 className="h-9 px-3 rounded-md bg-[#FF0000]/15 hover:bg-[#FF0000]/25 border border-[#FF0000]/40 text-[#FF0000] text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors"
               >
                 <span>YouTube</span>
@@ -210,8 +296,9 @@ export const ArtistAdModal: React.FC<ArtistAdModalProps> = ({
           <span className="font-mono text-[10px]">Plays every 3 songs · Cannot be skipped</span>
           {canSkip ? (
             <button
+              type="button"
               onClick={handleClose}
-              className="text-[#2dd4bf] hover:underline font-bold"
+              className="text-[#2dd4bf] hover:underline font-bold cursor-pointer"
             >
               Resume Music →
             </button>

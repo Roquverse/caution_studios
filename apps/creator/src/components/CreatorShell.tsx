@@ -23,7 +23,8 @@ import {
   Gift,
   CheckCircle2,
   Upload,
-  Download
+  Download,
+  Megaphone
 } from 'lucide-react';
 
 interface CreatorShellProps {
@@ -206,6 +207,12 @@ export function CreatorShell({ children, activePath }: CreatorShellProps) {
       href: '/beats',
       icon: Music2,
       badge: 'Live'
+    },
+    {
+      label: 'Promote Beats',
+      href: '/promote',
+      icon: Megaphone,
+      badge: 'Ads'
     },
     {
       label: 'Earnings & Payouts',

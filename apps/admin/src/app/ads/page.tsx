@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { AdminShell } from '../../components/AdminShell';
 import {
   Megaphone,
@@ -22,7 +22,8 @@ import {
   Lock,
   X,
   CreditCard,
-  Trash2
+  Trash2,
+  RefreshCw
 } from 'lucide-react';
 
 interface AdCampaign {
@@ -31,6 +32,7 @@ interface AdCampaign {
   artistName: string;
   artistHandle: string;
   coverUrl: string;
+  audioUrl?: string;
   genre: string;
   tier: 'Starter Spotlight' | 'Pro Rotation' | 'Studio Blast';
   amountPaidNgn: number;
@@ -50,163 +52,215 @@ export default function AdminAdsManagerPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
+  const [errorMsg, setErrorMsg] = useState('');
+  const [isLoading, setIsLoading] = useState(true);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   // Frequency Rule State
   const [songsPerAd, setSongsPerAd] = useState(3);
   const [adDurationSeconds, setAdDurationSeconds] = useState(15);
   const [isUnskippableEnforced, setIsUnskippableEnforced] = useState(true);
 
-  // Initial Campaigns
-  const [campaigns, setCampaigns] = useState<AdCampaign[]>([
-    {
-      id: 'ad-camp-1',
-      songTitle: 'Midnight Lagos',
-      artistName: 'Teniola Sound',
-      artistHandle: '@teniola_snd',
-      coverUrl: '/images/artist_studio_mic.jpg',
-      genre: 'Afro-Soul',
-      tier: 'Studio Blast',
-      amountPaidNgn: 75000,
-      impressionsDelivered: 38400,
-      impressionsTarget: 40000,
-      clicksCount: 2940,
-      status: 'active',
-      startDate: 'Oct 10, 2026',
-      spotifyUrl: 'https://open.spotify.com',
-      appleMusicUrl: 'https://music.apple.com',
-      audiomackUrl: 'https://audiomack.com',
-      youtubeUrl: 'https://youtube.com'
-    },
-    {
-      id: 'ad-camp-2',
-      songTitle: 'Golden Horizon',
-      artistName: 'Zino Waves ft. Caution',
-      artistHandle: '@zinowaves',
-      coverUrl: '/images/album_sunrise.jpg',
-      genre: 'Amapiano',
-      tier: 'Pro Rotation',
-      amountPaidNgn: 35000,
-      impressionsDelivered: 14200,
-      impressionsTarget: 15000,
-      clicksCount: 1180,
-      status: 'active',
-      startDate: 'Oct 14, 2026',
-      spotifyUrl: 'https://open.spotify.com',
-      appleMusicUrl: 'https://music.apple.com',
-      audiomackUrl: 'https://audiomack.com',
-      youtubeUrl: 'https://youtube.com'
-    },
-    {
-      id: 'ad-camp-3',
-      songTitle: 'Eko Nights Fever',
-      artistName: 'Burna Prince',
-      artistHandle: '@burnaprince',
-      coverUrl: '/images/album_neon_dj.jpg',
-      genre: 'Afrobeats',
-      tier: 'Starter Spotlight',
-      amountPaidNgn: 15000,
-      impressionsDelivered: 5000,
-      impressionsTarget: 5000,
-      clicksCount: 410,
-      status: 'completed',
-      startDate: 'Oct 01, 2026',
-      spotifyUrl: 'https://open.spotify.com',
-      appleMusicUrl: 'https://music.apple.com',
-      audiomackUrl: 'https://audiomack.com',
-      youtubeUrl: 'https://youtube.com'
-    },
-    {
-      id: 'ad-camp-4',
-      songTitle: 'Subway Tokyo Drift',
-      artistName: 'Kroma Sound Lab',
-      artistHandle: '@dj_kroma',
-      coverUrl: '/images/studio_mixing_console.jpg',
-      genre: 'Electronic',
-      tier: 'Pro Rotation',
-      amountPaidNgn: 35000,
-      impressionsDelivered: 8900,
-      impressionsTarget: 15000,
-      clicksCount: 780,
-      status: 'active',
-      startDate: 'Oct 18, 2026',
-      spotifyUrl: 'https://open.spotify.com',
-      appleMusicUrl: 'https://music.apple.com',
-      audiomackUrl: 'https://audiomack.com',
-      youtubeUrl: 'https://youtube.com'
-    }
-  ]);
+  // Campaigns State
+  const [campaigns, setCampaigns] = useState<AdCampaign[]>([]);
 
-  // Form State for New Campaign Payment
+  const fetchCampaigns = async () => {
+    setIsLoading(true);
+    try {
+      const res = await fetch('/api/ads');
+      const data = await res.json();
+      if (res.ok && Array.isArray(data.campaigns)) {
+        const mapped: AdCampaign[] = data.campaigns.map((c: any) => {
+          let tierName: AdCampaign['tier'] = 'Pro Rotation';
+          if (c.package_name === 'starter' || (c.price_ngn && c.price_ngn <= 15000)) {
+            tierName = 'Starter Spotlight';
+          } else if (c.package_name === 'studio' || (c.price_ngn && c.price_ngn >= 75000)) {
+            tierName = 'Studio Blast';
+          }
+
+          return {
+            id: c.id,
+            songTitle: c.song_title || 'Untitled Track',
+            artistName: c.artist_name || 'Anonymous Artist',
+            artistHandle: c.campaign_name?.includes('@') ? c.campaign_name : `@${(c.artist_name || 'artist').toLowerCase().replace(/\s+/g, '')}`,
+            coverUrl: c.cover_url || '/images/hero_boombox.jpg',
+            audioUrl: c.audio_url || undefined,
+            genre: 'Afrobeats',
+            tier: tierName,
+            amountPaidNgn: Number(c.price_ngn) || 15000,
+            impressionsDelivered: Number(c.delivered_plays) || 0,
+            impressionsTarget: Number(c.target_plays) || 10000,
+            clicksCount: Number(c.clicks_count) || 0,
+            status: c.status || 'active',
+            startDate: c.created_at ? new Date(c.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Recently',
+            spotifyUrl: c.spotify_url || 'https://open.spotify.com',
+            appleMusicUrl: c.apple_music_url || 'https://music.apple.com',
+            audiomackUrl: c.audiomack_url || 'https://audiomack.com',
+            youtubeUrl: c.youtube_url || 'https://youtube.com'
+          };
+        });
+        setCampaigns(mapped);
+      }
+    } catch (err: any) {
+      console.error('Failed to fetch campaigns:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchCampaigns();
+  }, []);
+
+  // Form State for New Campaign
   const [formArtistName, setFormArtistName] = useState('');
   const [formArtistHandle, setFormArtistHandle] = useState('');
   const [formSongTitle, setFormSongTitle] = useState('');
   const [formGenre, setFormGenre] = useState('Afrobeats');
   const [formTier, setFormTier] = useState<'Starter Spotlight' | 'Pro Rotation' | 'Studio Blast'>('Pro Rotation');
+  const [formAudioUrl, setFormAudioUrl] = useState('');
+  const [formCoverUrl, setFormCoverUrl] = useState('');
   const [formSpotify, setFormSpotify] = useState('https://open.spotify.com');
   const [formApple, setFormApple] = useState('https://music.apple.com');
   const [formAudiomack, setFormAudiomack] = useState('https://audiomack.com');
   const [formYouTube, setFormYouTube] = useState('https://youtube.com');
-  const [formPaymentMethod, setFormPaymentMethod] = useState('Paystack Direct Card/Transfer');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const totalRevenueNgn = campaigns.reduce((acc, c) => acc + c.amountPaidNgn, 0);
   const totalDelivered = campaigns.reduce((acc, c) => acc + c.impressionsDelivered, 0);
   const activeCount = campaigns.filter((c) => c.status === 'active').length;
 
-  const handleCreateCampaign = (e: React.FormEvent) => {
+  const handleAudioPreview = (camp: AdCampaign) => {
+    if (playingId === camp.id) {
+      if (audioRef.current) {
+        audioRef.current.pause();
+      }
+      setPlayingId(null);
+      return;
+    }
+
+    if (audioRef.current) {
+      audioRef.current.pause();
+    }
+
+    if (camp.audioUrl) {
+      const audio = new Audio(camp.audioUrl);
+      audioRef.current = audio;
+      audio.play().catch((e) => console.warn('Audio play failed:', e));
+      audio.onended = () => setPlayingId(null);
+      setPlayingId(camp.id);
+    } else {
+      setSuccessMsg(`Simulating 15s audio ad for "${camp.songTitle}"`);
+      setPlayingId(camp.id);
+      setTimeout(() => {
+        setPlayingId(null);
+      }, 5000);
+    }
+  };
+
+  const handleCreateCampaign = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formSongTitle || !formArtistName) return;
 
+    setIsSubmitting(true);
+    setErrorMsg('');
+
     const tierPrices = {
-      'Starter Spotlight': { price: 15000, impressions: 5000 },
-      'Pro Rotation': { price: 35000, impressions: 15000 },
-      'Studio Blast': { price: 75000, impressions: 40000 }
+      'Starter Spotlight': { price: 15000, impressions: 5000, pkg: 'starter' },
+      'Pro Rotation': { price: 35000, impressions: 15000, pkg: 'pro' },
+      'Studio Blast': { price: 75000, impressions: 40000, pkg: 'studio' }
     };
 
-    const newCamp: AdCampaign = {
-      id: `ad-camp-${Date.now()}`,
-      songTitle: formSongTitle,
-      artistName: formArtistName,
-      artistHandle: formArtistHandle.startsWith('@') ? formArtistHandle : `@${formArtistHandle || 'artist'}`,
-      coverUrl: '/images/hero_boombox.jpg',
-      genre: formGenre,
-      tier: formTier,
-      amountPaidNgn: tierPrices[formTier].price,
-      impressionsDelivered: 0,
-      impressionsTarget: tierPrices[formTier].impressions,
-      clicksCount: 0,
-      status: 'active',
-      startDate: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
-      spotifyUrl: formSpotify,
-      appleMusicUrl: formApple,
-      audiomackUrl: formAudiomack,
-      youtubeUrl: formYouTube
-    };
+    const selectedTier = tierPrices[formTier];
 
-    setCampaigns([newCamp, ...campaigns]);
-    setIsModalOpen(false);
-    setSuccessMsg(`Campaign "${formSongTitle}" created & payment of ₦${tierPrices[formTier].price.toLocaleString()} verified! Added to 3-song rotation.`);
-    setTimeout(() => setSuccessMsg(''), 5000);
+    try {
+      const res = await fetch('/api/ads', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          songTitle: formSongTitle,
+          artistName: formArtistName,
+          campaignName: formArtistHandle.startsWith('@') ? formArtistHandle : `@${formArtistHandle || 'artist'}`,
+          packageName: selectedTier.pkg,
+          priceNgn: selectedTier.price,
+          targetPlays: selectedTier.impressions,
+          audioUrl: formAudioUrl || undefined,
+          coverUrl: formCoverUrl || '/images/hero_boombox.jpg',
+          spotifyUrl: formSpotify,
+          appleMusicUrl: formApple,
+          audiomackUrl: formAudiomack,
+          youtubeUrl: formYouTube,
+          status: 'active'
+        })
+      });
 
-    // Reset Form
-    setFormArtistName('');
-    setFormSongTitle('');
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to create campaign');
+      }
+
+      setIsModalOpen(false);
+      setSuccessMsg(`Campaign "${formSongTitle}" created & added to active 3-song rotation!`);
+      setTimeout(() => setSuccessMsg(''), 5000);
+
+      // Reset form
+      setFormArtistName('');
+      setFormSongTitle('');
+      setFormArtistHandle('');
+      setFormAudioUrl('');
+      setFormCoverUrl('');
+
+      // Refresh list
+      fetchCampaigns();
+    } catch (err: any) {
+      console.error('Error creating campaign:', err);
+      setErrorMsg(err.message || 'Failed to book campaign');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  const toggleCampaignStatus = (id: string) => {
-    setCampaigns(
-      campaigns.map((c) => {
-        if (c.id === id) {
-          const nextStatus = c.status === 'active' ? 'paused' : 'active';
-          return { ...c, status: nextStatus };
-        }
-        return c;
-      })
-    );
+  const toggleCampaignStatus = async (id: string) => {
+    const target = campaigns.find((c) => c.id === id);
+    if (!target) return;
+    const nextStatus = target.status === 'active' ? 'paused' : 'active';
+
+    // Optimistic update
+    setCampaigns(campaigns.map((c) => (c.id === id ? { ...c, status: nextStatus } : c)));
+
+    try {
+      const res = await fetch(`/api/ads/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: nextStatus })
+      });
+      if (!res.ok) {
+        throw new Error('Failed to update status');
+      }
+    } catch (err) {
+      console.error('Error toggling campaign:', err);
+      // Revert on error
+      fetchCampaigns();
+    }
   };
 
-  const handleDeleteCampaign = (id: string) => {
-    if (confirm('Are you sure you want to remove this ad campaign from rotation?')) {
-      setCampaigns(campaigns.filter((c) => c.id !== id));
+  const handleDeleteCampaign = async (id: string) => {
+    if (!confirm('Are you sure you want to remove this ad campaign from rotation?')) return;
+
+    setCampaigns(campaigns.filter((c) => c.id !== id));
+
+    try {
+      const res = await fetch(`/api/ads/${id}`, {
+        method: 'DELETE'
+      });
+      if (!res.ok) {
+        throw new Error('Failed to delete campaign');
+      }
+      setSuccessMsg('Campaign deleted from rotation.');
+      setTimeout(() => setSuccessMsg(''), 4000);
+    } catch (err: any) {
+      console.error('Error deleting campaign:', err);
+      fetchCampaigns();
     }
   };
 
@@ -236,14 +290,26 @@ export default function AdminAdsManagerPage() {
           </p>
         </div>
 
-        <button
-          type="button"
-          onClick={() => setIsModalOpen(true)}
-          className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-md bg-[#2dd4bf] hover:bg-[#20b8a4] text-zinc-950 text-xs font-bold transition-colors shadow-xs cursor-pointer"
-        >
-          <Plus className="h-4 w-4 stroke-[2.5]" />
-          <span>Book & Pay for Ad Campaign</span>
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={fetchCampaigns}
+            disabled={isLoading}
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-md bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-semibold transition-colors cursor-pointer disabled:opacity-50"
+            title="Refresh Campaigns"
+          >
+            <RefreshCw className={`h-3.5 w-3.5 ${isLoading ? 'animate-spin text-[#2dd4bf]' : ''}`} />
+            <span>Sync</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setIsModalOpen(true)}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-md bg-[#2dd4bf] hover:bg-[#20b8a4] text-zinc-950 text-xs font-bold transition-colors shadow-xs cursor-pointer"
+          >
+            <Plus className="h-4 w-4 stroke-[2.5]" />
+            <span>Book & Pay for Ad Campaign</span>
+          </button>
+        </div>
       </div>
 
       {successMsg && (
@@ -447,8 +513,12 @@ export default function AdminAdsManagerPage() {
                       <div className="flex items-center gap-3">
                         <button
                           type="button"
-                          onClick={() => setPlayingId(playingId === camp.id ? null : camp.id)}
-                          className="h-8 w-8 rounded bg-zinc-800 hover:bg-[#2dd4bf] hover:text-black flex items-center justify-center shrink-0 transition-colors text-zinc-300"
+                          onClick={() => handleAudioPreview(camp)}
+                          className={`h-8 w-8 rounded flex items-center justify-center shrink-0 transition-colors ${
+                            playingId === camp.id
+                              ? 'bg-[#2dd4bf] text-black font-bold animate-pulse'
+                              : 'bg-zinc-800 hover:bg-[#2dd4bf] hover:text-black text-zinc-300'
+                          }`}
                           title="Preview 15s Ad Snippet"
                         >
                           {playingId === camp.id ? (
@@ -636,6 +706,30 @@ export default function AdminAdsManagerPage() {
                     <option value="Pro Rotation">Pro Rotation (₦35,000 · 15k plays)</option>
                     <option value="Studio Blast">Studio Blast (₦75,000 · 40k plays)</option>
                   </select>
+                </div>
+              </div>
+
+              {/* Audio URL & Artwork */}
+              <div className="grid grid-cols-2 gap-3 pt-2 border-t border-zinc-800">
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-zinc-300">Audio URL (R2 / CDN / MP3)</label>
+                  <input
+                    type="url"
+                    value={formAudioUrl}
+                    onChange={(e) => setFormAudioUrl(e.target.value)}
+                    placeholder="https://media.cautionstudioz.com/..."
+                    className="w-full bg-zinc-950 border border-zinc-800 rounded-md py-1.5 px-3 text-xs text-zinc-100 font-mono focus:outline-none focus:border-zinc-700"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-zinc-300">Artwork / Cover Image URL</label>
+                  <input
+                    type="url"
+                    value={formCoverUrl}
+                    onChange={(e) => setFormCoverUrl(e.target.value)}
+                    placeholder="/images/... or https://..."
+                    className="w-full bg-zinc-950 border border-zinc-800 rounded-md py-1.5 px-3 text-xs text-zinc-100 font-mono focus:outline-none focus:border-zinc-700"
+                  />
                 </div>
               </div>
 

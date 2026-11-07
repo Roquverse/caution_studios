@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServiceRoleClient } from '../../../../lib/supabaseClient';
 import { uploadToR2 } from '../../../../lib/r2Server';
+import { sendAdminNotification } from '../../../../lib/emailNotifier';
 
 export async function POST(req: NextRequest) {
   try {
@@ -54,6 +55,22 @@ export async function POST(req: NextRequest) {
     } catch (dbErr) {
       console.warn('Database insert failed gracefully:', dbErr);
     }
+
+    await sendAdminNotification({
+      event: 'SOUNDSTAGE_SUBMISSION',
+      subject: `🎤 New Soundstage Audition: ${artistName} ("${beatTitle}")`,
+      title: 'Soundstage Artist Audition Submitted',
+      description: `An artist recorded a live vocal audition and submitted it for Caution Studio A&R review.`,
+      details: {
+        'Artist Name': artistName,
+        'Social Handle': socialHandle || 'N/A',
+        'Phone / WhatsApp': contactPhone || 'N/A',
+        'Beat Track': beatTitle,
+        'Audio Recording': audioUrl ? `https://media.cautionstudioz.com/${audioUrl.replace('/api/media/', '')}` : 'Processed',
+        'Artist Notes': notes || 'None'
+      },
+      ctaUrl: 'https://admin.cautionstudioz.com'
+    });
 
     return NextResponse.json({
       success: true,

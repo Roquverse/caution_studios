@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { getServiceRoleClient } from '../../../../lib/supabaseClient';
+import { sendAdminNotification } from '../../../../lib/emailNotifier';
 
 export async function POST(req: NextRequest) {
   try {
@@ -106,6 +107,22 @@ export async function POST(req: NextRequest) {
           }
         }
       }
+
+      // Notify support@cautionstudioz.com of paid order
+      await sendAdminNotification({
+        event: 'LICENSE_PURCHASED',
+        subject: `💰 Beat License Purchased: ₦${((data.amount || 0) / 100).toLocaleString()} (Ref: ${reference})`,
+        title: 'Beat Store License Payment Succeeded',
+        description: `A customer has successfully completed payment for a music license on Caution Studios.`,
+        details: {
+          'Amount': `₦${((data.amount || 0) / 100).toLocaleString()}`,
+          'Paystack Ref': reference,
+          'Customer Email': data.customer?.email || 'N/A',
+          'Order ID': orderId || 'Direct',
+          'Items Count': items.length
+        },
+        ctaUrl: 'https://admin.cautionstudioz.com/orders'
+      });
 
       return NextResponse.json({ success: true, reference, orderId });
     }

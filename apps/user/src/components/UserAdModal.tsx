@@ -21,28 +21,42 @@ interface UserAdModalProps {
   onRewardEarned?: (newBonusCount: number) => void;
 }
 
+interface ActiveAd {
+  id: string;
+  song_title: string;
+  artist_name: string;
+  campaign_name?: string;
+  cover_url?: string;
+  audio_url?: string;
+  genre?: string;
+  spotify_url?: string;
+  apple_music_url?: string;
+  audiomack_url?: string;
+  youtube_url?: string;
+}
+
+const DEFAULT_AD: ActiveAd = {
+  id: 'promo-default-1',
+  song_title: 'Midnight Lagos',
+  artist_name: 'Teniola Sound',
+  campaign_name: 'Stream the new breakout single "Midnight Lagos" out on all DSPs now!',
+  genre: 'Afro-Soul',
+  cover_url: '/images/artist_studio_mic.jpg',
+  spotify_url: 'https://open.spotify.com',
+  apple_music_url: 'https://music.apple.com',
+  audiomack_url: 'https://audiomack.com',
+  youtube_url: 'https://youtube.com'
+};
+
 export const UserAdModal: React.FC<UserAdModalProps> = ({ isOpen, onClose, onRewardEarned }) => {
+  const [activeAd, setActiveAd] = useState<ActiveAd>(DEFAULT_AD);
   const [secondsRemaining, setSecondsRemaining] = useState(15);
   const [canSkip, setCanSkip] = useState(false);
   const [isPlaying, setIsPlaying] = useState(true);
   const [rewardAwarded, setRewardAwarded] = useState(false);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const rewardGrantedRef = useRef(false);
-
-  const song = {
-    id: 'promo-song-1',
-    title: 'Midnight Lagos',
-    artist_name: 'Teniola Sound',
-    genre: 'Afro-Soul',
-    cover_url: '/images/artist_studio_mic.jpg',
-    tagline: 'Stream the new breakout single "Midnight Lagos" out on all DSPs now!',
-    streaming_links: {
-      spotify: 'https://open.spotify.com',
-      apple_music: 'https://music.apple.com',
-      audiomack: 'https://audiomack.com',
-      youtube: 'https://youtube.com'
-    }
-  };
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const awardReward = () => {
     if (rewardGrantedRef.current) return;
@@ -55,37 +69,86 @@ export const UserAdModal: React.FC<UserAdModalProps> = ({ isOpen, onClose, onRew
   };
 
   useEffect(() => {
-    if (isOpen) {
-      setSecondsRemaining(15);
-      setCanSkip(false);
-      setIsPlaying(true);
-      setRewardAwarded(false);
-      rewardGrantedRef.current = false;
+    if (!isOpen) {
+      if (timerRef.current) clearInterval(timerRef.current);
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+      audioSynth.stop();
+      return;
+    }
 
+    setSecondsRemaining(15);
+    setCanSkip(false);
+    setIsPlaying(true);
+    setRewardAwarded(false);
+    rewardGrantedRef.current = false;
+
+    // Fetch randomized active ad
+    async function loadActiveAd() {
       try {
-        audioSynth.playTrack(song.id, () => {}, 15);
+        const res = await fetch('/api/ads/active');
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data.ads) && data.ads.length > 0) {
+            // Random pick
+            const randomPick = data.ads[Math.floor(Math.random() * data.ads.length)];
+            setActiveAd(randomPick);
+
+            // Track impression
+            fetch('/api/ads/impression', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ campaignId: randomPick.id })
+            }).catch(() => {});
+
+            // Play audio if available
+            if (randomPick.audio_url) {
+              const audio = new Audio(randomPick.audio_url);
+              audioRef.current = audio;
+              audio.play().catch((e) => {
+                console.warn('Real audio play prevented, fallback to synth:', e);
+                try {
+                  audioSynth.playTrack(randomPick.id, () => {}, 15);
+                } catch {}
+              });
+              return;
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('Could not load dynamic active ad:', err);
+      }
+
+      // Default synth playback
+      try {
+        audioSynth.playTrack(DEFAULT_AD.id, () => {}, 15);
       } catch (e) {
         console.warn('User ad synth:', e);
       }
-
-      timerRef.current = setInterval(() => {
-        setSecondsRemaining((prev) => {
-          if (prev <= 1) {
-            if (timerRef.current) clearInterval(timerRef.current);
-            setCanSkip(true);
-            awardReward();
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
-    } else {
-      if (timerRef.current) clearInterval(timerRef.current);
-      audioSynth.stop();
     }
+
+    loadActiveAd();
+
+    timerRef.current = setInterval(() => {
+      setSecondsRemaining((prev) => {
+        if (prev <= 1) {
+          if (timerRef.current) clearInterval(timerRef.current);
+          setCanSkip(true);
+          awardReward();
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
 
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
       audioSynth.stop();
     };
   }, [isOpen]);
@@ -96,22 +159,41 @@ export const UserAdModal: React.FC<UserAdModalProps> = ({ isOpen, onClose, onRew
     if (!canSkip && secondsRemaining > 0) return;
     awardReward();
     if (timerRef.current) clearInterval(timerRef.current);
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
+    }
     audioSynth.stop();
     onClose();
   };
 
   const toggleAudio = () => {
     if (isPlaying) {
+      if (audioRef.current) {
+        audioRef.current.pause();
+      }
       audioSynth.stop();
       setIsPlaying(false);
     } else {
-      audioSynth.playTrack(song.id, () => {}, secondsRemaining);
+      if (audioRef.current) {
+        audioRef.current.play().catch(() => {});
+      } else {
+        audioSynth.playTrack(activeAd.id, () => {}, secondsRemaining);
+      }
       setIsPlaying(true);
     }
   };
 
   const handleDspClick = () => {
     awardReward();
+    // Track DSP click
+    if (activeAd.id) {
+      fetch('/api/ads/click', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ campaignId: activeAd.id })
+      }).catch(() => {});
+    }
   };
 
   const progressPct = ((15 - secondsRemaining) / 15) * 100;
@@ -179,8 +261,8 @@ export const UserAdModal: React.FC<UserAdModalProps> = ({ isOpen, onClose, onRew
         <div className="p-6 text-center flex flex-col items-center">
           <div className="relative w-36 h-36 rounded-xl overflow-hidden shadow-2xl border border-white/10 mb-4 group">
             <img
-              src={song.cover_url}
-              alt={song.title}
+              src={activeAd.cover_url || '/images/hero_boombox.jpg'}
+              alt={activeAd.song_title}
               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
             />
             <div className="absolute inset-0 bg-black/30 flex items-center justify-center">
@@ -199,12 +281,12 @@ export const UserAdModal: React.FC<UserAdModalProps> = ({ isOpen, onClose, onRew
           </div>
 
           <span className="px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-[10px] font-mono text-amber-300 mb-1.5 uppercase">
-            {song.genre}
+            {activeAd.genre || 'Afrobeats'}
           </span>
-          <h3 className="text-lg font-black text-white tracking-tight">{song.title}</h3>
-          <p className="text-xs text-gray-400 font-medium mt-0.5">by {song.artist_name}</p>
+          <h3 className="text-lg font-black text-white tracking-tight">{activeAd.song_title}</h3>
+          <p className="text-xs text-gray-400 font-medium mt-0.5">by {activeAd.artist_name}</p>
           <p className="text-xs text-gray-300 mt-2 max-w-xs leading-relaxed italic">
-            &ldquo;{song.tagline}&rdquo;
+            &ldquo;{activeAd.campaign_name || `Stream "${activeAd.song_title}" out now on all major DSPs!`}&rdquo;
           </p>
 
           {/* Reward Status Card */}
@@ -222,7 +304,7 @@ export const UserAdModal: React.FC<UserAdModalProps> = ({ isOpen, onClose, onRew
             </span>
             <div className="grid grid-cols-2 gap-2">
               <a
-                href={song.streaming_links.spotify}
+                href={activeAd.spotify_url || 'https://open.spotify.com'}
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={handleDspClick}
@@ -233,7 +315,7 @@ export const UserAdModal: React.FC<UserAdModalProps> = ({ isOpen, onClose, onRew
               </a>
 
               <a
-                href={song.streaming_links.apple_music}
+                href={activeAd.apple_music_url || 'https://music.apple.com'}
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={handleDspClick}
@@ -244,7 +326,7 @@ export const UserAdModal: React.FC<UserAdModalProps> = ({ isOpen, onClose, onRew
               </a>
 
               <a
-                href={song.streaming_links.audiomack}
+                href={activeAd.audiomack_url || 'https://audiomack.com'}
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={handleDspClick}
@@ -255,7 +337,7 @@ export const UserAdModal: React.FC<UserAdModalProps> = ({ isOpen, onClose, onRew
               </a>
 
               <a
-                href={song.streaming_links.youtube}
+                href={activeAd.youtube_url || 'https://youtube.com'}
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={handleDspClick}

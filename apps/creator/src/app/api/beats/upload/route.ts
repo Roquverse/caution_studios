@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServiceRoleClient, supabase as publicSupabase } from '../../../../lib/supabaseClient';
 import { uploadToR2 } from '../../../../lib/r2Server';
+import { sendAdminNotification } from '../../../../lib/emailNotifier';
 
 export const dynamic = 'force-dynamic';
 
@@ -194,6 +195,23 @@ export async function POST(req: NextRequest) {
         { beat_id: newBeat.id, type: 'exclusive', price_cents: priceExclusive * 100, enabled: true }
       ]);
     }
+
+    // 8. Dispatch notification email to support@cautionstudioz.com
+    await sendAdminNotification({
+      event: 'BEAT_UPLOADED',
+      subject: `🎵 New Beat Uploaded: "${title.trim()}" (${genre || 'Afrobeats'})`,
+      title: 'Producer Beat Uploaded & Live in Catalog',
+      description: `A music producer has published a new master track to the Caution Studio store.`,
+      details: {
+        'Beat Title': title.trim(),
+        'Genre': genre || 'Afrobeats',
+        'BPM': bpm ? `${bpm} BPM` : 'N/A',
+        'Key': musicalKey || 'N/A',
+        'Producer ID': producerId,
+        'Type': isFreeBeat ? 'Free Stream' : `Paid (₦${priceBasic.toLocaleString()} - ₦${priceExclusive.toLocaleString()})`
+      },
+      ctaUrl: 'https://admin.cautionstudioz.com/beats'
+    });
 
     return NextResponse.json({
       success: true,

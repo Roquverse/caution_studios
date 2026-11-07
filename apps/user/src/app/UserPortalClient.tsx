@@ -29,7 +29,8 @@ import {
   Menu,
   ShoppingBag,
   Mic,
-  Lock
+  Lock,
+  Megaphone
 } from 'lucide-react';
 import { audioSynth, TrackRow } from '@caution/ui';
 import { UserDropdown } from '../components/UserDropdown';
@@ -972,6 +973,20 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
                   <span>Studio</span>
                 </div>
               </button>
+
+              <Link
+                href="/promote"
+                onClick={() => setMobileMenuOpen(false)}
+                className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-lg text-xs font-semibold text-amber-300 hover:text-white bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/20 transition-colors mt-2"
+              >
+                <div className="flex items-center gap-3">
+                  <Megaphone className="h-4 w-4 text-amber-400" />
+                  <span>Promote Music (Ads)</span>
+                </div>
+                <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-amber-400/20 text-amber-300 uppercase">
+                  Ads
+                </span>
+              </Link>
             </nav>
 
             {/* YOUR MUSIC */}
@@ -1104,6 +1119,20 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
                 <Mic className="h-4 w-4" />
                 <span>Studio</span>
               </button>
+
+              <Link
+                href="/promote"
+                className="w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-semibold text-amber-300 hover:text-white bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/20 transition-colors mt-2"
+                title="Promote Your Song with Audio Ads"
+              >
+                <div className="flex items-center gap-2.5">
+                  <Megaphone className="h-4 w-4 text-amber-400" />
+                  <span>Promote Music</span>
+                </div>
+                <span className="text-[9px] font-mono font-bold px-1.5 py-0.2 rounded bg-amber-400/20 text-amber-300 uppercase">
+                  Ads
+                </span>
+              </Link>
             </nav>
 
             <div>
