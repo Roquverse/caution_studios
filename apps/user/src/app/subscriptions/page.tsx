@@ -15,7 +15,8 @@ import {
   ArrowRight
 } from 'lucide-react';
 import { supabase } from '../../lib/supabaseClient';
-import { UserDropdown, UserProfileData } from '../../components/UserDropdown';
+import { UserProfileData } from '../../components/UserDropdown';
+import { UserShell } from '../../components/UserShell';
 import { setCachedUserPlan } from '../../lib/subscription';
 
 interface InvoiceRecord {
@@ -174,47 +175,8 @@ export default function SubscriptionsPage() {
   const isPlus = currentPlan === 'plus';
 
   return (
-    <div className="min-h-screen bg-[#08090B] text-white flex flex-col font-sans selection:bg-[#04564f] selection:text-white pb-20">
-      {/* 1. TOP HEADER */}
-      <header className="h-16 border-b border-white/[0.06] bg-[#0A0B0E] px-4 sm:px-6 flex items-center justify-between gap-3 sticky top-0 z-40">
-        <div className="flex items-center shrink-0">
-          <Link href="/" className="inline-flex items-center">
-            <img
-              src="/logo.png"
-              alt="Caution Studio"
-              className="h-7 sm:h-8 w-auto object-contain brightness-0 invert max-w-[130px] sm:max-w-[190px]"
-            />
-          </Link>
-        </div>
-
-        <div className="hidden md:flex flex-1 max-w-xl mx-4">
-          <div className="relative flex items-center w-full">
-            <Search className="h-4 w-4 text-gray-400 absolute left-3.5 pointer-events-none" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search plans & subscriptions..."
-              className="w-full h-10 pl-10 pr-4 rounded-lg bg-[#141518] border border-white/[0.06] text-xs text-white placeholder-gray-500 focus:outline-none focus:border-white/20 transition-colors"
-            />
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-          <Link
-            href="/"
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-white/20 hover:border-white/40 text-xs font-semibold text-white/90 transition-colors cursor-pointer"
-          >
-            <ChevronLeft className="h-3.5 w-3.5 text-gray-400" />
-            <span className="hidden sm:inline">Dashboard</span>
-          </Link>
-
-          <UserDropdown />
-        </div>
-      </header>
-
-      {/* 2. MAIN BODY */}
-      <main className="flex-1 max-w-5xl w-full mx-auto p-5 sm:p-8 space-y-8">
+    <UserShell activePath="/subscriptions">
+      <div className="max-w-5xl mx-auto space-y-8">
         <div>
           <div className="flex items-center gap-2 text-xs text-gray-400 mb-1">
             <Link href="/" className="hover:text-white transition-colors">
@@ -518,7 +480,7 @@ export default function SubscriptionsPage() {
             </table>
           </div>
         </div>
-      </main>
-    </div>
+      </div>
+    </UserShell>
   );
 }
