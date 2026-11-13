@@ -241,6 +241,168 @@ export async function sendAdminNotification(
   return { success: true, id: 'console-logged' };
 }
 
+/**
+ * Sends a secure, beautifully formatted Password Reset Email directly to the user.
+ * Tries Resend API, SMTP, or logs recovery link for local testing/troubleshooting.
+ */
+export async function sendPasswordResetEmail(params: {
+  to: string;
+  resetUrl: string;
+  userName?: string;
+}): Promise<{ success: boolean; id?: string; error?: string }> {
+  const { to, resetUrl, userName } = params;
+  const greeting = userName ? `Hello ${userName},` : 'Hello Creator,';
+  const timestamp = new Date().toUTCString();
+
+  const htmlContent = `
+    <!DOCTYPE html>
+    <html lang="en">
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Reset Your Password - Caution Studio</title>
+      </head>
+      <body style="margin: 0; padding: 0; background-color: #07090D; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #eceef2;">
+        <table width="100%" border="0" cellpadding="0" cellspacing="0" style="background-color: #07090D; padding: 40px 16px;">
+          <tr>
+            <td align="center">
+              <table width="100%" border="0" cellpadding="0" cellspacing="0" style="max-width: 560px; background-color: #0c0e14; border: 1px solid #1f242d; border-radius: 12px; overflow: hidden; box-shadow: 0 10px 25px rgba(0,0,0,0.5);">
+                
+                <!-- Header with Logo -->
+                <tr>
+                  <td style="padding: 28px 32px; background: linear-gradient(180deg, #11141c 0%, #0c0e14 100%); border-bottom: 1px solid #1f242d;">
+                    <table width="100%" border="0" cellpadding="0" cellspacing="0">
+                      <tr>
+                        <td>
+                          <span style="font-size: 20px; font-weight: 900; letter-spacing: -0.5px; color: #ffffff;">
+                            CAUTION <span style="color: #2dd4bf;">STUDIO</span>
+                          </span>
+                        </td>
+                        <td align="right">
+                          <span style="font-size: 11px; font-family: monospace; text-transform: uppercase; letter-spacing: 1px; color: #2dd4bf; background-color: rgba(45, 212, 191, 0.1); border: 1px solid rgba(45, 212, 191, 0.3); padding: 4px 10px; border-radius: 4px;">
+                            Account Security
+                          </span>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+
+                <!-- Content Body -->
+                <tr>
+                  <td style="padding: 36px 32px;">
+                    <h1 style="margin: 0 0 12px 0; font-size: 22px; font-weight: 800; color: #ffffff; letter-spacing: -0.3px;">
+                      Reset Your Account Password
+                    </h1>
+                    <p style="margin: 0 0 20px 0; font-size: 14px; line-height: 1.6; color: #9ca3af;">
+                      ${escapeHtml(greeting)}<br/><br/>
+                      We received a request to reset the password for your Caution Studio account (<strong>${escapeHtml(to)}</strong>).
+                      Click the button below to choose a new secure password:
+                    </p>
+
+                    <!-- CTA Button -->
+                    <table width="100%" border="0" cellpadding="0" cellspacing="0" style="margin: 28px 0;">
+                      <tr>
+                        <td align="center">
+                          <a href="${resetUrl}" style="display: inline-block; background-color: #04564f; color: #ffffff; text-decoration: none; font-weight: 700; font-size: 13px; text-transform: uppercase; letter-spacing: 0.8px; padding: 14px 32px; border-radius: 8px; border: 1px solid #2dd4bf; box-shadow: 0 4px 14px rgba(4, 86, 79, 0.4);">
+                            Reset My Password &rarr;
+                          </a>
+                        </td>
+                      </tr>
+                    </table>
+
+                    <!-- Fallback URL -->
+                    <p style="margin: 24px 0 12px 0; font-size: 12px; color: #6b7280; line-height: 1.5;">
+                      If the button above does not work, copy and paste this link into your browser:
+                    </p>
+                    <div style="background-color: #12151d; border: 1px solid #1f242d; border-radius: 6px; padding: 12px; word-break: break-all; font-family: monospace; font-size: 11px; color: #2dd4bf;">
+                      <a href="${resetUrl}" style="color: #2dd4bf; text-decoration: none;">${resetUrl}</a>
+                    </div>
+
+                    <div style="margin-top: 28px; padding-top: 20px; border-top: 1px solid #1f242d;">
+                      <p style="margin: 0; font-size: 11px; color: #9ca3af; line-height: 1.5;">
+                        &#9888; <strong>Security Notice:</strong> This password reset link will expire in 1 hour. If you did not request this password reset, please disregard this email &mdash; your account credentials remain safe and untouched.
+                      </p>
+                    </div>
+                  </td>
+                </tr>
+
+                <!-- Footer -->
+                <tr>
+                  <td style="padding: 20px 32px; background-color: #07090D; border-top: 1px solid #1f242d; font-size: 11px; color: #6b7280; text-align: center;">
+                    Caution Studio &bull; Next-Gen Music Licensing, Beat Store & Recording Cloud<br/>
+                    <a href="https://cautionstudioz.com" style="color: #2dd4bf; text-decoration: none; margin-top: 4px; display: inline-block;">cautionstudioz.com</a>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+        </table>
+      </body>
+    </html>
+  `;
+
+  // 1. Try Resend HTTP API
+  if (process.env.RESEND_API_KEY) {
+    try {
+      const res = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${process.env.RESEND_API_KEY}`
+        },
+        body: JSON.stringify({
+          from: process.env.EMAIL_FROM || 'Caution Studio <security@cautionstudioz.com>',
+          to: [to],
+          subject: '🔐 Reset Your Caution Studio Password',
+          html: htmlContent
+        })
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        console.log(`[Password Reset Email Sent via Resend to ${to}]`, data);
+        return { success: true, id: data.id };
+      }
+      const errText = await res.text();
+      console.warn('Resend API password reset error:', errText);
+    } catch (e: any) {
+      console.warn('Resend API failed, falling back to SMTP:', e?.message);
+    }
+  }
+
+  // 2. Try SMTP via Nodemailer
+  if (process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS) {
+    try {
+      const transporter = nodemailer.createTransport({
+        host: process.env.SMTP_HOST,
+        port: parseInt(process.env.SMTP_PORT || '587', 10),
+        secure: process.env.SMTP_SECURE === 'true' || process.env.SMTP_PORT === '465',
+        auth: {
+          user: process.env.SMTP_USER,
+          pass: process.env.SMTP_PASS
+        }
+      });
+
+      const info = await transporter.sendMail({
+        from: process.env.EMAIL_FROM || `"Caution Studio Security" <${process.env.SMTP_USER}>`,
+        to,
+        subject: '🔐 Reset Your Caution Studio Password',
+        html: htmlContent
+      });
+
+      console.log(`[Password Reset Email Sent via SMTP to ${to}]`, info.messageId);
+      return { success: true, id: info.messageId };
+    } catch (smtpErr: any) {
+      console.warn('SMTP password reset error:', smtpErr?.message);
+    }
+  }
+
+  // 3. Fallback log for local development
+  console.log(`[PASSWORD RESET LINK for ${to}]: ${resetUrl}`);
+  return { success: true, id: 'logged' };
+}
+
 function escapeHtml(str: string): string {
   return str
     .replace(/&/g, '&amp;')

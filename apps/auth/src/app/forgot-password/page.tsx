@@ -2,17 +2,60 @@
 
 import React, { useState } from 'react';
 import { Button } from '@caution/ui';
-import { ArrowLeft, Mail, CheckCircle2, ArrowUpRight, ShieldCheck, KeyRound } from 'lucide-react';
+import { ArrowLeft, Mail, CheckCircle2, ArrowUpRight, ShieldCheck, KeyRound, Loader2, AlertCircle } from 'lucide-react';
+import { supabase } from '../../lib/supabaseClient';
 
 const WEB_URL = process.env.NEXT_PUBLIC_WEB_URL || 'https://cautionstudioz.com';
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState('');
   const [submitted, setSubmitted] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSubmitted(true);
+    const cleanEmail = email.trim().toLowerCase();
+    if (!cleanEmail || !cleanEmail.includes('@')) {
+      setErrorMessage('Please enter a valid email address.');
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      setErrorMessage(null);
+
+      const origin = typeof window !== 'undefined' ? window.location.origin : 'https://auth.cautionstudioz.com';
+      const redirectTo = `${origin}/reset-password`;
+
+      // 1. Call custom reset API endpoint (sends custom styled email + telemetry)
+      const res = await fetch('/api/auth/forgot-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: cleanEmail })
+      });
+
+      // 2. Also trigger Supabase client-side reset
+      try {
+        await supabase.auth.resetPasswordForEmail(cleanEmail, {
+          redirectTo
+        });
+      } catch (clientErr) {
+        console.warn('Client-side resetPasswordForEmail warning:', clientErr);
+      }
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || 'Failed to dispatch reset link. Please try again.');
+      }
+
+      setSubmitted(true);
+    } catch (err: any) {
+      console.error('Password reset submit error:', err);
+      setErrorMessage(err.message || 'An error occurred while requesting password reset.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -130,16 +173,41 @@ export default function ForgotPasswordPage() {
             </p>
           </div>
 
+          {errorMessage && (
+            <div className="mb-4 p-3.5 rounded-[6px] bg-red-950/40 border border-red-800/60 text-red-200 flex items-center gap-2.5 text-xs animate-in fade-in">
+              <AlertCircle className="h-4 w-4 text-red-400 shrink-0" />
+              <span>{errorMessage}</span>
+            </div>
+          )}
+
           {submitted ? (
-            <div className="p-5 bg-[#0F131C] rounded-[6px] border border-white/[0.1] text-center space-y-3">
-              <CheckCircle2 className="h-8 w-8 text-[#2dd4bf] mx-auto" />
-              <h3 className="text-sm font-bold text-white">Check your inbox</h3>
-              <p className="text-xs text-gray-400 leading-relaxed">
-                We&apos;ve sent a password reset link to <strong className="text-white">{email}</strong>.
+            <div className="p-6 bg-[#0F131C] rounded-[8px] border border-white/[0.1] text-center space-y-4 animate-in fade-in zoom-in-95 duration-200">
+              <div className="h-12 w-12 rounded-full bg-[#04564f]/30 border border-[#2dd4bf]/40 flex items-center justify-center text-[#2dd4bf] mx-auto shadow-lg shadow-[#04564f]/20">
+                <CheckCircle2 className="h-6 w-6" />
+              </div>
+              <div className="space-y-1">
+                <h3 className="text-base font-bold text-white">Check your inbox</h3>
+                <p className="text-xs text-gray-400 leading-relaxed">
+                  We&apos;ve sent a password reset link to <strong className="text-white font-mono">{email}</strong>.
+                </p>
+              </div>
+              <p className="text-[11px] text-gray-500 leading-relaxed pt-1">
+                Be sure to check your spam/promotions folder if you don&apos;t see it within a couple of minutes.
               </p>
-              <div className="pt-2">
+              <div className="pt-3 flex flex-col sm:flex-row items-center justify-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSubmitted(false);
+                    setErrorMessage(null);
+                  }}
+                  className="text-xs text-gray-400 hover:text-white underline transition-colors cursor-pointer"
+                >
+                  Try another email
+                </button>
+                <span className="hidden sm:inline text-gray-600">•</span>
                 <a href="/login" className="text-xs font-semibold text-[#2dd4bf] hover:underline">
-                  Return to sign in
+                  Return to sign in &rarr;
                 </a>
               </div>
             </div>
@@ -149,24 +217,38 @@ export default function ForgotPasswordPage() {
                 <label className="block text-[11px] font-mono uppercase tracking-wider text-gray-400 mb-1.5">
                   Email Address
                 </label>
-                <input
-                  type="email"
-                  required
-                  placeholder="creator@studio.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="w-full h-11 px-3.5 rounded-[6px] bg-[#0F131C] border border-white/[0.1] text-xs text-white placeholder-gray-500 focus:outline-none focus:border-[#04564f] transition-colors"
-                />
+                <div className="relative">
+                  <Mail className="absolute left-3.5 top-3.5 h-4 w-4 text-gray-500 pointer-events-none" />
+                  <input
+                    type="email"
+                    required
+                    placeholder="creator@studio.com"
+                    value={email}
+                    onChange={(e) => {
+                      setEmail(e.target.value);
+                      setErrorMessage(null);
+                    }}
+                    className="w-full h-11 pl-10 pr-3.5 rounded-[6px] bg-[#0F131C] border border-white/[0.1] text-xs text-white placeholder-gray-500 focus:outline-none focus:border-[#2dd4bf] transition-colors"
+                  />
+                </div>
               </div>
 
               <div className="pt-2">
                 <Button
                   type="submit"
+                  disabled={isLoading || !email}
                   variant="primary"
                   size="lg"
-                  className="w-full h-11 rounded-[6px] bg-[#04564f] hover:bg-[#03453f] text-white font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-colors cursor-pointer border-0 shadow-none"
+                  className="w-full h-11 rounded-[6px] bg-[#04564f] hover:bg-[#03453f] text-white font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-all cursor-pointer border-0 shadow-none disabled:opacity-50"
                 >
-                  Send Reset Link
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <span>Sending Reset Link...</span>
+                    </>
+                  ) : (
+                    <span>Send Reset Link</span>
+                  )}
                 </Button>
               </div>
 
