@@ -150,7 +150,7 @@ export default function LandingPage() {
         onOpenCart={() => setIsCartOpen(true)}
       />
 
-      {/* 7. Music Licensing & Interactive Beat Catalog (Matching Reference Design) */}
+      {/* Music Licensing Platforms & Clearance */}
       <MusicLicensingSection
         onStartFree={() => (window.location.href = AUTH_SIGNUP_URL)}
       />
