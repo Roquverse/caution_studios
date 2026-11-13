@@ -17,7 +17,14 @@ import {
   Mic2,
   ShieldCheck,
   ChevronDown,
-  Loader2
+  Loader2,
+  KeyRound,
+  Eye,
+  EyeOff,
+  Wand2,
+  Copy,
+  Check,
+  AlertCircle
 } from 'lucide-react';
 
 export interface UserProfile {
@@ -40,6 +47,16 @@ export default function AdminUsersPage() {
   const [planFilter, setPlanFilter] = useState<'all' | 'free' | 'plus'>('all');
   const [roleFilter, setRoleFilter] = useState<'all' | 'artist' | 'producer' | 'admin'>('all');
   const [updatingId, setUpdatingId] = useState<string | null>(null);
+
+  // Password Update Modal State
+  const [passwordModalUser, setPasswordModalUser] = useState<UserProfile | null>(null);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [passwordSaving, setPasswordSaving] = useState(false);
+  const [passwordError, setPasswordError] = useState<string | null>(null);
+  const [passwordCopied, setPasswordCopied] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   useEffect(() => {
     fetchUsers();
@@ -86,6 +103,7 @@ export default function AdminUsersPage() {
         setUsers(
           users.map((u) => (u.id === user.id ? { ...u, plan: nextPlan } : u))
         );
+        showToast(`Subscription plan updated to ${nextPlan.toUpperCase()} for ${user.display_name}`);
       } else {
         const err = await res.json();
         alert(err.error || 'Failed to update plan');
@@ -131,6 +149,7 @@ export default function AdminUsersPage() {
               : u
           )
         );
+        showToast(`Role updated to ${newRole.toUpperCase()} for ${user.display_name}`);
       } else {
         const err = await res.json();
         alert(err.error || 'Failed to update role');
@@ -139,6 +158,103 @@ export default function AdminUsersPage() {
       alert(err.message || 'Error updating role');
     } finally {
       setUpdatingId(null);
+    }
+  };
+
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(null), 4000);
+  };
+
+  const handleOpenPasswordModal = (user: UserProfile) => {
+    setPasswordModalUser(user);
+    setNewPassword('');
+    setConfirmPassword('');
+    setShowPassword(false);
+    setPasswordError(null);
+    setPasswordCopied(false);
+  };
+
+  const handleClosePasswordModal = () => {
+    if (passwordSaving) return;
+    setPasswordModalUser(null);
+    setNewPassword('');
+    setConfirmPassword('');
+    setPasswordError(null);
+  };
+
+  const generateStrongPassword = () => {
+    const chars = 'abcdefghjkmnpqrstuvwxyzABCDEFGHJKMNPQRSTUVWXYZ23456789!@#$%&*';
+    let generated = '';
+    for (let i = 0; i < 14; i++) {
+      generated += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    setNewPassword(generated);
+    setConfirmPassword(generated);
+    setShowPassword(true);
+    setPasswordError(null);
+
+    if (typeof navigator !== 'undefined' && navigator.clipboard) {
+      navigator.clipboard.writeText(generated).then(() => {
+        setPasswordCopied(true);
+        setTimeout(() => setPasswordCopied(false), 3000);
+      });
+    }
+  };
+
+  const handleCopyPassword = () => {
+    if (!newPassword) return;
+    if (typeof navigator !== 'undefined' && navigator.clipboard) {
+      navigator.clipboard.writeText(newPassword).then(() => {
+        setPasswordCopied(true);
+        setTimeout(() => setPasswordCopied(false), 3000);
+      });
+    }
+  };
+
+  const handleSavePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!passwordModalUser) return;
+
+    const trimmed = newPassword.trim();
+    if (trimmed.length < 6) {
+      setPasswordError('Password must be at least 6 characters long.');
+      return;
+    }
+
+    if (trimmed !== confirmPassword.trim()) {
+      setPasswordError('Passwords do not match. Please re-enter.');
+      return;
+    }
+
+    try {
+      setPasswordSaving(true);
+      setPasswordError(null);
+
+      const { data: { session } } = await supabase.auth.getSession();
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (session?.access_token) {
+        headers['Authorization'] = `Bearer ${session.access_token}`;
+      }
+
+      const res = await fetch(`/api/users/${passwordModalUser.id}/password`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ password: trimmed })
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to update user password');
+      }
+
+      const userName = passwordModalUser.display_name || passwordModalUser.email;
+      showToast(`Password successfully updated for ${userName}!`);
+      handleClosePasswordModal();
+    } catch (err: any) {
+      setPasswordError(err.message || 'An error occurred while saving the password.');
+    } finally {
+      setPasswordSaving(false);
     }
   };
 
@@ -172,6 +288,25 @@ export default function AdminUsersPage() {
   return (
     <AdminShell activePath="/users">
       <div className="space-y-6">
+        {/* Toast Alert */}
+        {toastMessage && (
+          <div className="p-4 rounded-xl bg-[#04564f]/40 border border-[#2dd4bf]/50 text-white flex items-center justify-between gap-3 animate-in fade-in slide-in-from-top-2 shadow-lg">
+            <div className="flex items-center gap-3">
+              <CheckCircle2 className="h-5 w-5 text-[#2dd4bf] shrink-0" />
+              <span className="text-xs font-semibold text-[#2dd4bf]">
+                {toastMessage}
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setToastMessage(null)}
+              className="text-zinc-400 hover:text-white"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        )}
+
         {/* Header Bar */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
@@ -179,7 +314,7 @@ export default function AdminUsersPage() {
               Subscribers & Users
             </h1>
             <p className="text-xs sm:text-sm text-zinc-400 mt-0.5">
-              Creator profiles, Caution Plus membership status, and role assignments.
+              Creator profiles, producers, passwords, membership status, and role assignments.
             </p>
           </div>
 
@@ -358,7 +493,7 @@ export default function AdminUsersPage() {
                   <th className="py-3 px-4">Role Management</th>
                   <th className="py-3 px-4">Subscription Plan</th>
                   <th className="py-3 px-4">Registered Date</th>
-                  <th className="py-3 px-4 text-right">Subscription Action</th>
+                  <th className="py-3 px-4 text-right">Account Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-800/60">
@@ -473,28 +608,43 @@ export default function AdminUsersPage() {
                             : 'N/A'}
                         </td>
 
+                        {/* Actions: Update Password + Subscription Toggle */}
                         <td className="py-3 px-4 text-right">
-                          <button
-                            type="button"
-                            disabled={isUpdating}
-                            onClick={() => handleTogglePlan(u)}
-                            className={`text-xs font-semibold px-3 py-1.5 rounded-md border transition-all cursor-pointer ${
-                              isPlus
-                                ? 'bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border-zinc-700'
-                                : 'bg-[#2dd4bf] hover:bg-[#20b8a4] text-zinc-950 border-none shadow-xs'
-                            }`}
-                          >
-                            {isUpdating ? (
-                              <div className="flex items-center gap-1.5">
-                                <div className="h-3 w-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                                <span>Updating...</span>
-                              </div>
-                            ) : isPlus ? (
-                              'Downgrade to Free'
-                            ) : (
-                              'Upgrade to Plus'
-                            )}
-                          </button>
+                          <div className="flex items-center justify-end gap-2">
+                            {/* Update Password Button */}
+                            <button
+                              type="button"
+                              onClick={() => handleOpenPasswordModal(u)}
+                              className="text-xs font-semibold px-2.5 py-1.5 rounded-md border border-zinc-700 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 hover:text-white transition-all cursor-pointer flex items-center gap-1.5 shadow-xs"
+                              title={`Update password for ${u.display_name}`}
+                            >
+                              <KeyRound className="h-3.5 w-3.5 text-[#2dd4bf]" />
+                              <span>Password</span>
+                            </button>
+
+                            {/* Plan Toggle Button */}
+                            <button
+                              type="button"
+                              disabled={isUpdating}
+                              onClick={() => handleTogglePlan(u)}
+                              className={`text-xs font-semibold px-3 py-1.5 rounded-md border transition-all cursor-pointer ${
+                                isPlus
+                                  ? 'bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border-zinc-700'
+                                  : 'bg-[#2dd4bf] hover:bg-[#20b8a4] text-zinc-950 border-none shadow-xs'
+                              }`}
+                            >
+                              {isUpdating ? (
+                                <div className="flex items-center gap-1.5">
+                                  <div className="h-3 w-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                                  <span>Updating...</span>
+                                </div>
+                              ) : isPlus ? (
+                                'Downgrade'
+                              ) : (
+                                'Upgrade to Plus'
+                              )}
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     );
@@ -505,6 +655,187 @@ export default function AdminUsersPage() {
           </div>
         </div>
       </div>
+
+      {/* ADMIN PASSWORD UPDATE MODAL */}
+      {passwordModalUser && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-150">
+          <div className="relative w-full max-w-md rounded-2xl bg-[#121316] border border-zinc-800 p-6 shadow-2xl text-white space-y-5 animate-in zoom-in-95 duration-150">
+            {/* Close Button */}
+            <button
+              type="button"
+              onClick={handleClosePasswordModal}
+              disabled={passwordSaving}
+              className="absolute top-4 right-4 p-1.5 text-zinc-400 hover:text-white rounded-full bg-zinc-800/60 hover:bg-zinc-800 transition-colors disabled:opacity-50"
+              aria-label="Close modal"
+            >
+              <X className="h-4 w-4" />
+            </button>
+
+            {/* Modal Header */}
+            <div className="flex items-start gap-3">
+              <div className="h-10 w-10 rounded-xl bg-[#04564f]/40 border border-[#2dd4bf]/40 flex items-center justify-center text-[#2dd4bf] shrink-0">
+                <KeyRound className="h-5 w-5" />
+              </div>
+              <div className="min-w-0 flex-1 pr-6">
+                <h3 className="text-base font-bold text-white tracking-tight">
+                  Update Account Password
+                </h3>
+                <p className="text-xs text-zinc-400 mt-0.5 truncate">
+                  Set a new secure password for <span className="text-white font-medium">{passwordModalUser.display_name}</span>
+                </p>
+              </div>
+            </div>
+
+            {/* User Details Badge */}
+            <div className="p-3 rounded-xl bg-zinc-900 border border-zinc-800 flex items-center justify-between">
+              <div className="min-w-0 pr-2">
+                <span className="text-xs font-semibold text-white block truncate">
+                  {passwordModalUser.email}
+                </span>
+                <span className="text-[11px] text-zinc-500 font-mono block">
+                  @{passwordModalUser.handle}
+                </span>
+              </div>
+              <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase shrink-0 ${
+                getEffectiveRole(passwordModalUser) === 'admin'
+                  ? 'bg-[#2dd4bf]/10 text-[#2dd4bf] border border-[#2dd4bf]/30'
+                  : getEffectiveRole(passwordModalUser) === 'producer'
+                  ? 'bg-amber-500/10 text-amber-300 border border-amber-500/30'
+                  : 'bg-sky-500/10 text-sky-300 border border-sky-500/30'
+              }`}>
+                {getEffectiveRole(passwordModalUser)}
+              </span>
+            </div>
+
+            {/* Error Message */}
+            {passwordError && (
+              <div className="p-3 rounded-xl bg-red-950/40 border border-red-800/60 text-red-200 flex items-center gap-2 text-xs">
+                <AlertCircle className="h-4 w-4 text-red-400 shrink-0" />
+                <span>{passwordError}</span>
+              </div>
+            )}
+
+            {/* Password Form */}
+            <form onSubmit={handleSavePassword} className="space-y-4">
+              {/* New Password */}
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="text-xs font-medium text-zinc-300">
+                    New Password
+                  </label>
+                  <button
+                    type="button"
+                    onClick={generateStrongPassword}
+                    className="text-[11px] text-[#2dd4bf] hover:text-[#20b8a4] flex items-center gap-1 font-medium transition-colors cursor-pointer"
+                  >
+                    <Wand2 className="h-3 w-3" />
+                    <span>Generate Strong</span>
+                  </button>
+                </div>
+                <div className="relative">
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    value={newPassword}
+                    onChange={(e) => {
+                      setNewPassword(e.target.value);
+                      setPasswordError(null);
+                    }}
+                    placeholder="Enter at least 6 characters"
+                    required
+                    minLength={6}
+                    className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder:text-zinc-600 focus:outline-none focus:border-[#2dd4bf] pr-20 font-mono"
+                  />
+                  <div className="absolute right-2 top-2 flex items-center gap-1">
+                    {newPassword && (
+                      <button
+                        type="button"
+                        onClick={handleCopyPassword}
+                        className="p-1 text-zinc-400 hover:text-white rounded hover:bg-zinc-800 transition-colors"
+                        title="Copy password"
+                      >
+                        {passwordCopied ? (
+                          <Check className="h-3.5 w-3.5 text-[#2dd4bf]" />
+                        ) : (
+                          <Copy className="h-3.5 w-3.5" />
+                        )}
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="p-1 text-zinc-400 hover:text-white rounded hover:bg-zinc-800 transition-colors"
+                      title={showPassword ? 'Hide password' : 'Show password'}
+                    >
+                      {showPassword ? (
+                        <EyeOff className="h-3.5 w-3.5" />
+                      ) : (
+                        <Eye className="h-3.5 w-3.5" />
+                      )}
+                    </button>
+                  </div>
+                </div>
+                {passwordCopied && (
+                  <span className="text-[10px] text-[#2dd4bf] font-medium mt-1 block">
+                    ✓ Password copied to clipboard!
+                  </span>
+                )}
+              </div>
+
+              {/* Confirm Password */}
+              <div>
+                <label className="text-xs font-medium text-zinc-300 block mb-1.5">
+                  Confirm Password
+                </label>
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  value={confirmPassword}
+                  onChange={(e) => {
+                    setConfirmPassword(e.target.value);
+                    setPasswordError(null);
+                  }}
+                  placeholder="Re-enter password to confirm"
+                  required
+                  minLength={6}
+                  className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder:text-zinc-600 focus:outline-none focus:border-[#2dd4bf] font-mono"
+                />
+              </div>
+
+              <div className="p-3 rounded-lg bg-zinc-900/60 border border-zinc-800/80 text-[11px] text-zinc-400 leading-relaxed">
+                Updating this password takes effect immediately in Supabase Auth. The user/producer can immediately log in with their new credentials.
+              </div>
+
+              {/* Modal Actions */}
+              <div className="flex items-center justify-end gap-2.5 pt-2">
+                <button
+                  type="button"
+                  onClick={handleClosePasswordModal}
+                  disabled={passwordSaving}
+                  className="px-4 py-2 rounded-xl text-xs font-semibold text-zinc-400 hover:text-white transition-colors cursor-pointer disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={passwordSaving || !newPassword || newPassword.length < 6}
+                  className="px-5 py-2 rounded-xl bg-[#04564f] hover:bg-[#03453f] text-[#2dd4bf] text-xs font-bold uppercase tracking-wider flex items-center gap-2 border border-[#2dd4bf]/40 transition-all shadow-md cursor-pointer disabled:opacity-50"
+                >
+                  {passwordSaving ? (
+                    <>
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      <span>Updating...</span>
+                    </>
+                  ) : (
+                    <>
+                      <KeyRound className="h-3.5 w-3.5" />
+                      <span>Save Password</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </AdminShell>
   );
 }

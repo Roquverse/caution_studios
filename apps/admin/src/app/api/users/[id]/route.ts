@@ -18,6 +18,30 @@ export async function PATCH(
     const supabase = getServiceRoleClient();
     const body = await req.json();
 
+    // 1. Password update if requested by admin
+    let passwordUpdated = false;
+    if (body.password !== undefined && body.password !== null) {
+      const pwd = String(body.password).trim();
+      if (pwd.length < 6) {
+        return NextResponse.json(
+          { error: 'Password must be at least 6 characters long' },
+          { status: 400 }
+        );
+      }
+
+      const { error: pwdErr } = await supabase.auth.admin.updateUserById(params.id, {
+        password: pwd
+      });
+
+      if (pwdErr) {
+        return NextResponse.json(
+          { error: `Failed to update password: ${pwdErr.message}` },
+          { status: 500 }
+        );
+      }
+      passwordUpdated = true;
+    }
+
     const updateFields: Record<string, any> = {};
     if (body.plan !== undefined) updateFields.plan = body.plan;
     if (body.display_name !== undefined) updateFields.display_name = body.display_name;
@@ -104,6 +128,13 @@ export async function PATCH(
           }
         });
       }
+    }
+
+    if (Object.keys(updateFields).length === 0 && !targetRole) {
+      if (passwordUpdated) {
+        return NextResponse.json({ success: true, message: 'Password updated successfully' });
+      }
+      return NextResponse.json({ success: true, message: 'No changes requested' });
     }
 
     let { data: updated, error } = await supabase
