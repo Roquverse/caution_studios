@@ -367,3 +367,4 @@ export function UserShell({ children, activePath }: UserShellProps) {
     </div>
   );
 }
+

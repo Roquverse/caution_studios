@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { AdminShell } from '../../components/AdminShell';
+import { supabase } from '../../lib/supabaseClient';
 import {
   Plus,
   Search,
@@ -18,7 +19,8 @@ import {
   Filter,
   Music,
   Sliders,
-  Sparkles
+  Sparkles,
+  Loader2
 } from 'lucide-react';
 
 export interface BeatTrack {
@@ -66,6 +68,8 @@ export default function AdminTracksPage() {
   // Upload Modal State
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [uploadStep, setUploadStep] = useState<string>('');
+  const [uploadProgress, setUploadProgress] = useState<number>(0);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [uploadSuccess, setUploadSuccess] = useState(false);
 
@@ -178,6 +182,83 @@ export default function AdminTracksPage() {
     }
   };
 
+  // Direct storage upload with real progress tracking (bypasses Vercel 4.5MB serverless limit)
+  const uploadFileDirectly = async (
+    file: File,
+    type: 'audio' | 'stems' | 'cover',
+    titleStr: string,
+    authToken?: string
+  ): Promise<string> => {
+    let targetContentType = file.type;
+    if (!targetContentType || targetContentType === 'application/octet-stream') {
+      if (type === 'audio') {
+        const ext = file.name.split('.').pop()?.toLowerCase();
+        targetContentType = ext === 'mp3' ? 'audio/mpeg' : 'audio/wav';
+      } else if (type === 'stems') {
+        targetContentType = 'application/zip';
+      } else if (type === 'cover') {
+        targetContentType = 'image/jpeg';
+      }
+    }
+
+    // 1. Request presigned upload URL from admin endpoint
+    const presignRes = await fetch('/api/tracks/presigned-url', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(authToken ? { Authorization: `Bearer ${authToken}` } : {})
+      },
+      body: JSON.stringify({
+        filename: file.name,
+        contentType: targetContentType,
+        type,
+        title: titleStr
+      })
+    });
+
+    const presignText = await presignRes.text();
+    let presignJson: any = {};
+    try {
+      presignJson = JSON.parse(presignText);
+    } catch {
+      throw new Error(`Storage URL error (${presignRes.status}): ${presignText.slice(0, 120)}`);
+    }
+
+    if (!presignRes.ok || !presignJson.uploadUrl || !presignJson.key) {
+      throw new Error(presignJson.error || `Failed to initiate storage upload for ${file.name}`);
+    }
+
+    // 2. Direct PUT to Cloudflare R2 Storage with real-time percentage progress
+    await new Promise<void>((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('PUT', presignJson.uploadUrl, true);
+      xhr.setRequestHeader('Content-Type', targetContentType);
+
+      xhr.upload.onprogress = (evt) => {
+        if (evt.lengthComputable) {
+          const percent = Math.round((evt.loaded / evt.total) * 100);
+          setUploadProgress(percent);
+        }
+      };
+
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          resolve();
+        } else {
+          reject(new Error(`Direct storage upload failed with status ${xhr.status}`));
+        }
+      };
+
+      xhr.onerror = () => {
+        reject(new Error('Network error during file upload to storage. Check connection.'));
+      };
+
+      xhr.send(file);
+    });
+
+    return presignJson.key;
+  };
+
   const handleUploadSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim()) {
@@ -192,39 +273,92 @@ export default function AdminTracksPage() {
     try {
       setUploading(true);
       setUploadError(null);
+      setUploadProgress(0);
 
-      const formData = new FormData();
-      formData.append('title', title.trim());
-      formData.append('artist', artist.trim() || 'Caution Studio');
-      formData.append('genre', genre);
-      formData.append('bpm', bpm ? bpm.toString() : '120');
-      formData.append('musicalKey', musicalKey.trim() || 'C Minor');
-      formData.append('durationSeconds', durationSeconds.toString());
-      formData.append('description', description.trim());
-      formData.append('status', status);
-      formData.append('moods', mood);
-      formData.append('tags', tags.trim());
+      // Get authenticated admin session
+      let { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        const matchToken = typeof document !== 'undefined' ? document.cookie.match(/(?:^|;\s*)sb-token=([^;]*)/) : null;
+        const matchRefresh = typeof document !== 'undefined' ? document.cookie.match(/(?:^|;\s*)sb-refresh=([^;]*)/) : null;
+        if (matchToken && matchRefresh) {
+          const tokenVal = decodeURIComponent(matchToken[1]);
+          const refreshVal = decodeURIComponent(matchRefresh[1]);
+          const { data } = await supabase.auth.setSession({ access_token: tokenVal, refresh_token: refreshVal });
+          session = data.session;
+        }
+      }
+      const authToken = session?.access_token;
+
+      // 1. Upload Master Audio directly to R2
+      const audioSizeMb = (audioFile.size / (1024 * 1024)).toFixed(1);
+      setUploadStep(`Uploading master audio (${audioSizeMb} MB)...`);
+      setUploadProgress(0);
+      const masterAudioKey = await uploadFileDirectly(audioFile, 'audio', title.trim(), authToken);
+
+      // 2. Upload Stems ZIP directly to R2 if selected
+      let stemsKey: string | null = null;
+      if (stemsFile) {
+        const stemsSizeMb = (stemsFile.size / (1024 * 1024)).toFixed(1);
+        setUploadStep(`Uploading stems ZIP archive (${stemsSizeMb} MB)...`);
+        setUploadProgress(0);
+        stemsKey = await uploadFileDirectly(stemsFile, 'stems', title.trim(), authToken);
+      }
+
+      // 3. Upload Cover Image directly to R2 if selected
+      let coverUrl = '/images/album_neon_dj.jpg';
+      if (coverFile) {
+        setUploadStep('Uploading cover artwork...');
+        setUploadProgress(0);
+        const coverKey = await uploadFileDirectly(coverFile, 'cover', title.trim(), authToken);
+        coverUrl = `/api/media/${coverKey}`;
+      }
+
+      // 4. Register beat & licenses in DB via JSON payload (only a few bytes, 0 size risk)
+      setUploadStep('Publishing track to master catalog...');
+      setUploadProgress(100);
 
       const finalBasic = typeof basicPrice === 'number' && basicPrice > 0 ? basicPrice : 15000;
       const finalPremium = typeof premiumPrice === 'number' && premiumPrice > 0 ? premiumPrice : 45000;
       const finalExclusive = typeof exclusivePrice === 'number' && exclusivePrice > 0 ? exclusivePrice : 250000;
 
-      formData.append('basicPrice', Math.round(finalBasic * 100).toString());
-      formData.append('premiumPrice', Math.round(finalPremium * 100).toString());
-      formData.append('exclusivePrice', Math.round(finalExclusive * 100).toString());
-
-      formData.append('audio', audioFile);
-      if (coverFile) formData.append('cover', coverFile);
-      if (stemsFile) formData.append('stems', stemsFile);
+      const payload = {
+        title: title.trim(),
+        artist: artist.trim() || 'Caution Studio',
+        genre,
+        bpm: bpm ? bpm : 120,
+        musicalKey: musicalKey.trim() || 'C Minor',
+        durationSeconds,
+        description: description.trim(),
+        status,
+        moods: [mood],
+        tags: tags.trim() ? tags.split(',').map((t) => t.trim()).filter(Boolean) : ['Instrumental'],
+        basicPrice: Math.round(finalBasic * 100),
+        premiumPrice: Math.round(finalPremium * 100),
+        exclusivePrice: Math.round(finalExclusive * 100),
+        masterAudioKey,
+        coverUrl,
+        stemsKey
+      };
 
       const res = await fetch('/api/tracks', {
         method: 'POST',
-        body: formData
+        headers: {
+          'Content-Type': 'application/json',
+          ...(authToken ? { Authorization: `Bearer ${authToken}` } : {})
+        },
+        body: JSON.stringify(payload)
       });
 
-      const result = await res.json();
+      const resText = await res.text();
+      let result: any = {};
+      try {
+        result = JSON.parse(resText);
+      } catch {
+        throw new Error(`Server returned error (${res.status}): ${resText.slice(0, 120)}`);
+      }
+
       if (!res.ok) {
-        throw new Error(result.error || 'Failed to upload master track');
+        throw new Error(result.error || 'Failed to register master track');
       }
 
       setUploadSuccess(true);
@@ -235,9 +369,11 @@ export default function AdminTracksPage() {
         fetchTracks();
       }, 1000);
     } catch (err: any) {
+      console.error('Track upload error:', err);
       setUploadError(err.message || 'Error uploading track');
     } finally {
       setUploading(false);
+      setUploadStep('');
     }
   };
 
@@ -260,6 +396,8 @@ export default function AdminTracksPage() {
     setCoverPreviewUrl(null);
     setStemsFile(null);
     setUploadError(null);
+    setUploadProgress(0);
+    setUploadStep('');
   };
 
   const togglePlayTrack = (track: BeatTrack) => {
@@ -738,6 +876,24 @@ export default function AdminTracksPage() {
                 </div>
               )}
 
+              {uploading && (
+                <div className="p-3 rounded-lg border border-[#2dd4bf]/30 bg-[#2dd4bf]/10 space-y-2">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-medium text-[#2dd4bf] flex items-center gap-1.5">
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      {uploadStep || 'Uploading to Cloudflare R2...'}
+                    </span>
+                    <span className="font-mono text-[#2dd4bf] font-semibold">{uploadProgress}%</span>
+                  </div>
+                  <div className="w-full bg-zinc-800 rounded-full h-1.5 overflow-hidden">
+                    <div
+                      className="bg-[#2dd4bf] h-1.5 rounded-full transition-all duration-200"
+                      style={{ width: `${uploadProgress}%` }}
+                    />
+                  </div>
+                </div>
+              )}
+
               {/* Master Audio Upload Dropzone */}
               <div>
                 <label className="block text-xs font-semibold text-zinc-300 mb-1.5">
@@ -1005,12 +1161,12 @@ export default function AdminTracksPage() {
                 <button
                   type="submit"
                   disabled={uploading}
-                  className="px-4 py-1.5 rounded-md bg-[#2dd4bf] hover:bg-[#20b8a4] text-zinc-950 text-xs font-semibold"
+                  className="px-4 py-1.5 rounded-md bg-[#2dd4bf] hover:bg-[#20b8a4] text-zinc-950 text-xs font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                 >
                   {uploading ? (
                     <div className="flex items-center gap-1.5">
-                      <div className="h-3.5 w-3.5 border-2 border-zinc-950 border-t-transparent rounded-full animate-spin" />
-                      <span>Uploading to R2...</span>
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      <span>{uploadProgress > 0 ? `Uploading (${uploadProgress}%)...` : 'Uploading to R2...'}</span>
                     </div>
                   ) : (
                     'Publish Master Track'

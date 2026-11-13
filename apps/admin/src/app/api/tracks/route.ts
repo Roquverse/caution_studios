@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServiceRoleClient } from '../../../lib/supabaseClient';
 import { uploadToR2 } from '../../../lib/r2Server';
 import { verifyAdminRequest } from '../../../lib/adminAuth';
+import { sendAdminNotification } from '../../../lib/emailNotifier';
 
 export const dynamic = 'force-dynamic';
 
@@ -61,29 +62,69 @@ export async function POST(req: NextRequest) {
     }
 
     const supabase = getServiceRoleClient();
-    const formData = await req.formData();
+    const contentType = req.headers.get('content-type') || '';
+    const isJson = contentType.includes('application/json');
 
-    const title = (formData.get('title') as string) || '';
-    const artistName = (formData.get('artist') as string) || 'Caution Studio';
-    const genre = (formData.get('genre') as string) || 'Cinematic';
-    const bpm = parseInt(formData.get('bpm') as string) || 120;
-    const musicalKey = (formData.get('musicalKey') as string) || 'C Minor';
-    const durationSeconds = parseInt(formData.get('durationSeconds') as string) || 180;
-    const description = (formData.get('description') as string) || '';
-    const status = (formData.get('status') as string) || 'live';
+    let bodyData: any = {};
+    let audioFile: File | null = null;
+    let coverFile: File | null = null;
+    let stemsFile: File | null = null;
 
-    // Pricing (in kobo / cents: ₦15,000, ₦45,000, ₦250,000)
-    const basicPrice = parseInt(formData.get('basicPrice') as string) || 1500000;
-    const premiumPrice = parseInt(formData.get('premiumPrice') as string) || 4500000;
-    const exclusivePrice = parseInt(formData.get('exclusivePrice') as string) || 25000000;
+    if (isJson) {
+      bodyData = await req.json();
+    } else {
+      const formData = await req.formData();
+      bodyData = {
+        title: formData.get('title') as string,
+        artist: formData.get('artist') as string,
+        genre: formData.get('genre') as string,
+        bpm: formData.get('bpm') as string,
+        musicalKey: formData.get('musicalKey') as string,
+        durationSeconds: formData.get('durationSeconds') as string,
+        description: formData.get('description') as string,
+        status: formData.get('status') as string,
+        moods: formData.get('moods') as string,
+        tags: formData.get('tags') as string,
+        basicPrice: formData.get('basicPrice') as string,
+        premiumPrice: formData.get('premiumPrice') as string,
+        exclusivePrice: formData.get('exclusivePrice') as string,
+        masterAudioKey: formData.get('masterAudioKey') as string,
+        stemsKey: formData.get('stemsKey') as string,
+        coverUrl: formData.get('coverUrl') as string,
+      };
+      audioFile = formData.get('audio') as File | null;
+      coverFile = formData.get('cover') as File | null;
+      stemsFile = formData.get('stems') as File | null;
+    }
+
+    const title = (bodyData.title as string) || '';
+    const artistName = (bodyData.artist as string) || 'Caution Studio';
+    const genre = (bodyData.genre as string) || 'Cinematic';
+    const bpm = parseInt(bodyData.bpm as string, 10) || 120;
+    const musicalKey = (bodyData.musicalKey as string) || 'C Minor';
+    const durationSeconds = parseInt(bodyData.durationSeconds as string, 10) || 180;
+    const description = (bodyData.description as string) || '';
+    const status = (bodyData.status as string) || 'live';
+
+    // Pricing (in kobo / cents: ₦15,000 = 1500000, ₦45,000 = 4500000, ₦250,000 = 25000000)
+    const basicPrice = parseInt(bodyData.basicPrice as string, 10) || 1500000;
+    const premiumPrice = parseInt(bodyData.premiumPrice as string, 10) || 4500000;
+    const exclusivePrice = parseInt(bodyData.exclusivePrice as string, 10) || 25000000;
 
     // Moods and Tags
-    const moodsRaw = formData.get('moods') as string;
-    const moods = moodsRaw ? moodsRaw.split(',').map((m) => m.trim()).filter(Boolean) : ['Epic'];
-    const tagsRaw = formData.get('tags') as string;
-    const tags = tagsRaw ? tagsRaw.split(',').map((t) => t.trim()).filter(Boolean) : ['Instrumental'];
+    const moods = Array.isArray(bodyData.moods)
+      ? bodyData.moods
+      : typeof bodyData.moods === 'string' && bodyData.moods.trim()
+      ? bodyData.moods.split(',').map((m: string) => m.trim()).filter(Boolean)
+      : ['Epic'];
 
-    if (!title) {
+    const tags = Array.isArray(bodyData.tags)
+      ? bodyData.tags
+      : typeof bodyData.tags === 'string' && bodyData.tags.trim()
+      ? bodyData.tags.split(',').map((t: string) => t.trim()).filter(Boolean)
+      : ['Instrumental'];
+
+    if (!title.trim()) {
       return NextResponse.json({ error: 'Title is required' }, { status: 400 });
     }
 
@@ -117,20 +158,24 @@ export async function POST(req: NextRequest) {
 
     const slug = generateSlug(title);
 
-    // 2. Upload Audio File (Required or seeded)
-    const audioFile = formData.get('audio') as File | null;
-    let masterAudioKey: string | null = null;
+    // 2. Resolve Master Audio Key
+    let masterAudioKey: string | null = bodyData.masterAudioKey || null;
 
-    if (audioFile && audioFile.size > 0) {
+    if (!masterAudioKey && audioFile && audioFile.size > 0) {
       const audioBuffer = Buffer.from(await audioFile.arrayBuffer());
       const ext = audioFile.name.split('.').pop()?.toLowerCase() || 'wav';
       masterAudioKey = `masters/${slug}_${Date.now()}.${ext}`;
       await uploadToR2(masterAudioKey, audioBuffer, audioFile.type || 'audio/wav');
     }
 
-    // 3. Upload Cover Image (Optional)
-    const coverFile = formData.get('cover') as File | null;
-    let coverUrl = '/images/album_neon_dj.jpg';
+    if (!masterAudioKey) {
+      return NextResponse.json({ error: 'Master audio file is required' }, { status: 400 });
+    }
+
+    // 3. Resolve Cover Artwork
+    let coverUrl: string = bodyData.coverUrl && bodyData.coverUrl.trim()
+      ? bodyData.coverUrl.trim()
+      : '/images/album_neon_dj.jpg';
 
     if (coverFile && coverFile.size > 0) {
       const coverBuffer = Buffer.from(await coverFile.arrayBuffer());
@@ -140,11 +185,10 @@ export async function POST(req: NextRequest) {
       coverUrl = `/api/media/${coverKey}`;
     }
 
-    // 4. Upload Stems ZIP (Optional)
-    const stemsFile = formData.get('stems') as File | null;
-    let stemsKey: string | null = null;
+    // 4. Resolve Stems ZIP
+    let stemsKey: string | null = bodyData.stemsKey || null;
 
-    if (stemsFile && stemsFile.size > 0) {
+    if (!stemsKey && stemsFile && stemsFile.size > 0) {
       const stemsBuffer = Buffer.from(await stemsFile.arrayBuffer());
       stemsKey = `stems/${slug}_${Date.now()}.zip`;
       await uploadToR2(stemsKey, stemsBuffer, 'application/zip');
@@ -167,6 +211,7 @@ export async function POST(req: NextRequest) {
         status: status as any,
         master_wav_key: masterAudioKey,
         preview_clean_key: masterAudioKey,
+        preview_tagged_key: masterAudioKey,
         stems_zip_key: stemsKey,
         duration_seconds: durationSeconds,
         published_at: status === 'live' ? new Date().toISOString() : null
@@ -190,6 +235,32 @@ export async function POST(req: NextRequest) {
     if (licErr) {
       console.warn('Warning inserting licenses:', licErr.message);
     }
+
+    // 7. Send Activity Email Notification to support@cautionstudioz.com
+    sendAdminNotification({
+      event: 'BEAT_UPLOADED',
+      subject: `New Master Track Uploaded: "${title}"`,
+      title: 'Master Track Catalog Addition',
+      description: `A new track "${title}" (${genre}, ${bpm} BPM) was published to the master catalog by ${artistName}.`,
+      actor: {
+        name: artistName,
+        role: 'Admin'
+      },
+      details: {
+        'Track Title': title,
+        'Artist / Producer': artistName,
+        'Genre': genre,
+        'BPM': bpm,
+        'Musical Key': musicalKey,
+        'Master Audio Key': masterAudioKey || 'None',
+        'Stems ZIP Key': stemsKey || 'None',
+        'Basic License': `₦${(basicPrice / 100).toLocaleString('en-NG')}`,
+        'Premium License': `₦${(premiumPrice / 100).toLocaleString('en-NG')}`,
+        'Exclusive License': `₦${(exclusivePrice / 100).toLocaleString('en-NG')}`
+      },
+      ctaUrl: `https://admin.cautionstudioz.com/tracks`,
+      ctaText: 'View in Admin Catalog'
+    }).catch((err) => console.warn('Failed to send admin notification email:', err));
 
     return NextResponse.json({
       success: true,
