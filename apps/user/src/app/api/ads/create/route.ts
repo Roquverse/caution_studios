@@ -76,6 +76,7 @@ export async function POST(req: NextRequest) {
     const tierMap: Record<string, { price: number; plays: number }> = {
       starter: { price: 15000, plays: 5000 },
       pro: { price: 35000, plays: 15000 },
+      studio: { price: 75000, plays: 40000 },
       studio_blast: { price: 75000, plays: 40000 }
     };
 
@@ -86,9 +87,12 @@ export async function POST(req: NextRequest) {
     const safeSlug = songTitle.toLowerCase().replace(/[^a-z0-9]/g, '-').slice(0, 30) || 'ad';
     const timestamp = Date.now();
 
-    // 1. Upload audio if provided as file
-    let audioUrl = bodyData.audioUrl || '';
-    if (audioFile && audioFile.size > 0) {
+    // 1. Resolve audio URL: provided directly or fallback
+    let audioUrl = bodyData.audioUrl && typeof bodyData.audioUrl === 'string' && bodyData.audioUrl.trim()
+      ? bodyData.audioUrl.trim()
+      : '';
+
+    if (!audioUrl && audioFile && audioFile.size > 0) {
       const audioBuffer = Buffer.from(await audioFile.arrayBuffer());
       const ext = audioFile.name.split('.').pop()?.toLowerCase() || 'mp3';
       const key = `ads/${safeSlug}_${timestamp}.${ext}`;
@@ -96,8 +100,15 @@ export async function POST(req: NextRequest) {
       audioUrl = `https://media.cautionstudioz.com/${key}`;
     }
 
-    // 2. Upload cover if provided as file
-    let coverUrl = bodyData.coverUrl || '/images/hero_boombox.jpg';
+    if (!audioUrl) {
+      audioUrl = 'https://media.cautionstudioz.com/masters/alex-morgan-afrobeat-instrumental-summer-groove-573648-hubz_1791151613114.mp3';
+    }
+
+    // 2. Resolve cover artwork
+    let coverUrl = bodyData.coverUrl && typeof bodyData.coverUrl === 'string' && bodyData.coverUrl.trim()
+      ? bodyData.coverUrl.trim()
+      : '/images/hero_boombox.jpg';
+
     if (coverFile && coverFile.size > 0) {
       const coverBuffer = Buffer.from(await coverFile.arrayBuffer());
       const ext = coverFile.name.split('.').pop()?.toLowerCase() || 'jpg';

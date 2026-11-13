@@ -16,11 +16,13 @@ import {
   Headphones,
   Play,
   Pause,
-  AlertCircle
+  AlertCircle,
+  Loader2
 } from 'lucide-react';
 import { supabase } from '../../lib/supabaseClient';
 import { UserProfileData } from '../../components/UserDropdown';
 import { UserShell } from '../../components/UserShell';
+import { UserAdModal } from '../../components/UserAdModal';
 
 interface CampaignTier {
   id: 'starter' | 'pro' | 'studio';
@@ -74,13 +76,27 @@ export default function PromoteMusicPage() {
   const [coverFile, setCoverFile] = useState<File | null>(null);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false);
+  const [uploadStep, setUploadStep] = useState('');
+  const [uploadProgress, setUploadProgress] = useState(0);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [myCampaigns, setMyCampaigns] = useState<any[]>([]);
 
   useEffect(() => {
     async function loadUser() {
-      const { data: { session } } = await supabase.auth.getSession();
+      let session = (await supabase.auth.getSession()).data.session;
+      if (!session?.user && typeof document !== 'undefined') {
+        const matchToken = document.cookie.match(/(?:^|;\s*)sb-token=([^;]*)/);
+        const matchRefresh = document.cookie.match(/(?:^|;\s*)sb-refresh=([^;]*)/);
+        if (matchToken && matchRefresh) {
+          const token = decodeURIComponent(matchToken[1]);
+          const refresh = decodeURIComponent(matchRefresh[1]);
+          const { data } = await supabase.auth.setSession({ access_token: token, refresh_token: refresh });
+          session = data.session;
+        }
+      }
+
       if (session?.user) {
         const { data: p } = await supabase
           .from('profiles')
@@ -106,6 +122,78 @@ export default function PromoteMusicPage() {
     loadUser();
   }, []);
 
+  const uploadFileDirectly = async (
+    file: File,
+    type: 'audio' | 'cover',
+    titleStr: string,
+    authToken?: string
+  ): Promise<string> => {
+    let targetContentType = file.type;
+    if (!targetContentType || targetContentType === 'application/octet-stream') {
+      if (type === 'audio') {
+        const ext = file.name.split('.').pop()?.toLowerCase();
+        targetContentType = ext === 'wav' ? 'audio/wav' : 'audio/mpeg';
+      } else if (type === 'cover') {
+        targetContentType = 'image/jpeg';
+      }
+    }
+
+    const presignRes = await fetch('/api/ads/presigned-url', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(authToken ? { Authorization: `Bearer ${authToken}` } : {})
+      },
+      body: JSON.stringify({
+        filename: file.name,
+        contentType: targetContentType,
+        type,
+        title: titleStr
+      })
+    });
+
+    const presignText = await presignRes.text();
+    let presignJson: any = {};
+    try {
+      presignJson = JSON.parse(presignText);
+    } catch {
+      throw new Error(`Storage error (${presignRes.status}): ${presignText.slice(0, 120)}`);
+    }
+
+    if (!presignRes.ok || !presignJson.uploadUrl || !presignJson.publicUrl) {
+      throw new Error(presignJson.error || `Failed to initiate storage upload for ${file.name}`);
+    }
+
+    await new Promise<void>((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('PUT', presignJson.uploadUrl, true);
+      xhr.setRequestHeader('Content-Type', targetContentType);
+
+      xhr.upload.onprogress = (evt) => {
+        if (evt.lengthComputable) {
+          const percent = Math.round((evt.loaded / evt.total) * 100);
+          setUploadProgress(percent);
+        }
+      };
+
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          resolve();
+        } else {
+          reject(new Error(`Storage upload failed with status ${xhr.status}`));
+        }
+      };
+
+      xhr.onerror = () => {
+        reject(new Error('Network error during file upload to storage. Check connection.'));
+      };
+
+      xhr.send(file);
+    });
+
+    return presignJson.publicUrl;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!songTitle.trim() || !artistName.trim()) {
@@ -116,28 +204,77 @@ export default function PromoteMusicPage() {
     setIsSubmitting(true);
     setErrorMessage(null);
     setSuccessMessage(null);
+    setUploadProgress(0);
 
     try {
-      const formData = new FormData();
-      formData.append('songTitle', songTitle.trim());
-      formData.append('artistName', artistName.trim());
-      formData.append('campaignName', tagline.trim() || `Promote "${songTitle.trim()}"`);
-      formData.append('packageName', selectedTier.id);
-      formData.append('priceNgn', selectedTier.priceNgn.toString());
-      formData.append('targetPlays', selectedTier.plays.toString());
-      if (spotifyUrl) formData.append('spotifyUrl', spotifyUrl);
-      if (appleMusicUrl) formData.append('appleMusicUrl', appleMusicUrl);
-      if (audiomackUrl) formData.append('audiomackUrl', audiomackUrl);
-      if (youtubeUrl) formData.append('youtubeUrl', youtubeUrl);
-      if (audioFile) formData.append('audio', audioFile);
-      if (coverFile) formData.append('cover', coverFile);
+      let { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        const matchToken = typeof document !== 'undefined' ? document.cookie.match(/(?:^|;\s*)sb-token=([^;]*)/) : null;
+        const matchRefresh = typeof document !== 'undefined' ? document.cookie.match(/(?:^|;\s*)sb-refresh=([^;]*)/) : null;
+        if (matchToken && matchRefresh) {
+          const tokenVal = decodeURIComponent(matchToken[1]);
+          const refreshVal = decodeURIComponent(matchRefresh[1]);
+          const { data } = await supabase.auth.setSession({ access_token: tokenVal, refresh_token: refreshVal });
+          session = data.session;
+        }
+      }
+
+      const authToken = session?.access_token;
+      const advertiserId = session?.user?.id;
+      const advertiserEmail = session?.user?.email;
+
+      let audioUrl = '';
+      if (audioFile) {
+        const sizeMb = (audioFile.size / (1024 * 1024)).toFixed(1);
+        setUploadStep(`Uploading audio snippet (${sizeMb} MB)...`);
+        setUploadProgress(0);
+        audioUrl = await uploadFileDirectly(audioFile, 'audio', songTitle.trim(), authToken);
+      }
+
+      let coverUrl = '';
+      if (coverFile) {
+        setUploadStep('Uploading cover artwork...');
+        setUploadProgress(0);
+        coverUrl = await uploadFileDirectly(coverFile, 'cover', songTitle.trim(), authToken);
+      }
+
+      setUploadStep('Launching song promotion campaign...');
+      setUploadProgress(100);
+
+      const payload = {
+        advertiserId,
+        advertiserEmail,
+        songTitle: songTitle.trim(),
+        artistName: artistName.trim(),
+        campaignName: tagline.trim() || `Promote "${songTitle.trim()}"`,
+        packageName: selectedTier.id,
+        priceNgn: selectedTier.priceNgn,
+        targetPlays: selectedTier.plays,
+        audioUrl: audioUrl || undefined,
+        coverUrl: coverUrl || undefined,
+        spotifyUrl: spotifyUrl.trim() || undefined,
+        appleMusicUrl: appleMusicUrl.trim() || undefined,
+        audiomackUrl: audiomackUrl.trim() || undefined,
+        youtubeUrl: youtubeUrl.trim() || undefined
+      };
 
       const res = await fetch('/api/ads/create', {
         method: 'POST',
-        body: formData
+        headers: {
+          'Content-Type': 'application/json',
+          ...(authToken ? { Authorization: `Bearer ${authToken}` } : {})
+        },
+        body: JSON.stringify(payload)
       });
 
-      const data = await res.json();
+      const resText = await res.text();
+      let data: any = {};
+      try {
+        data = JSON.parse(resText);
+      } catch {
+        throw new Error(`Server returned error (${res.status}): ${resText.slice(0, 120)}`);
+      }
+
       if (!res.ok) {
         throw new Error(data.error || 'Failed to submit promotion campaign.');
       }
@@ -159,6 +296,7 @@ export default function PromoteMusicPage() {
       setErrorMessage(err.message || 'Something went wrong. Please try again.');
     } finally {
       setIsSubmitting(false);
+      setUploadStep('');
     }
   };
 
@@ -183,6 +321,15 @@ export default function PromoteMusicPage() {
                 Get thousands of guaranteed, unskippable 15-second audio plays across free listeners on Caution Studioz. Every listener is served direct links to stream your full song on Spotify, Apple Music, Audiomack, and YouTube.
               </p>
             </div>
+
+            <button
+              type="button"
+              onClick={() => setIsPreviewModalOpen(true)}
+              className="px-4 py-2.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 font-bold text-xs border border-amber-500/30 flex items-center gap-2 transition-all shrink-0 self-start sm:self-auto cursor-pointer shadow-sm hover:scale-[1.02]"
+            >
+              <Radio className="h-4 w-4 text-amber-400 animate-pulse" />
+              <span>Preview 15s Audio Ad</span>
+            </button>
           </div>
         </div>
 
@@ -421,13 +568,34 @@ export default function PromoteMusicPage() {
                 </span>
               </div>
 
+              {isSubmitting && (
+                <div className="w-full sm:max-w-xs space-y-1.5 p-3 rounded-xl bg-white/[0.04] border border-[#2dd4bf]/30">
+                  <div className="flex items-center justify-between text-xs text-[#2dd4bf] font-medium">
+                    <span className="flex items-center gap-1.5">
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      {uploadStep || 'Processing...'}
+                    </span>
+                    <span className="font-mono">{uploadProgress}%</span>
+                  </div>
+                  <div className="w-full bg-white/10 rounded-full h-1.5 overflow-hidden">
+                    <div
+                      className="bg-[#2dd4bf] h-1.5 rounded-full transition-all duration-200"
+                      style={{ width: `${uploadProgress}%` }}
+                    />
+                  </div>
+                </div>
+              )}
+
               <button
                 type="submit"
                 disabled={isSubmitting}
                 className="px-8 py-3 rounded-xl bg-[#2dd4bf] hover:bg-[#20b8a4] text-black font-black text-xs uppercase tracking-wider transition-all disabled:opacity-50 cursor-pointer flex items-center justify-center gap-2"
               >
                 {isSubmitting ? (
-                  <span>Submitting Campaign...</span>
+                  <span className="flex items-center gap-1.5">
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    <span>{uploadProgress > 0 ? `Uploading (${uploadProgress}%)...` : 'Submitting Campaign...'}</span>
+                  </span>
                 ) : (
                   <>
                     <Megaphone className="h-4 w-4" />
@@ -502,6 +670,11 @@ export default function PromoteMusicPage() {
           </div>
         )}
       </div>
+
+      <UserAdModal
+        isOpen={isPreviewModalOpen}
+        onClose={() => setIsPreviewModalOpen(false)}
+      />
     </UserShell>
   );
 }

@@ -820,6 +820,15 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
           setIsPlaying(false);
           setCurrentTime(0);
           activeListenSessionRef.current = null;
+
+          // Auto-advance to next track in playlist (which triggers unskippable 3-song audio ad for free listeners)
+          const currentIndex = playlistRows.findIndex((r) => r.id === currentTrack.id);
+          if (currentIndex !== -1 && playlistRows.length > 0) {
+            const nextIndex = (currentIndex + 1) % playlistRows.length;
+            if (playlistRows[nextIndex]) {
+              handlePlayToggle(playlistRows[nextIndex]);
+            }
+          }
         }}
         onError={(err) => {
           const target = err.currentTarget;

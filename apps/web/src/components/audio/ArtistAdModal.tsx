@@ -83,12 +83,14 @@ export const ArtistAdModal: React.FC<ArtistAdModalProps> = ({
             const audio = new Audio(adAudioSrc);
             audioRef.current = audio;
             audio.volume = 0.85;
-            audio.play().catch((e) => {
-              console.warn('Ad audio autoplay blocked, fallback to synth:', e);
-              try {
-                audioSynth.playTrack(randomPick.id, () => {}, 15);
-              } catch {}
-            });
+            audio.play()
+              .then(() => {
+                setIsPlaying(true);
+              })
+              .catch((e) => {
+                console.warn('Ad audio autoplay blocked by browser policy:', e);
+                setIsPlaying(false);
+              });
             return;
           }
         }
@@ -101,9 +103,13 @@ export const ArtistAdModal: React.FC<ArtistAdModalProps> = ({
         const fallbackAudio = new Audio('https://media.cautionstudioz.com/masters/alex-morgan-afrobeat-instrumental-summer-groove-573648-hubz_1791151613114.mp3');
         audioRef.current = fallbackAudio;
         fallbackAudio.volume = 0.85;
-        fallbackAudio.play().catch(() => {
-          audioSynth.playTrack(promotedSong?.id || 'seeded-ad-1', () => {}, 15);
-        });
+        fallbackAudio.play()
+          .then(() => {
+            setIsPlaying(true);
+          })
+          .catch(() => {
+            setIsPlaying(false);
+          });
       } catch (e) {
         console.warn('Fallback ad audio failed:', e);
       }
@@ -219,15 +225,22 @@ export const ArtistAdModal: React.FC<ArtistAdModalProps> = ({
               alt={currentSong.title}
               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
             />
-            <div className="absolute inset-0 bg-black/30 flex items-center justify-center">
+            <div className="absolute inset-0 bg-black/35 flex flex-col items-center justify-center gap-1.5">
               <button
                 type="button"
                 onClick={toggleAudio}
-                className="w-12 h-12 rounded-full bg-[#04564f]/90 hover:bg-[#04564f] text-white flex items-center justify-center shadow-lg transition-transform hover:scale-105 cursor-pointer"
+                className={`w-12 h-12 rounded-full flex items-center justify-center shadow-lg transition-transform hover:scale-105 cursor-pointer ${
+                  isPlaying ? 'bg-[#04564f]/95 hover:bg-[#04564f] text-white' : 'bg-amber-400 text-black ring-4 ring-amber-400/30 animate-pulse'
+                }`}
                 aria-label={isPlaying ? 'Pause preview' : 'Play preview'}
               >
-                {isPlaying ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5 ml-0.5" />}
+                {isPlaying ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5 ml-0.5 fill-current" />}
               </button>
+              {!isPlaying && (
+                <span className="text-[10px] font-bold text-amber-300 bg-black/80 px-2.5 py-0.5 rounded-full border border-amber-400/40 shadow">
+                  Tap to Play Audio
+                </span>
+              )}
             </div>
             <div className="absolute top-2 right-2 px-1.5 py-0.5 rounded bg-black/60 text-[9px] font-mono text-white">
               {secondsRemaining}s
