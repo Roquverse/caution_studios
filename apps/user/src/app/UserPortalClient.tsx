@@ -30,7 +30,8 @@ import {
   ShoppingBag,
   Mic,
   Lock,
-  Megaphone
+  Megaphone,
+  Sliders
 } from 'lucide-react';
 import { audioSynth, TrackRow } from '@caution/ui';
 import { UserDropdown } from '../components/UserDropdown';
@@ -39,6 +40,11 @@ import { UserMarketplaceView, isFreeBeat } from '../components/UserMarketplaceVi
 import { UserRecordStudioModal } from '../components/UserRecordStudioModal';
 import { useUserSubscription } from '../lib/subscription';
 import { supabase } from '../lib/supabaseClient';
+import {
+  useAppSettings,
+  resolveAudioForQuality,
+  findHarmonicallyMatchedBeat
+} from '../lib/settings';
 import {
   useDailyDownloadQuota,
   recordBeatDownload,
@@ -92,6 +98,7 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
   const [currentTime, setCurrentTime] = useState(0);
   const [volume, setVolume] = useState(0.8);
   const [isMuted, setIsMuted] = useState(false);
+  const { settings } = useAppSettings();
 
   const [likesCount, setLikesCount] = useState(0);
   const [streamsCount, setStreamsCount] = useState(0);
@@ -215,10 +222,11 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
 
   useEffect(() => {
     if (audioRef.current) {
-      audioRef.current.volume = isMuted ? 0 : volume;
+      const normalizedVol = settings.volumeNormalization ? Math.min(1, volume * 0.85) : volume;
+      audioRef.current.volume = isMuted ? 0 : normalizedVol;
       audioRef.current.muted = isMuted;
     }
-  }, [volume, isMuted]);
+  }, [volume, isMuted, settings.volumeNormalization]);
 
   // Load user saved local preferences on mount
   useEffect(() => {
@@ -464,22 +472,47 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
     activeListenSessionRef.current = track.id;
     recordTrackListen(track);
 
+    const targetAudioSrc = resolveAudioForQuality(track, settings.audioQuality);
+    const targetVol = isMuted ? 0 : (settings.volumeNormalization ? Math.min(1, volume * 0.85) : volume);
+
     if (audioRef.current) {
-      if (track.audioUrl) {
-        audioRef.current.src = track.audioUrl;
-        audioRef.current.volume = isMuted ? 0 : volume;
-        audioRef.current.load();
-        audioRef.current.play().catch((err) => {
-          if (err.name !== 'AbortError') {
-            console.warn('Audio playback error:', err);
-            audioSynth.playTrack(track.id, () => {});
-          }
-        });
+      if (targetAudioSrc) {
+        audioRef.current.src = targetAudioSrc;
+        if (settings.crossfadeSeconds > 0 && !isMuted) {
+          audioRef.current.volume = 0;
+          audioRef.current.load();
+          audioRef.current.play().then(() => {
+            const steps = 10;
+            const durationMs = Math.max(500, settings.crossfadeSeconds * 1000);
+            let step = 0;
+            const timer = setInterval(() => {
+              step++;
+              if (audioRef.current && !isMuted) {
+                audioRef.current.volume = Math.min(targetVol, (targetVol * step) / steps);
+              }
+              if (step >= steps) clearInterval(timer);
+            }, durationMs / steps);
+          }).catch((err) => {
+            if (err.name !== 'AbortError') {
+              console.warn('Audio playback error:', err);
+              audioSynth.playTrack(track.id, () => {});
+            }
+          });
+        } else {
+          audioRef.current.volume = targetVol;
+          audioRef.current.load();
+          audioRef.current.play().catch((err) => {
+            if (err.name !== 'AbortError') {
+              console.warn('Audio playback error:', err);
+              audioSynth.playTrack(track.id, () => {});
+            }
+          });
+        }
       } else {
         audioRef.current.pause();
         audioSynth.playTrack(track.id, () => {});
       }
-    } else if (!track.audioUrl) {
+    } else if (!targetAudioSrc) {
       audioSynth.playTrack(track.id, () => {});
     }
   };
@@ -503,12 +536,15 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
           recordTrackListen(track);
         }
 
-        if (track.audioUrl && audioRef.current) {
-          if (audioRef.current.src !== track.audioUrl && !audioRef.current.src.endsWith(track.audioUrl)) {
-            audioRef.current.src = track.audioUrl;
+        const targetAudioSrc = resolveAudioForQuality(track, settings.audioQuality);
+        const targetVol = isMuted ? 0 : (settings.volumeNormalization ? Math.min(1, volume * 0.85) : volume);
+
+        if (targetAudioSrc && audioRef.current) {
+          if (audioRef.current.src !== targetAudioSrc && !audioRef.current.src.endsWith(targetAudioSrc)) {
+            audioRef.current.src = targetAudioSrc;
             audioRef.current.load();
           }
-          audioRef.current.volume = isMuted ? 0 : volume;
+          audioRef.current.volume = targetVol;
           audioRef.current.play().catch((err) => {
             if (err.name !== 'AbortError') {
               console.warn('Audio playback error:', err);
@@ -800,6 +836,16 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
           const sec = e.currentTarget.currentTime;
           const isPaid = !isFreeBeat(currentTrack);
 
+          // Crossfade: smoothly fade out volume as track nears end
+          if (settings.crossfadeSeconds > 0 && currentTrack.durationSeconds > 0 && audioRef.current && !isMuted) {
+            const timeLeft = currentTrack.durationSeconds - sec;
+            if (timeLeft <= settings.crossfadeSeconds && timeLeft >= 0) {
+              const fadeRatio = Math.max(0, timeLeft / settings.crossfadeSeconds);
+              const targetVol = settings.volumeNormalization ? Math.min(1, volume * 0.85) : volume;
+              audioRef.current.volume = targetVol * fadeRatio;
+            }
+          }
+
           // Audio watermark anti-rip protection: watermark pulse at 10s and 22s during paid preview
           if (isPaid && !isSubscribed) {
             const roundedSec = Math.floor(sec);
@@ -821,12 +867,22 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
           setCurrentTime(0);
           activeListenSessionRef.current = null;
 
-          // Auto-advance to next track in playlist (which triggers unskippable 3-song audio ad for free listeners)
-          const currentIndex = playlistRows.findIndex((r) => r.id === currentTrack.id);
-          if (currentIndex !== -1 && playlistRows.length > 0) {
-            const nextIndex = (currentIndex + 1) % playlistRows.length;
-            if (playlistRows[nextIndex]) {
-              handlePlayToggle(playlistRows[nextIndex]);
+          // Check user's Autoplay setting: if disabled, stop playback completely
+          if (!settings.autoplay) {
+            return;
+          }
+
+          // Autoplay enabled: find harmonically matched beat using Camelot Wheel
+          const harmonicNext = findHarmonicallyMatchedBeat(currentTrack, playlistRows);
+          if (harmonicNext) {
+            handlePlayToggle(harmonicNext);
+          } else {
+            const currentIndex = playlistRows.findIndex((r) => r.id === currentTrack.id);
+            if (currentIndex !== -1 && playlistRows.length > 0) {
+              const nextIndex = (currentIndex + 1) % playlistRows.length;
+              if (playlistRows[nextIndex]) {
+                handlePlayToggle(playlistRows[nextIndex]);
+              }
             }
           }
         }}
@@ -2205,7 +2261,19 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
             </div>
           </div>
 
-          <div className="hidden sm:flex items-center gap-3 w-64 justify-end shrink-0">
+          <div className="hidden sm:flex items-center gap-3 w-72 justify-end shrink-0">
+            {/* Active Quality & DSP Badge */}
+            <Link
+              href="/settings"
+              className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-[#04564f]/40 border border-[#2dd4bf]/30 text-[#2dd4bf] hover:bg-[#04564f]/60 transition-colors"
+              title={`Streaming Quality: ${settings.audioQuality.toUpperCase()} • Normalization: ${settings.volumeNormalization ? '-14 LUFS (ON)' : 'OFF'} • Autoplay: ${settings.autoplay ? 'Harmonic (ON)' : 'OFF'}`}
+            >
+              <Sliders className="h-3 w-3" />
+              <span>
+                {settings.audioQuality === 'lossless' ? 'LOSSLESS 24-BIT' : settings.audioQuality === 'high' ? 'HIGH 320K' : 'STD 128K'}
+              </span>
+            </Link>
+
             <div className="flex items-center gap-1.5 text-gray-400">
               <button
                 type="button"

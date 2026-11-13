@@ -27,7 +27,17 @@ export async function getStudioBeats(): Promise<{ beats: TrackItem[]; producers:
 
     if (dbBeats && dbBeats.length > 0) {
       const r2Cdn = process.env.NEXT_PUBLIC_R2_PUBLIC_URL?.replace(/\/$/, '') || 'https://media.cautionstudioz.com';
+      const resolveAudioKey = (key?: string) => {
+        if (!key) return undefined;
+        if (key.startsWith('http') || key.startsWith('/')) return key;
+        return `${r2Cdn}/${key}`;
+      };
+
       beats = dbBeats.map((b) => {
+        const masterUrl = resolveAudioKey(b.master_wav_key);
+        const previewCleanUrl = resolveAudioKey(b.preview_clean_key);
+        const previewTaggedUrl = resolveAudioKey(b.preview_tagged_key);
+
         const audioKey = b.preview_clean_key || b.preview_tagged_key || b.master_wav_key;
         let audioUrl = '';
         if (audioKey) {
@@ -78,6 +88,9 @@ export async function getStudioBeats(): Promise<{ beats: TrackItem[]; producers:
           coverUrl: b.cover_url || '/images/album_neon_dj.jpg',
           category: isFreeTagged ? 'free' : 'playlists',
           audioUrl,
+          masterUrl,
+          previewCleanUrl,
+          previewTaggedUrl,
           bpm: b.bpm || 120,
           genre: b.genre || 'Electronic',
           musicalKey: b.musical_key || 'C Minor',

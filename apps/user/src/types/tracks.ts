@@ -12,6 +12,9 @@ export interface TrackItem {
   isListenLater?: boolean;
   category?: string;
   audioUrl?: string;
+  masterUrl?: string;
+  previewCleanUrl?: string;
+  previewTaggedUrl?: string;
   priceNgn?: number;
   exclusivePriceNgn?: number;
   isFree?: boolean;
