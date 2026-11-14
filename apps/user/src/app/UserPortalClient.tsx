@@ -539,8 +539,8 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
       } else {
         const isNewAudition = activeListenSessionRef.current !== track.id;
 
-        // Spotify-style audio ad check: triggers after playing 2 beats or more
-        if (!isSubscribed && isNewAudition && songsPlayedSinceLastAd >= nextAdTriggerRef.current) {
+        // Spotify-style audio ad check: triggers after playing 2 beats or more across all tiers
+        if (isNewAudition && songsPlayedSinceLastAd >= nextAdTriggerRef.current) {
           setSongsPlayedSinceLastAd(0);
           try { sessionStorage.setItem('caution:beats-played-since-ad', '0'); } catch (e) {}
           nextAdTriggerRef.current = Math.random() < 0.5 ? 2 : 3;
@@ -559,12 +559,10 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
         if (isNewAudition) {
           activeListenSessionRef.current = track.id;
           recordTrackListen(track);
-          if (!isSubscribed) {
-            const nextPlayed = songsPlayedSinceLastAd + 1;
-            setSongsPlayedSinceLastAd(nextPlayed);
-            setSongsPlayedCount((prev) => prev + 1);
-            try { sessionStorage.setItem('caution:beats-played-since-ad', String(nextPlayed)); } catch (e) {}
-          }
+          const nextPlayed = songsPlayedSinceLastAd + 1;
+          setSongsPlayedSinceLastAd(nextPlayed);
+          setSongsPlayedCount((prev) => prev + 1);
+          try { sessionStorage.setItem('caution:beats-played-since-ad', String(nextPlayed)); } catch (e) {}
         }
 
         const targetAudioSrc = resolveAudioForQuality(track, settings.audioQuality);
@@ -593,8 +591,8 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
       }
       audioSynth.stop();
 
-      // Spotify-style audio ad: first 15 seconds unskippable, triggers randomly after playing 2 beats or more
-      if (!isSubscribed && songsPlayedSinceLastAd >= nextAdTriggerRef.current) {
+      // Spotify-style audio ad: first 15 seconds unskippable, triggers randomly after playing 2 beats or more across all tiers
+      if (songsPlayedSinceLastAd >= nextAdTriggerRef.current) {
         // Reset count and choose a new random interval (2 or 3 songs) for the next ad
         setSongsPlayedSinceLastAd(0);
         try { sessionStorage.setItem('caution:beats-played-since-ad', '0'); } catch (e) {}
@@ -607,12 +605,10 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
         return; // DO NOT PLAY THE INTENDED SONG! THE AD PLAYS INSTEAD!
       }
 
-      if (!isSubscribed) {
-        const nextPlayed = songsPlayedSinceLastAd + 1;
-        setSongsPlayedSinceLastAd(nextPlayed);
-        setSongsPlayedCount((prev) => prev + 1);
-        try { sessionStorage.setItem('caution:beats-played-since-ad', String(nextPlayed)); } catch (e) {}
-      }
+      const nextPlayed = songsPlayedSinceLastAd + 1;
+      setSongsPlayedSinceLastAd(nextPlayed);
+      setSongsPlayedCount((prev) => prev + 1);
+      try { sessionStorage.setItem('caution:beats-played-since-ad', String(nextPlayed)); } catch (e) {}
 
       executePlayTrack(track);
     }
@@ -695,9 +691,9 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
       return;
     }
 
-    // Check daily download allowance (base 2 + ad bonus)
+    // Check daily download allowance (base 2 + ad bonus) across all tiers
     const quotaState = getDailyDownloadState();
-    if (!isSubscribed && !quotaState.canDownload) {
+    if (!quotaState.canDownload) {
       pendingDownloadTrackRef.current = track;
       setIsDownloadLimitModalOpen(true);
       return;
@@ -2616,11 +2612,9 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
           else if (pendingTrackRef.current) {
             const trackToResume = pendingTrackRef.current;
             pendingTrackRef.current = null;
-            if (!isSubscribed) {
-              setSongsPlayedSinceLastAd(1);
-              setSongsPlayedCount((prev) => prev + 1);
-              try { sessionStorage.setItem('caution:beats-played-since-ad', '1'); } catch (e) {}
-            }
+            setSongsPlayedSinceLastAd(1);
+            setSongsPlayedCount((prev) => prev + 1);
+            try { sessionStorage.setItem('caution:beats-played-since-ad', '1'); } catch (e) {}
             executePlayTrack(trackToResume);
           }
         }}

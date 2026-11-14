@@ -431,7 +431,7 @@ export default function AdminAdsManagerPage() {
               <span className="text-xs font-mono font-bold text-white">₦15,000</span>
             </div>
             <p className="text-[11px] text-zinc-400">
-              5,000 guaranteed unskippable 15s audio plays across free listeners.
+              5,000 guaranteed unskippable 15s audio plays across all active listeners.
             </p>
             <div className="pt-2 text-[10px] text-zinc-500 font-mono">
               CPM: ₦3,000 / 1k plays · All DSP links

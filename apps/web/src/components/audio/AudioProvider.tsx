@@ -223,24 +223,22 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const play = (beat: Beat) => {
     if (beat.status === 'sold') return; // Cannot stream exclusive sold beat if locked
 
-    // Spotify-like audio ad: first 15 seconds unskippable, random trigger after playing 2 or more beats
-    if (!isSubscribed) {
-      if (beatsPlayedSinceLastAd >= nextAdTriggerRef.current) {
-        setBeatsPlayedSinceLastAd(0);
-        try { sessionStorage.setItem('caution:beats-played-since-ad', '0'); } catch (e) {}
-        nextAdTriggerRef.current = Math.random() < 0.5 ? 2 : 3;
+    // Spotify-like audio ad: first 15 seconds unskippable, random trigger after playing 2 or more beats across all tiers
+    if (beatsPlayedSinceLastAd >= nextAdTriggerRef.current) {
+      setBeatsPlayedSinceLastAd(0);
+      try { sessionStorage.setItem('caution:beats-played-since-ad', '0'); } catch (e) {}
+      nextAdTriggerRef.current = Math.random() < 0.5 ? 2 : 3;
 
-        pause();
-        pendingBeatRef.current = beat;
-        setIsAdModalOpen(true);
-        return; // DO NOT PLAY THE INTENDED BEAT! THE AD PLAYS INSTEAD!
-      }
-
-      const nextPlayed = beatsPlayedSinceLastAd + 1;
-      setBeatsPlayedSinceLastAd(nextPlayed);
-      setBeatsPlayedCount((prev) => prev + 1);
-      try { sessionStorage.setItem('caution:beats-played-since-ad', String(nextPlayed)); } catch (e) {}
+      pause();
+      pendingBeatRef.current = beat;
+      setIsAdModalOpen(true);
+      return; // DO NOT PLAY THE INTENDED BEAT! THE AD PLAYS INSTEAD!
     }
+
+    const nextPlayed = beatsPlayedSinceLastAd + 1;
+    setBeatsPlayedSinceLastAd(nextPlayed);
+    setBeatsPlayedCount((prev) => prev + 1);
+    try { sessionStorage.setItem('caution:beats-played-since-ad', String(nextPlayed)); } catch (e) {}
 
     executePlayBeat(beat);
   };
@@ -414,11 +412,9 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           else if (pendingBeatRef.current) {
             const beatToResume = pendingBeatRef.current;
             pendingBeatRef.current = null;
-            if (!isSubscribed) {
-              setBeatsPlayedSinceLastAd(1);
-              setBeatsPlayedCount((prev) => prev + 1);
-              try { sessionStorage.setItem('caution:beats-played-since-ad', '1'); } catch (e) {}
-            }
+            setBeatsPlayedSinceLastAd(1);
+            setBeatsPlayedCount((prev) => prev + 1);
+            try { sessionStorage.setItem('caution:beats-played-since-ad', '1'); } catch (e) {}
             executePlayBeat(beatToResume);
           }
         }}

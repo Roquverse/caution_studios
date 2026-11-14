@@ -41,7 +41,7 @@ const TIERS: CampaignTier[] = [
     priceNgn: 15000,
     plays: 5000,
     cpm: '₦3,000 / 1k plays',
-    description: '5,000 guaranteed unskippable 15-second audio plays across free listeners.'
+    description: '5,000 guaranteed unskippable 15-second audio plays across all active listeners.'
   },
   {
     id: 'pro',
@@ -318,7 +318,7 @@ export default function PromoteMusicPage() {
                 <span>Promote Your Music with Audio Ads</span>
               </h1>
               <p className="text-xs text-gray-400 mt-1 max-w-2xl">
-                Get thousands of guaranteed, unskippable 15-second audio plays across free listeners on Caution Studioz. Every listener is served direct links to stream your full song on Spotify, Apple Music, Audiomack, and YouTube.
+                Get thousands of guaranteed, unskippable 15-second audio plays across all active listeners on Caution Studioz. Every listener is served direct links to stream your full song on Spotify, Apple Music, Audiomack, and YouTube.
               </p>
             </div>
 
@@ -341,7 +341,7 @@ export default function PromoteMusicPage() {
               <span className="text-xs font-bold uppercase tracking-wider">Unskippable Rotation</span>
             </div>
             <p className="text-xs text-gray-400">
-              Plays automatically after every 3 songs streamed by free listeners. Guaranteed 100% completion.
+              Plays automatically after every 2+ songs streamed across all listeners. Guaranteed 100% completion.
             </p>
           </div>
 

@@ -172,7 +172,7 @@ export default function ProducerPromotePage() {
       }
 
       setSuccessMessage(
-        `Beat promotion campaign launched successfully! "${songTitle}" is now active in the 3-song rotation across free listeners.`
+        `Beat promotion campaign launched successfully! "${songTitle}" is now active in rotation across all active listeners.`
       );
       if (data.campaign) {
         setMyCampaigns((prev) => [data.campaign, ...prev]);
