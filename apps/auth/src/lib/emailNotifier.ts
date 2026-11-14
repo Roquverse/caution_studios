@@ -248,9 +248,10 @@ export async function sendAdminNotification(
 export async function sendPasswordResetEmail(params: {
   to: string;
   resetUrl: string;
+  code?: string;
   userName?: string;
 }): Promise<{ success: boolean; id?: string; error?: string }> {
-  const { to, resetUrl, userName } = params;
+  const { to, resetUrl, code, userName } = params;
   const greeting = userName ? `Hello ${userName},` : 'Hello Creator,';
   const timestamp = new Date().toUTCString();
 
@@ -297,15 +298,37 @@ export async function sendPasswordResetEmail(params: {
                     <p style="margin: 0 0 20px 0; font-size: 14px; line-height: 1.6; color: #9ca3af;">
                       ${escapeHtml(greeting)}<br/><br/>
                       We received a request to reset the password for your Caution Studio account (<strong>${escapeHtml(to)}</strong>).
-                      Click the button below to choose a new secure password:
+                      Use the 6-digit recovery code below or click the button to set your new password:
                     </p>
+
+                    ${
+                      code
+                        ? `
+                    <!-- 6-Digit Verification Code -->
+                    <table width="100%" border="0" cellpadding="0" cellspacing="0" style="margin: 20px 0;">
+                      <tr>
+                        <td align="center">
+                          <div style="background-color: #12151d; border: 1px dashed rgba(45, 212, 191, 0.5); border-radius: 8px; padding: 20px 32px; display: inline-block;">
+                            <div style="font-size: 11px; font-family: monospace; text-transform: uppercase; letter-spacing: 1.5px; color: #9ca3af; margin-bottom: 8px;">
+                              6-Digit Password Reset Code
+                            </div>
+                            <div style="font-size: 36px; font-weight: 900; font-family: monospace; letter-spacing: 8px; color: #2dd4bf;">
+                              ${escapeHtml(code)}
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    </table>
+                    `
+                        : ''
+                    }
 
                     <!-- CTA Button -->
                     <table width="100%" border="0" cellpadding="0" cellspacing="0" style="margin: 28px 0;">
                       <tr>
                         <td align="center">
                           <a href="${resetUrl}" style="display: inline-block; background-color: #04564f; color: #ffffff; text-decoration: none; font-weight: 700; font-size: 13px; text-transform: uppercase; letter-spacing: 0.8px; padding: 14px 32px; border-radius: 8px; border: 1px solid #2dd4bf; box-shadow: 0 4px 14px rgba(4, 86, 79, 0.4);">
-                            Reset My Password &rarr;
+                            Reset Password on Caution Studio &rarr;
                           </a>
                         </td>
                       </tr>

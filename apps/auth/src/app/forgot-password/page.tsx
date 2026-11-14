@@ -28,25 +28,16 @@ export default function ForgotPasswordPage() {
       const origin = typeof window !== 'undefined' ? window.location.origin : 'https://auth.cautionstudioz.com';
       const redirectTo = `${origin}/reset-password`;
 
-      // 1. Call custom reset API endpoint (sends custom styled email + telemetry)
+      // Call custom reset API endpoint (sends Caution Studio branded email with 6-digit code & direct link)
       const res = await fetch('/api/auth/forgot-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: cleanEmail })
       });
 
-      // 2. Also trigger Supabase client-side reset
-      try {
-        await supabase.auth.resetPasswordForEmail(cleanEmail, {
-          redirectTo
-        });
-      } catch (clientErr) {
-        console.warn('Client-side resetPasswordForEmail warning:', clientErr);
-      }
-
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || 'Failed to dispatch reset link. Please try again.');
+        throw new Error(data.error || 'Failed to dispatch reset code. Please try again.');
       }
 
       setSubmitted(true);
@@ -186,14 +177,25 @@ export default function ForgotPasswordPage() {
                 <CheckCircle2 className="h-6 w-6" />
               </div>
               <div className="space-y-1">
-                <h3 className="text-base font-bold text-white">Check your inbox</h3>
+                <h3 className="text-base font-bold text-white">Reset Code Dispatched</h3>
                 <p className="text-xs text-gray-400 leading-relaxed">
-                  We&apos;ve sent a password reset link to <strong className="text-white font-mono">{email}</strong>.
+                  We&apos;ve sent your 6-digit recovery code and reset link to <strong className="text-white font-mono">{email}</strong>.
                 </p>
               </div>
-              <p className="text-[11px] text-gray-500 leading-relaxed pt-1">
-                Be sure to check your spam/promotions folder if you don&apos;t see it within a couple of minutes.
+              <p className="text-[11px] text-gray-400 leading-relaxed pt-1">
+                Check your inbox or spam folder for your 6-digit code, then enter it below to set your new password.
               </p>
+
+              <div className="pt-2">
+                <a
+                  href={`/reset-password?email=${encodeURIComponent(email.trim().toLowerCase())}`}
+                  className="w-full h-11 rounded-[6px] bg-[#04564f] hover:bg-[#03453f] text-white font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-all cursor-pointer border border-[#2dd4bf]/40 shadow-md"
+                >
+                  <KeyRound className="h-4 w-4" />
+                  <span>Enter 6-Digit Code &amp; Change Password &rarr;</span>
+                </a>
+              </div>
+
               <div className="pt-3 flex flex-col sm:flex-row items-center justify-center gap-3">
                 <button
                   type="button"

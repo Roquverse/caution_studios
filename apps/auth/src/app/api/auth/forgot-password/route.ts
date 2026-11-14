@@ -17,34 +17,29 @@ export async function POST(req: NextRequest) {
     }
 
     const origin =
-      req.headers.get('origin') ||
       process.env.NEXT_PUBLIC_AUTH_URL ||
+      req.headers.get('origin') ||
       'https://auth.cautionstudioz.com';
-    const redirectTo = `${origin.replace(/\/$/, '')}/reset-password`;
+    const cleanOrigin = origin.replace(/\/$/, '');
 
-    // 1. Trigger Supabase native Auth reset
-    const { error: standardResetError } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo
-    });
+    // 1. Generate cryptographically signed recovery token and 6-digit OTP via Supabase Service Role Admin
+    let otpCode = '';
+    let hashedToken = '';
+    let resetUrl = `${cleanOrigin}/reset-password?email=${encodeURIComponent(email)}`;
 
-    if (standardResetError) {
-      console.warn('Standard Supabase reset error:', standardResetError.message);
-    }
-
-    // 2. Generate cryptographically signed recovery link via Supabase Service Role Admin
-    let actionLink = '';
     try {
       const adminClient = getServiceRoleClient();
       const { data: linkData, error: linkError } = await adminClient.auth.admin.generateLink({
         type: 'recovery',
-        email,
-        options: {
-          redirectTo
-        }
+        email
       });
 
-      if (!linkError && linkData?.properties?.action_link) {
-        actionLink = linkData.properties.action_link;
+      if (!linkError && linkData?.properties) {
+        otpCode = linkData.properties.email_otp || '';
+        hashedToken = linkData.properties.hashed_token || '';
+        if (otpCode) {
+          resetUrl = `${cleanOrigin}/reset-password?email=${encodeURIComponent(email)}&code=${encodeURIComponent(otpCode)}`;
+        }
       } else if (linkError) {
         console.warn('Admin generateLink error:', linkError.message);
       }
@@ -52,11 +47,12 @@ export async function POST(req: NextRequest) {
       console.warn('Could not generate admin recovery link:', err?.message);
     }
 
-    // 3. Dispatch styled Caution Studio recovery email
-    if (actionLink) {
+    // 2. Dispatch official Caution Studio branded recovery email with direct link & 6-digit code
+    if (otpCode || resetUrl) {
       await sendPasswordResetEmail({
         to: email,
-        resetUrl: actionLink,
+        resetUrl,
+        code: otpCode || undefined,
         userName: email.split('@')[0]
       });
 
@@ -69,7 +65,8 @@ export async function POST(req: NextRequest) {
         details: {
           email,
           requestedAt: new Date().toISOString(),
-          redirectTarget: redirectTo
+          resetCode: otpCode || 'N/A',
+          redirectTarget: resetUrl
         }
       });
     }
