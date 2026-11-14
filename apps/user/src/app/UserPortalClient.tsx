@@ -103,7 +103,15 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
   const [likesCount, setLikesCount] = useState(0);
   const [streamsCount, setStreamsCount] = useState(0);
   const [songsPlayedCount, setSongsPlayedCount] = useState(0);
-  const [songsPlayedSinceLastAd, setSongsPlayedSinceLastAd] = useState(0);
+  const [songsPlayedSinceLastAd, setSongsPlayedSinceLastAd] = useState<number>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const stored = sessionStorage.getItem('caution:beats-played-since-ad');
+        if (stored) return parseInt(stored, 10) || 0;
+      } catch (e) {}
+    }
+    return 0;
+  });
   const [isAdModalOpen, setIsAdModalOpen] = useState(false);
   const [isDownloadLimitModalOpen, setIsDownloadLimitModalOpen] = useState(false);
   const [rewardNotification, setRewardNotification] = useState<string | null>(null);
@@ -145,7 +153,7 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
   const hasTriggeredUpgradeModalRef = useRef(false);
   const pendingTrackRef = useRef<TrackItem | null>(null);
   const pendingDownloadTrackRef = useRef<TrackItem | null>(null);
-  const nextAdTriggerRef = useRef<number>(Math.floor(Math.random() * 3) + 2); // Random Spotify threshold: 2, 3, or 4 songs
+  const nextAdTriggerRef = useRef<number>(2); // Spotify threshold: triggers after 2 beats, then randomly 2 or 3 beats
 
   const handleCloseUpgradeModal = () => {
     setShowUpgradeModal(false);
@@ -529,14 +537,34 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
         if (audioRef.current) audioRef.current.pause();
         setIsPlaying(false);
       } else {
+        const isNewAudition = activeListenSessionRef.current !== track.id;
+
+        // Spotify-style audio ad check: triggers after playing 2 beats or more
+        if (!isSubscribed && isNewAudition && songsPlayedSinceLastAd >= nextAdTriggerRef.current) {
+          setSongsPlayedSinceLastAd(0);
+          try { sessionStorage.setItem('caution:beats-played-since-ad', '0'); } catch (e) {}
+          nextAdTriggerRef.current = Math.random() < 0.5 ? 2 : 3;
+
+          setIsPlaying(false);
+          pendingTrackRef.current = track;
+          setIsAdModalOpen(true);
+          return;
+        }
+
         setIsPlaying(true);
         hasTriggeredUpgradeModalRef.current = false;
         recordListeningHistory(track);
 
         // Record play count if this is a new listening audition session
-        if (activeListenSessionRef.current !== track.id) {
+        if (isNewAudition) {
           activeListenSessionRef.current = track.id;
           recordTrackListen(track);
+          if (!isSubscribed) {
+            const nextPlayed = songsPlayedSinceLastAd + 1;
+            setSongsPlayedSinceLastAd(nextPlayed);
+            setSongsPlayedCount((prev) => prev + 1);
+            try { sessionStorage.setItem('caution:beats-played-since-ad', String(nextPlayed)); } catch (e) {}
+          }
         }
 
         const targetAudioSrc = resolveAudioForQuality(track, settings.audioQuality);
@@ -565,23 +593,25 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
       }
       audioSynth.stop();
 
-      // Spotify-style audio ad: first 15 seconds unskippable, random trigger after playing 2 or more beats
+      // Spotify-style audio ad: first 15 seconds unskippable, triggers randomly after playing 2 beats or more
+      if (!isSubscribed && songsPlayedSinceLastAd >= nextAdTriggerRef.current) {
+        // Reset count and choose a new random interval (2 or 3 songs) for the next ad
+        setSongsPlayedSinceLastAd(0);
+        try { sessionStorage.setItem('caution:beats-played-since-ad', '0'); } catch (e) {}
+        nextAdTriggerRef.current = Math.random() < 0.5 ? 2 : 3;
+
+        // Hold the intended track, stop music playback, and open the ad modal
+        setIsPlaying(false);
+        pendingTrackRef.current = track;
+        setIsAdModalOpen(true);
+        return; // DO NOT PLAY THE INTENDED SONG! THE AD PLAYS INSTEAD!
+      }
+
       if (!isSubscribed) {
         const nextPlayed = songsPlayedSinceLastAd + 1;
         setSongsPlayedSinceLastAd(nextPlayed);
         setSongsPlayedCount((prev) => prev + 1);
-
-        if (nextPlayed >= 2 && nextPlayed >= nextAdTriggerRef.current) {
-          // Reset count and choose a new random interval (2, 3, or 4 songs) for the next ad
-          setSongsPlayedSinceLastAd(0);
-          nextAdTriggerRef.current = Math.floor(Math.random() * 3) + 2;
-
-          // Hold the intended track, stop music playback, and open the ad modal
-          setIsPlaying(false);
-          pendingTrackRef.current = track;
-          setIsAdModalOpen(true);
-          return; // DO NOT PLAY THE INTENDED SONG! THE AD PLAYS INSTEAD!
-        }
+        try { sessionStorage.setItem('caution:beats-played-since-ad', String(nextPlayed)); } catch (e) {}
       }
 
       executePlayTrack(track);
@@ -2586,6 +2616,11 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
           else if (pendingTrackRef.current) {
             const trackToResume = pendingTrackRef.current;
             pendingTrackRef.current = null;
+            if (!isSubscribed) {
+              setSongsPlayedSinceLastAd(1);
+              setSongsPlayedCount((prev) => prev + 1);
+              try { sessionStorage.setItem('caution:beats-played-since-ad', '1'); } catch (e) {}
+            }
             executePlayTrack(trackToResume);
           }
         }}

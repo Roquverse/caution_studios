@@ -92,7 +92,15 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   // Promoted Audio Ads & Rewarded Downloads
   const [beatsPlayedCount, setBeatsPlayedCount] = useState<number>(0);
-  const [beatsPlayedSinceLastAd, setBeatsPlayedSinceLastAd] = useState<number>(0);
+  const [beatsPlayedSinceLastAd, setBeatsPlayedSinceLastAd] = useState<number>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const stored = sessionStorage.getItem('caution:beats-played-since-ad');
+        if (stored) return parseInt(stored, 10) || 0;
+      } catch (e) {}
+    }
+    return 0;
+  });
   const [isAdModalOpen, setIsAdModalOpen] = useState<boolean>(false);
   const [rewardedDownloadBeat, setRewardedDownloadBeat] = useState<Beat | null>(null);
 
@@ -109,7 +117,7 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   const pendingDownloadBeatRef = useRef<Beat | null>(null);
-  const nextAdTriggerRef = useRef<number>(Math.floor(Math.random() * 3) + 2); // Random Spotify threshold: 2, 3, or 4 beats
+  const nextAdTriggerRef = useRef<number>(2); // Spotify cadence: starts at 2 beats, then randomly 2 or 3 beats
 
   const triggerBeatDownload = (beat: Beat, onApproved?: () => void): boolean => {
     if (!downloadState.canDownload) {
@@ -217,20 +225,21 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
     // Spotify-like audio ad: first 15 seconds unskippable, random trigger after playing 2 or more beats
     if (!isSubscribed) {
-      const nextPlayed = beatsPlayedSinceLastAd + 1;
-      setBeatsPlayedSinceLastAd(nextPlayed);
-      setBeatsPlayedCount((prev) => prev + 1);
-
-      if (nextPlayed >= 2 && nextPlayed >= nextAdTriggerRef.current) {
-        // Reset and re-roll next ad trigger threshold (between 2 and 4 beats)
+      if (beatsPlayedSinceLastAd >= nextAdTriggerRef.current) {
         setBeatsPlayedSinceLastAd(0);
-        nextAdTriggerRef.current = Math.floor(Math.random() * 3) + 2;
+        try { sessionStorage.setItem('caution:beats-played-since-ad', '0'); } catch (e) {}
+        nextAdTriggerRef.current = Math.random() < 0.5 ? 2 : 3;
 
         pause();
         pendingBeatRef.current = beat;
         setIsAdModalOpen(true);
         return; // DO NOT PLAY THE INTENDED BEAT! THE AD PLAYS INSTEAD!
       }
+
+      const nextPlayed = beatsPlayedSinceLastAd + 1;
+      setBeatsPlayedSinceLastAd(nextPlayed);
+      setBeatsPlayedCount((prev) => prev + 1);
+      try { sessionStorage.setItem('caution:beats-played-since-ad', String(nextPlayed)); } catch (e) {}
     }
 
     executePlayBeat(beat);
@@ -405,6 +414,11 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           else if (pendingBeatRef.current) {
             const beatToResume = pendingBeatRef.current;
             pendingBeatRef.current = null;
+            if (!isSubscribed) {
+              setBeatsPlayedSinceLastAd(1);
+              setBeatsPlayedCount((prev) => prev + 1);
+              try { sessionStorage.setItem('caution:beats-played-since-ad', '1'); } catch (e) {}
+            }
             executePlayBeat(beatToResume);
           }
         }}

@@ -17,9 +17,13 @@ export async function GET() {
       console.warn('Error fetching active ad campaigns:', error.message);
     }
 
-    if (campaigns && campaigns.length > 0) {
+    const validCampaigns = (campaigns || []).filter(
+      (c) => c.audio_url && c.audio_url.trim().length > 0 && (c.target_plays == null || (c.delivered_plays || 0) < c.target_plays)
+    );
+
+    if (validCampaigns.length > 0) {
       // Fisher-Yates shuffle for true random distribution
-      const shuffled = [...campaigns];
+      const shuffled = [...validCampaigns];
       for (let i = shuffled.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
         [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
