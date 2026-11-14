@@ -103,6 +103,7 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
   const [likesCount, setLikesCount] = useState(0);
   const [streamsCount, setStreamsCount] = useState(0);
   const [songsPlayedCount, setSongsPlayedCount] = useState(0);
+  const [songsPlayedSinceLastAd, setSongsPlayedSinceLastAd] = useState(0);
   const [isAdModalOpen, setIsAdModalOpen] = useState(false);
   const [isDownloadLimitModalOpen, setIsDownloadLimitModalOpen] = useState(false);
   const [rewardNotification, setRewardNotification] = useState<string | null>(null);
@@ -143,6 +144,8 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
   const activeListenSessionRef = useRef<string | null>(null);
   const hasTriggeredUpgradeModalRef = useRef(false);
   const pendingTrackRef = useRef<TrackItem | null>(null);
+  const pendingDownloadTrackRef = useRef<TrackItem | null>(null);
+  const nextAdTriggerRef = useRef<number>(Math.floor(Math.random() * 3) + 2); // Random Spotify threshold: 2, 3, or 4 songs
 
   const handleCloseUpgradeModal = () => {
     setShowUpgradeModal(false);
@@ -562,15 +565,23 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
       }
       audioSynth.stop();
 
-      // Check 3-song unskippable audio ad threshold (Audiomack / Spotify model)
-      const nextCount = songsPlayedCount + 1;
-      setSongsPlayedCount(nextCount);
-      if (!isSubscribed && nextCount > 0 && nextCount % 3 === 0) {
-        // Hold the intended track, stop music playback, and open the ad modal
-        setIsPlaying(false);
-        pendingTrackRef.current = track;
-        setIsAdModalOpen(true);
-        return; // DO NOT PLAY THE INTENDED SONG! THE AD PLAYS INSTEAD!
+      // Spotify-style audio ad: first 15 seconds unskippable, random trigger after playing 2 or more beats
+      if (!isSubscribed) {
+        const nextPlayed = songsPlayedSinceLastAd + 1;
+        setSongsPlayedSinceLastAd(nextPlayed);
+        setSongsPlayedCount((prev) => prev + 1);
+
+        if (nextPlayed >= 2 && nextPlayed >= nextAdTriggerRef.current) {
+          // Reset count and choose a new random interval (2, 3, or 4 songs) for the next ad
+          setSongsPlayedSinceLastAd(0);
+          nextAdTriggerRef.current = Math.floor(Math.random() * 3) + 2;
+
+          // Hold the intended track, stop music playback, and open the ad modal
+          setIsPlaying(false);
+          pendingTrackRef.current = track;
+          setIsAdModalOpen(true);
+          return; // DO NOT PLAY THE INTENDED SONG! THE AD PLAYS INSTEAD!
+        }
       }
 
       executePlayTrack(track);
@@ -654,9 +665,10 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
       return;
     }
 
-    // Check daily download allowance (base + ad bonus)
+    // Check daily download allowance (base 2 + ad bonus)
     const quotaState = getDailyDownloadState();
     if (!isSubscribed && !quotaState.canDownload) {
+      pendingDownloadTrackRef.current = track;
       setIsDownloadLimitModalOpen(true);
       return;
     }
@@ -675,12 +687,18 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
       const safeArtist = (track.artist || 'Caution Studio').replace(/[^a-zA-Z0-9_\-\s]/g, '').trim();
       const filename = `${safeTitle} - ${safeArtist}.wav`;
 
-      let targetUrl = track.audioUrl;
+      // Build direct CDN download URL to bypass Vercel Fast limits completely
+      const r2Cdn = process.env.NEXT_PUBLIC_R2_PUBLIC_URL?.replace(/\/$/, '') || 'https://media.cautionstudioz.com';
+      let targetUrl = track.audioUrl || track.masterUrl || track.previewCleanUrl || '';
       if (targetUrl) {
+        if (targetUrl.includes('/api/media/')) {
+          const pathPart = targetUrl.split('/api/media/')[1]?.split('?')[0];
+          targetUrl = `${r2Cdn}/${pathPart}`;
+        }
         const sep = targetUrl.includes('?') ? '&' : '?';
         targetUrl = `${targetUrl}${sep}download=1&filename=${encodeURIComponent(filename)}`;
       } else {
-        targetUrl = `/api/media/masters/${track.id}.wav?download=1&filename=${encodeURIComponent(filename)}`;
+        targetUrl = `${r2Cdn}/masters/${track.id}.wav?download=1&filename=${encodeURIComponent(filename)}`;
       }
 
       const link = document.createElement('a');
@@ -2486,7 +2504,7 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
       {isDownloadLimitModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-200">
           <div
-            className="relative w-full max-w-md rounded-2xl bg-[#0F131C] border border-white/10 p-6 sm:p-7 shadow-2xl text-white overflow-hidden"
+            className="relative w-full max-w-md rounded-2xl bg-[#0F131C] border border-white/10 p-6 sm:p-7 shadow-2xl text-white overflow-hidden text-center"
             onClick={(e) => e.stopPropagation()}
           >
             <button
@@ -2497,15 +2515,23 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
               <X className="h-4 w-4" />
             </button>
 
-            <div className="w-12 h-12 rounded-2xl bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-300 mb-4 shadow-inner">
+            <div className="w-12 h-12 rounded-2xl bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-300 mx-auto mb-4 shadow-inner">
               <Download className="h-6 w-6" />
             </div>
 
             <h3 className="text-xl font-black text-white tracking-tight">
-              Daily Download Limit Reached
+              Daily 2-Download Limit Reached
             </h3>
             <p className="text-xs text-gray-300 mt-2 leading-relaxed">
-              You have downloaded your quota for today. Stream an artist sponsored track through ads to instantly earn <strong className="text-teal-300">+1 bonus beat download</strong> for today!
+              {pendingDownloadTrackRef.current ? (
+                <>
+                  You’ve used your 2 free downloads today. Listen to a 15-second sponsored ad to unlock and download <strong className="text-teal-300">&ldquo;{pendingDownloadTrackRef.current.title}&rdquo;</strong> right now!
+                </>
+              ) : (
+                <>
+                  You have downloaded your quota for today. Listen to a 15-second sponsored artist ad to instantly earn <strong className="text-teal-300">+1 bonus beat download</strong>!
+                </>
+              )}
             </p>
 
             <div className="mt-6 flex flex-col gap-2.5">
@@ -2518,7 +2544,11 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
                 className="w-full py-3 rounded-xl bg-[#2dd4bf] hover:bg-[#20b8a4] text-zinc-950 font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-transform hover:scale-[1.02] shadow-lg shadow-[#2dd4bf]/20 cursor-pointer"
               >
                 <Sparkles className="h-4 w-4" />
-                <span>Stream Artist Track (+1 Download)</span>
+                <span>
+                  {pendingDownloadTrackRef.current
+                    ? `Listen to 15s Ad & Download Beat`
+                    : `Stream 15s Ad (+1 Download)`}
+                </span>
               </button>
 
               <button
@@ -2536,12 +2566,24 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
         </div>
       )}
 
-      {/* 3-Song Unskippable Audio Ad (Audiomack / Spotify Model) */}
+      {/* Spotify-Style Unskippable (15s) Audio Ad Modal */}
       <UserAdModal
         isOpen={isAdModalOpen}
+        pendingDownloadTitle={pendingDownloadTrackRef.current?.title || null}
         onClose={() => {
           setIsAdModalOpen(false);
-          if (pendingTrackRef.current) {
+          // 1. If ad was listened to in order to download a beat:
+          if (pendingDownloadTrackRef.current) {
+            const trackToDownload = pendingDownloadTrackRef.current;
+            pendingDownloadTrackRef.current = null;
+            setRewardNotification(
+              `🎉 15s ad completed! +1 bonus download unlocked. Downloading "${trackToDownload.title}" now!`
+            );
+            handleDownload(trackToDownload);
+            setTimeout(() => setRewardNotification(null), 6000);
+          }
+          // 2. If ad was triggered by playing a song:
+          else if (pendingTrackRef.current) {
             const trackToResume = pendingTrackRef.current;
             pendingTrackRef.current = null;
             executePlayTrack(trackToResume);
@@ -2549,7 +2591,7 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
         }}
         onRewardEarned={(bonusCount) => {
           setRewardNotification(
-            `You streamed the sponsored artist song! +1 bonus beat download has been credited for today (total bonus: ${bonusCount}).`
+            `You completed the 15-second sponsored ad! +1 bonus download credited for today (total bonus: ${bonusCount}).`
           );
           setTimeout(() => setRewardNotification(null), 6000);
         }}

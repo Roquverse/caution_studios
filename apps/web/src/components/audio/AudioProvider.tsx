@@ -92,6 +92,7 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   // Promoted Audio Ads & Rewarded Downloads
   const [beatsPlayedCount, setBeatsPlayedCount] = useState<number>(0);
+  const [beatsPlayedSinceLastAd, setBeatsPlayedSinceLastAd] = useState<number>(0);
   const [isAdModalOpen, setIsAdModalOpen] = useState<boolean>(false);
   const [rewardedDownloadBeat, setRewardedDownloadBeat] = useState<Beat | null>(null);
 
@@ -107,8 +108,12 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setIsDownloadLimitModalOpen(true);
   };
 
+  const pendingDownloadBeatRef = useRef<Beat | null>(null);
+  const nextAdTriggerRef = useRef<number>(Math.floor(Math.random() * 3) + 2); // Random Spotify threshold: 2, 3, or 4 beats
+
   const triggerBeatDownload = (beat: Beat, onApproved?: () => void): boolean => {
     if (!downloadState.canDownload) {
+      pendingDownloadBeatRef.current = beat;
       setIsDownloadLimitModalOpen(true);
       return false;
     }
@@ -210,16 +215,22 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const play = (beat: Beat) => {
     if (beat.status === 'sold') return; // Cannot stream exclusive sold beat if locked
 
-    // Check 3-song unskippable audio ad threshold (Audiomack / Spotify model: after listening to 3 songs an ad comes in and can't be skipped)
-    const nextPlayed = beatsPlayedCount + 1;
-    setBeatsPlayedCount(nextPlayed);
+    // Spotify-like audio ad: first 15 seconds unskippable, random trigger after playing 2 or more beats
+    if (!isSubscribed) {
+      const nextPlayed = beatsPlayedSinceLastAd + 1;
+      setBeatsPlayedSinceLastAd(nextPlayed);
+      setBeatsPlayedCount((prev) => prev + 1);
 
-    if (!isSubscribed && nextPlayed > 0 && nextPlayed % 3 === 0) {
-      // Hold the intended beat, pause any current music, and open the ad modal
-      pause();
-      pendingBeatRef.current = beat;
-      setIsAdModalOpen(true);
-      return; // DO NOT PLAY THE INTENDED BEAT! THE AD PLAYS INSTEAD!
+      if (nextPlayed >= 2 && nextPlayed >= nextAdTriggerRef.current) {
+        // Reset and re-roll next ad trigger threshold (between 2 and 4 beats)
+        setBeatsPlayedSinceLastAd(0);
+        nextAdTriggerRef.current = Math.floor(Math.random() * 3) + 2;
+
+        pause();
+        pendingBeatRef.current = beat;
+        setIsAdModalOpen(true);
+        return; // DO NOT PLAY THE INTENDED BEAT! THE AD PLAYS INSTEAD!
+      }
     }
 
     executePlayBeat(beat);
@@ -367,12 +378,31 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         beat={currentBeat}
       />
 
-      {/* Promoted Artist Audio Ad Modal (Pops up every 3 songs) */}
+      {/* Promoted Artist Audio Ad Modal (Spotify 15s unskippable ad mode) */}
       <ArtistAdModal
         isOpen={isAdModalOpen}
+        pendingDownloadTitle={pendingDownloadBeatRef.current?.title || null}
         onClose={() => {
           setIsAdModalOpen(false);
-          if (pendingBeatRef.current) {
+          // 1. If ad was listened to in order to unlock a beat download:
+          if (pendingDownloadBeatRef.current) {
+            const beatToDownload = pendingDownloadBeatRef.current;
+            pendingDownloadBeatRef.current = null;
+            recordBeatDownload(beatToDownload.id, beatToDownload.title);
+
+            // Initiate browser file download directly from Cloudflare R2 CDN (aligns with Vercel Fast limits)
+            const r2Cdn = process.env.NEXT_PUBLIC_R2_PUBLIC_URL?.replace(/\/$/, '') || 'https://media.cautionstudioz.com';
+            const audioKey = beatToDownload.preview_clean_key || beatToDownload.audio_url || beatToDownload.master_wav_key || `masters/${beatToDownload.id}.wav`;
+            const downloadUrl = audioKey.startsWith('http') ? audioKey : `${r2Cdn}/${audioKey}`;
+            const link = document.createElement('a');
+            link.href = downloadUrl;
+            link.download = `${beatToDownload.title || 'beat'} - Caution Studio.wav`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+          }
+          // 2. If ad was triggered by playing music:
+          else if (pendingBeatRef.current) {
             const beatToResume = pendingBeatRef.current;
             pendingBeatRef.current = null;
             executePlayBeat(beatToResume);
@@ -394,6 +424,11 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         isOpen={isDownloadLimitModalOpen}
         onClose={() => setIsDownloadLimitModalOpen(false)}
         downloadState={downloadState}
+        pendingBeatTitle={pendingDownloadBeatRef.current?.title}
+        onWatchAd={() => {
+          setIsDownloadLimitModalOpen(false);
+          setIsAdModalOpen(true);
+        }}
       />
     </AudioContext.Provider>
   );

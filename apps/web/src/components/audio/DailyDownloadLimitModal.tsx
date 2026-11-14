@@ -18,13 +18,17 @@ interface DailyDownloadLimitModalProps {
   onClose: () => void;
   downloadState: DailyDownloadState;
   onContinueBrowsing?: () => void;
+  onWatchAd?: () => void;
+  pendingBeatTitle?: string;
 }
 
 export const DailyDownloadLimitModal: React.FC<DailyDownloadLimitModalProps> = ({
   isOpen,
   onClose,
   downloadState,
-  onContinueBrowsing
+  onContinueBrowsing,
+  onWatchAd,
+  pendingBeatTitle
 }) => {
   if (!isOpen) return null;
 
@@ -145,23 +149,44 @@ export const DailyDownloadLimitModal: React.FC<DailyDownloadLimitModalProps> = (
         </div>
 
         {/* Modal Action Buttons */}
-        <div className="p-5 pt-3 bg-[#0a0d13] border-t border-white/[0.08] flex items-center gap-3">
-          <button
-            type="button"
-            onClick={handleContinue}
-            className="flex-1 py-2.5 px-4 rounded-full bg-[#04564f] hover:bg-[#03453f] text-white text-xs font-bold uppercase tracking-wider transition-all shadow-md shadow-[#04564f]/30 flex items-center justify-center gap-2 border border-[#2dd4bf]/30"
-          >
-            <Headphones className="w-3.5 h-3.5" />
-            <span>Continue Previewing Beats</span>
-          </button>
+        <div className="p-5 pt-3 bg-[#0a0d13] border-t border-white/[0.08] flex flex-col gap-2.5">
+          {onWatchAd && (
+            <button
+              type="button"
+              onClick={() => {
+                onClose();
+                onWatchAd();
+              }}
+              className="w-full py-3 px-4 rounded-full bg-[#2dd4bf] hover:bg-[#20b8a4] text-zinc-950 text-xs font-black uppercase tracking-wider transition-all shadow-md shadow-[#2dd4bf]/20 flex items-center justify-center gap-2 cursor-pointer"
+            >
+              <Sparkles className="w-4 h-4" />
+              <span>
+                {pendingBeatTitle
+                  ? `Listen to 15s Ad to Download "${pendingBeatTitle.slice(0, 20)}"`
+                  : 'Listen to 15s Ad (+1 Beat Download)'}
+              </span>
+            </button>
+          )}
 
-          <a
-            href="/beats"
-            onClick={onClose}
-            className="py-2.5 px-4 rounded-full bg-white/10 hover:bg-white/15 text-gray-300 hover:text-white text-xs font-semibold transition-colors"
-          >
-            Explore Beats
-          </a>
+          <div className="flex items-center gap-2.5">
+            <button
+              type="button"
+              onClick={handleContinue}
+              className="flex-1 py-2.5 px-4 rounded-full bg-[#04564f] hover:bg-[#03453f] text-white text-xs font-bold uppercase tracking-wider transition-all shadow-md shadow-[#04564f]/30 flex items-center justify-center gap-2 border border-[#2dd4bf]/30 cursor-pointer"
+            >
+              <Headphones className="w-3.5 h-3.5" />
+              <span>Preview Beats</span>
+            </button>
+
+            <a
+              href="/subscriptions"
+              onClick={onClose}
+              className="py-2.5 px-4 rounded-full bg-white/10 hover:bg-white/15 text-gray-200 hover:text-white text-xs font-semibold transition-colors flex items-center gap-1.5"
+            >
+              <Sparkles className="w-3 h-3 text-[#2dd4bf]" />
+              <span>Get Plus</span>
+            </a>
+          </div>
         </div>
 
       </div>

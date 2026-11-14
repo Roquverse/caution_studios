@@ -205,6 +205,7 @@ export const DOWNLOAD_RESET_HOURS = 24;
 export interface DailyDownloadState {
   downloadsCount: number;
   limit: number;
+  bonusDownloads: number;
   remaining: number;
   canDownload: boolean;
   nextAvailableTime: Date | null;
@@ -218,6 +219,7 @@ export function getDailyDownloadState(): DailyDownloadState {
     return {
       downloadsCount: 0,
       limit: DAILY_DOWNLOAD_LIMIT,
+      bonusDownloads: 0,
       remaining: DAILY_DOWNLOAD_LIMIT,
       canDownload: true,
       nextAvailableTime: null,
@@ -240,6 +242,13 @@ export function getDailyDownloadState(): DailyDownloadState {
     timestamps = [];
   }
 
+  let bonus = 0;
+  try {
+    bonus = parseInt(localStorage.getItem('caution_daily_bonus_downloads') || '0', 10) || 0;
+  } catch (e) {
+    bonus = 0;
+  }
+
   const now = Date.now();
   const windowMs = DOWNLOAD_RESET_HOURS * 60 * 60 * 1000;
   // Filter active downloads from last 24h
@@ -252,8 +261,9 @@ export function getDailyDownloadState(): DailyDownloadState {
   }
 
   const count = activeDownloads.length;
-  const remaining = Math.max(0, DAILY_DOWNLOAD_LIMIT - count);
-  const canDownload = count < DAILY_DOWNLOAD_LIMIT;
+  const totalLimit = DAILY_DOWNLOAD_LIMIT + bonus;
+  const remaining = Math.max(0, totalLimit - count);
+  const canDownload = count < totalLimit;
 
   let nextAvailableTime: Date | null = null;
   let hoursRemaining = 0;
@@ -270,7 +280,8 @@ export function getDailyDownloadState(): DailyDownloadState {
 
   return {
     downloadsCount: count,
-    limit: DAILY_DOWNLOAD_LIMIT,
+    limit: totalLimit,
+    bonusDownloads: bonus,
     remaining,
     canDownload,
     nextAvailableTime,
@@ -278,6 +289,31 @@ export function getDailyDownloadState(): DailyDownloadState {
     minutesRemaining,
     unlimitedPreview: true
   };
+}
+
+export function grantBonusDownload(count: number = 1): DailyDownloadState {
+  if (typeof window === 'undefined') return getDailyDownloadState();
+
+  let currentBonus = 0;
+  try {
+    currentBonus = parseInt(localStorage.getItem('caution_daily_bonus_downloads') || '0', 10) || 0;
+  } catch (e) {}
+
+  const newBonus = currentBonus + count;
+  try {
+    localStorage.setItem('caution_daily_bonus_downloads', newBonus.toString());
+  } catch (e) {}
+
+  const updated = getDailyDownloadState();
+
+  window.dispatchEvent(
+    new CustomEvent('caution:bonus-download-awarded', {
+      detail: { bonusGranted: count, totalBonus: newBonus, remaining: updated.remaining }
+    })
+  );
+  window.dispatchEvent(new CustomEvent('caution:download-recorded'));
+
+  return updated;
 }
 
 export function recordBeatDownload(beatId: string, beatTitle?: string): DailyDownloadState {
@@ -318,9 +354,13 @@ export function useDailyDownloadQuota() {
 
     if (typeof window !== 'undefined') {
       window.addEventListener('caution:download-recorded', updateState);
+      window.addEventListener('caution:bonus-download-awarded', updateState);
+      window.addEventListener('storage', updateState);
       const interval = setInterval(updateState, 30000); // refresh every 30s
       return () => {
         window.removeEventListener('caution:download-recorded', updateState);
+        window.removeEventListener('caution:bonus-download-awarded', updateState);
+        window.removeEventListener('storage', updateState);
         clearInterval(interval);
       };
     }
