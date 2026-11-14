@@ -143,8 +143,8 @@ export default function UserBillingPage() {
                 PLUS ACTIVE
               </span>
             ) : (
-              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-white/10 text-gray-400 border border-white/10">
-                FREE CREATOR
+              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-amber-500/10 text-amber-300 border border-amber-500/30">
+                MEMBERSHIP REQUIRED
               </span>
             )}
           </h1>
@@ -159,20 +159,20 @@ export default function UserBillingPage() {
             <div className="flex items-center gap-2">
               <CreditCard className="h-4 w-4 text-[#2dd4bf]" />
               <h2 className="text-lg font-bold text-white">
-                {isPlus ? 'Caution Plus Tier' : 'Free Creator Tier'}
+                {isPlus ? 'Caution Plus Tier' : 'Caution Plus Membership Required'}
               </h2>
             </div>
             <p className="text-xs text-gray-400 leading-relaxed max-w-lg">
               {isPlus
                 ? 'Full studio license clearance enabled with unlimited 24-bit lossless streaming, full trackout WAV stems, and automated synchronization clearance.'
-                : 'Free tier with standard listening previews and single-track beat store checkout. Upgrade anytime to unlock stems and unlimited playback.'}
+                : 'Caution Studio is an exclusive paid platform. Activate your Caution Plus membership to unlock unlimited lossless streaming, full trackout WAV stems, and commercial licensing.'}
             </p>
             <div className="pt-2 flex items-center gap-3 font-mono text-xs">
               <span className="text-xl font-black text-white">
-                {isPlus ? '₦3,000' : '₦0'}
+                {isPlus ? '₦3,000' : 'Inactive'}
               </span>
               <span className="text-gray-400">
-                {isPlus ? '/ month (auto-renews via Paystack)' : '/ forever'}
+                {isPlus ? '/ month (auto-renews via Paystack)' : '— Select a paid plan to activate'}
               </span>
             </div>
           </div>
@@ -183,7 +183,7 @@ export default function UserBillingPage() {
               className="px-5 py-2.5 rounded-full bg-[#04564f] hover:bg-[#03453f] text-[#2dd4bf] text-xs font-bold uppercase tracking-wider flex items-center gap-2 border border-[#2dd4bf]/30 transition-colors shadow-lg cursor-pointer"
             >
               <Sparkles className="h-3.5 w-3.5" />
-              <span>{isPlus ? 'Manage Tier' : 'Upgrade to Plus'}</span>
+              <span>{isPlus ? 'Manage Membership' : 'Subscribe to Plus'}</span>
             </Link>
           </div>
 

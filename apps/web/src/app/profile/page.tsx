@@ -342,9 +342,15 @@ export default function ProfilePage() {
               <h2 className="text-xl sm:text-2xl font-black text-white truncate">
                 {displayName || 'Arakunrin Cole'}
               </h2>
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-[#04564f] text-[#2dd4bf] border border-[#2dd4bf]/30">
-                {profile?.plan === 'plus' ? 'Caution Plus Member' : 'Free Tier'}
-              </span>
+              {profile?.plan === 'plus' ? (
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-[#04564f] text-[#2dd4bf] border border-[#2dd4bf]/30">
+                  Caution Plus Member
+                </span>
+              ) : (
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-amber-500/10 text-amber-300 border border-amber-500/30">
+                  Subscription Inactive
+                </span>
+              )}
             </div>
             <p className="text-xs text-gray-400 font-mono">@{handle || (email ? email.split('@')[0] : 'user')}</p>
             <p className="text-xs text-gray-300 leading-relaxed max-w-xl line-clamp-2">

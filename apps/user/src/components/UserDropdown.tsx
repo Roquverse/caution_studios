@@ -266,8 +266,8 @@ export function UserDropdown() {
                       PLUS
                     </span>
                   ) : (
-                    <span className="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-white/10 text-gray-400">
-                      FREE
+                    <span className="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-amber-500/10 text-amber-300 border border-amber-500/30">
+                      INACTIVE
                     </span>
                   )}
                 </div>

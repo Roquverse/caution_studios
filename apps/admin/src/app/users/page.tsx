@@ -103,7 +103,11 @@ export default function AdminUsersPage() {
         setUsers(
           users.map((u) => (u.id === user.id ? { ...u, plan: nextPlan } : u))
         );
-        showToast(`Subscription plan updated to ${nextPlan.toUpperCase()} for ${user.display_name}`);
+        showToast(
+          nextPlan === 'plus'
+            ? `Caution Plus activated for ${user.display_name}`
+            : `Caution Plus deactivated for ${user.display_name}`
+        );
       } else {
         const err = await res.json();
         alert(err.error || 'Failed to update plan');
@@ -477,7 +481,7 @@ export default function AdminUsersPage() {
                     : 'text-zinc-400 hover:text-zinc-200'
                 }`}
               >
-                Free ({freeCount})
+                Inactive ({freeCount})
               </button>
             </div>
           </div>
@@ -592,8 +596,8 @@ export default function AdminUsersPage() {
                               <Crown className="h-3 w-3" /> Caution Plus
                             </span>
                           ) : (
-                            <span className="inline-flex items-center gap-1 text-[11px] font-medium text-zinc-400 bg-zinc-800 px-2.5 py-0.5 rounded-full border border-zinc-700">
-                              Free Tier
+                            <span className="inline-flex items-center gap-1 text-[11px] font-medium text-amber-300 bg-amber-500/10 px-2.5 py-0.5 rounded-full border border-amber-500/30">
+                              Inactive
                             </span>
                           )}
                         </td>
@@ -639,9 +643,9 @@ export default function AdminUsersPage() {
                                   <span>Updating...</span>
                                 </div>
                               ) : isPlus ? (
-                                'Downgrade'
+                                'Deactivate Plus'
                               ) : (
-                                'Upgrade to Plus'
+                                'Activate Plus'
                               )}
                             </button>
                           </div>

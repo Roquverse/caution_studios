@@ -510,7 +510,7 @@ export default function AdminDashboardPage() {
                               : 'bg-zinc-800 text-zinc-300 border-zinc-700'
                           }`}
                         >
-                          {user.plan === 'plus' ? 'Plus Plan' : 'Free Tier'}
+                          {user.plan === 'plus' ? 'Caution Plus' : 'Inactive'}
                         </span>
                       </div>
                     ))
