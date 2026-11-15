@@ -173,14 +173,14 @@ export default function LoginPage() {
             <div className="group relative rounded-[6px] overflow-hidden border border-white/[0.08] bg-[#07090D]">
               <div className="aspect-square w-full overflow-hidden relative">
                 <img
-                  src="/images/album_neon_dj.jpg"
-                  alt="Cyber Dreams Beat"
+                  src="/images/african_producer_beats.jpg"
+                  alt="African Producer Studio Session"
                   className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent" />
                 <div className="absolute bottom-1.5 left-2 right-2">
-                  <p className="text-[11px] font-bold text-white truncate">Beat Blitz</p>
-                  <p className="text-[9px] font-mono text-gray-400">124 BPM • Afro</p>
+                  <p className="text-[11px] font-bold text-white truncate">Afrobeats Lab</p>
+                  <p className="text-[9px] font-mono text-gray-400">118 BPM • Producer</p>
                 </div>
               </div>
             </div>
@@ -190,13 +190,13 @@ export default function LoginPage() {
               <div className="aspect-square w-full overflow-hidden relative">
                 <img
                   src="/images/artist_studio_mic.jpg"
-                  alt="Vocal Session Master"
+                  alt="African Vocal Recording Session"
                   className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent" />
                 <div className="absolute bottom-1.5 left-2 right-2">
-                  <p className="text-[11px] font-bold text-white truncate">Vocal Booth</p>
-                  <p className="text-[9px] font-mono text-gray-400">92 BPM • R&B</p>
+                  <p className="text-[11px] font-bold text-white truncate">Vocal Session</p>
+                  <p className="text-[9px] font-mono text-gray-400">92 BPM • Afro-R&B</p>
                 </div>
               </div>
             </div>
