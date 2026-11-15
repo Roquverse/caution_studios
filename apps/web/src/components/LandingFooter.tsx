@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import Link from 'next/link';
 import { ArrowUpRight, Sparkles, Disc3, ShieldCheck } from 'lucide-react';
 
 interface LandingFooterProps {
@@ -45,16 +46,16 @@ export const LandingFooter: React.FC<LandingFooterProps> = ({
             </h4>
             <ul className="space-y-2.5 text-sm text-gray-300">
               <li>
-                <a href="#hero" className="hover:text-white transition-colors">Home</a>
+                <Link href="/" className="hover:text-white transition-colors">Home</Link>
               </li>
               <li>
-                <a href="#about" className="hover:text-white transition-colors">About</a>
+                <Link href="/about" className="hover:text-white transition-colors">About</Link>
               </li>
               <li>
-                <a href="#tracks" className="hover:text-white transition-colors">Artists & Beats</a>
+                <Link href="/artists" className="hover:text-white transition-colors">Artists &amp; Beats</Link>
               </li>
               <li>
-                <a href="#press" className="hover:text-white transition-colors">Press & Media</a>
+                <Link href="/press" className="hover:text-white transition-colors">Press &amp; Media</Link>
               </li>
             </ul>
           </div>
@@ -66,23 +67,22 @@ export const LandingFooter: React.FC<LandingFooterProps> = ({
             </h4>
             <ul className="space-y-2.5 text-sm text-gray-300">
               <li>
-                <a href="#process" className="hover:text-white transition-colors">Services</a>
+                <Link href="/services" className="hover:text-white transition-colors">Services</Link>
               </li>
               <li>
-                <a href="#process" className="hover:text-white transition-colors">Case Studies</a>
+                <Link href="/case-studies" className="hover:text-white transition-colors">Case Studies</Link>
               </li>
               <li>
-                <button
-                  type="button"
-                  onClick={onOpenAssessment}
+                <Link
+                  href="/assessment"
                   className="flex items-center gap-1.5 text-[#2dd4bf] hover:text-white font-medium transition-colors"
                 >
                   <Sparkles className="h-3.5 w-3.5" />
                   Artist Assessment
-                </button>
+                </Link>
               </li>
               <li>
-                <a href="#pricing" className="hover:text-white transition-colors">Pricing Plans</a>
+                <Link href="/pricing" className="hover:text-white transition-colors">Pricing Plans</Link>
               </li>
             </ul>
           </div>
@@ -94,17 +94,17 @@ export const LandingFooter: React.FC<LandingFooterProps> = ({
             </h4>
             <ul className="space-y-2.5 text-sm text-gray-300">
               <li>
-                <a href="https://twitter.com" target="_blank" rel="noreferrer" className="flex items-center gap-1 hover:text-white transition-colors">
+                <a href="https://x.com/cautionstudioz" target="_blank" rel="noreferrer" className="flex items-center gap-1 hover:text-white transition-colors">
                   Twitter (X) <ArrowUpRight className="h-3 w-3 text-gray-500" />
                 </a>
               </li>
               <li>
-                <a href="https://instagram.com" target="_blank" rel="noreferrer" className="flex items-center gap-1 hover:text-white transition-colors">
+                <a href="https://instagram.com/cautionstudioz" target="_blank" rel="noreferrer" className="flex items-center gap-1 hover:text-white transition-colors">
                   Instagram <ArrowUpRight className="h-3 w-3 text-gray-500" />
                 </a>
               </li>
               <li>
-                <a href="https://facebook.com" target="_blank" rel="noreferrer" className="flex items-center gap-1 hover:text-white transition-colors">
+                <a href="https://facebook.com/cautionstudioz" target="_blank" rel="noreferrer" className="flex items-center gap-1 hover:text-white transition-colors">
                   Facebook <ArrowUpRight className="h-3 w-3 text-gray-500" />
                 </a>
               </li>
