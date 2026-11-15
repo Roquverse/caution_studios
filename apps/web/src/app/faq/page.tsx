@@ -11,7 +11,7 @@ export default function FAQPage() {
       <Navbar
         brandName="Caution Studio"
         currentPath="/faq"
-        onStartFree={() => (window.location.href = AUTH_SIGNUP_URL)}
+        onStartFree={() => (window.location.href = APP_URL)}
         onSignIn={() => (window.location.href = AUTH_LOGIN_URL)}
         userPortalUrl={APP_URL}
         adminPortalUrl={ADMIN_URL}

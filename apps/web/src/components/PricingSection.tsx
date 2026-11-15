@@ -3,7 +3,7 @@
 import React from 'react';
 import { Button } from '@caution/ui';
 import { Check, Disc3 } from 'lucide-react';
-import { AUTH_SIGNUP_URL } from '../lib/urls';
+import { APP_URL } from '../lib/urls';
 
 interface PricingSectionProps {
   onSelectPlan?: (planName: string, price: string) => void;
@@ -151,11 +151,13 @@ export const PricingSection: React.FC<PricingSectionProps> = ({ onSelectPlan }) 
                   variant={plan.isRecommended ? 'primary' : 'outline'}
                   size="md"
                   pill
-                  onClick={() =>
-                    onSelectPlan
-                      ? onSelectPlan(plan.name, plan.price)
-                      : (window.location.href = AUTH_SIGNUP_URL)
-                  }
+                  onClick={() => {
+                    if (onSelectPlan) {
+                      onSelectPlan(plan.name, plan.price);
+                    } else {
+                      window.location.href = APP_URL;
+                    }
+                  }}
                   className={`w-full text-xs font-bold uppercase tracking-wider py-3 ${
                     plan.isRecommended
                       ? 'bg-[#04564f] hover:bg-[#03453f] text-white shadow-md'

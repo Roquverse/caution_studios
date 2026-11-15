@@ -24,7 +24,7 @@ import {
 } from 'lucide-react';
 import { Beat } from '@caution/types';
 import { useUserSubscription } from '../../lib/subscription';
-import { AUTH_SIGNUP_URL } from '../../lib/urls';
+import { APP_URL } from '../../lib/urls';
 
 interface SoundstageModalProps {
   isOpen: boolean;
@@ -547,7 +547,7 @@ export const SoundstageModal: React.FC<SoundstageModalProps> = ({
             {/* Action Buttons */}
             <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
               <a
-                href={AUTH_SIGNUP_URL}
+                href={APP_URL}
                 className="w-full sm:w-auto px-6 py-3 rounded-xl bg-[#2dd4bf] hover:bg-[#26b8a5] text-black text-xs font-black tracking-wider uppercase transition-transform hover:scale-105 shadow-lg shadow-[#2dd4bf]/20 flex items-center justify-center gap-2"
               >
                 <span>Subscribe / Register (₦3,000/mo)</span>

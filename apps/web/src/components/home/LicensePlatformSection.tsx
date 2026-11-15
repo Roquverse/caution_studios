@@ -3,6 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { formatNaira } from '../../lib/paystack';
+import { APP_URL } from '../../lib/urls';
 import { Check, ShieldCheck, ArrowRight } from 'lucide-react';
 
 export const LicensePlatformSection: React.FC = () => {
@@ -114,8 +115,8 @@ export const LicensePlatformSection: React.FC = () => {
               </div>
 
               <div className="pt-8">
-                <Link
-                  href="/beats"
+                <a
+                  href={APP_URL}
                   className={`w-full h-10 rounded-pill font-semibold text-xs flex items-center justify-center gap-1.5 transition-colors border ${
                     tier.isPopular
                       ? 'bg-accent hover:bg-[#135d56] text-text border-accent'
@@ -124,7 +125,7 @@ export const LicensePlatformSection: React.FC = () => {
                 >
                   <span>Browse beats for {tier.name}</span>
                   <ArrowRight className="h-3 w-3" />
-                </Link>
+                </a>
               </div>
             </div>
           ))}

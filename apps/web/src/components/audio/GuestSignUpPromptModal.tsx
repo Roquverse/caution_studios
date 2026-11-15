@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { Beat } from '@caution/types';
-import { AUTH_LOGIN_URL, AUTH_SIGNUP_URL } from '../../lib/urls';
+import { AUTH_LOGIN_URL, APP_URL } from '../../lib/urls';
 import {
   Sparkles,
   Lock,
@@ -118,10 +118,10 @@ export const GuestSignUpPromptModal: React.FC<GuestSignUpPromptModalProps> = ({
         {/* Action Buttons */}
         <div className="mt-6 flex flex-col gap-2.5">
           <a
-            href={AUTH_SIGNUP_URL}
+            href={APP_URL}
             className="w-full py-3 rounded-xl bg-[#E8B896] hover:bg-[#d8a886] text-black font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-transform hover:scale-[1.01] active:scale-[0.99] shadow-lg shadow-[#E8B896]/20 text-center"
           >
-            <span>Create Free Account / Sign Up</span>
+            <span>Get Started / Open App</span>
             <ArrowRight className="h-4 w-4" />
           </a>
 

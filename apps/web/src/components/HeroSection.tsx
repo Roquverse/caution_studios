@@ -270,7 +270,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                     if (onGetStarted) {
                       onGetStarted();
                     } else {
-                      window.location.href = AUTH_SIGNUP_URL;
+                      window.location.href = APP_URL;
                     }
                   }}
                   className="hidden md:inline-flex text-xs font-bold uppercase tracking-wider px-4 sm:px-5 py-2 sm:py-2.5 bg-[#04564f] hover:bg-[#03453f] text-white transition-all shadow-md shadow-[#04564f]/40 border border-[#2dd4bf]/20"
@@ -368,7 +368,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                       if (onGetStarted) {
                         onGetStarted();
                       } else {
-                        window.location.href = AUTH_SIGNUP_URL;
+                        window.location.href = APP_URL;
                       }
                     }}
                     className="w-full text-xs font-bold uppercase tracking-wider py-3 bg-[#04564f] hover:bg-[#03453f] text-white font-semibold shadow-md shadow-[#04564f]/30"

@@ -131,8 +131,8 @@ export default function LandingPage() {
     setIsAssessmentOpen(true);
   };
 
-  const handleSelectPlan = (planName: string, price: string) => {
-    setSelectedPlan({ name: planName, price });
+  const handleSelectPlan = (planName?: string, price?: string) => {
+    window.location.href = APP_URL;
   };
 
   return (
@@ -152,7 +152,7 @@ export default function LandingPage() {
 
       {/* Music Licensing Platforms & Clearance */}
       <MusicLicensingSection
-        onStartFree={() => (window.location.href = AUTH_SIGNUP_URL)}
+        onStartFree={() => (window.location.href = APP_URL)}
       />
 
       <PricingSection
@@ -169,7 +169,7 @@ export default function LandingPage() {
 
       {/* 10. Join 40,000 Creators CTA Banner */}
       <JoinCreatorsSection
-        onStartFree={() => (window.location.href = AUTH_SIGNUP_URL)}
+        onStartFree={() => (window.location.href = APP_URL)}
       />
 
       {/* 11. Footer (Brand info, Explore, Insights, Follow) */}

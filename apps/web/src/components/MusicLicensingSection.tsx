@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { Check } from 'lucide-react';
-import { AUTH_SIGNUP_URL } from '../lib/urls';
+import { APP_URL } from '../lib/urls';
 
 interface MusicLicensingSectionProps {
   onStartFree?: () => void;
@@ -46,7 +46,7 @@ export const MusicLicensingSection: React.FC<MusicLicensingSectionProps> = ({
         <div className="flex justify-center">
           <button
             type="button"
-            onClick={onStartFree ? onStartFree : () => (window.location.href = AUTH_SIGNUP_URL)}
+            onClick={onStartFree ? onStartFree : () => (window.location.href = APP_URL)}
             className="bg-[#04564f] hover:bg-[#03453f] text-white font-bold text-xs uppercase tracking-wider px-8 py-3.5 rounded-md shadow-md shadow-[#04564f]/20 transition-all duration-200 active:scale-95 cursor-pointer"
           >
             START FREE NOW

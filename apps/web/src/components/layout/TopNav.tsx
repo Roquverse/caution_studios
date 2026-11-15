@@ -127,7 +127,7 @@ export const TopNav: React.FC = () => {
               </a>
 
               <a
-                href={AUTH_SIGNUP_URL}
+                href={APP_URL}
                 className="hidden md:inline-flex h-8 px-4 rounded-pill border border-border hover:border-text-faint text-text text-xs font-semibold items-center justify-center transition-colors"
               >
                 Get started
@@ -223,7 +223,7 @@ export const TopNav: React.FC = () => {
                 Sign in
               </a>
               <a
-                href={AUTH_SIGNUP_URL}
+                href={APP_URL}
                 onClick={() => setMobileMenuOpen(false)}
                 className="flex-1 h-9 rounded-sm bg-accent text-center text-xs font-medium text-text flex items-center justify-center"
               >

@@ -7,7 +7,7 @@ import { HomeFooter } from '../../components/home/HomeFooter';
 import { CartDrawer } from '../../components/cart/CartDrawer';
 import { NowPlayingPanel } from '../../components/audio/NowPlayingPanel';
 import { formatNaira } from '../../lib/paystack';
-import { AUTH_SIGNUP_URL } from '../../lib/urls';
+import { APP_URL } from '../../lib/urls';
 import { Check, Sparkles, ArrowRight, ShieldCheck } from 'lucide-react';
 
 export default function PricingPage() {
@@ -71,59 +71,21 @@ export default function PricingPage() {
           </p>
         </div>
 
-        {/* Free vs Plus Subscription Plans */}
+        {/* Subscription Plan */}
         <div className="mb-20">
           <div className="text-xs font-bold uppercase tracking-wider text-text-muted mb-4 text-center">
-            Artist Membership Tiers
+            Artist Membership Tier
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto">
-            {/* Free */}
-            <div className="p-6 sm:p-8 rounded-sm bg-surface border border-border flex flex-col justify-between">
-              <div>
-                <h3 className="text-lg font-bold text-text">Free Artist</h3>
-                <div className="mt-3 flex items-baseline gap-1">
-                  <span className="text-3xl sm:text-4xl font-black font-mono text-text">₦0</span>
-                  <span className="text-xs text-text-muted">forever</span>
-                </div>
-                <p className="text-xs text-text-muted mt-2">
-                  Browse, search, and preview beats with watermarked audio tags.
-                </p>
-
-                <ul className="mt-6 pt-5 border-t border-border space-y-2.5 text-xs text-text-muted">
-                  <li className="flex items-center gap-2">
-                    <Check className="h-4 w-4 text-accent-live" />
-                    <span>Unlimited watermarked preview streaming</span>
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <Check className="h-4 w-4 text-accent-live" />
-                    <span>Standard Paystack checkout</span>
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <Check className="h-4 w-4 text-accent-live" />
-                    <span>Library & license agreement storage</span>
-                  </li>
-                </ul>
-              </div>
-
-              <div className="pt-8">
-                <Link
-                  href="/beats"
-                  className="w-full h-10 rounded-pill bg-surface hover:bg-surface-2 text-text font-semibold text-xs flex items-center justify-center border border-border"
-                >
-                  Start free
-                </Link>
-              </div>
-            </div>
-
+          <div className="max-w-xl mx-auto">
             {/* Plus */}
-            <div className="p-6 sm:p-8 rounded-sm bg-surface-2 border border-accent-live ring-1 ring-accent-live flex flex-col justify-between relative">
-              <div className="absolute -top-2.5 right-6 px-2.5 py-0.5 rounded-sm bg-accent border border-accent text-[10px] font-bold text-text uppercase tracking-wider">
+            <div className="p-6 sm:p-8 rounded-2xl bg-surface-2 border border-accent-live ring-1 ring-accent-live flex flex-col justify-between relative shadow-xl">
+              <div className="absolute -top-2.5 right-6 px-2.5 py-0.5 rounded-full bg-accent border border-accent text-[10px] font-bold text-text uppercase tracking-wider">
                 Artist Plus
               </div>
 
               <div>
-                <h3 className="text-lg font-bold text-text">Caution Plus</h3>
+                <h3 className="text-xl font-bold text-text">Caution Plus</h3>
                 <div className="mt-3 flex items-baseline gap-1">
                   <span className="text-3xl sm:text-4xl font-black font-mono text-text">
                     {formatNaira(3000)}
@@ -160,8 +122,8 @@ export default function PricingPage() {
 
               <div className="pt-8">
                 <a
-                  href={AUTH_SIGNUP_URL}
-                  className="w-full h-10 rounded-pill bg-accent hover:bg-[#135d56] text-text font-semibold text-xs flex items-center justify-center border border-accent shadow-sm"
+                  href={APP_URL}
+                  className="w-full h-11 rounded-full bg-accent hover:bg-[#135d56] text-text font-semibold text-xs flex items-center justify-center border border-accent shadow-sm uppercase tracking-wider"
                 >
                   Subscribe to Plus for {formatNaira(3000)}/mo
                 </a>
@@ -211,12 +173,12 @@ export default function PricingPage() {
                 </div>
 
                 <div className="pt-6">
-                  <Link
-                    href="/beats"
+                  <a
+                    href={APP_URL}
                     className="w-full h-9 rounded-pill bg-surface hover:bg-surface-2 text-text text-xs font-medium border border-border flex items-center justify-center"
                   >
                     Browse beats
-                  </Link>
+                  </a>
                 </div>
               </div>
             ))}
