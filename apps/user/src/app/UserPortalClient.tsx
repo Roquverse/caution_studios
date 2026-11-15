@@ -2551,11 +2551,11 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
             <p className="text-xs text-gray-300 mt-2 leading-relaxed">
               {pendingDownloadTrackRef.current ? (
                 <>
-                  You’ve used your 2 free downloads today. Listen to a 15-second sponsored ad to unlock and download <strong className="text-teal-300">&ldquo;{pendingDownloadTrackRef.current.title}&rdquo;</strong> right now!
+                  You’ve used your 2 free downloads today. Stream a 15-second sponsored ad to unlock and download <strong className="text-teal-300">&ldquo;{pendingDownloadTrackRef.current.title}&rdquo;</strong> right now!
                 </>
               ) : (
                 <>
-                  You have downloaded your quota for today. Listen to a 15-second sponsored artist ad to instantly earn <strong className="text-teal-300">+1 bonus beat download</strong>!
+                  You have downloaded your quota for today. Stream a 15-second sponsored artist ad to instantly earn <strong className="text-teal-300">+1 bonus beat download</strong>!
                 </>
               )}
             </p>
@@ -2572,7 +2572,7 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
                 <Sparkles className="h-4 w-4" />
                 <span>
                   {pendingDownloadTrackRef.current
-                    ? `Listen to 15s Ad & Download Beat`
+                    ? `Stream 15s Ad & Download Beat`
                     : `Stream 15s Ad (+1 Download)`}
                 </span>
               </button>

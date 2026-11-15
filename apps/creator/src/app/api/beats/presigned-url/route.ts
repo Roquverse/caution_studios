@@ -4,15 +4,14 @@ import { supabase as publicSupabase } from '../../../../lib/supabaseClient';
 
 export const dynamic = 'force-dynamic';
 
-function cleanSlug(text: string) {
-  const clean = text
-    .toLowerCase()
+function getActualSafeName(title?: string, filename?: string) {
+  const base = (title && title.trim()) || (filename ? filename.replace(/\.[^/.]+$/, '') : 'track');
+  const clean = base
     .trim()
-    .replace(/[^\w\s-]/g, '')
-    .replace(/[\s_-]+/g, '-')
-    .replace(/^-+|-+$/g, '');
-  const randomSuffix = Math.random().toString(36).substring(2, 6);
-  return `${clean || 'beat'}-${randomSuffix}`;
+    .replace(/[/\\?%*:|"<>#]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return clean || 'track';
 }
 
 export async function POST(req: NextRequest) {
@@ -49,23 +48,23 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Filename is required' }, { status: 400 });
     }
 
-    const safeTitleSlug = cleanSlug(title || filename.split('.')[0] || 'track');
+    const actualName = getActualSafeName(title, filename);
     const ext = filename.split('.').pop()?.toLowerCase() || (type === 'audio' ? 'wav' : type === 'stems' ? 'zip' : 'jpg');
 
     let key = '';
     let finalContentType = contentType;
     if (type === 'audio') {
-      key = `masters/${safeTitleSlug}_${Date.now()}.${ext}`;
+      key = `masters/${actualName}.${ext}`;
       if (!finalContentType) finalContentType = 'audio/wav';
     } else if (type === 'stems') {
       const stemExt = ext.includes('zip') || ext.includes('rar') || ext.includes('tar') ? ext : 'zip';
-      key = `stems/${safeTitleSlug}_${Date.now()}.${stemExt}`;
+      key = `stems/${actualName} - Stems.${stemExt}`;
       if (!finalContentType || finalContentType === 'application/octet-stream') finalContentType = 'application/zip';
     } else if (type === 'cover') {
-      key = `covers/${safeTitleSlug}_${Date.now()}.${ext}`;
+      key = `covers/${actualName} - Artwork.${ext}`;
       if (!finalContentType) finalContentType = 'image/jpeg';
     } else {
-      key = `uploads/${safeTitleSlug}_${Date.now()}.${ext}`;
+      key = `uploads/${actualName}.${ext}`;
       if (!finalContentType) finalContentType = 'application/octet-stream';
     }
 

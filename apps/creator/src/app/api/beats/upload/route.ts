@@ -5,6 +5,16 @@ import { sendAdminNotification } from '../../../../lib/emailNotifier';
 
 export const dynamic = 'force-dynamic';
 
+function getActualSafeName(title?: string, filename?: string) {
+  const base = (title && title.trim()) || (filename ? filename.replace(/\.[^/.]+$/, '') : 'track');
+  const clean = base
+    .trim()
+    .replace(/[/\\?%*:|"<>#]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return clean || 'track';
+}
+
 function generateSlug(text: string) {
   const clean = text
     .toLowerCase()
@@ -111,13 +121,15 @@ export async function POST(req: NextRequest) {
 
     const slug = generateSlug(title);
 
+    const actualName = getActualSafeName(title, audioFile?.name);
+
     // 3. Resolve Master Audio Key
     let masterAudioKey: string | null = bodyData.masterAudioKey || null;
 
     if (!masterAudioKey && audioFile && audioFile.size > 0) {
       const audioBuffer = Buffer.from(await audioFile.arrayBuffer());
       const ext = audioFile.name.split('.').pop()?.toLowerCase() || 'wav';
-      masterAudioKey = `masters/${slug}_${Date.now()}.${ext}`;
+      masterAudioKey = `masters/${actualName}.${ext}`;
       await uploadToR2(masterAudioKey, audioBuffer, audioFile.type || 'audio/wav');
     } else if (!masterAudioKey) {
       masterAudioKey = 'masters/alex-morgan-afrobeat-instrumental-summer-groove-573648-hubz_1791151613114.mp3';
@@ -131,7 +143,7 @@ export async function POST(req: NextRequest) {
     if (coverFile && coverFile.size > 0) {
       const coverBuffer = Buffer.from(await coverFile.arrayBuffer());
       const coverExt = coverFile.name.split('.').pop()?.toLowerCase() || 'jpg';
-      const coverKey = `covers/${slug}_${Date.now()}.${coverExt}`;
+      const coverKey = `covers/${actualName} - Artwork.${coverExt}`;
       await uploadToR2(coverKey, coverBuffer, coverFile.type || 'image/jpeg');
       coverUrl = `/api/media/${coverKey}`;
     }
@@ -141,7 +153,7 @@ export async function POST(req: NextRequest) {
 
     if (!stemsKey && stemsFile && stemsFile.size > 0) {
       const stemsBuffer = Buffer.from(await stemsFile.arrayBuffer());
-      stemsKey = `stems/${slug}_${Date.now()}.zip`;
+      stemsKey = `stems/${actualName} - Stems.zip`;
       await uploadToR2(stemsKey, stemsBuffer, 'application/zip');
     }
 

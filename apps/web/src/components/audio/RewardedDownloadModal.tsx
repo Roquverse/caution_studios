@@ -159,7 +159,7 @@ export const RewardedDownloadModal: React.FC<RewardedDownloadModalProps> = ({
             <div>
               <h3 className="text-sm font-bold text-white">Free Beat Download Option</h3>
               <p className="text-[10px] text-gray-400 font-mono">
-                Listen to 2 promoted songs to earn 1 free download of &ldquo;{beat.title}&rdquo;
+                Stream 2 promoted songs to earn 1 free download of &ldquo;{beat.title}&rdquo;
               </p>
             </div>
           </div>

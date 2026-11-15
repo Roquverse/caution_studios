@@ -206,7 +206,7 @@ export const GetBeatPriceModal: React.FC<GetBeatPriceModalProps> = ({
                   </div>
                   <p className="text-[11px] text-gray-400">
                     {downloadState.canDownload
-                      ? 'Listen to 2 promoted songs to unlock 1 free MP3 download (up to 2 beats/day, 62 beats/mo).'
+                      ? 'Stream 2 promoted songs to unlock 1 free MP3 download (up to 2 beats/day, 62 beats/mo).'
                       : 'You have used your 2 downloads for today. You can download again after 24 hours, but enjoy unlimited beat previews!'}
                   </p>
                 </div>

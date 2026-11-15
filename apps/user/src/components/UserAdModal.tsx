@@ -321,8 +321,8 @@ export const UserAdModal: React.FC<UserAdModalProps> = ({
               ) : (
                 <span>
                   {pendingDownloadTitle
-                    ? 'Listen to 15s ad to download your selected beat!'
-                    : 'Listen to 15s to earn +1 bonus beat download for today!'}
+                    ? 'Stream 15s ad to download your selected beat!'
+                    : 'Stream 15s to earn +1 bonus beat download for today!'}
                 </span>
               )}
             </p>

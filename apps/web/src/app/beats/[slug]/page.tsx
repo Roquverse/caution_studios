@@ -305,7 +305,7 @@ export default function BeatDetailPage() {
                     </span>
                   </div>
                   <h3 className="text-base font-bold text-white mt-1">
-                    Listen to 2 Songs to Download This Beat Free
+                    Stream 2 Songs to Download This Beat Free
                   </h3>
                   <p className="text-xs text-text-muted mt-1 max-w-xl leading-relaxed">
                     {downloadState.canDownload

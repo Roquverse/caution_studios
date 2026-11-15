@@ -162,8 +162,8 @@ export const DailyDownloadLimitModal: React.FC<DailyDownloadLimitModalProps> = (
               <Sparkles className="w-4 h-4" />
               <span>
                 {pendingBeatTitle
-                  ? `Listen to 15s Ad to Download "${pendingBeatTitle.slice(0, 20)}"`
-                  : 'Listen to 15s Ad (+1 Beat Download)'}
+                  ? `Stream 15s Ad to Download "${pendingBeatTitle.slice(0, 20)}"`
+                  : 'Stream 15s Ad (+1 Beat Download)'}
               </span>
             </button>
           )}

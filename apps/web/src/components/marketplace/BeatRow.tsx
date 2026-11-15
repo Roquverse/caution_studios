@@ -129,7 +129,7 @@ export const BeatRow: React.FC<BeatRowProps> = ({ beat, onOpenLicenseSelector })
           <button
             type="button"
             onClick={() => openRewardedDownload(beat)}
-            title="Listen to 2 promoted songs to download free"
+            title="Stream 2 promoted songs to download free"
             className="hidden md:flex h-8 px-2.5 rounded-pill bg-surface hover:bg-surface-2 text-amber-300 hover:text-amber-200 border border-amber-500/30 text-xs font-medium items-center gap-1 transition-colors"
           >
             <Download className="h-3 w-3" />
