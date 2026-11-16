@@ -132,36 +132,31 @@ export default function ResetPasswordPage() {
       setIsSubmitting(true);
       setErrorMessage(null);
 
-      // Step 1: Verify OTP if not already pre-verified in an active recovery session
-      if (!isPreVerified) {
-        const { data: otpData, error: otpError } = await supabase.auth.verifyOtp({
-          email: cleanEmail,
-          token: cleanCode,
-          type: 'recovery'
+      // Step 1: If pre-verified (via direct email link click), update password directly with active session
+      if (isPreVerified) {
+        const { error: updateError } = await supabase.auth.updateUser({
+          password: cleanPassword
         });
 
-        if (otpError) {
-          throw new Error(
-            otpError.message.includes('Token has expired')
-              ? 'The 6-digit code has expired. Please request a new code.'
-              : otpError.message.includes('Token is invalid')
-              ? 'Invalid 6-digit code. Please verify the code in your email or request a new one.'
-              : otpError.message || 'Verification failed. Please check your code.'
-          );
+        if (updateError) {
+          throw new Error(updateError.message || 'Failed to update password.');
         }
+      } else {
+        // Step 2: Verify 6-digit code and update password via backend API with service-role security
+        const res = await fetch('/api/auth/reset-password', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: cleanEmail,
+            code: cleanCode,
+            password: cleanPassword
+          })
+        });
 
-        if (!otpData?.session) {
-          throw new Error('Failed to establish secure recovery session. Please try again.');
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          throw new Error(data.error || 'Failed to update password. Please check your code and try again.');
         }
-      }
-
-      // Step 2: Update password with verified session
-      const { error: updateError } = await supabase.auth.updateUser({
-        password: cleanPassword
-      });
-
-      if (updateError) {
-        throw new Error(updateError.message || 'Failed to update password.');
       }
 
       setIsSuccess(true);
@@ -340,8 +335,8 @@ export default function ResetPasswordPage() {
                     />
                   </div>
                   {!isPreVerified && (
-                    <p className="mt-1 text-[10px] text-gray-500">
-                      Check your email inbox or spam folder for the 6-digit recovery code.
+                    <p className="mt-1.5 text-[11px] text-gray-400 leading-normal">
+                      Enter the 6-digit code from your <strong className="text-gray-200">most recent</strong> email. If you requested multiple codes, earlier codes are automatically expired.
                     </p>
                   )}
                 </div>
