@@ -247,7 +247,7 @@ export default function SubscriptionsPage() {
           const handler = (window as any).PaystackPop.setup({
             key: publicKey,
             email: userEmail,
-            amount: amountNgn * 100,
+            amount: Math.round(amountNgn * 100),
             currency: 'NGN',
             ref: `CS_${orderId}_${Date.now()}`,
             metadata: {
@@ -256,33 +256,35 @@ export default function SubscriptionsPage() {
               billing_cycle: tier,
               user_id: userId
             },
-            callback: async (response: { reference: string }) => {
+            callback: function (response: { reference: string }) {
               setIsLoading(true);
-              try {
-                const verifyRes = await fetch('/api/paystack/verify', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                    reference: response.reference,
-                    order_id: orderId,
-                    plan: tier,
-                    userId
-                  })
+              fetch('/api/paystack/verify', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  reference: response.reference,
+                  order_id: orderId,
+                  plan: tier,
+                  userId
+                })
+              })
+                .then((r) => r.json())
+                .then(async (verifyData) => {
+                  if (verifyData.verified || verifyData.status) {
+                    setCurrentPlan(tier);
+                    setCachedUserPlan(tier);
+                    await loadBillingInvoices(userId || undefined);
+                    setNotification(`🎉 Payment verified via Paystack! Caution ${tier === 'pro' ? 'Pro' : 'Plus'} membership is active.`);
+                  }
+                })
+                .catch((err) => {
+                  console.error('Paystack popup verify error:', err);
+                })
+                .finally(() => {
+                  setIsLoading(false);
                 });
-                const verifyData = await verifyRes.json();
-                if (verifyData.verified || verifyData.status) {
-                  setCurrentPlan(tier);
-                  setCachedUserPlan(tier);
-                  await loadBillingInvoices(userId || undefined);
-                  setNotification(`🎉 Payment verified via Paystack! Caution ${tier === 'pro' ? 'Pro' : 'Plus'} membership is active.`);
-                }
-              } catch (err) {
-                console.error('Paystack popup verify error:', err);
-              } finally {
-                setIsLoading(false);
-              }
             },
-            onClose: () => {
+            onClose: function () {
               setIsLoading(false);
             }
           });

@@ -238,7 +238,7 @@ export function UserMarketplaceView({
           const handler = (window as any).PaystackPop.setup({
             key: publicKey,
             email: userEmail,
-            amount: priceNgn * 100,
+            amount: Math.round(priceNgn * 100),
             currency: 'NGN',
             ref: `CS_${orderId}_${Date.now()}`,
             metadata: {
@@ -250,29 +250,31 @@ export function UserMarketplaceView({
               priceNgn,
               user_id: userId
             },
-            callback: async (response: { reference: string }) => {
-              try {
-                const verifyRes = await fetch('/api/paystack/verify', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                    reference: response.reference,
-                    order_id: orderId,
-                    userId
-                  })
+            callback: function (response: { reference: string }) {
+              fetch('/api/paystack/verify', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  reference: response.reference,
+                  order_id: orderId,
+                  userId
+                })
+              })
+                .then((r) => r.json())
+                .then((verifyData) => {
+                  if (verifyData.verified || verifyData.status) {
+                    setLicenseModalTrack(null);
+                    window.location.href = `/?type=purchase&beat_id=${licenseModalTrack.id}&reference=${response.reference}`;
+                  }
+                })
+                .catch((err) => {
+                  console.error('Paystack popup verify error:', err);
+                })
+                .finally(() => {
+                  setIsCheckingOut(false);
                 });
-                const verifyData = await verifyRes.json();
-                if (verifyData.verified || verifyData.status) {
-                  setLicenseModalTrack(null);
-                  window.location.href = `/?type=purchase&beat_id=${licenseModalTrack.id}&reference=${response.reference}`;
-                }
-              } catch (err) {
-                console.error('Paystack popup verify error:', err);
-              } finally {
-                setIsCheckingOut(false);
-              }
             },
-            onClose: () => {
+            onClose: function () {
               setIsCheckingOut(false);
             }
           });
