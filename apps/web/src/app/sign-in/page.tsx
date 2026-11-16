@@ -4,13 +4,14 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { supabase } from '../../lib/supabaseClient';
-import { ArrowRight, AlertCircle, ArrowUpRight, Disc3, Check } from 'lucide-react';
+import { ArrowRight, AlertCircle, ArrowUpRight, Disc3, Check, Eye, EyeOff } from 'lucide-react';
 import { APP_URL } from '../../lib/urls';
 
 export default function SignInPage() {
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
@@ -223,18 +224,32 @@ export default function SignInPage() {
                 <label className="block text-[11px] font-mono uppercase tracking-wider text-gray-400">
                   Password
                 </label>
-                <a href="#" className="text-[11px] text-[#2dd4bf] hover:underline">
+                <a
+                  href="https://auth.cautionstudioz.com/forgot-password"
+                  className="text-[11px] text-[#2dd4bf] hover:underline"
+                >
                   Forgot password?
                 </a>
               </div>
-              <input
-                type="password"
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••••••"
-                className="w-full h-11 px-3.5 rounded-[6px] bg-[#0F131C] border border-white/[0.1] text-xs text-white placeholder-gray-500 focus:outline-none focus:border-[#04564f] transition-colors"
-              />
+              <div className="relative">
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••••••"
+                  className="w-full h-11 pl-3.5 pr-10 rounded-[6px] bg-[#0F131C] border border-white/[0.1] text-xs text-white placeholder-gray-500 focus:outline-none focus:border-[#2dd4bf] transition-colors"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3.5 top-3.5 text-gray-400 hover:text-white transition-colors cursor-pointer"
+                  title={showPassword ? 'Hide password' : 'Show password'}
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                >
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
             </div>
 
             {/* Flat Submit Button (NO SHADOWS) */}
