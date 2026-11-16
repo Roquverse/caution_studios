@@ -5,8 +5,8 @@ import Link from 'next/link';
 import { ArrowUpRight, Sparkles, Disc3, ShieldCheck } from 'lucide-react';
 
 interface LandingFooterProps {
-  onOpenAssessment: () => void;
-  onBookCall: () => void;
+  onOpenAssessment?: () => void;
+  onBookCall?: () => void;
 }
 
 export const LandingFooter: React.FC<LandingFooterProps> = ({

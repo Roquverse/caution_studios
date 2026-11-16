@@ -42,7 +42,11 @@ const FAQ_ITEMS: FaqItem[] = [
   }
 ];
 
-export const FaqSection: React.FC = () => {
+interface FaqSectionProps {
+  dark?: boolean;
+}
+
+export const FaqSection: React.FC<FaqSectionProps> = ({ dark = false }) => {
   // Question #3 is open by default matching the reference screenshot!
   const [openId, setOpenId] = useState<string | null>('3');
 
@@ -51,14 +55,23 @@ export const FaqSection: React.FC = () => {
   };
 
   return (
-    <section id="faq" className="bg-white py-20 lg:py-28 border-t border-gray-100">
+    <section
+      id="faq"
+      className={
+        dark
+          ? 'bg-transparent py-10'
+          : 'bg-white py-20 lg:py-28 border-t border-gray-100'
+      }
+    >
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Headline */}
-        <div className="text-center mb-12">
-          <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black text-gray-950 tracking-tight">
-            Frequently asked questions
-          </h2>
-        </div>
+        {!dark && (
+          <div className="text-center mb-12">
+            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black text-gray-950 tracking-tight">
+              Frequently asked questions
+            </h2>
+          </div>
+        )}
 
         {/* Accordion List */}
         <div className="space-y-3">
@@ -67,31 +80,65 @@ export const FaqSection: React.FC = () => {
             return (
               <div
                 key={item.id}
-                className={`rounded-xl border transition-all duration-200 overflow-hidden ${
-                  isOpen
-                    ? 'bg-[#04564f]/[0.03] border-[#04564f]/30 shadow-sm'
-                    : 'bg-white border-gray-200/80 hover:border-gray-300'
-                }`}
+                className={
+                  dark
+                    ? `rounded-2xl border transition-all duration-200 overflow-hidden ${
+                        isOpen
+                          ? 'bg-white/[0.07] border-[#2dd4bf]/40 shadow-lg'
+                          : 'bg-white/[0.03] border-white/10 hover:border-white/20'
+                      }`
+                    : `rounded-xl border transition-all duration-200 overflow-hidden ${
+                        isOpen
+                          ? 'bg-[#04564f]/[0.03] border-[#04564f]/30 shadow-sm'
+                          : 'bg-white border-gray-200/80 hover:border-gray-300'
+                      }`
+                }
               >
                 <button
                   type="button"
                   onClick={() => toggle(item.id)}
-                  className="flex w-full items-center justify-between px-6 py-5 text-left font-semibold text-gray-900 transition-colors"
+                  className={`flex w-full items-center justify-between px-6 py-5 text-left font-semibold transition-colors ${
+                    dark ? 'text-white' : 'text-gray-900'
+                  }`}
                 >
-                  <span className={`text-sm sm:text-base font-medium ${isOpen ? 'text-[#04564f] font-bold' : 'text-gray-900'}`}>
+                  <span
+                    className={`text-sm sm:text-base font-medium ${
+                      isOpen
+                        ? dark
+                          ? 'text-[#2dd4bf] font-bold'
+                          : 'text-[#04564f] font-bold'
+                        : dark
+                        ? 'text-white'
+                        : 'text-gray-900'
+                    }`}
+                  >
                     {item.question}
                   </span>
                   <span className="ml-4 flex h-6 w-6 shrink-0 items-center justify-center text-gray-500">
                     {isOpen ? (
-                      <Minus className="h-4 w-4 text-[#04564f] stroke-[2.5]" />
+                      <Minus
+                        className={`h-4 w-4 stroke-[2.5] ${
+                          dark ? 'text-[#2dd4bf]' : 'text-[#04564f]'
+                        }`}
+                      />
                     ) : (
-                      <Plus className="h-4 w-4 text-gray-400 stroke-[2]" />
+                      <Plus
+                        className={`h-4 w-4 stroke-[2] ${
+                          dark ? 'text-neutral-400' : 'text-gray-400'
+                        }`}
+                      />
                     )}
                   </span>
                 </button>
 
                 {isOpen && (
-                  <div className="px-6 pb-6 pt-1 text-xs sm:text-sm text-gray-600 leading-relaxed border-t border-[#04564f]/10">
+                  <div
+                    className={`px-6 pb-6 pt-1 text-xs sm:text-sm leading-relaxed border-t ${
+                      dark
+                        ? 'text-neutral-300 border-white/10'
+                        : 'text-gray-600 border-[#04564f]/10'
+                    }`}
+                  >
                     <p>{item.answer}</p>
                   </div>
                 )}
