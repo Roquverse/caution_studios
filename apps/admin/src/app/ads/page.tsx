@@ -118,6 +118,7 @@ export default function AdminAdsManagerPage() {
   const [formSongTitle, setFormSongTitle] = useState('');
   const [formGenre, setFormGenre] = useState('Afrobeats');
   const [formTier, setFormTier] = useState<'Starter Spotlight' | 'Pro Rotation' | 'Studio Blast'>('Pro Rotation');
+  const [formAdType, setFormAdType] = useState<'listening' | 'download' | 'all'>('listening');
   const [formAudioUrl, setFormAudioUrl] = useState('');
   const [formCoverUrl, setFormCoverUrl] = useState('');
   const [formSpotify, setFormSpotify] = useState('https://open.spotify.com');
@@ -184,6 +185,7 @@ export default function AdminAdsManagerPage() {
           packageName: selectedTier.pkg,
           priceNgn: selectedTier.price,
           targetPlays: selectedTier.impressions,
+          adType: formAdType,
           audioUrl: formAudioUrl || undefined,
           coverUrl: formCoverUrl || '/images/hero_boombox.jpg',
           spotifyUrl: formSpotify,
@@ -705,6 +707,19 @@ export default function AdminAdsManagerPage() {
                     <option value="Starter Spotlight">Starter Spotlight (₦15,000 · 5k plays)</option>
                     <option value="Pro Rotation">Pro Rotation (₦35,000 · 15k plays)</option>
                     <option value="Studio Blast">Studio Blast (₦75,000 · 40k plays)</option>
+                  </select>
+                </div>
+
+                <div className="space-y-1 col-span-2">
+                  <label className="text-xs font-medium text-zinc-300">Ad Placement / Category *</label>
+                  <select
+                    value={formAdType}
+                    onChange={(e) => setFormAdType(e.target.value as any)}
+                    className="w-full bg-zinc-950 border border-zinc-800 rounded-md py-1.5 px-3 text-xs text-zinc-100 focus:outline-none"
+                  >
+                    <option value="listening">Music Stream Ad (Plays during beat streaming/auditions)</option>
+                    <option value="download">Download Unlock Ad (Rewarded ad when 2-download daily limit is reached)</option>
+                    <option value="all">All Placements (Both listening break and download unlock)</option>
                   </select>
                 </div>
               </div>

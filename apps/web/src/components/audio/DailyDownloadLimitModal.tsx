@@ -61,14 +61,18 @@ export const DailyDownloadLimitModal: React.FC<DailyDownloadLimitModalProps> = (
             <div>
               <div className="flex items-center gap-2">
                 <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold uppercase tracking-wider bg-amber-500/10 text-amber-300 border border-amber-500/30">
-                  Daily Limit Reached
+                  {downloadState.canEarnBonus ? 'Daily Limit Reached' : 'Daily Max Reached'}
                 </span>
                 <span className="text-[11px] font-mono text-gray-400">
-                  2 / 2 Beats Today
+                  {downloadState.canEarnBonus
+                    ? `${downloadState.downloadsCount} / ${downloadState.limit} Free Beats`
+                    : '4 / 4 Beats (Max Used)'}
                 </span>
               </div>
               <h3 className="text-base font-black text-white mt-1">
-                You’ve Downloaded 2 Beats Today
+                {downloadState.canEarnBonus
+                  ? 'Daily 2-Download Limit Reached'
+                  : 'Daily Limit Reached (2 Free + 2 Ad Bonuses Used)'}
               </h3>
             </div>
           </div>
@@ -150,7 +154,7 @@ export const DailyDownloadLimitModal: React.FC<DailyDownloadLimitModalProps> = (
 
         {/* Modal Action Buttons */}
         <div className="p-5 pt-3 bg-[#0a0d13] border-t border-white/[0.08] flex flex-col gap-2.5">
-          {onWatchAd && (
+          {onWatchAd && downloadState.canEarnBonus ? (
             <button
               type="button"
               onClick={() => {
@@ -162,10 +166,14 @@ export const DailyDownloadLimitModal: React.FC<DailyDownloadLimitModalProps> = (
               <Sparkles className="w-4 h-4" />
               <span>
                 {pendingBeatTitle
-                  ? `Stream 15s Ad to Download "${pendingBeatTitle.slice(0, 20)}"`
-                  : 'Stream 15s Ad (+1 Beat Download)'}
+                  ? `Stream 15s Ad & Download Beat (${downloadState.bonusDownloadsRemaining} of 2 bonus left)`
+                  : `Stream 15s Ad & Unlock Download (${downloadState.bonusDownloadsRemaining} of 2 bonus left)`}
               </span>
             </button>
+          ) : (
+            <div className="w-full py-2.5 px-4 rounded-full bg-white/5 border border-white/10 text-gray-400 text-xs font-semibold text-center">
+              Daily Ad Download Bonus Reached (2/2 Extra Used Today)
+            </div>
           )}
 
           <div className="flex items-center gap-2.5">

@@ -56,29 +56,47 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Song title and artist name are required' }, { status: 400 });
     }
 
+    const adType = body.adType || 'listening';
+    const tagPrefix = adType === 'download' ? '[DOWNLOAD AD] ' : '[STREAM AD] ';
+    const resolvedCampaignName = campaignName?.trim()
+      ? (campaignName.includes('[') ? campaignName.trim() : `${tagPrefix}${campaignName.trim()}`)
+      : `${tagPrefix}Promote "${songTitle}"`;
+
+    const insertPayload: any = {
+      song_title: songTitle.trim(),
+      artist_name: artistName.trim(),
+      campaign_name: resolvedCampaignName,
+      package_name: packageName || 'starter',
+      price_ngn: Number(priceNgn) || 15000,
+      target_plays: Number(targetPlays) || 10000,
+      delivered_plays: 0,
+      clicks_count: 0,
+      audio_url: audioUrl || null,
+      cover_url: coverUrl || '/images/hero_boombox.jpg',
+      spotify_url: spotifyUrl || null,
+      apple_music_url: appleMusicUrl || null,
+      audiomack_url: audiomackUrl || null,
+      youtube_url: youtubeUrl || null,
+      status: status || 'active',
+      starts_at: new Date().toISOString()
+    };
+
     const supabase = getServiceRoleClient();
-    const { data: newCampaign, error } = await supabase
+    let { data: newCampaign, error } = await supabase
       .from('ad_campaigns')
-      .insert({
-        song_title: songTitle.trim(),
-        artist_name: artistName.trim(),
-        campaign_name: campaignName?.trim() || `Promote "${songTitle}"`,
-        package_name: packageName || 'starter',
-        price_ngn: Number(priceNgn) || 15000,
-        target_plays: Number(targetPlays) || 10000,
-        delivered_plays: 0,
-        clicks_count: 0,
-        audio_url: audioUrl || null,
-        cover_url: coverUrl || '/images/hero_boombox.jpg',
-        spotify_url: spotifyUrl || null,
-        apple_music_url: appleMusicUrl || null,
-        audiomack_url: audiomackUrl || null,
-        youtube_url: youtubeUrl || null,
-        status: status || 'active',
-        starts_at: new Date().toISOString()
-      })
+      .insert({ ...insertPayload, ad_type: adType })
       .select()
       .single();
+
+    if (error && error.message?.includes('ad_type')) {
+      const fallbackInsert = await supabase
+        .from('ad_campaigns')
+        .insert(insertPayload)
+        .select()
+        .single();
+      newCampaign = fallbackInsert.data;
+      error = fallbackInsert.error;
+    }
 
     if (error) {
       console.error('Error inserting ad campaign:', error);

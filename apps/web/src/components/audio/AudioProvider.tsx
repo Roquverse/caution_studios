@@ -102,6 +102,7 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return 0;
   });
   const [isAdModalOpen, setIsAdModalOpen] = useState<boolean>(false);
+  const [adModalType, setAdModalType] = useState<'listening' | 'download'>('listening');
   const [rewardedDownloadBeat, setRewardedDownloadBeat] = useState<Beat | null>(null);
 
   const openRewardedDownload = (beat: Beat) => {
@@ -231,6 +232,7 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
       pause();
       pendingBeatRef.current = beat;
+      setAdModalType('listening');
       setIsAdModalOpen(true);
       return; // DO NOT PLAY THE INTENDED BEAT! THE AD PLAYS INSTEAD!
     }
@@ -388,11 +390,12 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       {/* Promoted Artist Audio Ad Modal (Spotify 15s unskippable ad mode) */}
       <ArtistAdModal
         isOpen={isAdModalOpen}
-        pendingDownloadTitle={pendingDownloadBeatRef.current?.title || null}
+        adType={adModalType}
+        pendingDownloadTitle={adModalType === 'download' ? (pendingDownloadBeatRef.current?.title || null) : null}
         onClose={() => {
           setIsAdModalOpen(false);
           // 1. If ad was listened to in order to unlock a beat download:
-          if (pendingDownloadBeatRef.current) {
+          if (adModalType === 'download' && pendingDownloadBeatRef.current) {
             const beatToDownload = pendingDownloadBeatRef.current;
             pendingDownloadBeatRef.current = null;
             recordBeatDownload(beatToDownload.id, beatToDownload.title);
@@ -437,6 +440,7 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         pendingBeatTitle={pendingDownloadBeatRef.current?.title}
         onWatchAd={() => {
           setIsDownloadLimitModalOpen(false);
+          setAdModalType('download');
           setIsAdModalOpen(true);
         }}
       />

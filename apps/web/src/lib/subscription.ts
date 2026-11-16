@@ -199,6 +199,7 @@ export function useUserSubscription() {
 }
 
 export const DAILY_DOWNLOAD_LIMIT = 2;
+export const DAILY_MAX_BONUS_DOWNLOADS = 2; // Restricted to 2 extra downloads per day via ads
 export const MONTHLY_BEAT_ACCESS_LIMIT = 62;
 export const DOWNLOAD_RESET_HOURS = 24;
 
@@ -206,6 +207,9 @@ export interface DailyDownloadState {
   downloadsCount: number;
   limit: number;
   bonusDownloads: number;
+  maxBonusDownloads: number;
+  bonusDownloadsRemaining: number;
+  canEarnBonus: boolean;
   remaining: number;
   canDownload: boolean;
   nextAvailableTime: Date | null;
@@ -220,6 +224,9 @@ export function getDailyDownloadState(): DailyDownloadState {
       downloadsCount: 0,
       limit: DAILY_DOWNLOAD_LIMIT,
       bonusDownloads: 0,
+      maxBonusDownloads: DAILY_MAX_BONUS_DOWNLOADS,
+      bonusDownloadsRemaining: DAILY_MAX_BONUS_DOWNLOADS,
+      canEarnBonus: true,
       remaining: DAILY_DOWNLOAD_LIMIT,
       canDownload: true,
       nextAvailableTime: null,
@@ -249,6 +256,11 @@ export function getDailyDownloadState(): DailyDownloadState {
     bonus = 0;
   }
 
+  // Cap bonus downloads to maximum 2 extra downloads per day
+  const cappedBonus = Math.min(bonus, DAILY_MAX_BONUS_DOWNLOADS);
+  const bonusDownloadsRemaining = Math.max(0, DAILY_MAX_BONUS_DOWNLOADS - cappedBonus);
+  const canEarnBonus = bonusDownloadsRemaining > 0;
+
   const now = Date.now();
   const windowMs = DOWNLOAD_RESET_HOURS * 60 * 60 * 1000;
   // Filter active downloads from last 24h
@@ -261,7 +273,7 @@ export function getDailyDownloadState(): DailyDownloadState {
   }
 
   const count = activeDownloads.length;
-  const totalLimit = DAILY_DOWNLOAD_LIMIT + bonus;
+  const totalLimit = DAILY_DOWNLOAD_LIMIT + cappedBonus;
   const remaining = Math.max(0, totalLimit - count);
   const canDownload = count < totalLimit;
 
@@ -281,7 +293,10 @@ export function getDailyDownloadState(): DailyDownloadState {
   return {
     downloadsCount: count,
     limit: totalLimit,
-    bonusDownloads: bonus,
+    bonusDownloads: cappedBonus,
+    maxBonusDownloads: DAILY_MAX_BONUS_DOWNLOADS,
+    bonusDownloadsRemaining,
+    canEarnBonus,
     remaining,
     canDownload,
     nextAvailableTime,
@@ -299,7 +314,9 @@ export function grantBonusDownload(count: number = 1): DailyDownloadState {
     currentBonus = parseInt(localStorage.getItem('caution_daily_bonus_downloads') || '0', 10) || 0;
   } catch (e) {}
 
-  const newBonus = currentBonus + count;
+  // Cap bonus downloads strictly to max 2 extra per day
+  const allowedGrant = Math.min(count, Math.max(0, DAILY_MAX_BONUS_DOWNLOADS - currentBonus));
+  const newBonus = currentBonus + allowedGrant;
   try {
     localStorage.setItem('caution_daily_bonus_downloads', newBonus.toString());
   } catch (e) {}

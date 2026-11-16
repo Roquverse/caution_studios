@@ -113,6 +113,7 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
     return 0;
   });
   const [isAdModalOpen, setIsAdModalOpen] = useState(false);
+  const [adModalType, setAdModalType] = useState<'listening' | 'download'>('listening');
   const [isDownloadLimitModalOpen, setIsDownloadLimitModalOpen] = useState(false);
   const [rewardNotification, setRewardNotification] = useState<string | null>(null);
   const [paidBeatPurchaseTrack, setPaidBeatPurchaseTrack] = useState<TrackItem | null>(null);
@@ -577,6 +578,7 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
 
           setIsPlaying(false);
           pendingTrackRef.current = track;
+          setAdModalType('listening');
           setIsAdModalOpen(true);
           return;
         }
@@ -631,6 +633,7 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
         // Hold the intended track, stop music playback, and open the ad modal
         setIsPlaying(false);
         pendingTrackRef.current = track;
+        setAdModalType('listening');
         setIsAdModalOpen(true);
         return; // DO NOT PLAY THE INTENDED SONG! THE AD PLAYS INSTEAD!
       }
@@ -2576,36 +2579,51 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
             </div>
 
             <h3 className="text-xl font-black text-white tracking-tight">
-              Daily 2-Download Limit Reached
+              {downloadQuota.canEarnBonus
+                ? 'Daily 2-Download Limit Reached'
+                : 'Daily Limit Reached (2 Free + 2 Ad Bonuses Used)'}
             </h3>
             <p className="text-xs text-gray-300 mt-2 leading-relaxed">
-              {pendingDownloadTrackRef.current ? (
-                <>
-                  You’ve used your 2 free downloads today. Stream a 15-second sponsored ad to unlock and download <strong className="text-teal-300">&ldquo;{pendingDownloadTrackRef.current.title}&rdquo;</strong> right now!
-                </>
+              {downloadQuota.canEarnBonus ? (
+                pendingDownloadTrackRef.current ? (
+                  <>
+                    You’ve used your 2 free downloads today. Stream a 15-second sponsored ad to unlock and download <strong className="text-teal-300">&ldquo;{pendingDownloadTrackRef.current.title}&rdquo;</strong> ({downloadQuota.bonusRemaining} of 2 bonus left today)!
+                  </>
+                ) : (
+                  <>
+                    You have downloaded your quota for today. Stream a 15-second sponsored ad to earn <strong className="text-teal-300">+1 bonus download</strong> ({downloadQuota.bonusRemaining} of 2 bonus left today)!
+                  </>
+                )
               ) : (
                 <>
-                  You have downloaded your quota for today. Stream a 15-second sponsored artist ad to instantly earn <strong className="text-teal-300">+1 bonus beat download</strong>!
+                  You have used all 2 free daily downloads and both of your 2 bonus ad downloads for today (4 total). Free downloads reset after 24 hours.
                 </>
               )}
             </p>
 
             <div className="mt-6 flex flex-col gap-2.5">
-              <button
-                type="button"
-                onClick={() => {
-                  setIsDownloadLimitModalOpen(false);
-                  setIsAdModalOpen(true);
-                }}
-                className="w-full py-3 rounded-xl bg-[#2dd4bf] hover:bg-[#20b8a4] text-zinc-950 font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-transform hover:scale-[1.02] shadow-lg shadow-[#2dd4bf]/20 cursor-pointer"
-              >
-                <Sparkles className="h-4 w-4" />
-                <span>
-                  {pendingDownloadTrackRef.current
-                    ? `Stream 15s Ad & Download Beat`
-                    : `Stream 15s Ad (+1 Download)`}
-                </span>
-              </button>
+              {downloadQuota.canEarnBonus ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsDownloadLimitModalOpen(false);
+                    setAdModalType('download');
+                    setIsAdModalOpen(true);
+                  }}
+                  className="w-full py-3 rounded-xl bg-[#2dd4bf] hover:bg-[#20b8a4] text-zinc-950 font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-transform hover:scale-[1.02] shadow-lg shadow-[#2dd4bf]/20 cursor-pointer"
+                >
+                  <Sparkles className="h-4 w-4" />
+                  <span>
+                    {pendingDownloadTrackRef.current
+                      ? `Stream 15s Ad & Download Beat (${downloadQuota.bonusRemaining} of 2 bonus left)`
+                      : `Stream 15s Ad (+1 Download · ${downloadQuota.bonusRemaining} of 2 left)`}
+                  </span>
+                </button>
+              ) : (
+                <div className="w-full py-2.5 rounded-xl bg-white/5 border border-white/10 text-gray-400 font-bold text-xs text-center">
+                  Daily Ad Bonus Limit Reached (2/2 Extra Used Today)
+                </div>
+              )}
 
               <button
                 type="button"
@@ -2625,11 +2643,12 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
       {/* Spotify-Style Unskippable (15s) Audio Ad Modal */}
       <UserAdModal
         isOpen={isAdModalOpen}
-        pendingDownloadTitle={pendingDownloadTrackRef.current?.title || null}
+        adType={adModalType}
+        pendingDownloadTitle={adModalType === 'download' ? (pendingDownloadTrackRef.current?.title || null) : null}
         onClose={() => {
           setIsAdModalOpen(false);
           // 1. If ad was listened to in order to download a beat:
-          if (pendingDownloadTrackRef.current) {
+          if (adModalType === 'download' && pendingDownloadTrackRef.current) {
             const trackToDownload = pendingDownloadTrackRef.current;
             pendingDownloadTrackRef.current = null;
             setRewardNotification(

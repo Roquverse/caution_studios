@@ -118,29 +118,46 @@ export async function POST(req: NextRequest) {
     }
 
     // 3. Insert into Supabase ad_campaigns
-    const { data: newCampaign, error: dbError } = await supabase
+    const adType = bodyData.adType || 'listening';
+    const tagPrefix = adType === 'download' ? '[DOWNLOAD AD] ' : '[STREAM AD] ';
+    const rawCampaignName = bodyData.campaignName || `Promote "${songTitle}"`;
+    const resolvedCampaignName = rawCampaignName.includes('[') ? rawCampaignName : `${tagPrefix}${rawCampaignName}`;
+
+    const insertPayload: any = {
+      advertiser_id: advertiserId || null,
+      campaign_name: resolvedCampaignName,
+      artist_name: artistName,
+      song_title: songTitle,
+      package_name: packageName,
+      price_ngn: priceNgn,
+      target_plays: targetPlays,
+      delivered_plays: 0,
+      clicks_count: 0,
+      audio_url: audioUrl,
+      cover_url: coverUrl,
+      spotify_url: bodyData.spotifyUrl || null,
+      apple_music_url: bodyData.appleMusicUrl || null,
+      audiomack_url: bodyData.audiomackUrl || null,
+      youtube_url: bodyData.youtubeUrl || null,
+      status: 'active',
+      starts_at: new Date().toISOString()
+    };
+
+    let { data: newCampaign, error: dbError } = await supabase
       .from('ad_campaigns')
-      .insert({
-        advertiser_id: advertiserId || null,
-        campaign_name: bodyData.campaignName || `Promote "${songTitle}"`,
-        artist_name: artistName,
-        song_title: songTitle,
-        package_name: packageName,
-        price_ngn: priceNgn,
-        target_plays: targetPlays,
-        delivered_plays: 0,
-        clicks_count: 0,
-        audio_url: audioUrl,
-        cover_url: coverUrl,
-        spotify_url: bodyData.spotifyUrl || null,
-        apple_music_url: bodyData.appleMusicUrl || null,
-        audiomack_url: bodyData.audiomackUrl || null,
-        youtube_url: bodyData.youtubeUrl || null,
-        status: 'active',
-        starts_at: new Date().toISOString()
-      })
+      .insert({ ...insertPayload, ad_type: adType })
       .select()
       .single();
+
+    if (dbError && dbError.message?.includes('ad_type')) {
+      const fallbackInsert = await supabase
+        .from('ad_campaigns')
+        .insert(insertPayload)
+        .select()
+        .single();
+      newCampaign = fallbackInsert.data;
+      dbError = fallbackInsert.error;
+    }
 
     if (dbError) {
       console.error('Failed to insert ad campaign into DB:', dbError);

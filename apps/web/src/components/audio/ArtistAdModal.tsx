@@ -22,6 +22,7 @@ interface ArtistAdModalProps {
   onClose: () => void;
   promotedSong?: PromotedArtistSong;
   pendingDownloadTitle?: string | null;
+  adType?: 'listening' | 'download';
 }
 
 const R2_CDN = process.env.NEXT_PUBLIC_R2_PUBLIC_URL?.replace(/\/$/, '') || 'https://media.cautionstudioz.com';
@@ -47,7 +48,8 @@ export const ArtistAdModal: React.FC<ArtistAdModalProps> = ({
   isOpen,
   onClose,
   promotedSong,
-  pendingDownloadTitle
+  pendingDownloadTitle,
+  adType = pendingDownloadTitle ? 'download' : 'listening'
 }) => {
   const [currentSong, setCurrentSong] = useState<any>(promotedSong || SEEDED_PROMOTED_SONGS[0]);
   const [secondsRemaining, setSecondsRemaining] = useState(15);
@@ -62,7 +64,10 @@ export const ArtistAdModal: React.FC<ArtistAdModalProps> = ({
     if (rewardGrantedRef.current) return;
     rewardGrantedRef.current = true;
     setRewardAwarded(true);
-    grantBonusDownload(1);
+    // ONLY grant bonus download if this is a rewarded download ad
+    if (adType === 'download') {
+      grantBonusDownload(1);
+    }
   };
 
   useEffect(() => {
@@ -84,7 +89,7 @@ export const ArtistAdModal: React.FC<ArtistAdModalProps> = ({
 
     async function loadDynamicAd() {
       try {
-        const res = await fetch('/api/ads/active');
+        const res = await fetch(`/api/ads/active?type=${adType}`);
         if (res.ok) {
           const data = await res.json();
           if (Array.isArray(data.ads) && data.ads.length > 0) {
@@ -250,9 +255,9 @@ export const ArtistAdModal: React.FC<ArtistAdModalProps> = ({
           <div className="flex items-center gap-2">
             <div className="w-2 h-2 rounded-full bg-[#2dd4bf] animate-ping" />
             <span className="font-mono text-[11px] font-bold text-gray-200 uppercase tracking-wider">
-              {pendingDownloadTitle
-                ? `Unlock Download: ${pendingDownloadTitle.slice(0, 18)}...`
-                : 'Spotify Ad Mode · Sponsor Spotlight'}
+              {adType === 'download'
+                ? `Unlock Download: ${pendingDownloadTitle ? pendingDownloadTitle.slice(0, 18) : 'Beat'}...`
+                : 'Listening Break · Sponsor Spotlight'}
             </span>
           </div>
 
@@ -263,7 +268,7 @@ export const ArtistAdModal: React.FC<ArtistAdModalProps> = ({
                 onClick={handleClose}
                 className="px-3 py-1 rounded-full bg-[#2dd4bf] hover:bg-[#20b8a4] text-zinc-950 text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer shadow-md shadow-[#2dd4bf]/20 animate-pulse"
               >
-                <span>{pendingDownloadTitle ? 'Start Download' : 'Skip Ad'}</span>
+                <span>{adType === 'download' ? 'Start Download' : 'Resume Music'}</span>
                 <X className="h-3.5 w-3.5 stroke-[2.5]" />
               </button>
             ) : (
@@ -283,26 +288,36 @@ export const ArtistAdModal: React.FC<ArtistAdModalProps> = ({
           />
         </div>
 
-        {/* Rewarded Download Banner Alert */}
+        {/* Top Banner Alert: Listening vs Download */}
         <div className="px-4 py-2.5 bg-gradient-to-r from-teal-500/15 via-emerald-500/15 to-teal-500/15 border-b border-teal-500/20 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Download className="h-3.5 w-3.5 text-teal-300 shrink-0" />
+            {adType === 'download' ? (
+              <Download className="h-3.5 w-3.5 text-teal-300 shrink-0" />
+            ) : (
+              <Music2 className="h-3.5 w-3.5 text-teal-300 shrink-0" />
+            )}
             <p className="text-[11px] text-teal-200 font-medium">
-              {rewardAwarded ? (
-                <span className="font-bold text-teal-300 flex items-center gap-1">
-                  <CheckCircle2 className="h-3 w-3 text-teal-400 inline" />
-                  +1 Bonus Download Unlocked! Download starts on skip.
-                </span>
+              {adType === 'download' ? (
+                rewardAwarded ? (
+                  <span className="font-bold text-teal-300 flex items-center gap-1">
+                    <CheckCircle2 className="h-3 w-3 text-teal-400 inline" />
+                    +1 Bonus Download Unlocked! File downloads on close.
+                  </span>
+                ) : (
+                  <span>
+                    {pendingDownloadTitle
+                      ? `Stream 15s to download "${pendingDownloadTitle}" (max 2 bonus/day)`
+                      : 'Stream 15s to unlock +1 bonus download (restricted to 2/day)'}
+                  </span>
+                )
               ) : (
                 <span>
-                  {pendingDownloadTitle
-                    ? 'Stream 15s ad to download your selected beat!'
-                    : 'Stream 15s to earn +1 bonus beat download for today!'}
+                  Audio ad break during free beat streaming · Music automatically resumes shortly
                 </span>
               )}
             </p>
           </div>
-          {rewardAwarded && (
+          {adType === 'download' && rewardAwarded && (
             <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-teal-400/20 text-teal-300 font-bold border border-teal-400/30">
               +1 Earned
             </span>

@@ -69,6 +69,7 @@ export default function ProducerPromotePage() {
   const [appleMusicUrl, setAppleMusicUrl] = useState('');
   const [audiomackUrl, setAudiomackUrl] = useState('');
   const [youtubeUrl, setYoutubeUrl] = useState('');
+  const [adType, setAdType] = useState<'listening' | 'download' | 'all'>('listening');
 
   const [audioFile, setAudioFile] = useState<File | null>(null);
   const [coverFile, setCoverFile] = useState<File | null>(null);
@@ -152,6 +153,7 @@ export default function ProducerPromotePage() {
       formData.append('packageName', selectedTier.id);
       formData.append('priceNgn', selectedTier.priceNgn.toString());
       formData.append('targetPlays', selectedTier.plays.toString());
+      formData.append('adType', adType);
       if (audioUrl) formData.append('audioUrl', audioUrl);
       if (coverUrl) formData.append('coverUrl', coverUrl);
       if (spotifyUrl) formData.append('spotifyUrl', spotifyUrl);
@@ -416,6 +418,62 @@ export default function ProducerPromotePage() {
                     </p>
                   )}
                 </div>
+              </div>
+            </div>
+
+            {/* Placement / Ad Type */}
+            <div className="space-y-2 pt-2 border-t border-zinc-800">
+              <label className="text-xs font-semibold text-zinc-300 block">
+                Ad Placement / Category
+              </label>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => setAdType('listening')}
+                  className={`p-3 rounded-lg border text-left text-xs transition-all cursor-pointer ${
+                    adType === 'listening'
+                      ? 'bg-[#2dd4bf]/15 border-[#2dd4bf] text-white ring-1 ring-[#2dd4bf]'
+                      : 'bg-zinc-950 border-zinc-800 text-zinc-400 hover:text-white'
+                  }`}
+                >
+                  <div className="font-bold flex items-center gap-1.5 text-white">
+                    <Radio className="h-3.5 w-3.5 text-[#2dd4bf]" />
+                    <span>Stream Audio Ad</span>
+                  </div>
+                  <div className="text-[10px] text-zinc-400 mt-1">Plays during free beat audition streaming</div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setAdType('download')}
+                  className={`p-3 rounded-lg border text-left text-xs transition-all cursor-pointer ${
+                    adType === 'download'
+                      ? 'bg-[#2dd4bf]/15 border-[#2dd4bf] text-white ring-1 ring-[#2dd4bf]'
+                      : 'bg-zinc-950 border-zinc-800 text-zinc-400 hover:text-white'
+                  }`}
+                >
+                  <div className="font-bold flex items-center gap-1.5 text-white">
+                    <Sparkles className="h-3.5 w-3.5 text-[#2dd4bf]" />
+                    <span>Download Unlock Ad</span>
+                  </div>
+                  <div className="text-[10px] text-zinc-400 mt-1">Rewarded ad when 2-download limit is reached</div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setAdType('all')}
+                  className={`p-3 rounded-lg border text-left text-xs transition-all cursor-pointer ${
+                    adType === 'all'
+                      ? 'bg-[#2dd4bf]/15 border-[#2dd4bf] text-white ring-1 ring-[#2dd4bf]'
+                      : 'bg-zinc-950 border-zinc-800 text-zinc-400 hover:text-white'
+                  }`}
+                >
+                  <div className="font-bold flex items-center gap-1.5 text-white">
+                    <Megaphone className="h-3.5 w-3.5 text-[#2dd4bf]" />
+                    <span>Both Placements</span>
+                  </div>
+                  <div className="text-[10px] text-zinc-400 mt-1">Maximum coverage across audio breaks & downloads</div>
+                </button>
               </div>
             </div>
 

@@ -3,11 +3,15 @@
 import { useState, useEffect } from 'react';
 
 export const DAILY_BASE_DOWNLOAD_LIMIT = 2;
+export const DAILY_MAX_BONUS_DOWNLOADS = 2; // Restricted to 2 extra downloads per day via ads
 
 export interface DailyDownloadQuotaState {
   used: number;
   bonus: number;
   baseLimit: number;
+  maxBonus: number;
+  bonusRemaining: number;
+  canEarnBonus: boolean;
   totalAllowed: number;
   remaining: number;
   canDownload: boolean;
@@ -24,6 +28,9 @@ export function getDailyDownloadState(): DailyDownloadQuotaState {
       used: 0,
       bonus: 0,
       baseLimit: DAILY_BASE_DOWNLOAD_LIMIT,
+      maxBonus: DAILY_MAX_BONUS_DOWNLOADS,
+      bonusRemaining: DAILY_MAX_BONUS_DOWNLOADS,
+      canEarnBonus: true,
       totalAllowed: DAILY_BASE_DOWNLOAD_LIMIT,
       remaining: DAILY_BASE_DOWNLOAD_LIMIT,
       canDownload: true,
@@ -47,14 +54,22 @@ export function getDailyDownloadState(): DailyDownloadQuotaState {
     localStorage.setItem('caution_daily_bonus_downloads', '0');
   }
 
-  const totalAllowed = DAILY_BASE_DOWNLOAD_LIMIT + bonus;
+  // Ensure bonus does not exceed the daily 2-extra-downloads maximum
+  const cappedBonus = Math.min(bonus, DAILY_MAX_BONUS_DOWNLOADS);
+  const bonusRemaining = Math.max(0, DAILY_MAX_BONUS_DOWNLOADS - cappedBonus);
+  const canEarnBonus = bonusRemaining > 0;
+
+  const totalAllowed = DAILY_BASE_DOWNLOAD_LIMIT + cappedBonus;
   const remaining = Math.max(0, totalAllowed - used);
   const canDownload = remaining > 0;
 
   return {
     used,
-    bonus,
+    bonus: cappedBonus,
     baseLimit: DAILY_BASE_DOWNLOAD_LIMIT,
+    maxBonus: DAILY_MAX_BONUS_DOWNLOADS,
+    bonusRemaining,
+    canEarnBonus,
     totalAllowed,
     remaining,
     canDownload,
@@ -62,11 +77,18 @@ export function getDailyDownloadState(): DailyDownloadQuotaState {
   };
 }
 
+export function canEarnBonusDownload(): boolean {
+  const state = getDailyDownloadState();
+  return state.canEarnBonus;
+}
+
 export function grantBonusDownload(count: number = 1): DailyDownloadQuotaState {
   if (typeof window === 'undefined') return getDailyDownloadState();
 
   const state = getDailyDownloadState();
-  const newBonus = state.bonus + count;
+  // Restrict bonus downloads to max 2 extra downloads per day
+  const allowedGrant = Math.min(count, Math.max(0, DAILY_MAX_BONUS_DOWNLOADS - state.bonus));
+  const newBonus = state.bonus + allowedGrant;
 
   localStorage.setItem('caution_daily_downloads_date', state.todayDate);
   localStorage.setItem('caution_daily_bonus_downloads', newBonus.toString());
