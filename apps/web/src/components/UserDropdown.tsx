@@ -152,6 +152,7 @@ export function UserDropdown({ initialProfile }: { initialProfile?: UserProfileD
     return null;
   }
 
+  const isPro = profile?.plan === 'pro';
   const isPlus = profile?.plan === 'plus';
 
   return (
@@ -193,13 +194,17 @@ export function UserDropdown({ initialProfile }: { initialProfile?: UserProfileD
                   <p className="text-xs font-bold text-white truncate">
                     {profile?.display_name || 'Arakunrin Cole'}
                   </p>
-                  {isPlus ? (
+                  {isPro ? (
+                    <span className="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-teal-500/20 text-teal-300 border border-teal-500/40">
+                      PRO
+                    </span>
+                  ) : isPlus ? (
                     <span className="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-[#04564f] text-[#2dd4bf] border border-[#2dd4bf]/30">
                       PLUS
                     </span>
                   ) : (
-                    <span className="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-amber-500/10 text-amber-300 border border-amber-500/30">
-                      INACTIVE
+                    <span className="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-zinc-800 text-zinc-400 border border-zinc-700">
+                      FREE
                     </span>
                   )}
                 </div>

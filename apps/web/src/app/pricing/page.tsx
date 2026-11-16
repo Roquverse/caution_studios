@@ -71,17 +71,17 @@ export default function PricingPage() {
           </p>
         </div>
 
-        {/* Subscription Plan */}
+        {/* Subscription Plans */}
         <div className="mb-20">
-          <div className="text-xs font-bold uppercase tracking-wider text-text-muted mb-4 text-center">
-            Artist Membership Tier
+          <div className="text-xs font-bold uppercase tracking-wider text-text-muted mb-6 text-center">
+            Artist &amp; Producer Membership Tiers
           </div>
 
-          <div className="max-w-xl mx-auto">
-            {/* Plus */}
-            <div className="p-6 sm:p-8 rounded-2xl bg-surface-2 border border-accent-live ring-1 ring-accent-live flex flex-col justify-between relative shadow-xl">
-              <div className="absolute -top-2.5 right-6 px-2.5 py-0.5 rounded-full bg-accent border border-accent text-[10px] font-bold text-text uppercase tracking-wider">
-                Artist Plus
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto">
+            {/* Caution Plus */}
+            <div className="p-6 sm:p-8 rounded-2xl bg-surface-2 border border-border flex flex-col justify-between relative shadow-lg">
+              <div className="absolute -top-2.5 right-6 px-2.5 py-0.5 rounded-full bg-white/10 border border-white/15 text-[10px] font-bold text-text uppercase tracking-wider">
+                With Ads
               </div>
 
               <div>
@@ -93,29 +93,85 @@ export default function PricingPage() {
                   <span className="text-xs text-text-muted">/ month</span>
                 </div>
                 <p className="text-xs text-text-muted mt-2">
-                  Have access to 62 beats in a month with unlimited beat preview.
+                  Ad-supported studio access with 62 beats per month.
                 </p>
 
                 <ul className="mt-6 pt-5 border-t border-border space-y-2.5 text-xs text-text-muted">
                   <li className="flex items-center gap-2 text-text font-medium">
                     <Check className="h-4 w-4 text-accent-live" />
-                    <span>Access to 62 beats every month (2 beats daily)</span>
+                    <span>2 Free Daily Downloads (resets after 24 hours)</span>
                   </li>
                   <li className="flex items-center gap-2 text-text font-medium">
                     <Check className="h-4 w-4 text-accent-live" />
-                    <span>Unlimited beat preview streaming (100% clean &amp; untagged)</span>
+                    <span>+2 Bonus Downloads daily via 15s sponsored ads</span>
                   </li>
                   <li className="flex items-center gap-2">
                     <Check className="h-4 w-4 text-accent-live" />
-                    <span>Daily 2-beat download quota (resets after 24 hours)</span>
+                    <span>Access to 62 beats every month</span>
                   </li>
                   <li className="flex items-center gap-2">
                     <Check className="h-4 w-4 text-accent-live" />
-                    <span>15% discount on trackout stems and exclusive rights</span>
+                    <span>Lossless streaming with audio sponsor breaks</span>
                   </li>
                   <li className="flex items-center gap-2">
                     <Check className="h-4 w-4 text-accent-live" />
-                    <span>Priority A&amp;R playlist pitching recommendation</span>
+                    <span>Non-exclusive commercial release rights (YouTube, DSPs)</span>
+                  </li>
+                </ul>
+              </div>
+
+              <div className="pt-8">
+                <Link
+                  href="/subscriptions"
+                  className="w-full h-11 rounded-full bg-white/10 hover:bg-white/15 text-text font-semibold text-xs flex items-center justify-center border border-white/15 shadow-sm uppercase tracking-wider"
+                >
+                  Subscribe to Plus ({formatNaira(3000)}/mo)
+                </Link>
+              </div>
+            </div>
+
+            {/* Caution Pro */}
+            <div className="p-6 sm:p-8 rounded-2xl bg-surface-2 border border-accent-live ring-1 ring-accent-live flex flex-col justify-between relative shadow-2xl">
+              <div className="absolute -top-2.5 right-6 px-2.5 py-0.5 rounded-full bg-accent border border-accent text-[10px] font-bold text-text uppercase tracking-wider shadow-sm">
+                Recommended &bull; Studio Suite
+              </div>
+
+              <div>
+                <h3 className="text-xl font-bold text-text">Caution Pro</h3>
+                <div className="mt-3 flex items-baseline gap-1">
+                  <span className="text-3xl sm:text-4xl font-black font-mono text-text">
+                    {formatNaira(30000)}
+                  </span>
+                  <span className="text-xs text-text-muted">/ month</span>
+                </div>
+                <p className="text-xs text-text-muted mt-2">
+                  Unlimited downloads with zero ads &amp; in-browser Studio Suite enabled.
+                </p>
+
+                <ul className="mt-6 pt-5 border-t border-border space-y-2.5 text-xs text-text-muted">
+                  <li className="flex items-center gap-2 text-text font-medium">
+                    <Check className="h-4 w-4 text-accent-live" />
+                    <span><strong>Unlimited Downloads &bull; 100% Ad-Free</strong> (Zero limits)</span>
+                  </li>
+                  <li className="flex items-center gap-2 text-text font-medium">
+                    <Check className="h-4 w-4 text-accent-live" />
+                    <span><strong>Studio Page Enabled (/studio)</strong> &bull; Vocal recording suite</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Check className="h-4 w-4 text-accent-live" />
+                    <span>Full WAV Trackout Stems (.ZIP) for every beat</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Check className="h-4 w-4 text-accent-live" />
+                    <span>100% Royalty keeping on all commercial releases</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Check className="h-4 w-4 text-accent-live" />
+                    <span>Radio airplay, TV, cinema &amp; video game sync clearance</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Check className="h-4 w-4 text-accent-live" />
+                    <span>Priority A&amp;R pitching &amp; VIP Studio support</span>
                   </li>
                 </ul>
               </div>
@@ -125,7 +181,7 @@ export default function PricingPage() {
                   href="/subscriptions"
                   className="w-full h-11 rounded-full bg-accent hover:bg-[#135d56] text-text font-semibold text-xs flex items-center justify-center border border-accent shadow-sm uppercase tracking-wider"
                 >
-                  Subscribe to Plus for {formatNaira(3000)}/mo
+                  Subscribe to Pro ({formatNaira(30000)}/mo)
                 </Link>
               </div>
             </div>

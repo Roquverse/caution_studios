@@ -189,10 +189,10 @@ export const DailyDownloadLimitModal: React.FC<DailyDownloadLimitModalProps> = (
             <a
               href="/subscriptions"
               onClick={onClose}
-              className="py-2.5 px-4 rounded-full bg-white/10 hover:bg-white/15 text-gray-200 hover:text-white text-xs font-semibold transition-colors flex items-center gap-1.5"
+              className="py-2.5 px-4 rounded-full bg-[#04564f]/40 hover:bg-[#04564f] text-[#2dd4bf] border border-[#2dd4bf]/40 text-xs font-semibold transition-colors flex items-center gap-1.5 shadow-sm"
             >
               <Sparkles className="w-3 h-3 text-[#2dd4bf]" />
-              <span>Get Plus</span>
+              <span>Get Caution Pro (₦30,000)</span>
             </a>
           </div>
         </div>

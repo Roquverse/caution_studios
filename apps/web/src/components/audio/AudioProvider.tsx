@@ -86,7 +86,8 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [isCartOpen, setIsCartOpen] = useState<boolean>(false);
   const [likes, setLikes] = useState<string[]>(['beat-1', 'beat-2']);
 
-  const { isSubscribed, isLoggedIn } = useUserSubscription();
+  const { isSubscribed, isLoggedIn, plan } = useUserSubscription();
+  const isPro = plan === 'pro';
   const [showUpgradePrompt, setShowUpgradePrompt] = useState<boolean>(false);
   const [isSignUpModalOpen, setIsSignUpModalOpen] = useState<boolean>(false);
 
@@ -121,6 +122,15 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const nextAdTriggerRef = useRef<number>(2); // Spotify cadence: starts at 2 beats, then randomly 2 or 3 beats
 
   const triggerBeatDownload = (beat: Beat, onApproved?: () => void): boolean => {
+    // Pro members enjoy unlimited downloads with zero restrictions
+    if (isPro) {
+      recordBeatDownload(beat.id, beat.title);
+      if (onApproved) {
+        onApproved();
+      }
+      return true;
+    }
+
     if (!downloadState.canDownload) {
       pendingDownloadBeatRef.current = beat;
       setIsDownloadLimitModalOpen(true);
@@ -224,8 +234,8 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const play = (beat: Beat) => {
     if (beat.status === 'sold') return; // Cannot stream exclusive sold beat if locked
 
-    // Spotify-like audio ad: first 15 seconds unskippable, random trigger after playing 2 or more beats across all tiers
-    if (beatsPlayedSinceLastAd >= nextAdTriggerRef.current) {
+    // Spotify-like audio ad: first 15 seconds unskippable, triggers randomly after playing 2 or more beats (pro tier is 100% ad-free)
+    if (!isPro && beatsPlayedSinceLastAd >= nextAdTriggerRef.current) {
       setBeatsPlayedSinceLastAd(0);
       try { sessionStorage.setItem('caution:beats-played-since-ad', '0'); } catch (e) {}
       nextAdTriggerRef.current = Math.random() < 0.5 ? 2 : 3;

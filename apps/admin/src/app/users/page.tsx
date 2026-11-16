@@ -35,7 +35,7 @@ export interface UserProfile {
   bio?: string;
   roles: string[];
   primary_role?: string;
-  plan: 'free' | 'plus';
+  plan: 'free' | 'plus' | 'pro';
   email: string;
   created_at: string;
 }
@@ -44,7 +44,7 @@ export default function AdminUsersPage() {
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [planFilter, setPlanFilter] = useState<'all' | 'free' | 'plus'>('all');
+  const [planFilter, setPlanFilter] = useState<'all' | 'free' | 'plus' | 'pro'>('all');
   const [roleFilter, setRoleFilter] = useState<'all' | 'artist' | 'producer' | 'admin'>('all');
   const [updatingId, setUpdatingId] = useState<string | null>(null);
 
@@ -83,8 +83,7 @@ export default function AdminUsersPage() {
     }
   };
 
-  const handleTogglePlan = async (user: UserProfile) => {
-    const nextPlan = user.plan === 'plus' ? 'free' : 'plus';
+  const handleUpdatePlan = async (user: UserProfile, nextPlan: 'free' | 'plus' | 'pro') => {
     try {
       setUpdatingId(user.id);
       const { data: { session } } = await supabase.auth.getSession();
@@ -103,11 +102,8 @@ export default function AdminUsersPage() {
         setUsers(
           users.map((u) => (u.id === user.id ? { ...u, plan: nextPlan } : u))
         );
-        showToast(
-          nextPlan === 'plus'
-            ? `Caution Plus activated for ${user.display_name}`
-            : `Caution Plus deactivated for ${user.display_name}`
-        );
+        const planLabel = nextPlan === 'pro' ? 'Caution Pro' : nextPlan === 'plus' ? 'Caution Plus' : 'Free';
+        showToast(`Plan updated to ${planLabel} for ${user.display_name}`);
       } else {
         const err = await res.json();
         alert(err.error || 'Failed to update plan');
@@ -277,14 +273,17 @@ export default function AdminUsersPage() {
       u.email.toLowerCase().includes(search.toLowerCase()) ||
       effectiveRole.includes(search.toLowerCase());
 
-    const matchesPlan = planFilter === 'all' || u.plan === planFilter;
+    const matchesPlan =
+      planFilter === 'all' ||
+      (planFilter === 'free' ? !u.plan || u.plan === 'free' : u.plan === planFilter);
     const matchesRole = roleFilter === 'all' || effectiveRole === roleFilter;
 
     return matchesSearch && matchesPlan && matchesRole;
   });
 
+  const proCount = users.filter((u) => u.plan === 'pro').length;
   const plusCount = users.filter((u) => u.plan === 'plus').length;
-  const freeCount = users.filter((u) => u.plan === 'free').length;
+  const freeCount = users.filter((u) => !u.plan || u.plan === 'free').length;
   const producerCount = users.filter((u) => getEffectiveRole(u) === 'producer').length;
   const artistCount = users.filter((u) => getEffectiveRole(u) === 'artist').length;
   const adminCount = users.filter((u) => getEffectiveRole(u) === 'admin').length;
@@ -463,6 +462,17 @@ export default function AdminUsersPage() {
               </button>
               <button
                 type="button"
+                onClick={() => setPlanFilter('pro')}
+                className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
+                  planFilter === 'pro'
+                    ? 'bg-teal-500/20 text-teal-300 border border-teal-500/40 font-semibold'
+                    : 'text-zinc-400 hover:text-zinc-200'
+                }`}
+              >
+                Pro ({proCount})
+              </button>
+              <button
+                type="button"
                 onClick={() => setPlanFilter('plus')}
                 className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
                   planFilter === 'plus'
@@ -481,7 +491,7 @@ export default function AdminUsersPage() {
                     : 'text-zinc-400 hover:text-zinc-200'
                 }`}
               >
-                Inactive ({freeCount})
+                Free ({freeCount})
               </button>
             </div>
           </div>
@@ -520,6 +530,7 @@ export default function AdminUsersPage() {
                 ) : (
                   filtered.map((u) => {
                     const isPlus = u.plan === 'plus';
+                    const isPro = u.plan === 'pro';
                     const isUpdating = updatingId === u.id;
                     const effectiveRole = getEffectiveRole(u);
 
@@ -591,13 +602,17 @@ export default function AdminUsersPage() {
                         </td>
 
                         <td className="py-3 px-4">
-                          {isPlus ? (
+                          {isPro ? (
+                            <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-teal-300 bg-teal-500/15 px-2.5 py-0.5 rounded-full border border-teal-500/40 shadow-xs">
+                              <Crown className="h-3 w-3 text-teal-300" /> Caution Pro
+                            </span>
+                          ) : isPlus ? (
                             <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-[#2dd4bf] bg-[#2dd4bf]/10 px-2.5 py-0.5 rounded-full border border-[#2dd4bf]/30">
                               <Crown className="h-3 w-3" /> Caution Plus
                             </span>
                           ) : (
-                            <span className="inline-flex items-center gap-1 text-[11px] font-medium text-amber-300 bg-amber-500/10 px-2.5 py-0.5 rounded-full border border-amber-500/30">
-                              Inactive
+                            <span className="inline-flex items-center gap-1 text-[11px] font-medium text-zinc-400 bg-zinc-800/60 px-2.5 py-0.5 rounded-full border border-zinc-700/50">
+                              Free
                             </span>
                           )}
                         </td>
@@ -612,7 +627,7 @@ export default function AdminUsersPage() {
                             : 'N/A'}
                         </td>
 
-                        {/* Actions: Update Password + Subscription Toggle */}
+                        {/* Actions: Update Password + Plan Selector */}
                         <td className="py-3 px-4 text-right">
                           <div className="flex items-center justify-end gap-2">
                             {/* Update Password Button */}
@@ -626,28 +641,23 @@ export default function AdminUsersPage() {
                               <span>Password</span>
                             </button>
 
-                            {/* Plan Toggle Button */}
-                            <button
-                              type="button"
-                              disabled={isUpdating}
-                              onClick={() => handleTogglePlan(u)}
-                              className={`text-xs font-semibold px-3 py-1.5 rounded-md border transition-all cursor-pointer ${
-                                isPlus
-                                  ? 'bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border-zinc-700'
-                                  : 'bg-[#2dd4bf] hover:bg-[#20b8a4] text-zinc-950 border-none shadow-xs'
-                              }`}
-                            >
-                              {isUpdating ? (
-                                <div className="flex items-center gap-1.5">
-                                  <div className="h-3 w-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                                  <span>Updating...</span>
-                                </div>
-                              ) : isPlus ? (
-                                'Deactivate Plus'
-                              ) : (
-                                'Activate Plus'
-                              )}
-                            </button>
+                            {/* Plan Selection Dropdown */}
+                            <div className="relative inline-block">
+                              <select
+                                disabled={isUpdating}
+                                value={u.plan || 'free'}
+                                onChange={(e) =>
+                                  handleUpdatePlan(u, e.target.value as 'free' | 'plus' | 'pro')
+                                }
+                                className="bg-zinc-800 hover:bg-zinc-750 text-zinc-200 border border-zinc-700 text-xs font-medium rounded-md px-2.5 py-1.5 pr-7 cursor-pointer focus:outline-none focus:border-[#2dd4bf] appearance-none disabled:opacity-50"
+                                title="Change user subscription tier"
+                              >
+                                <option value="free">Plan: Free</option>
+                                <option value="plus">Plan: Caution Plus (₦3k)</option>
+                                <option value="pro">Plan: Caution Pro (₦30k)</option>
+                              </select>
+                              <ChevronDown className="h-3.5 w-3.5 text-zinc-400 absolute right-2 top-2 pointer-events-none" />
+                            </div>
                           </div>
                         </td>
                       </tr>

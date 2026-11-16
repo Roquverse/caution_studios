@@ -61,7 +61,7 @@ interface AdminStats {
     display_name: string;
     avatar_url?: string;
     roles: string[];
-    plan: 'free' | 'plus';
+    plan: 'free' | 'plus' | 'pro';
     email?: string;
     created_at: string;
   }>;
@@ -505,12 +505,14 @@ export default function AdminDashboardPage() {
                         </div>
                         <span
                           className={`inline-flex text-[10px] font-semibold px-2 py-0.5 rounded border ${
-                            user.plan === 'plus'
+                            user.plan === 'pro'
+                              ? 'bg-teal-500/20 text-teal-300 border-teal-500/40 shadow-xs'
+                              : user.plan === 'plus'
                               ? 'bg-[#2dd4bf]/15 text-[#2dd4bf] border-[#2dd4bf]/30'
                               : 'bg-zinc-800 text-zinc-300 border-zinc-700'
                           }`}
                         >
-                          {user.plan === 'plus' ? 'Caution Plus' : 'Inactive'}
+                          {user.plan === 'pro' ? 'Caution Pro' : user.plan === 'plus' ? 'Caution Plus' : 'Free'}
                         </span>
                       </div>
                     ))

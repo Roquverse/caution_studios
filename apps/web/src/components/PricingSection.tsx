@@ -12,37 +12,37 @@ interface PricingSectionProps {
 export const PricingSection: React.FC<PricingSectionProps> = ({ onSelectPlan }) => {
   const plans = [
     {
-      id: 'starter',
+      id: 'plus',
       name: 'Caution Plus',
       price: '₦3,000',
       period: '/ month',
-      description: 'Have access to 62 beats in a month with unlimited beat preview',
+      description: 'Ad-supported studio tier with 62 beats per month',
       isRecommended: false,
       features: [
         'Access to 62 beats in a month (2 beats daily)',
-        'Unlimited beat preview streaming',
-        'Daily 2-beat download quota (resets after 24 hours)',
+        'Up to 2 extra bonus downloads daily via 15s ads',
+        'Unlimited beat preview streaming with audio ads',
         'High quality MP3 audio downloads',
-        'Non-exclusive release rights',
-        'Community curator pitching support'
+        'Non-exclusive commercial release rights',
+        'Standard community & curator pitching support'
       ]
     },
     {
-      id: 'premium',
-      name: 'Premium Beat Plan',
+      id: 'pro',
+      name: 'Caution Pro',
       badge: 'Recommended',
-      price: '₦30,000+',
-      period: 'one-time',
-      description: 'For artists building a serious commercial catalog',
+      price: '₦30,000',
+      period: '/ month',
+      description: 'Unlimited downloads with zero ads & in-browser Studio Suite enabled',
       isRecommended: true,
       features: [
-        'High-Quality WAV + 320kbps MP3 Master',
-        'Full Trackout Stems included',
-        'Up to 500,000 monetized streams',
-        'Radio airplay & music video sync',
+        'Unlimited Beat Downloads (100% Ad-Free)',
+        'In-Browser Studio Recording Suite enabled (/studio)',
+        'Full Trackout WAV Stems (.ZIP) included',
         '100% Royalty keeping on your releases',
-        'Producer earns 20% royalties on song releases (optional)',
-        'Automated Content ID clearance'
+        'Radio airplay, TV, cinema & music video sync',
+        'Automated Content ID clearance',
+        'Priority A&R playlist pitching & VIP Studio support'
       ]
     },
     {

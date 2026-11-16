@@ -35,14 +35,20 @@ export async function POST(req: NextRequest) {
     const metadata = data.metadata || {};
     const supabase = getServiceRoleClient();
 
-    // 1. Handle Subscription Verification
-    if (metadata.type === 'subscription' || metadata.plan === 'plus') {
+    // 1. Handle Subscription Verification (Caution Plus @ 3k or Caution Pro @ 30k)
+    if (metadata.type === 'subscription' || metadata.plan === 'plus' || metadata.plan === 'pro') {
       const targetUserId = metadata.user_id;
+      const targetPlan =
+        metadata.plan === 'pro' ||
+        metadata.billing_cycle === 'pro' ||
+        (data.amount && Number(data.amount) >= 2500000)
+          ? 'pro'
+          : 'plus';
 
       if (targetUserId) {
         await supabase
           .from('profiles')
-          .update({ plan: 'plus' })
+          .update({ plan: targetPlan })
           .eq('id', targetUserId);
       }
 
@@ -54,7 +60,7 @@ export async function POST(req: NextRequest) {
         .maybeSingle();
 
       if (!existingOrder) {
-        const amountCents = data.amount || (metadata.billing_cycle === 'yearly' ? 3000000 : 300000);
+        const amountCents = data.amount || (targetPlan === 'pro' ? 3000000 : 300000);
         await supabase.from('orders').insert({
           buyer_id: targetUserId || null,
           status: 'paid',
@@ -71,8 +77,8 @@ export async function POST(req: NextRequest) {
         status: true,
         verified: true,
         type: 'subscription',
-        plan: 'plus',
-        billingCycle: metadata.billing_cycle || 'monthly',
+        plan: targetPlan,
+        billingCycle: targetPlan === 'pro' ? 'pro' : 'plus',
         reference
       });
     }

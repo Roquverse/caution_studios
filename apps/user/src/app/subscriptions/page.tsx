@@ -33,8 +33,7 @@ interface InvoiceRecord {
 
 export default function SubscriptionsPage() {
   const [profile, setProfile] = useState<UserProfileData | null>(null);
-  const [currentPlan, setCurrentPlan] = useState<'free' | 'plus'>('free');
-  const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('monthly');
+  const [currentPlan, setCurrentPlan] = useState<'free' | 'plus' | 'pro'>('free');
   const [isLoading, setIsLoading] = useState(false);
   const [notification, setNotification] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -53,14 +52,9 @@ export default function SubscriptionsPage() {
         }
         if (data.profile) {
           setProfile(data.profile);
-          setCurrentPlan(data.profile.plan === 'plus' ? 'plus' : 'free');
-          setCachedUserPlan(data.profile.plan === 'plus' ? 'plus' : 'free');
-        }
-        if (data.invoices && data.invoices.length > 0) {
-          const latest = data.invoices[0];
-          if (latest.amountNgn >= 20000) {
-            setBillingCycle('yearly');
-          }
+          const p = data.profile.plan === 'pro' ? 'pro' : data.profile.plan === 'plus' ? 'plus' : 'free';
+          setCurrentPlan(p);
+          setCachedUserPlan(p);
         }
       }
     } catch (err) {
@@ -104,7 +98,9 @@ export default function SubscriptionsPage() {
 
           if (data) {
             setProfile(data);
-            setCurrentPlan(data.plan === 'plus' ? 'plus' : 'free');
+            const p = data.plan === 'pro' ? 'pro' : data.plan === 'plus' ? 'plus' : 'free';
+            setCurrentPlan(p);
+            setCachedUserPlan(p);
           } else {
             const meta = session.user.user_metadata || {};
             setProfile({
@@ -116,6 +112,7 @@ export default function SubscriptionsPage() {
               bio: null
             });
             setCurrentPlan('free');
+            setCachedUserPlan('free');
           }
         }
 
@@ -144,10 +141,13 @@ export default function SubscriptionsPage() {
           .then((r) => r.json())
           .then(async (data) => {
             if (data.verified || data.status) {
-              setCurrentPlan('plus');
-              setCachedUserPlan('plus');
+              const targetPlan = data.plan === 'pro' ? 'pro' : 'plus';
+              setCurrentPlan(targetPlan);
+              setCachedUserPlan(targetPlan);
               await loadBillingInvoices(profile?.id);
-              setNotification('🎉 Payment verified via Paystack! Caution Plus membership is active.');
+              setNotification(
+                `🎉 Payment verified via Paystack! Caution ${targetPlan === 'pro' ? 'Pro' : 'Plus'} membership is active.`
+              );
               window.history.replaceState({}, document.title, window.location.pathname);
             }
           })
@@ -157,16 +157,15 @@ export default function SubscriptionsPage() {
     }
   }, []);
 
-  const handleSubscribe = async (cycle: 'monthly' | 'yearly') => {
+  const handleSubscribe = async (tier: 'plus' | 'pro') => {
     setIsLoading(true);
     setNotification(null);
-    setBillingCycle(cycle);
 
     try {
-      const amountNgn = cycle === 'yearly' ? 30000 : 3000;
+      const amountNgn = tier === 'pro' ? 30000 : 3000;
       const { data: { session } } = await supabase.auth.getSession();
       const userEmail = session?.user?.email || (profile as any)?.email || 'artist@cautionstudio.com';
-      const orderId = `sub_${Date.now()}`;
+      const orderId = `sub_${tier}_${Date.now()}`;
 
       const res = await fetch('/api/paystack/initialize', {
         method: 'POST',
@@ -178,8 +177,8 @@ export default function SubscriptionsPage() {
           callbackUrl: `${window.location.origin}/subscriptions`,
           metadata: {
             type: 'subscription',
-            plan: 'plus',
-            billing_cycle: cycle,
+            plan: tier,
+            billing_cycle: tier,
             user_id: profile?.id || session?.user?.id || null
           }
         })
@@ -198,11 +197,11 @@ export default function SubscriptionsPage() {
     } catch (err: any) {
       console.error('Plan update error:', err);
       if (profile?.id && profile.id !== 'demo-user') {
-        await supabase.from('profiles').update({ plan: 'plus' }).eq('id', profile.id);
+        await supabase.from('profiles').update({ plan: tier }).eq('id', profile.id);
       }
-      setCurrentPlan('plus');
-      setCachedUserPlan('plus');
-      setNotification(`Caution Plus (${cycle === 'yearly' ? '₦30,000 / year' : '₦3,000 / month'}) activated.`);
+      setCurrentPlan(tier);
+      setCachedUserPlan(tier);
+      setNotification(`Caution ${tier === 'pro' ? 'Pro' : 'Plus'} (₦${tier === 'pro' ? '30,000' : '3,000'} / month) activated.`);
       setTimeout(() => setNotification(null), 4000);
     } finally {
       setIsLoading(false);
@@ -210,6 +209,8 @@ export default function SubscriptionsPage() {
   };
 
   const isPlus = currentPlan === 'plus';
+  const isPro = currentPlan === 'pro';
+  const isSubscribed = isPlus || isPro;
 
   return (
     <UserShell activePath="/subscriptions">
@@ -245,13 +246,19 @@ export default function SubscriptionsPage() {
             </span>
             <div className="flex items-center gap-3">
               <h2 className="text-xl sm:text-2xl font-black text-white">
-                {isPlus
-                  ? `Caution Plus Tier (${billingCycle === 'yearly' ? 'Annual' : 'Monthly'})`
+                {isPro
+                  ? 'Caution Pro Tier'
+                  : isPlus
+                  ? 'Caution Plus Tier'
                   : 'Subscription Inactive'}
               </h2>
-              {isPlus ? (
-                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-[#04564f] text-[#2dd4bf] border border-[#2dd4bf]/30">
-                  ACTIVE
+              {isPro ? (
+                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-[#04564f] text-[#2dd4bf] border border-[#2dd4bf]/40 flex items-center gap-1 shadow-sm">
+                  <Sparkles className="h-3 w-3" /> ACTIVE PRO
+                </span>
+              ) : isPlus ? (
+                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-[#04564f]/60 text-[#2dd4bf] border border-[#2dd4bf]/30">
+                  ACTIVE PLUS
                 </span>
               ) : (
                 <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-amber-500/10 text-amber-300 border border-amber-500/30">
@@ -260,39 +267,49 @@ export default function SubscriptionsPage() {
               )}
             </div>
             <p className="text-xs text-gray-400 leading-relaxed max-w-xl">
-              {isPlus
-                ? `Your Caution Plus plan includes unlimited 24-bit lossless streaming, full WAV trackout stems (.ZIP) downloads, and commercial synchronization rights. ${
-                    billingCycle === 'yearly' ? 'Annual membership active (saves 20%).' : 'Renews monthly.'
-                  }`
-                : 'Caution Studio requires an active Caution Plus membership. Choose your preferred billing cycle below to unlock unlimited lossless streaming, full trackout stems (.ZIP), and commercial release clearance.'}
+              {isPro
+                ? 'Your Caution Pro plan includes unlimited beat downloads with zero ads, commercial synchronization rights, full WAV trackout stems (.ZIP), and unlocked access to the in-browser recording Studio Suite.'
+                : isPlus
+                ? 'Your Caution Plus plan includes 62 beats per month (2 daily free downloads + 2 ad bonus downloads) and commercial release rights. Upgrade to Caution Pro to unlock the in-browser Recording Studio and unlimited ad-free downloads.'
+                : 'Caution Studio requires an active membership. Choose Caution Plus (₦3,000/mo) or Caution Pro (₦30,000/mo) below to get full access, downloads, and commercial licensing.'}
             </p>
           </div>
 
           <div className="shrink-0 flex items-center gap-3">
-            {!isPlus ? (
+            {!isSubscribed ? (
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleSubscribe('plus')}
+                  disabled={isLoading}
+                  className="px-5 py-2.5 rounded-full bg-white/10 hover:bg-white/15 text-white text-xs font-bold transition-colors border border-white/10 cursor-pointer disabled:opacity-50"
+                >
+                  Get Plus (₦3,000)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleSubscribe('pro')}
+                  disabled={isLoading}
+                  className="px-5 py-2.5 rounded-full bg-[#04564f] hover:bg-[#03453f] text-[#2dd4bf] text-xs font-bold uppercase tracking-wider flex items-center gap-2 border border-[#2dd4bf]/30 transition-colors shadow-lg cursor-pointer disabled:opacity-50"
+                >
+                  <Sparkles className="h-4 w-4" />
+                  <span>Get Pro (₦30,000)</span>
+                </button>
+              </div>
+            ) : isPlus ? (
               <button
                 type="button"
-                onClick={() => handleSubscribe(billingCycle)}
+                onClick={() => handleSubscribe('pro')}
                 disabled={isLoading}
-                className="px-6 py-3 rounded-full bg-[#04564f] hover:bg-[#03453f] text-[#2dd4bf] text-xs font-bold uppercase tracking-wider flex items-center gap-2 border border-[#2dd4bf]/30 transition-colors shadow-lg cursor-pointer disabled:opacity-50"
-              >
-                <Sparkles className="h-4 w-4" />
-                <span>Activate Caution Plus</span>
-              </button>
-            ) : billingCycle === 'monthly' ? (
-              <button
-                type="button"
-                onClick={() => handleSubscribe('yearly')}
-                disabled={isLoading}
-                className="px-5 py-2.5 rounded-full bg-[#04564f]/40 hover:bg-[#04564f] text-[#2dd4bf] border border-[#2dd4bf]/40 text-xs font-semibold transition-colors cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
+                className="px-5 py-2.5 rounded-full bg-[#04564f] hover:bg-[#03453f] text-[#2dd4bf] border border-[#2dd4bf]/40 text-xs font-bold uppercase tracking-wider transition-colors cursor-pointer disabled:opacity-50 flex items-center gap-1.5 shadow-md"
               >
                 <Sparkles className="h-3.5 w-3.5" />
-                <span>Upgrade to Annual (Save 20%)</span>
+                <span>Upgrade to Pro (₦30,000)</span>
               </button>
             ) : (
               <div className="px-4 py-2 rounded-full bg-[#04564f]/40 border border-[#2dd4bf]/30 text-xs font-mono font-bold text-[#2dd4bf] flex items-center gap-1.5">
                 <CheckCircle2 className="h-4 w-4" />
-                <span>Annual Member Active</span>
+                <span>Pro Member Active</span>
               </div>
             )}
           </div>
@@ -300,47 +317,20 @@ export default function SubscriptionsPage() {
 
         {/* Pricing Plan Cards */}
         <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-sm font-bold uppercase tracking-wider font-mono text-white">
-                Available Membership Plans
-              </h3>
-              <p className="text-[11px] text-gray-500 font-mono mt-0.5">
-                Paid-only access with full studio rights & uncompressed stems
-              </p>
-            </div>
-            {/* Billing cycle pill toggle */}
-            <div className="flex items-center gap-1 p-1 rounded-full bg-[#121316] border border-white/10 text-xs">
-              <button
-                type="button"
-                onClick={() => setBillingCycle('monthly')}
-                className={`px-3 py-1 rounded-full font-semibold transition-colors cursor-pointer ${
-                  billingCycle === 'monthly'
-                    ? 'bg-[#04564f] text-[#2dd4bf]'
-                    : 'text-gray-400 hover:text-white'
-                }`}
-              >
-                Monthly
-              </button>
-              <button
-                type="button"
-                onClick={() => setBillingCycle('yearly')}
-                className={`px-3 py-1 rounded-full font-semibold transition-colors cursor-pointer ${
-                  billingCycle === 'yearly'
-                    ? 'bg-[#04564f] text-[#2dd4bf]'
-                    : 'text-gray-400 hover:text-white'
-                }`}
-              >
-                Yearly (Save 20%)
-              </button>
-            </div>
+          <div>
+            <h3 className="text-sm font-bold uppercase tracking-wider font-mono text-white">
+              Available Membership Plans
+            </h3>
+            <p className="text-[11px] text-gray-500 font-mono mt-0.5">
+              Select Caution Plus or Caution Pro. Instant activation via Paystack.
+            </p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            {/* Plan 1: Caution Plus (Monthly) */}
+            {/* Plan 1: Caution Plus */}
             <div
               className={`p-6 rounded-2xl bg-[#121316] border transition-all flex flex-col justify-between ${
-                isPlus && billingCycle === 'monthly'
+                isPlus
                   ? 'border-[#2dd4bf] shadow-xl ring-1 ring-[#2dd4bf]/40'
                   : 'border-white/[0.08] hover:border-white/20'
               }`}
@@ -349,15 +339,15 @@ export default function SubscriptionsPage() {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <Sparkles className="h-4 w-4 text-[#2dd4bf]" />
-                    <h4 className="text-lg font-black text-white">Caution Plus (Monthly)</h4>
+                    <h4 className="text-lg font-black text-white">Caution Plus</h4>
                   </div>
-                  {isPlus && billingCycle === 'monthly' ? (
+                  {isPlus ? (
                     <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-[#04564f] text-[#2dd4bf] border border-[#2dd4bf]/30">
                       CURRENT
                     </span>
                   ) : (
-                    <span className="px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-white/5 text-gray-400 border border-white/10">
-                      FLEXIBLE
+                    <span className="px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-white/5 text-gray-400 border border-white/10 uppercase">
+                      With Ads
                     </span>
                   )}
                 </div>
@@ -369,25 +359,29 @@ export default function SubscriptionsPage() {
                   <span className="text-xs text-gray-400"> / month</span>
                 </div>
                 <p className="text-xs text-gray-400 leading-relaxed">
-                  Full studio clearance for active recording artists, labels, and commercial creators. Billed monthly.
+                  Ad-supported full catalog access for independent recording artists and creators.
                 </p>
 
                 <div className="space-y-2.5 pt-2 text-xs text-gray-300">
                   <div className="flex items-center gap-2">
                     <Check className="h-4 w-4 text-[#2dd4bf] shrink-0" />
-                    <span>Unlimited 24-bit lossless FLAC streaming</span>
+                    <span><strong>2 Free Daily Downloads</strong> (resets every 24 hours)</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <Check className="h-4 w-4 text-[#2dd4bf] shrink-0" />
-                    <span>Full WAV trackout stems (.ZIP) download rights</span>
+                    <span><strong>+2 Bonus Downloads daily</strong> via 15s sponsored ads</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <Check className="h-4 w-4 text-[#2dd4bf] shrink-0" />
-                    <span>Commercial synchronization rights (YouTube, DSPs)</span>
+                    <span>Access to <strong>62 beats every month</strong></span>
                   </div>
                   <div className="flex items-center gap-2">
                     <Check className="h-4 w-4 text-[#2dd4bf] shrink-0" />
-                    <span>1 Free Basic Lease credit every month</span>
+                    <span>24-bit lossless streaming with audio ads</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Check className="h-4 w-4 text-[#2dd4bf] shrink-0" />
+                    <span>Non-exclusive commercial release rights (YouTube, DSPs)</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <Check className="h-4 w-4 text-[#2dd4bf] shrink-0" />
@@ -399,15 +393,15 @@ export default function SubscriptionsPage() {
               <div className="pt-6">
                 <button
                   type="button"
-                  onClick={() => handleSubscribe('monthly')}
-                  disabled={isLoading || (isPlus && billingCycle === 'monthly')}
+                  onClick={() => handleSubscribe('plus')}
+                  disabled={isLoading || isPlus}
                   className={`w-full py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-colors flex items-center justify-center gap-2 cursor-pointer ${
-                    isPlus && billingCycle === 'monthly'
+                    isPlus
                       ? 'bg-[#04564f] text-[#2dd4bf] cursor-default border border-[#2dd4bf]/30'
                       : 'bg-[#04564f] hover:bg-[#03453f] text-[#2dd4bf] border border-[#2dd4bf]/40 shadow-lg'
                   }`}
                 >
-                  {isPlus && billingCycle === 'monthly' ? (
+                  {isPlus ? (
                     <>
                       <Check className="h-3.5 w-3.5" />
                       <span>Active Plan</span>
@@ -415,32 +409,32 @@ export default function SubscriptionsPage() {
                   ) : (
                     <>
                       <Sparkles className="h-3.5 w-3.5" />
-                      <span>{isPlus ? 'Switch to Monthly (₦3,000)' : 'Subscribe Monthly (₦3,000)'}</span>
+                      <span>{isPro ? 'Switch to Plus (₦3,000)' : 'Subscribe to Plus (₦3,000)'}</span>
                     </>
                   )}
                 </button>
               </div>
             </div>
 
-            {/* Plan 2: Caution Plus (Annual) */}
+            {/* Plan 2: Caution Pro */}
             <div
               className={`p-6 rounded-2xl bg-[#121316] border relative overflow-hidden transition-all flex flex-col justify-between ${
-                isPlus && billingCycle === 'yearly'
+                isPro
                   ? 'border-[#2dd4bf] shadow-xl ring-1 ring-[#2dd4bf]/40'
                   : 'border-[#04564f]/70 hover:border-[#2dd4bf]/50'
               }`}
             >
               <div className="absolute top-0 right-0 px-4 py-1 bg-gradient-to-l from-[#04564f] to-[#2dd4bf] text-black text-[10px] font-black uppercase tracking-wider rounded-bl-xl shadow-md">
-                MOST POPULAR • SAVE 20%
+                RECOMMENDED • UNLIMITED &amp; STUDIO
               </div>
 
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <Sparkles className="h-4 w-4 text-[#2dd4bf]" />
-                    <h4 className="text-lg font-black text-white">Caution Plus (Annual)</h4>
+                    <Zap className="h-4 w-4 text-[#2dd4bf]" />
+                    <h4 className="text-lg font-black text-white">Caution Pro</h4>
                   </div>
-                  {isPlus && billingCycle === 'yearly' && (
+                  {isPro && (
                     <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-[#04564f] text-[#2dd4bf] border border-[#2dd4bf]/30">
                       CURRENT
                     </span>
@@ -452,40 +446,44 @@ export default function SubscriptionsPage() {
                       <span className="font-sans font-semibold text-2xl text-[#2dd4bf] mr-1 select-none">₦</span>
                       30,000
                     </span>
-                    <span className="text-xs text-gray-400"> / year</span>
+                    <span className="text-xs text-gray-400"> / month</span>
                   </div>
                   <span className="text-[11px] font-mono text-[#2dd4bf]">
-                    ₦2,500 / month • 2 Months Free
+                    Unlimited Downloads &bull; Studio Recording Suite
                   </span>
                 </div>
                 <p className="text-xs text-gray-400 leading-relaxed">
-                  Best value for active recording artists and producers. Includes full stem clearance and upfront lease credits.
+                  Ultimate tier for professional artists &amp; producers. Unlimited downloads with no ads and in-browser Studio Suite enabled.
                 </p>
 
                 <div className="space-y-2.5 pt-2 text-xs text-gray-300">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 text-white font-medium">
                     <Check className="h-4 w-4 text-[#2dd4bf] shrink-0" />
-                    <span>Unlimited 24-bit lossless FLAC streaming</span>
+                    <span><strong>Unlimited Downloads &bull; 100% Ad-Free</strong> (Zero limits)</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-white font-medium">
+                    <Check className="h-4 w-4 text-[#2dd4bf] shrink-0" />
+                    <span><strong>Studio Page Enabled (/studio)</strong> &bull; Record vocals &amp; export masters</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <Check className="h-4 w-4 text-[#2dd4bf] shrink-0" />
-                    <span>Full WAV trackout stems (.ZIP) download rights</span>
+                    <span>Full WAV Trackout Stems (.ZIP) for every beat</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <Check className="h-4 w-4 text-[#2dd4bf] shrink-0" />
-                    <span>Commercial synchronization rights (YouTube, DSPs)</span>
+                    <span>100% Royalty retention on commercial releases</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <Check className="h-4 w-4 text-[#2dd4bf] shrink-0" />
-                    <span>12 Free Basic Lease credits (1 per month)</span>
+                    <span>Radio airplay, TV, Cinema &amp; video game sync clearance</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <Check className="h-4 w-4 text-[#2dd4bf] shrink-0" />
-                    <span>Save ₦6,000 per year (2 months completely free)</span>
+                    <span>Automated Content ID clearance</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <Check className="h-4 w-4 text-[#2dd4bf] shrink-0" />
-                    <span>Priority Stem Mastering & VIP Studio Support</span>
+                    <span>Priority A&amp;R playlist pitching &amp; VIP Studio support</span>
                   </div>
                 </div>
               </div>
@@ -493,23 +491,23 @@ export default function SubscriptionsPage() {
               <div className="pt-6">
                 <button
                   type="button"
-                  onClick={() => handleSubscribe('yearly')}
-                  disabled={isLoading || (isPlus && billingCycle === 'yearly')}
+                  onClick={() => handleSubscribe('pro')}
+                  disabled={isLoading || isPro}
                   className={`w-full py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-colors flex items-center justify-center gap-2 cursor-pointer ${
-                    isPlus && billingCycle === 'yearly'
+                    isPro
                       ? 'bg-[#04564f] text-[#2dd4bf] cursor-default border border-[#2dd4bf]/30'
                       : 'bg-[#04564f] hover:bg-[#03453f] text-[#2dd4bf] border border-[#2dd4bf]/40 shadow-lg'
                   }`}
                 >
-                  {isPlus && billingCycle === 'yearly' ? (
+                  {isPro ? (
                     <>
                       <Check className="h-3.5 w-3.5" />
-                      <span>Active Plan</span>
+                      <span>Active Pro Plan</span>
                     </>
                   ) : (
                     <>
                       <Sparkles className="h-3.5 w-3.5" />
-                      <span>{isPlus ? 'Upgrade to Annual (Save 20%)' : 'Subscribe Annually (₦30,000)'}</span>
+                      <span>Subscribe to Caution Pro (₦30,000)</span>
                     </>
                   )}
                 </button>

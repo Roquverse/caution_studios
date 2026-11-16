@@ -266,7 +266,7 @@ export default function ProfilePage() {
             className="px-4 py-2 rounded-full bg-[#04564f] hover:bg-[#03453f] text-[#2dd4bf] text-xs font-bold tracking-wide uppercase flex items-center gap-2 border border-[#2dd4bf]/20 transition-colors"
           >
             <Sparkles className="h-3.5 w-3.5" />
-            <span>{profile?.plan === 'plus' ? 'Caution Plus' : 'Upgrade Plan'}</span>
+            <span>{profile?.plan === 'pro' ? 'Caution Pro' : profile?.plan === 'plus' ? 'Caution Plus' : 'Upgrade Plan'}</span>
           </Link>
         </div>
 
@@ -328,13 +328,17 @@ export default function ProfilePage() {
               <h2 className="text-xl sm:text-2xl font-black text-white truncate">
                 {displayName || (email ? email.split('@')[0] : 'User')}
               </h2>
-              {profile?.plan === 'plus' ? (
+              {profile?.plan === 'pro' ? (
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-teal-500/20 text-teal-300 border border-teal-500/40">
+                  Caution Pro Member
+                </span>
+              ) : profile?.plan === 'plus' ? (
                 <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-[#04564f] text-[#2dd4bf] border border-[#2dd4bf]/30">
                   Caution Plus Member
                 </span>
               ) : (
                 <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-amber-500/10 text-amber-300 border border-amber-500/30">
-                  Subscription Inactive
+                  Free Member
                 </span>
               )}
             </div>

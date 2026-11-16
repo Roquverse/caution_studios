@@ -68,7 +68,8 @@ interface UserPortalClientProps {
 }
 
 export function UserPortalClient({ initialBeats, initialProducers }: UserPortalClientProps) {
-  const { isSubscribed } = useUserSubscription();
+  const { isSubscribed, plan } = useUserSubscription();
+  const isPro = plan === 'pro';
   const effectiveBeats = initialBeats && initialBeats.length > 0 ? initialBeats : FALLBACK_BEATS;
   const effectiveProducers = initialProducers && initialProducers.length > 0 ? initialProducers : FALLBACK_PRODUCERS;
 
@@ -294,9 +295,13 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
         .then((res) => res.json())
         .then((data) => {
           if (data.verified || data.status) {
-            if (data.type === 'subscription' || data.plan === 'plus') {
+            const planTier = data.plan === 'pro' ? 'pro' : (data.plan === 'plus' || data.type === 'subscription' ? 'plus' : null);
+            if (planTier === 'pro') {
+              setCachedUserPlan('pro');
+              setRewardNotification('🎉 Caution Pro active! Unlimited ad-free downloads and in-browser Studio unlocked.');
+            } else if (planTier === 'plus') {
               setCachedUserPlan('plus');
-              setRewardNotification('🎉 Caution Plus subscription active! Unlimited downloads & features unlocked.');
+              setRewardNotification('🎉 Caution Plus active! Monthly beats & commercial clearance unlocked.');
             } else {
               setRewardNotification('🎉 Paystack beat license verified! Master files and commercial license unlocked.');
             }
@@ -570,8 +575,8 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
       } else {
         const isNewAudition = activeListenSessionRef.current !== track.id;
 
-        // Spotify-style audio ad check: triggers after playing 2 beats or more across all tiers
-        if (isNewAudition && songsPlayedSinceLastAd >= nextAdTriggerRef.current) {
+        // Spotify-style audio ad check: triggers after playing 2 beats or more (pro tier is 100% ad-free)
+        if (!isPro && isNewAudition && songsPlayedSinceLastAd >= nextAdTriggerRef.current) {
           setSongsPlayedSinceLastAd(0);
           try { sessionStorage.setItem('caution:beats-played-since-ad', '0'); } catch (e) {}
           nextAdTriggerRef.current = Math.random() < 0.5 ? 2 : 3;
@@ -623,8 +628,8 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
       }
       audioSynth.stop();
 
-      // Spotify-style audio ad: first 15 seconds unskippable, triggers randomly after playing 2 beats or more across all tiers
-      if (songsPlayedSinceLastAd >= nextAdTriggerRef.current) {
+      // Spotify-style audio ad: first 15 seconds unskippable, triggers randomly after playing 2 beats or more (pro is 100% ad-free)
+      if (!isPro && songsPlayedSinceLastAd >= nextAdTriggerRef.current) {
         // Reset count and choose a new random interval (2 or 3 songs) for the next ad
         setSongsPlayedSinceLastAd(0);
         try { sessionStorage.setItem('caution:beats-played-since-ad', '0'); } catch (e) {}
@@ -724,9 +729,9 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
       return;
     }
 
-    // Check daily download allowance (base 2 + ad bonus) across all tiers
+    // Check daily download allowance (base 2 + ad bonus); Caution Pro has unlimited downloads
     const quotaState = getDailyDownloadState();
-    if (!quotaState.canDownload) {
+    if (!isPro && !quotaState.canDownload) {
       pendingDownloadTrackRef.current = track;
       setIsDownloadLimitModalOpen(true);
       return;
@@ -2629,11 +2634,12 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
                 type="button"
                 onClick={() => {
                   setIsDownloadLimitModalOpen(false);
-                  setShowUpgradeModal(true);
+                  router.push('/subscriptions');
                 }}
                 className="w-full py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-white font-bold text-xs flex items-center justify-center gap-2 border border-white/10 transition-colors cursor-pointer"
               >
-                <span>Upgrade to Plus for Unlimited Downloads</span>
+                <Sparkles className="h-3.5 w-3.5 text-[#2dd4bf]" />
+                <span>Upgrade to Caution Pro for Unlimited Downloads &amp; Studio</span>
               </button>
             </div>
           </div>

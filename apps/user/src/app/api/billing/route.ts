@@ -112,11 +112,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: profileErr.message }, { status: 500 });
     }
 
-    // 2. If upgrading to Plus, insert real invoice record into orders table
+    // 2. If upgrading to Plus or Pro, insert real invoice record into orders table
     let newOrder = null;
-    if (plan === 'plus') {
-      const isYearly = billingCycle === 'yearly';
-      const amountCents = isYearly ? 3000000 : 300000; // ₦30,000 or ₦3,000 in kobo
+    if (plan === 'plus' || plan === 'pro') {
+      const isPro = plan === 'pro';
+      const amountCents = isPro ? 3000000 : 300000; // ₦30,000 for Caution Pro, ₦3,000 for Caution Plus
       const now = new Date();
       const invoiceRef = `CS-INV-${now.getFullYear()}-${String(Math.floor(1000 + Math.random() * 9000))}`;
 

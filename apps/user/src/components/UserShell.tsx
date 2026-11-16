@@ -65,6 +65,8 @@ export function UserShell({ children, activePath }: UserShellProps) {
       href: '/studio',
       icon: Mic,
       isButton: true,
+      badge: 'PRO',
+      badgeColor: 'bg-[#04564f] text-[#2dd4bf] border border-[#2dd4bf]/40',
       isActive: pathname.startsWith('/studio')
     },
     {

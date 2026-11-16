@@ -57,12 +57,19 @@ export async function POST(req: NextRequest) {
 
       const supabase = getServiceRoleClient();
 
-      // 1. Handle subscription upgrade
-      if (metadata.type === 'subscription' || metadata.plan === 'plus') {
+      // 1. Handle subscription upgrade (Caution Plus or Caution Pro)
+      if (metadata.type === 'subscription' || metadata.plan === 'plus' || metadata.plan === 'pro') {
+        const targetPlan =
+          metadata.plan === 'pro' ||
+          metadata.billing_cycle === 'pro' ||
+          (data.amount && Number(data.amount) >= 2500000)
+            ? 'pro'
+            : 'plus';
+
         if (metadata.user_id) {
           await supabase
             .from('profiles')
-            .update({ plan: 'plus' })
+            .update({ plan: targetPlan })
             .eq('id', metadata.user_id);
         }
       }

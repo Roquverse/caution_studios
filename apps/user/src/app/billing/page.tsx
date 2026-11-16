@@ -66,7 +66,9 @@ export default function UserBillingPage() {
     loadBillingData();
   }, []);
 
+  const isPro = profile?.plan === 'pro';
   const isPlus = profile?.plan === 'plus';
+  const isSubscribed = isPro || isPlus;
 
   return (
     <div className="min-h-screen bg-[#08090B] text-white flex flex-col font-sans selection:bg-[#04564f] selection:text-white pb-20">
@@ -159,20 +161,26 @@ export default function UserBillingPage() {
             <div className="flex items-center gap-2">
               <CreditCard className="h-4 w-4 text-[#2dd4bf]" />
               <h2 className="text-lg font-bold text-white">
-                {isPlus ? 'Caution Plus Tier' : 'Caution Plus Membership Required'}
+                {isPro
+                  ? 'Caution Pro Tier'
+                  : isPlus
+                  ? 'Caution Plus Tier'
+                  : 'Membership Required'}
               </h2>
             </div>
             <p className="text-xs text-gray-400 leading-relaxed max-w-lg">
-              {isPlus
-                ? 'Full studio license clearance enabled with unlimited 24-bit lossless streaming, full trackout WAV stems, and automated synchronization clearance.'
-                : 'Caution Studio is an exclusive paid platform. Activate your Caution Plus membership to unlock unlimited lossless streaming, full trackout WAV stems, and commercial licensing.'}
+              {isPro
+                ? 'Full Pro studio license clearance enabled with unlimited downloads, zero ads, in-browser Studio Suite enabled, and full trackout WAV stems.'
+                : isPlus
+                ? 'Caution Plus license clearance enabled with 62 beats per month, ad-supported downloads, and commercial synchronization rights.'
+                : 'Caution Studio is an exclusive paid platform. Activate your Caution Plus (₦3,000) or Caution Pro (₦30,000) membership to unlock full access.'}
             </p>
             <div className="pt-2 flex items-center gap-3 font-mono text-xs">
               <span className="text-xl font-black text-white">
-                {isPlus ? '₦3,000' : 'Inactive'}
+                {isPro ? '₦30,000' : isPlus ? '₦3,000' : 'Inactive'}
               </span>
               <span className="text-gray-400">
-                {isPlus ? '/ month (auto-renews via Paystack)' : '— Select a paid plan to activate'}
+                {isSubscribed ? '/ month (auto-renews via Paystack)' : '— Select a paid plan to activate'}
               </span>
             </div>
           </div>
@@ -183,7 +191,7 @@ export default function UserBillingPage() {
               className="px-5 py-2.5 rounded-full bg-[#04564f] hover:bg-[#03453f] text-[#2dd4bf] text-xs font-bold uppercase tracking-wider flex items-center gap-2 border border-[#2dd4bf]/30 transition-colors shadow-lg cursor-pointer"
             >
               <Sparkles className="h-3.5 w-3.5" />
-              <span>{isPlus ? 'Manage Membership' : 'Subscribe to Plus'}</span>
+              <span>{isSubscribed ? 'Manage Membership' : 'Subscribe Now'}</span>
             </Link>
           </div>
 

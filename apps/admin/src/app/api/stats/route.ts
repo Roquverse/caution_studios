@@ -69,6 +69,7 @@ export async function GET(req: NextRequest) {
 
     const usersCount = allProfiles ? allProfiles.length : 0;
     const plusCount = (allProfiles || []).filter((p) => p.plan === 'plus').length;
+    const proCount = (allProfiles || []).filter((p) => p.plan === 'pro').length;
 
     // Match auth emails for recent profiles
     let recentUsers = (allProfiles || []).slice(0, 6);
@@ -131,6 +132,8 @@ export async function GET(req: NextRequest) {
       tracksCount,
       usersCount,
       plusCount,
+      proCount,
+      subscribersCount: plusCount + proCount,
       totalPlays,
       ordersCount: allOrders ? allOrders.length : 0,
       totalRevenue,
