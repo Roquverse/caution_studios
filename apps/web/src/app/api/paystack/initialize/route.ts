@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { initializePaystack } from '../../../../lib/paystack';
 import { getServiceRoleClient } from '../../../../lib/supabaseClient';
 
+export const dynamic = 'force-dynamic';
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
@@ -14,13 +16,11 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Email validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
       return NextResponse.json({ error: 'Invalid email address' }, { status: 400 });
     }
 
-    // Number validation
     const parsedAmount = Number(amountNgn);
     if (isNaN(parsedAmount) || parsedAmount <= 0) {
       return NextResponse.json({ error: 'Invalid transaction amount' }, { status: 400 });
@@ -36,7 +36,6 @@ export async function POST(req: NextRequest) {
 
     let verifiedAmountNgn = parsedAmount;
     if (dbOrder && dbOrder.total_cents) {
-      // Check for price tampering
       const expectedAmountNgn = Math.round(dbOrder.total_cents / 100);
       if (Math.abs(expectedAmountNgn - parsedAmount) > 1) {
         return NextResponse.json(
@@ -54,6 +53,15 @@ export async function POST(req: NextRequest) {
       callbackUrl,
       metadata
     });
+
+    if (!res.status && res.configured === false) {
+      return NextResponse.json({
+        status: false,
+        configured: false,
+        error: 'PAYSTACK_NOT_CONFIGURED',
+        message: res.message
+      }, { status: 200 });
+    }
 
     return NextResponse.json(res);
   } catch (error: any) {

@@ -83,14 +83,19 @@ export default function SubscriptionsPage() {
     // Verify Paystack payment if redirected with reference
     if (typeof window !== 'undefined') {
       const urlParams = new URLSearchParams(window.location.search);
-      const paystackRef = urlParams.get('reference');
+      const paystackRef = urlParams.get('reference') || urlParams.get('trxref');
+      const orderId = urlParams.get('order_id');
 
       if (paystackRef) {
         setIsLoading(true);
         fetch('/api/paystack/verify', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ reference: paystackRef })
+          body: JSON.stringify({
+            reference: paystackRef,
+            order_id: orderId,
+            plan: orderId?.includes('pro') || paystackRef.includes('pro') ? 'pro' : 'plus'
+          })
         })
           .then((r) => r.json())
           .then((data) => {
@@ -138,12 +143,17 @@ export default function SubscriptionsPage() {
       });
 
       const data = await res.json();
-      if (data.data?.authorization_url) {
-        window.location.href = data.data.authorization_url;
+      const redirectUrl = data.data?.authorization_url || data.authorization_url;
+      if (
+        redirectUrl &&
+        (redirectUrl.startsWith('https://checkout.paystack.com') || redirectUrl.startsWith('http'))
+      ) {
+        window.location.href = redirectUrl;
         return;
-      } else if (data.authorization_url) {
-        window.location.href = data.authorization_url;
-        return;
+      }
+
+      if (!data.status || data.configured === false || data.error === 'PAYSTACK_NOT_CONFIGURED') {
+        throw new Error('Paystack secret key is not configured in Vercel environment variables.');
       } else {
         throw new Error(data.error || 'Failed to initialize Paystack');
       }

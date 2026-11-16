@@ -2806,8 +2806,13 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
 
                       const data = await res.json();
                       const redirectUrl = data.data?.authorization_url || data.authorization_url;
-                      if (redirectUrl) {
+                      if (redirectUrl && (redirectUrl.startsWith('https://checkout.paystack.com') || redirectUrl.startsWith('http'))) {
                         window.location.href = redirectUrl;
+                        return;
+                      }
+
+                      if (!data.status || data.configured === false || data.error === 'PAYSTACK_NOT_CONFIGURED') {
+                        throw new Error('Paystack API keys not configured in Vercel. Please add PAYSTACK_SECRET_KEY in Vercel settings.');
                       } else {
                         throw new Error(data.error || 'Failed to initialize payment gateway');
                       }

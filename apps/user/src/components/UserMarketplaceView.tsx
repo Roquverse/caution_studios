@@ -220,6 +220,68 @@ export function UserMarketplaceView({
 
       const orderId = `beat_${licenseModalTrack.id.slice(0, 8)}_${Date.now()}`;
 
+      // 1. If Paystack public key is configured on client, try seamless Paystack popup
+      const publicKey = process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY;
+      if (publicKey && publicKey.startsWith('pk_')) {
+        if (!(window as any).PaystackPop) {
+          await new Promise<void>((resolve) => {
+            const script = document.createElement('script');
+            script.src = 'https://js.paystack.co/v1/inline.js';
+            script.async = true;
+            script.onload = () => resolve();
+            script.onerror = () => resolve();
+            document.body.appendChild(script);
+          });
+        }
+
+        if ((window as any).PaystackPop) {
+          const handler = (window as any).PaystackPop.setup({
+            key: publicKey,
+            email: userEmail,
+            amount: priceNgn * 100,
+            currency: 'NGN',
+            ref: `CS_${orderId}_${Date.now()}`,
+            metadata: {
+              type: 'purchase',
+              order_id: orderId,
+              beat_id: licenseModalTrack.id,
+              beat_title: licenseModalTrack.title,
+              license: selectedTier,
+              priceNgn,
+              user_id: userId
+            },
+            callback: async (response: { reference: string }) => {
+              try {
+                const verifyRes = await fetch('/api/paystack/verify', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    reference: response.reference,
+                    order_id: orderId,
+                    userId
+                  })
+                });
+                const verifyData = await verifyRes.json();
+                if (verifyData.verified || verifyData.status) {
+                  setLicenseModalTrack(null);
+                  window.location.href = `/?type=purchase&beat_id=${licenseModalTrack.id}&reference=${response.reference}`;
+                }
+              } catch (err) {
+                console.error('Paystack popup verify error:', err);
+              } finally {
+                setIsCheckingOut(false);
+              }
+            },
+            onClose: () => {
+              setIsCheckingOut(false);
+            }
+          });
+          handler.openIframe();
+          return;
+        }
+      }
+
+      // 2. Server-side initialize for standard redirect
       const res = await fetch('/api/paystack/initialize', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -242,12 +304,18 @@ export function UserMarketplaceView({
 
       const data = await res.json();
       const redirectUrl = data.data?.authorization_url || data.authorization_url;
-      if (redirectUrl) {
+      if (redirectUrl && (redirectUrl.startsWith('https://checkout.paystack.com') || redirectUrl.startsWith('http'))) {
         window.location.href = redirectUrl;
         return;
-      } else {
-        throw new Error(data.error || 'Failed to initialize Paystack checkout gateway');
       }
+
+      if (!data.status || data.configured === false || data.error === 'PAYSTACK_NOT_CONFIGURED') {
+        setCheckoutError('Paystack API keys not configured in Vercel. Please add PAYSTACK_SECRET_KEY in Vercel Project Settings.');
+        setIsCheckingOut(false);
+        return;
+      }
+
+      throw new Error(data.error || 'Failed to initialize Paystack checkout gateway');
     } catch (err: any) {
       console.error('License checkout error:', err);
       setCheckoutError(err.message || 'Payment initialization failed. Please try again.');

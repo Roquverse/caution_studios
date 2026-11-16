@@ -12,7 +12,12 @@ import {
   Download,
   Shield,
   Zap,
-  ArrowRight
+  ArrowRight,
+  AlertTriangle,
+  Copy,
+  ExternalLink,
+  X,
+  Loader2
 } from 'lucide-react';
 import { supabase } from '../../lib/supabaseClient';
 import { UserProfileData } from '../../components/UserDropdown';
@@ -39,6 +44,12 @@ export default function SubscriptionsPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [invoices, setInvoices] = useState<InvoiceRecord[]>([]);
   const [loadingInvoices, setLoadingInvoices] = useState(true);
+
+  // Paystack configuration modal state
+  const [showConfigModal, setShowConfigModal] = useState(false);
+  const [pendingTier, setPendingTier] = useState<'plus' | 'pro'>('pro');
+  const [copiedKey, setCopiedKey] = useState<string | null>(null);
+  const [isSimulating, setIsSimulating] = useState(false);
 
   async function loadBillingInvoices(userId?: string) {
     try {
@@ -129,14 +140,19 @@ export default function SubscriptionsPage() {
     // Verify Paystack payment if redirected with reference
     if (typeof window !== 'undefined') {
       const urlParams = new URLSearchParams(window.location.search);
-      const paystackRef = urlParams.get('reference');
+      const paystackRef = urlParams.get('reference') || urlParams.get('trxref');
+      const orderId = urlParams.get('order_id');
 
       if (paystackRef) {
         setIsLoading(true);
         fetch('/api/paystack/verify', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ reference: paystackRef })
+          body: JSON.stringify({
+            reference: paystackRef,
+            order_id: orderId,
+            plan: orderId?.includes('pro') || paystackRef.includes('pro') ? 'pro' : 'plus'
+          })
         })
           .then((r) => r.json())
           .then(async (data) => {
@@ -144,7 +160,8 @@ export default function SubscriptionsPage() {
               const targetPlan = data.plan === 'pro' ? 'pro' : 'plus';
               setCurrentPlan(targetPlan);
               setCachedUserPlan(targetPlan);
-              await loadBillingInvoices(profile?.id);
+              const { data: { session } } = await supabase.auth.getSession();
+              await loadBillingInvoices(session?.user?.id || profile?.id);
               setNotification(
                 `🎉 Payment verified via Paystack! Caution ${targetPlan === 'pro' ? 'Pro' : 'Plus'} membership is active.`
               );
@@ -157,16 +174,124 @@ export default function SubscriptionsPage() {
     }
   }, []);
 
+  const copyToClipboard = (text: string, label: string) => {
+    if (navigator?.clipboard) {
+      navigator.clipboard.writeText(text);
+      setCopiedKey(label);
+      setTimeout(() => setCopiedKey(null), 2500);
+    }
+  };
+
+  const handleSimulatePayment = async () => {
+    setIsSimulating(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const userId = profile?.id || session?.user?.id;
+      const ref = `demo_ref_sub_${pendingTier}_${Date.now()}`;
+
+      const res = await fetch('/api/paystack/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          reference: ref,
+          order_id: `sub_${pendingTier}_${Date.now()}`,
+          plan: pendingTier,
+          userId,
+          email: session?.user?.email || (profile as any)?.email
+        })
+      });
+
+      const data = await res.json();
+      if (data.verified || data.status) {
+        setCurrentPlan(pendingTier);
+        setCachedUserPlan(pendingTier);
+        await loadBillingInvoices(userId || undefined);
+        setNotification(`🎉 Caution ${pendingTier === 'pro' ? 'Pro' : 'Plus'} membership activated! (Test simulation verified)`);
+        setShowConfigModal(false);
+      }
+    } catch (e: any) {
+      console.error('Simulation error:', e);
+    } finally {
+      setIsSimulating(false);
+      setIsLoading(false);
+    }
+  };
+
   const handleSubscribe = async (tier: 'plus' | 'pro') => {
     setIsLoading(true);
     setNotification(null);
+    setPendingTier(tier);
 
     try {
       const amountNgn = tier === 'pro' ? 30000 : 3000;
       const { data: { session } } = await supabase.auth.getSession();
       const userEmail = session?.user?.email || (profile as any)?.email || 'artist@cautionstudio.com';
+      const userId = profile?.id || session?.user?.id || null;
       const orderId = `sub_${tier}_${Date.now()}`;
 
+      // 1. If Paystack public key is configured on client, try seamless Paystack popup
+      const publicKey = process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY;
+      if (publicKey && publicKey.startsWith('pk_')) {
+        if (!(window as any).PaystackPop) {
+          await new Promise<void>((resolve) => {
+            const script = document.createElement('script');
+            script.src = 'https://js.paystack.co/v1/inline.js';
+            script.async = true;
+            script.onload = () => resolve();
+            script.onerror = () => resolve();
+            document.body.appendChild(script);
+          });
+        }
+
+        if ((window as any).PaystackPop) {
+          const handler = (window as any).PaystackPop.setup({
+            key: publicKey,
+            email: userEmail,
+            amount: amountNgn * 100,
+            currency: 'NGN',
+            ref: `CS_${orderId}_${Date.now()}`,
+            metadata: {
+              type: 'subscription',
+              plan: tier,
+              billing_cycle: tier,
+              user_id: userId
+            },
+            callback: async (response: { reference: string }) => {
+              setIsLoading(true);
+              try {
+                const verifyRes = await fetch('/api/paystack/verify', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    reference: response.reference,
+                    order_id: orderId,
+                    plan: tier,
+                    userId
+                  })
+                });
+                const verifyData = await verifyRes.json();
+                if (verifyData.verified || verifyData.status) {
+                  setCurrentPlan(tier);
+                  setCachedUserPlan(tier);
+                  await loadBillingInvoices(userId || undefined);
+                  setNotification(`🎉 Payment verified via Paystack! Caution ${tier === 'pro' ? 'Pro' : 'Plus'} membership is active.`);
+                }
+              } catch (err) {
+                console.error('Paystack popup verify error:', err);
+              } finally {
+                setIsLoading(false);
+              }
+            },
+            onClose: () => {
+              setIsLoading(false);
+            }
+          });
+          handler.openIframe();
+          return;
+        }
+      }
+
+      // 2. Initialize Paystack on server for standard checkout redirect
       const res = await fetch('/api/paystack/initialize', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -179,31 +304,34 @@ export default function SubscriptionsPage() {
             type: 'subscription',
             plan: tier,
             billing_cycle: tier,
-            user_id: profile?.id || session?.user?.id || null
+            user_id: userId
           }
         })
       });
 
       const data = await res.json();
-      if (data.data?.authorization_url) {
+
+      // If real Paystack authorization URL is returned
+      if (
+        data.data?.authorization_url &&
+        (data.data.authorization_url.startsWith('https://checkout.paystack.com') ||
+          data.data.authorization_url.startsWith('http'))
+      ) {
         window.location.href = data.data.authorization_url;
         return;
-      } else if (data.authorization_url) {
-        window.location.href = data.authorization_url;
+      }
+
+      // If server does not have PAYSTACK_SECRET_KEY configured
+      if (!data.status || data.configured === false || data.error === 'PAYSTACK_NOT_CONFIGURED') {
+        setShowConfigModal(true);
+        setIsLoading(false);
         return;
-      } else {
-        throw new Error(data.error || 'Failed to initialize Paystack');
       }
+
+      throw new Error(data.message || data.error || 'Failed to initialize Paystack checkout');
     } catch (err: any) {
-      console.error('Plan update error:', err);
-      if (profile?.id && profile.id !== 'demo-user') {
-        await supabase.from('profiles').update({ plan: tier }).eq('id', profile.id);
-      }
-      setCurrentPlan(tier);
-      setCachedUserPlan(tier);
-      setNotification(`Caution ${tier === 'pro' ? 'Pro' : 'Plus'} (₦${tier === 'pro' ? '30,000' : '3,000'} / month) activated.`);
-      setTimeout(() => setNotification(null), 4000);
-    } finally {
+      console.error('Subscription checkout error:', err);
+      setShowConfigModal(true);
       setIsLoading(false);
     }
   };
@@ -585,6 +713,121 @@ export default function SubscriptionsPage() {
           </div>
         </div>
       </div>
+
+      {/* Paystack Setup & Test Simulator Modal */}
+      {showConfigModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in">
+          <div className="relative w-full max-w-lg bg-[#0E1015] border border-white/10 rounded-2xl p-6 sm:p-7 shadow-2xl space-y-5 text-left">
+            <div className="flex items-start justify-between">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400">
+                  <CreditCard className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-white tracking-tight">
+                    Paystack Gateway Setup Required
+                  </h3>
+                  <p className="text-xs text-gray-400 mt-0.5 font-mono">
+                    Live payments require Paystack keys in Vercel
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowConfigModal(false)}
+                className="p-1 rounded-lg text-gray-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-200/90 leading-relaxed">
+              <span className="font-semibold text-amber-300">Why didn&apos;t Paystack open?</span> To process live debit cards and bank transfers, you must add your Paystack API keys to your project environment variables.
+            </div>
+
+            {/* Keys instructions */}
+            <div className="space-y-3">
+              <div className="text-xs font-semibold text-gray-300">
+                1. Add these 2 Environment Variables in Vercel:
+              </div>
+
+              {/* Secret Key */}
+              <div className="p-3 rounded-xl bg-zinc-900 border border-white/5 space-y-1">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-mono text-gray-400">Key 1 (Server Secret)</span>
+                  <button
+                    type="button"
+                    onClick={() => copyToClipboard('PAYSTACK_SECRET_KEY', 'secret')}
+                    className="inline-flex items-center gap-1 text-[10px] text-[#2dd4bf] hover:underline cursor-pointer"
+                  >
+                    <Copy className="h-3 w-3" />
+                    <span>{copiedKey === 'secret' ? 'Copied!' : 'Copy Name'}</span>
+                  </button>
+                </div>
+                <div className="font-mono text-xs text-white select-all">
+                  PAYSTACK_SECRET_KEY
+                </div>
+                <div className="text-[10px] text-gray-500 font-mono">
+                  Value: sk_live_... (or sk_test_... from Paystack Settings &rarr; API Keys)
+                </div>
+              </div>
+
+              {/* Public Key */}
+              <div className="p-3 rounded-xl bg-zinc-900 border border-white/5 space-y-1">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-mono text-gray-400">Key 2 (Client Public)</span>
+                  <button
+                    type="button"
+                    onClick={() => copyToClipboard('NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY', 'public')}
+                    className="inline-flex items-center gap-1 text-[10px] text-[#2dd4bf] hover:underline cursor-pointer"
+                  >
+                    <Copy className="h-3 w-3" />
+                    <span>{copiedKey === 'public' ? 'Copied!' : 'Copy Name'}</span>
+                  </button>
+                </div>
+                <div className="font-mono text-xs text-white select-all">
+                  NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY
+                </div>
+                <div className="text-[10px] text-gray-500 font-mono">
+                  Value: pk_live_... (or pk_test_... from Paystack Settings &rarr; API Keys)
+                </div>
+              </div>
+
+              <div className="text-[11px] text-gray-400 font-mono leading-relaxed pl-1">
+                &bull; In Vercel: Project &rarr; <strong>Settings</strong> &rarr; <strong>Environment Variables</strong> &rarr; Add &amp; Save &rarr; Redeploy.
+              </div>
+            </div>
+
+            {/* Test Simulation Button */}
+            <div className="pt-2 border-t border-white/10 space-y-2">
+              <div className="text-xs font-semibold text-gray-300">
+                2. Or test Caution {pendingTier === 'pro' ? 'Pro' : 'Plus'} right now:
+              </div>
+              <p className="text-[11px] text-gray-400">
+                You can activate Caution {pendingTier === 'pro' ? 'Pro (₦30,000)' : 'Plus (₦3,000)'} in test mode to verify all features and unlock the Studio immediately:
+              </p>
+              <button
+                type="button"
+                onClick={handleSimulatePayment}
+                disabled={isSimulating}
+                className="w-full py-3 rounded-xl bg-[#04564f] hover:bg-[#03453f] text-[#2dd4bf] border border-[#2dd4bf]/40 font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg transition-transform hover:scale-[1.01] cursor-pointer disabled:opacity-50"
+              >
+                {isSimulating ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span>Activating in Test Mode...</span>
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="h-4 w-4" />
+                    <span>Simulate Payment &amp; Activate Caution {pendingTier === 'pro' ? 'Pro' : 'Plus'}</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </UserShell>
   );
 }

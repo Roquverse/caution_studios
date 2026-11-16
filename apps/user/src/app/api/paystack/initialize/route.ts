@@ -33,10 +33,18 @@ export async function POST(req: NextRequest) {
       metadata
     });
 
+    if (!res.status && res.configured === false) {
+      return NextResponse.json({
+        status: false,
+        configured: false,
+        error: 'PAYSTACK_NOT_CONFIGURED',
+        message: res.message
+      }, { status: 200 });
+    }
+
     return NextResponse.json(res);
   } catch (error: any) {
     console.error('Paystack user initialization error:', error);
     return NextResponse.json({ error: error.message || 'Payment initialization failed' }, { status: 500 });
   }
 }
-
