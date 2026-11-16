@@ -28,16 +28,27 @@ export default function ForgotPasswordPage() {
       const origin = typeof window !== 'undefined' ? window.location.origin : 'https://auth.cautionstudioz.com';
       const redirectTo = `${origin}/reset-password`;
 
-      // Call custom reset API endpoint (sends Caution Studio branded email with 6-digit code & direct link)
-      const res = await fetch('/api/auth/forgot-password', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: cleanEmail })
+      // 1. Dispatch Supabase native password recovery email (delivers the 6-digit OTP code & link directly)
+      const { error: resetError } = await supabase.auth.resetPasswordForEmail(cleanEmail, {
+        redirectTo
       });
 
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || 'Failed to dispatch reset code. Please try again.');
+      if (resetError) {
+        console.warn('Supabase resetPasswordForEmail notice:', resetError.message);
+        if (resetError.status === 429 || resetError.message?.toLowerCase().includes('rate limit')) {
+          throw new Error('For security reasons, you can only request a password reset once every 60 seconds. Please check your inbox or wait a moment.');
+        }
+      }
+
+      // 2. Call custom reset API endpoint (for telemetry, admin alerts, and secondary SMTP/Resend dispatch)
+      try {
+        await fetch('/api/auth/forgot-password', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: cleanEmail, clientHandled: true })
+        });
+      } catch (apiErr) {
+        console.warn('Background forgot-password API notice:', apiErr);
       }
 
       setSubmitted(true);

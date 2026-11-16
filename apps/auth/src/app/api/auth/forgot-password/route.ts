@@ -8,6 +8,7 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const email = body.email ? String(body.email).toLowerCase().trim() : '';
+    const clientHandled = Boolean(body.clientHandled);
 
     if (!email || !email.includes('@')) {
       return NextResponse.json(
@@ -21,6 +22,18 @@ export async function POST(req: NextRequest) {
       req.headers.get('origin') ||
       'https://auth.cautionstudioz.com';
     const cleanOrigin = origin.replace(/\/$/, '');
+
+    // If client hasn't already triggered Supabase email and no external transport exists, ensure Supabase delivers it
+    const hasExternalTransport = Boolean(process.env.RESEND_API_KEY || (process.env.SMTP_HOST && process.env.SMTP_USER));
+    if (!clientHandled && !hasExternalTransport) {
+      try {
+        await supabase.auth.resetPasswordForEmail(email, {
+          redirectTo: `${cleanOrigin}/reset-password`
+        });
+      } catch (err: any) {
+        console.warn('Fallback server resetPasswordForEmail notice:', err?.message);
+      }
+    }
 
     // 1. Generate cryptographically signed recovery token and 6-digit OTP via Supabase Service Role Admin
     let otpCode = '';
