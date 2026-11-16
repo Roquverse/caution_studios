@@ -24,20 +24,40 @@ export const CartDrawer: React.FC = () => {
 
     try {
       const orderId = `ord_${Date.now()}`;
-      const res = await initializePaystack({
-        email: email || 'artist@cautionstudio.com',
-        amountNgn: subtotal,
-        orderId,
-        metadata: {
-          items: cart.map((i) => ({ beat_id: i.beat.id, license: i.licenseType }))
-        }
+      const checkoutEmail = email?.trim() || 'customer@cautionstudioz.com';
+
+      const res = await fetch('/api/paystack/initialize', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: checkoutEmail,
+          amountNgn: subtotal,
+          orderId,
+          callbackUrl: `${window.location.origin}/checkout/success`,
+          metadata: {
+            type: 'cart_purchase',
+            order_id: orderId,
+            items: cart.map((i) => ({
+              beat_id: i.beat.id,
+              title: i.beat.title,
+              license: i.licenseType,
+              price: i.priceCents
+            }))
+          }
+        })
       });
 
-      if (res.data?.authorization_url) {
-        window.location.href = res.data.authorization_url;
+      const data = await res.json();
+      if (data.data?.authorization_url) {
+        window.location.href = data.data.authorization_url;
+      } else if (data.authorization_url) {
+        window.location.href = data.authorization_url;
+      } else {
+        throw new Error(data.error || 'Failed to initialize payment');
       }
-    } catch (err) {
-      console.error(err);
+    } catch (err: any) {
+      console.error('Paystack checkout error:', err);
+      alert(err.message || 'Payment initialization failed. Please try again.');
       setIsProcessing(false);
     }
   };

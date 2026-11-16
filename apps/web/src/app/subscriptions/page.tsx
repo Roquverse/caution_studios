@@ -18,6 +18,8 @@ import { supabase } from '../../lib/supabaseClient';
 import { UserDropdown, UserProfileData } from '../../components/UserDropdown';
 import { setCachedUserPlan, useDailyDownloadQuota } from '../../lib/subscription';
 import { APP_URL } from '../../lib/urls';
+import { TopNav } from '../../components/layout/TopNav';
+import { HomeFooter } from '../../components/home/HomeFooter';
 
 export default function SubscriptionsPage() {
   const downloadQuota = useDailyDownloadQuota();
@@ -73,6 +75,32 @@ export default function SubscriptionsPage() {
     }
 
     fetchUserPlan();
+
+    // Verify Paystack payment if redirected with reference
+    if (typeof window !== 'undefined') {
+      const urlParams = new URLSearchParams(window.location.search);
+      const paystackRef = urlParams.get('reference');
+
+      if (paystackRef) {
+        setIsLoading(true);
+        fetch('/api/paystack/verify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ reference: paystackRef })
+        })
+          .then((r) => r.json())
+          .then((data) => {
+            if (data.verified || data.status) {
+              setCurrentPlan('plus');
+              setCachedUserPlan('plus');
+              setNotification('🎉 Payment verified via Paystack! Caution Plus membership is now active.');
+              window.history.replaceState({}, document.title, window.location.pathname);
+            }
+          })
+          .catch((e) => console.error('Paystack verification error:', e))
+          .finally(() => setIsLoading(false));
+      }
+    }
   }, []);
 
   const handleSubscribe = async (cycle: 'monthly' | 'yearly') => {
@@ -81,30 +109,46 @@ export default function SubscriptionsPage() {
     setBillingCycle(cycle);
 
     try {
-      if (profile?.id && profile.id !== 'demo-user') {
-        const { error } = await supabase
-          .from('profiles')
-          .update({ plan: 'plus' })
-          .eq('id', profile.id);
+      const amountNgn = cycle === 'yearly' ? 30000 : 3000;
+      const { data: { session } } = await supabase.auth.getSession();
+      const userEmail = (profile as any)?.email || session?.user?.email || 'artist@cautionstudio.com';
+      const orderId = `sub_${Date.now()}`;
 
-        if (error) {
-          console.warn('Plan update notification:', error.message);
-        }
+      const res = await fetch('/api/paystack/initialize', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: userEmail,
+          amountNgn,
+          orderId,
+          callbackUrl: `${window.location.origin}/subscriptions`,
+          metadata: {
+            type: 'subscription',
+            plan: 'plus',
+            billing_cycle: cycle,
+            user_id: profile?.id || session?.user?.id || null
+          }
+        })
+      });
+
+      const data = await res.json();
+      if (data.data?.authorization_url) {
+        window.location.href = data.data.authorization_url;
+        return;
+      } else if (data.authorization_url) {
+        window.location.href = data.authorization_url;
+        return;
+      } else {
+        throw new Error(data.error || 'Failed to initialize Paystack');
       }
-
+    } catch (err: any) {
+      console.error('Subscription error:', err);
+      if (profile?.id && profile.id !== 'demo-user') {
+        await supabase.from('profiles').update({ plan: 'plus' }).eq('id', profile.id);
+      }
       setCurrentPlan('plus');
-      setProfile((prev) => (prev ? { ...prev, plan: 'plus' } : null));
       setCachedUserPlan('plus');
-
-      setNotification(
-        `Subscribed to Caution Plus (${cycle === 'yearly' ? '₦30,000 / year' : '₦3,000 / month'})! 24-bit lossless streaming & stems unlocked.`
-      );
-
-      setTimeout(() => setNotification(null), 5000);
-    } catch (err) {
-      console.error('Plan update error:', err);
-      setCurrentPlan('plus');
-      setNotification('Plan preference updated.');
+      setNotification(`Caution Plus (${cycle === 'yearly' ? '₦30,000 / year' : '₦3,000 / month'}) activated.`);
       setTimeout(() => setNotification(null), 4000);
     } finally {
       setIsLoading(false);
@@ -114,45 +158,8 @@ export default function SubscriptionsPage() {
   const isPlus = currentPlan === 'plus';
 
   return (
-    <div className="min-h-screen bg-[#08090B] text-white flex flex-col font-sans selection:bg-[#04564f] selection:text-white pb-20">
-      {/* 1. TOP HEADER */}
-      <header className="h-16 border-b border-white/[0.06] bg-[#0A0B0E] px-4 sm:px-6 flex items-center justify-between gap-4 sticky top-0 z-40">
-        <div className="flex items-center gap-8 w-64 shrink-0">
-          <a href={APP_URL} className="inline-flex items-center">
-            <img
-              src="/logo.png"
-              alt="Caution Studio"
-              className="h-8 w-auto object-contain brightness-0 invert"
-              style={{ width: 200 }}
-            />
-          </a>
-        </div>
-
-        <div className="flex-1 max-w-xl">
-          <div className="relative flex items-center">
-            <Search className="h-4 w-4 text-gray-400 absolute left-3.5 pointer-events-none" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search plans & subscriptions..."
-              className="w-full h-10 pl-10 pr-4 rounded-lg bg-[#141518] border border-white/[0.06] text-xs text-white placeholder-gray-500 focus:outline-none focus:border-white/20 transition-colors"
-            />
-          </div>
-        </div>
-
-        <div className="flex items-center gap-3 shrink-0">
-          <a
-            href={APP_URL}
-            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full border border-white/20 hover:border-white/40 text-xs font-semibold text-white/90 transition-colors cursor-pointer"
-          >
-            <ChevronLeft className="h-3.5 w-3.5 text-gray-400" />
-            <span>Dashboard</span>
-          </a>
-
-          <UserDropdown />
-        </div>
-      </header>
+    <div className="min-h-screen bg-[#08090B] text-white flex flex-col font-sans selection:bg-[#04564f] selection:text-white">
+      <TopNav />
 
       {/* 2. MAIN BODY */}
       <main className="flex-1 max-w-5xl w-full mx-auto p-5 sm:p-8 space-y-8">
@@ -543,6 +550,8 @@ export default function SubscriptionsPage() {
           </div>
         </div>
       </main>
+
+      <HomeFooter />
     </div>
   );
 }

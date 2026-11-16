@@ -37,11 +37,15 @@ export async function initializePaystack(params: InitializePaystackParams): Prom
 
   if (!secretKey) {
     // Development / demo fallback
+    const fallbackUrl = params.callbackUrl
+      ? `${params.callbackUrl}${params.callbackUrl.includes('?') ? '&' : '?'}reference=demo_ref_${Date.now()}&order_id=${params.orderId}`
+      : `/checkout/success?reference=demo_ref_${Date.now()}&order_id=${params.orderId}`;
+
     return {
       status: true,
       message: 'Demo mode transaction initialized',
       data: {
-        authorization_url: `/checkout/success?reference=demo_ref_${Date.now()}&order_id=${params.orderId}`,
+        authorization_url: fallbackUrl,
         access_code: `demo_code_${Date.now()}`,
         reference: `caution_ref_${Date.now()}`
       }

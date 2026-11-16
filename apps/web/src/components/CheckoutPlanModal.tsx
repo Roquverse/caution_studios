@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { Modal, Button } from '@caution/ui';
-import { CheckCircle2, ShieldCheck, CreditCard, Sparkles, Lock, ArrowRight } from 'lucide-react';
+import { CheckCircle2, ShieldCheck, CreditCard, Sparkles, Lock, ArrowRight, Loader2 } from 'lucide-react';
 
 interface CheckoutPlanModalProps {
   isOpen: boolean;
@@ -19,6 +19,7 @@ export const CheckoutPlanModal: React.FC<CheckoutPlanModalProps> = ({
   plan
 }) => {
   const [isSuccess, setIsSuccess] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
   const [email, setEmail] = useState('');
   const [name, setName] = useState('');
 
@@ -27,18 +28,55 @@ export const CheckoutPlanModal: React.FC<CheckoutPlanModalProps> = ({
       setEmail('');
       setName('');
       setIsSuccess(false);
+      setIsProcessing(false);
     }
   }, [isOpen]);
 
   if (!plan) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsSuccess(true);
+    setIsProcessing(true);
+
+    try {
+      const numericPrice = Number(plan.price.replace(/[^\d]/g, '')) || 3000;
+      const orderId = `plan_${Date.now()}`;
+
+      const res = await fetch('/api/paystack/initialize', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: email.trim(),
+          amountNgn: numericPrice,
+          orderId,
+          callbackUrl: `${window.location.origin}/checkout/success?type=subscription`,
+          metadata: {
+            type: 'subscription',
+            plan_name: plan.name,
+            full_name: name.trim(),
+            order_id: orderId
+          }
+        })
+      });
+
+      const data = await res.json();
+      if (data.data?.authorization_url) {
+        window.location.href = data.data.authorization_url;
+      } else if (data.authorization_url) {
+        window.location.href = data.authorization_url;
+      } else {
+        throw new Error(data.error || 'Payment initialization failed');
+      }
+    } catch (err: any) {
+      console.error('Paystack plan checkout error:', err);
+      alert(err.message || 'Payment initialization failed. Please try again.');
+      setIsProcessing(false);
+    }
   };
 
   const handleReset = () => {
     setIsSuccess(false);
+    setIsProcessing(false);
     setEmail('');
     setName('');
     onClose();
@@ -48,7 +86,7 @@ export const CheckoutPlanModal: React.FC<CheckoutPlanModalProps> = ({
     <Modal
       isOpen={isOpen}
       onClose={handleReset}
-      title={isSuccess ? 'Payment Successful' : `Subscribe to ${plan.name}`}
+      title={isSuccess ? 'Payment Successful' : `Subscribe to ${plan.name} via Paystack`}
       maxWidth="md"
     >
       {isSuccess ? (
@@ -119,7 +157,7 @@ export const CheckoutPlanModal: React.FC<CheckoutPlanModalProps> = ({
           {/* Secure Payment Note */}
           <div className="flex items-center gap-2 text-xs text-gray-500 pt-1">
             <Lock className="h-3.5 w-3.5 text-emerald-600" />
-            <span>256-bit encrypted checkout via Paystack / Flutterwave</span>
+            <span>256-bit encrypted secure checkout via Paystack</span>
           </div>
 
           <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-100">
@@ -127,6 +165,7 @@ export const CheckoutPlanModal: React.FC<CheckoutPlanModalProps> = ({
               type="button"
               variant="ghost"
               onClick={onClose}
+              disabled={isProcessing}
               className="text-xs font-semibold text-gray-600"
             >
               Cancel
@@ -135,10 +174,20 @@ export const CheckoutPlanModal: React.FC<CheckoutPlanModalProps> = ({
               type="submit"
               variant="primary"
               pill
-              className="bg-[#04564f] hover:bg-[#03453f] text-white px-6 py-2.5 font-bold text-xs shadow-md flex items-center gap-1.5"
+              disabled={isProcessing}
+              className="bg-[#04564f] hover:bg-[#03453f] text-white px-6 py-2.5 font-bold text-xs shadow-md flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
             >
-              Pay {plan.price}
-              <ArrowRight className="h-3.5 w-3.5" />
+              {isProcessing ? (
+                <>
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  <span>Connecting to Paystack...</span>
+                </>
+              ) : (
+                <>
+                  <span>Pay {plan.price} with Paystack</span>
+                  <ArrowRight className="h-3.5 w-3.5" />
+                </>
+              )}
             </Button>
           </div>
         </form>

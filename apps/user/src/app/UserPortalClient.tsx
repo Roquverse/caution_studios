@@ -38,7 +38,7 @@ import { UserDropdown } from '../components/UserDropdown';
 import { UserAdModal } from '../components/UserAdModal';
 import { UserMarketplaceView, isFreeBeat } from '../components/UserMarketplaceView';
 import { UserRecordStudioModal } from '../components/UserRecordStudioModal';
-import { useUserSubscription } from '../lib/subscription';
+import { useUserSubscription, setCachedUserPlan } from '../lib/subscription';
 import { supabase } from '../lib/supabaseClient';
 import {
   useAppSettings,
@@ -118,6 +118,7 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
   const [paidBeatPurchaseTrack, setPaidBeatPurchaseTrack] = useState<TrackItem | null>(null);
   const [purchaseTier, setPurchaseTier] = useState<'premium' | 'exclusive'>('premium');
   const [purchaseComplete, setPurchaseComplete] = useState(false);
+  const [isPurchasingBeat, setIsPurchasingBeat] = useState(false);
   const downloadQuota = useDailyDownloadQuota();
   const router = useRouter();
 
@@ -275,6 +276,35 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
       }
     } catch (e) {
       console.warn('Error reading from localStorage:', e);
+    }
+  }, []);
+
+  // Verify Paystack redirect payments (subscriptions or beat licenses)
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const urlParams = new URLSearchParams(window.location.search);
+    const paystackRef = urlParams.get('reference');
+    if (paystackRef) {
+      fetch('/api/paystack/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reference: paystackRef })
+      })
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.verified || data.status) {
+            if (data.type === 'subscription' || data.plan === 'plus') {
+              setCachedUserPlan('plus');
+              setRewardNotification('🎉 Caution Plus subscription active! Unlimited downloads & features unlocked.');
+            } else {
+              setRewardNotification('🎉 Paystack beat license verified! Master files and commercial license unlocked.');
+            }
+            window.history.replaceState({}, document.title, window.location.pathname);
+          }
+        })
+        .catch((err) => {
+          console.error('Paystack verification error:', err);
+        });
     }
   }, []);
 
@@ -2711,19 +2741,66 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
               ) : (
                 <button
                   type="button"
-                  onClick={() => {
-                    setPurchaseComplete(true);
-                    setTimeout(() => {
-                      setPaidBeatPurchaseTrack(null);
-                      setPurchaseComplete(false);
-                      setRewardNotification('Beat license confirmed! Full audio unlocked.');
-                    }, 1800);
+                  disabled={isPurchasingBeat}
+                  onClick={async () => {
+                    if (!paidBeatPurchaseTrack) return;
+                    setIsPurchasingBeat(true);
+                    try {
+                      const sessionRes = await supabase.auth.getSession();
+                      const userEmail = sessionRes.data.session?.user?.email || 'buyer@cautionstudioz.com';
+                      const userId = sessionRes.data.session?.user?.id || null;
+
+                      const priceNgn =
+                        purchaseTier === 'premium'
+                          ? Math.max(15000, (paidBeatPurchaseTrack.priceNgn || 3000) * 3)
+                          : (paidBeatPurchaseTrack.exclusivePriceNgn || 50000);
+
+                      const orderId = `beat_${paidBeatPurchaseTrack.id.slice(0, 8)}_${Date.now()}`;
+
+                      const res = await fetch('/api/paystack/initialize', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                          email: userEmail,
+                          amountNgn: priceNgn,
+                          orderId,
+                          callbackUrl: `${window.location.origin}/?reference=${orderId}&type=purchase&beat_id=${paidBeatPurchaseTrack.id}`,
+                          metadata: {
+                            type: 'purchase',
+                            order_id: orderId,
+                            beat_id: paidBeatPurchaseTrack.id,
+                            beat_title: paidBeatPurchaseTrack.title,
+                            license: purchaseTier,
+                            priceNgn,
+                            user_id: userId
+                          }
+                        })
+                      });
+
+                      const data = await res.json();
+                      const redirectUrl = data.data?.authorization_url || data.authorization_url;
+                      if (redirectUrl) {
+                        window.location.href = redirectUrl;
+                      } else {
+                        throw new Error(data.error || 'Failed to initialize payment gateway');
+                      }
+                    } catch (err: any) {
+                      console.error('License checkout error:', err);
+                      setRewardNotification('Could not start Paystack checkout: ' + (err.message || 'Error'));
+                      setIsPurchasingBeat(false);
+                    }
                   }}
-                  className="w-full py-3 rounded-xl bg-[#E8B896] hover:bg-[#d8a886] text-black font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-transform hover:scale-[1.01] shadow-lg shadow-[#E8B896]/20 cursor-pointer"
+                  className="w-full py-3 rounded-xl bg-[#E8B896] hover:bg-[#d8a886] text-black font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-transform hover:scale-[1.01] shadow-lg shadow-[#E8B896]/20 cursor-pointer disabled:opacity-60"
                 >
                   <ShoppingBag className="h-4 w-4" />
                   <span>
-                    Confirm & License {purchaseTier === 'premium' ? `₦${Math.max(15000, (paidBeatPurchaseTrack.priceNgn || 3000) * 3).toLocaleString()}` : `₦${(paidBeatPurchaseTrack.exclusivePriceNgn || 50000).toLocaleString()}`}
+                    {isPurchasingBeat
+                      ? 'Connecting to Paystack...'
+                      : `Pay & License ${
+                          purchaseTier === 'premium'
+                            ? `₦${Math.max(15000, (paidBeatPurchaseTrack.priceNgn || 3000) * 3).toLocaleString()}`
+                            : `₦${(paidBeatPurchaseTrack.exclusivePriceNgn || 50000).toLocaleString()}`
+                        }`}
                   </span>
                 </button>
               )}

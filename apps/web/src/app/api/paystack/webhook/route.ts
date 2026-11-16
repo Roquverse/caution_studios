@@ -57,6 +57,16 @@ export async function POST(req: NextRequest) {
 
       const supabase = getServiceRoleClient();
 
+      // 1. Handle subscription upgrade
+      if (metadata.type === 'subscription' || metadata.plan === 'plus') {
+        if (metadata.user_id) {
+          await supabase
+            .from('profiles')
+            .update({ plan: 'plus' })
+            .eq('id', metadata.user_id);
+        }
+      }
+
       // Check order
       if (orderId) {
         await supabase

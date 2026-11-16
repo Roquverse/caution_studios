@@ -128,6 +128,33 @@ export default function SubscriptionsPage() {
     }
 
     initUserAndBilling();
+
+    // Verify Paystack payment if redirected with reference
+    if (typeof window !== 'undefined') {
+      const urlParams = new URLSearchParams(window.location.search);
+      const paystackRef = urlParams.get('reference');
+
+      if (paystackRef) {
+        setIsLoading(true);
+        fetch('/api/paystack/verify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ reference: paystackRef })
+        })
+          .then((r) => r.json())
+          .then(async (data) => {
+            if (data.verified || data.status) {
+              setCurrentPlan('plus');
+              setCachedUserPlan('plus');
+              await loadBillingInvoices(profile?.id);
+              setNotification('🎉 Payment verified via Paystack! Caution Plus membership is active.');
+              window.history.replaceState({}, document.title, window.location.pathname);
+            }
+          })
+          .catch((e) => console.error('Paystack verification error:', e))
+          .finally(() => setIsLoading(false));
+      }
+    }
   }, []);
 
   const handleSubscribe = async (cycle: 'monthly' | 'yearly') => {
@@ -136,33 +163,39 @@ export default function SubscriptionsPage() {
     setBillingCycle(cycle);
 
     try {
-      const res = await fetch('/api/billing', {
+      const amountNgn = cycle === 'yearly' ? 30000 : 3000;
+      const { data: { session } } = await supabase.auth.getSession();
+      const userEmail = session?.user?.email || (profile as any)?.email || 'artist@cautionstudio.com';
+      const orderId = `sub_${Date.now()}`;
+
+      const res = await fetch('/api/paystack/initialize', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          userId: profile?.id,
-          plan: 'plus',
-          billingCycle: cycle
+          email: userEmail,
+          amountNgn,
+          orderId,
+          callbackUrl: `${window.location.origin}/subscriptions`,
+          metadata: {
+            type: 'subscription',
+            plan: 'plus',
+            billing_cycle: cycle,
+            user_id: profile?.id || session?.user?.id || null
+          }
         })
       });
 
-      if (res.ok) {
-        setCurrentPlan('plus');
-        setProfile((prev) => (prev ? { ...prev, plan: 'plus' } : null));
-        setCachedUserPlan('plus');
-
-        // Instantly reload invoices from real database records
-        await loadBillingInvoices(profile?.id);
-
-        setNotification(
-          `Subscribed to Caution Plus (${cycle === 'yearly' ? '₦30,000 / year' : '₦3,000 / month'})! Real invoice issued in database.`
-        );
+      const data = await res.json();
+      if (data.data?.authorization_url) {
+        window.location.href = data.data.authorization_url;
+        return;
+      } else if (data.authorization_url) {
+        window.location.href = data.authorization_url;
+        return;
       } else {
-        throw new Error('Failed to update plan on database');
+        throw new Error(data.error || 'Failed to initialize Paystack');
       }
-
-      setTimeout(() => setNotification(null), 5000);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Plan update error:', err);
       if (profile?.id && profile.id !== 'demo-user') {
         await supabase.from('profiles').update({ plan: 'plus' }).eq('id', profile.id);

@@ -121,12 +121,12 @@ export default function PricingPage() {
               </div>
 
               <div className="pt-8">
-                <a
-                  href={APP_URL}
+                <Link
+                  href="/subscriptions"
                   className="w-full h-11 rounded-full bg-accent hover:bg-[#135d56] text-text font-semibold text-xs flex items-center justify-center border border-accent shadow-sm uppercase tracking-wider"
                 >
                   Subscribe to Plus for {formatNaira(3000)}/mo
-                </a>
+                </Link>
               </div>
             </div>
           </div>

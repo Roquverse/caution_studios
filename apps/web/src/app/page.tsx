@@ -132,7 +132,11 @@ export default function LandingPage() {
   };
 
   const handleSelectPlan = (planName?: string, price?: string) => {
-    window.location.href = APP_URL;
+    if (planName && price) {
+      setSelectedPlan({ name: planName, price });
+    } else {
+      window.location.href = '/subscriptions';
+    }
   };
 
   return (
@@ -199,6 +203,13 @@ export default function LandingPage() {
       )}
       <CartDrawer />
       <NowPlayingPanel />
+
+      {/* Paystack Subscription & Plan Checkout Modal */}
+      <CheckoutPlanModal
+        isOpen={Boolean(selectedPlan)}
+        onClose={() => setSelectedPlan(null)}
+        plan={selectedPlan}
+      />
 
       {/* Caution Soundstage Modal */}
       <SoundstageModal

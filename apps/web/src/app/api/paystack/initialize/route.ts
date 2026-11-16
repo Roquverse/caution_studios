@@ -5,7 +5,7 @@ import { getServiceRoleClient } from '../../../../lib/supabaseClient';
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { email, amountNgn, orderId, metadata } = body;
+    const { email, amountNgn, orderId, metadata, callbackUrl } = body;
 
     if (!email || !amountNgn || !orderId) {
       return NextResponse.json(
@@ -51,6 +51,7 @@ export async function POST(req: NextRequest) {
       email: email.trim().toLowerCase(),
       amountNgn: verifiedAmountNgn,
       orderId,
+      callbackUrl,
       metadata
     });
 
