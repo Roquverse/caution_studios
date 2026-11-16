@@ -719,7 +719,7 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
     bonusUsed?: boolean;
   } | null>(null);
 
-  const handleDownload = (track: TrackItem, e?: React.MouseEvent) => {
+  const handleDownload = async (track: TrackItem, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
     if (!track) return;
 
@@ -749,30 +749,58 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
     });
 
     try {
-      const safeTitle = (track.title || 'track').replace(/[^a-zA-Z0-9_\-\s]/g, '').trim();
-      const safeArtist = (track.artist || 'Caution Studio').replace(/[^a-zA-Z0-9_\-\s]/g, '').trim();
-      const filename = `${safeTitle} - ${safeArtist}.wav`;
+      const safeTitle = (track.title || 'track').replace(/[/\\?%*:|"<>#]/g, '').trim();
+      const safeArtist = (track.artist || 'Caution Studio').replace(/[/\\?%*:|"<>#]/g, '').trim();
 
-      // Build direct CDN download URL to bypass Vercel Fast limits completely
-      const r2Cdn = process.env.NEXT_PUBLIC_R2_PUBLIC_URL?.replace(/\/$/, '') || 'https://media.cautionstudioz.com';
-      let targetUrl = track.audioUrl || track.masterUrl || track.previewCleanUrl || '';
-      if (targetUrl) {
-        if (targetUrl.includes('/api/media/')) {
-          const pathPart = targetUrl.split('/api/media/')[1]?.split('?')[0];
-          targetUrl = `${r2Cdn}/${pathPart}`;
-        }
-        const sep = targetUrl.includes('?') ? '&' : '?';
-        targetUrl = `${targetUrl}${sep}download=1&filename=${encodeURIComponent(filename)}`;
+      // Detect correct file extension from audio source (mp3, wav, etc.)
+      const sourceUrl = track.audioUrl || track.masterUrl || track.previewCleanUrl || '';
+      const extMatch = sourceUrl.match(/\.(mp3|wav|flac|aac|m4a|zip)(\?.*)?$/i);
+      const ext = extMatch ? extMatch[1].toLowerCase() : (sourceUrl.includes('.wav') ? 'wav' : 'mp3');
+      const filename = `${safeTitle} - ${safeArtist}.${ext}`;
+
+      // Extract raw R2 key so we route through /api/media with proper ResponseContentDisposition
+      let mediaKey = '';
+      if (sourceUrl.includes('media.cautionstudioz.com/')) {
+        mediaKey = sourceUrl.split('media.cautionstudioz.com/')[1]?.split('?')[0];
+      } else if (sourceUrl.includes('/api/media/')) {
+        mediaKey = sourceUrl.split('/api/media/')[1]?.split('?')[0];
+      } else if (sourceUrl.startsWith('http')) {
+        mediaKey = sourceUrl.split('?')[0].replace(/^https?:\/\/[^/]+\//, '');
       } else {
-        targetUrl = `${r2Cdn}/masters/${track.id}.wav?download=1&filename=${encodeURIComponent(filename)}`;
+        mediaKey = sourceUrl || `masters/${track.id}.${ext}`;
       }
 
-      const link = document.createElement('a');
-      link.href = targetUrl;
-      link.download = filename;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+      const downloadEndpoint = `/api/media/${mediaKey}?download=1&filename=${encodeURIComponent(filename)}`;
+
+      // 1. Try client-side Blob download first (guarantees exact filename on desktop and mobile)
+      let blobSucceeded = false;
+      try {
+        const response = await fetch(downloadEndpoint);
+        if (response.ok) {
+          const blob = await response.blob();
+          const blobUrl = window.URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          link.href = blobUrl;
+          link.download = filename;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          setTimeout(() => window.URL.revokeObjectURL(blobUrl), 30000);
+          blobSucceeded = true;
+        }
+      } catch (blobErr) {
+        console.warn('Direct blob download failed, falling back to presigned stream:', blobErr);
+      }
+
+      // 2. Fallback: Direct click to /api/media which sends R2 presigned URL with ResponseContentDisposition
+      if (!blobSucceeded) {
+        const link = document.createElement('a');
+        link.href = downloadEndpoint;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      }
     } catch (err) {
       console.error('Download trigger error:', err);
     } finally {

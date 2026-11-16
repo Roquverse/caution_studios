@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getFromR2 } from '../../../../lib/r2Server';
+import { getFromR2, getPresignedDownloadUrl } from '../../../../lib/r2Server';
 
 export async function GET(
   req: NextRequest,
@@ -17,10 +17,24 @@ export async function GET(
       return NextResponse.json({ error: 'Invalid path' }, { status: 400 });
     }
 
+    const isDownload = req.nextUrl.searchParams.get('download') === '1' || req.nextUrl.searchParams.get('download') === 'true';
+    const customFilename = req.nextUrl.searchParams.get('filename') || cleanKey.split('/').pop() || 'caution-audio.mp3';
+
+    // If downloading, generate a presigned R2 URL with ResponseContentDisposition
+    // so Cloudflare R2 serves the exact header: Content-Disposition: attachment; filename="[Title] - [Producer].mp3"
+    if (isDownload) {
+      try {
+        const presignedDownloadUrl = await getPresignedDownloadUrl(cleanKey, customFilename);
+        return NextResponse.redirect(presignedDownloadUrl, { status: 307 });
+      } catch (presignErr) {
+        console.warn('Presigned download URL generation failed, falling back:', presignErr);
+      }
+    }
+
     // If an R2 public CDN / custom domain is configured, redirect directly to Cloudflare
     // to bypass Vercel Fast Origin Transfer completely (0 Vercel bandwidth used).
     const publicR2 = process.env.NEXT_PUBLIC_R2_PUBLIC_URL || process.env.R2_PUBLIC_URL || 'https://media.cautionstudioz.com';
-    if (publicR2) {
+    if (publicR2 && !isDownload) {
       const targetCdnUrl = `${publicR2.replace(/\/$/, '')}/${cleanKey}`;
       return NextResponse.redirect(targetCdnUrl, { status: 307 });
     }
@@ -42,9 +56,6 @@ export async function GET(
       else if (cleanKey.endsWith('.jpg') || cleanKey.endsWith('.jpeg')) contentType = 'image/jpeg';
       else contentType = 'application/octet-stream';
     }
-
-    const isDownload = req.nextUrl.searchParams.get('download') === '1' || req.nextUrl.searchParams.get('download') === 'true';
-    const customFilename = req.nextUrl.searchParams.get('filename') || cleanKey.split('/').pop() || 'caution-audio.mp3';
 
     const responseHeaders: Record<string, string> = {
       'Content-Type': contentType,

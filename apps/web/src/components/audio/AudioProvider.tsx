@@ -410,16 +410,56 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             pendingDownloadBeatRef.current = null;
             recordBeatDownload(beatToDownload.id, beatToDownload.title);
 
-            // Initiate browser file download directly from Cloudflare R2 CDN (aligns with Vercel Fast limits)
-            const r2Cdn = process.env.NEXT_PUBLIC_R2_PUBLIC_URL?.replace(/\/$/, '') || 'https://media.cautionstudioz.com';
-            const audioKey = beatToDownload.preview_clean_key || beatToDownload.audio_url || beatToDownload.master_wav_key || `masters/${beatToDownload.id}.wav`;
-            const downloadUrl = audioKey.startsWith('http') ? audioKey : `${r2Cdn}/${audioKey}`;
-            const link = document.createElement('a');
-            link.href = downloadUrl;
-            link.download = `${beatToDownload.title || 'beat'} - Caution Studio.wav`;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
+            // Initiate browser file download with clean [Title] - [Producer].[ext] filename
+            const producerName = beatToDownload.producer?.display_name || beatToDownload.producer?.handle || 'Caution Studio';
+            const safeTitle = (beatToDownload.title || 'beat').replace(/[/\\?%*:|"<>#]/g, '').trim();
+            const safeArtist = producerName.replace(/[/\\?%*:|"<>#]/g, '').trim();
+
+            const audioKey = beatToDownload.preview_clean_key || beatToDownload.audio_url || beatToDownload.master_wav_key || `masters/${beatToDownload.id}.mp3`;
+            const extMatch = audioKey.match(/\.(mp3|wav|flac|aac|m4a|zip)(\?.*)?$/i);
+            const ext = extMatch ? extMatch[1].toLowerCase() : (audioKey.includes('.wav') ? 'wav' : 'mp3');
+            const filename = `${safeTitle} - ${safeArtist}.${ext}`;
+
+            let cleanKey = audioKey;
+            if (cleanKey.includes('media.cautionstudioz.com/')) {
+              cleanKey = cleanKey.split('media.cautionstudioz.com/')[1]?.split('?')[0];
+            } else if (cleanKey.includes('/api/media/')) {
+              cleanKey = cleanKey.split('/api/media/')[1]?.split('?')[0];
+            } else if (cleanKey.startsWith('http')) {
+              cleanKey = cleanKey.split('?')[0].replace(/^https?:\/\/[^/]+\//, '');
+            }
+
+            const downloadEndpoint = `/api/media/${cleanKey}?download=1&filename=${encodeURIComponent(filename)}`;
+
+            (async () => {
+              let blobSuccess = false;
+              try {
+                const response = await fetch(downloadEndpoint);
+                if (response.ok) {
+                  const blob = await response.blob();
+                  const blobUrl = window.URL.createObjectURL(blob);
+                  const link = document.createElement('a');
+                  link.href = blobUrl;
+                  link.download = filename;
+                  document.body.appendChild(link);
+                  link.click();
+                  document.body.removeChild(link);
+                  setTimeout(() => window.URL.revokeObjectURL(blobUrl), 30000);
+                  blobSuccess = true;
+                }
+              } catch (e) {
+                console.warn('Blob fetch failed, falling back to anchor:', e);
+              }
+
+              if (!blobSuccess) {
+                const link = document.createElement('a');
+                link.href = downloadEndpoint;
+                link.download = filename;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+              }
+            })();
           }
           // 2. If ad was triggered by playing music:
           else if (pendingBeatRef.current) {

@@ -41,3 +41,16 @@ export async function getPresignedUploadUrl(key: string, contentType?: string, e
   });
   return await getSignedUrl(r2, command, { expiresIn });
 }
+
+export async function getPresignedDownloadUrl(key: string, filename?: string, expiresIn = 3600): Promise<string> {
+  const safeFilename = (filename || key.split('/').pop() || 'caution-beat.mp3')
+    .replace(/[/\\?%*:|"<>#]/g, '')
+    .trim();
+
+  const command = new GetObjectCommand({
+    Bucket: R2_BUCKET,
+    Key: key,
+    ResponseContentDisposition: `attachment; filename="${safeFilename}"; filename*=UTF-8''${encodeURIComponent(safeFilename)}"`
+  });
+  return await getSignedUrl(r2, command, { expiresIn });
+}
