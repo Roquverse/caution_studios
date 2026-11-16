@@ -285,7 +285,8 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const urlParams = new URLSearchParams(window.location.search);
-    const paystackRef = urlParams.get('reference');
+    const allRefs = urlParams.getAll('reference');
+    const paystackRef = allRefs.find((r) => r.startsWith('CS_')) || allRefs[allRefs.length - 1] || urlParams.get('trxref') || urlParams.get('reference');
     if (paystackRef) {
       fetch('/api/paystack/verify', {
         method: 'POST',
@@ -303,7 +304,8 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
               setCachedUserPlan('plus');
               setRewardNotification('🎉 Caution Plus active! Monthly beats & commercial clearance unlocked.');
             } else {
-              setRewardNotification('🎉 Paystack beat license verified! Master files and commercial license unlocked.');
+              const beatName = data.beatTitle ? `"${data.beatTitle}"` : 'beat';
+              setRewardNotification(`🎉 Payment verified via Paystack! Commercial license & master stems for ${beatName} unlocked.`);
             }
             window.history.replaceState({}, document.title, window.location.pathname);
           }
@@ -2752,7 +2754,7 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
                   <span className="text-[11px] text-gray-400">Unlimited Streams · Sole Master Rights · Retired from Store</span>
                 </div>
                 <span className="text-sm font-black text-purple-400">
-                  ₦{(paidBeatPurchaseTrack.exclusivePriceNgn || 50000).toLocaleString()}
+                  ₦{(paidBeatPurchaseTrack.exclusivePriceNgn || 200000).toLocaleString()}
                 </span>
               </div>
             </div>
@@ -2776,9 +2778,9 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
                       const userId = sessionRes.data.session?.user?.id || null;
 
                       const priceNgn =
-                        purchaseTier === 'premium'
-                          ? Math.max(15000, (paidBeatPurchaseTrack.priceNgn || 3000) * 3)
-                          : (paidBeatPurchaseTrack.exclusivePriceNgn || 50000);
+                        purchaseTier === 'exclusive'
+                          ? (paidBeatPurchaseTrack.exclusivePriceNgn || 200000)
+                          : Math.max(15000, (paidBeatPurchaseTrack.priceNgn || 3000) * 3);
 
                       const orderId = `beat_${paidBeatPurchaseTrack.id.slice(0, 8)}_${Date.now()}`;
 
@@ -2789,7 +2791,7 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
                           email: userEmail,
                           amountNgn: priceNgn,
                           orderId,
-                          callbackUrl: `${window.location.origin}/?reference=${orderId}&type=purchase&beat_id=${paidBeatPurchaseTrack.id}`,
+                          callbackUrl: `${window.location.origin}/?type=purchase&beat_id=${paidBeatPurchaseTrack.id}`,
                           metadata: {
                             type: 'purchase',
                             order_id: orderId,

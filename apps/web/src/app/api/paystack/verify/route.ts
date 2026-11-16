@@ -85,16 +85,66 @@ export async function POST(req: NextRequest) {
 
     // 2. Handle Cart or Beat License Purchase Verification
     const orderId = metadata.order_id;
-    const items = metadata.items || [];
+    const targetUserId = metadata.user_id || null;
+    const items = (metadata.items && metadata.items.length > 0)
+      ? metadata.items
+      : metadata.beat_id
+      ? [{
+          beat_id: metadata.beat_id,
+          title: metadata.beat_title,
+          license: metadata.license || 'premium',
+          price: metadata.priceNgn || 15000
+        }]
+      : [];
+
+    let recordedOrderId = orderId;
 
     if (orderId) {
-      await supabase
+      const { data: updatedOrder } = await supabase
         .from('orders')
         .update({
           status: 'paid',
           paystack_reference: reference
         })
-        .eq('id', orderId);
+        .eq('id', orderId)
+        .select('id')
+        .maybeSingle();
+
+      if (updatedOrder) {
+        recordedOrderId = updatedOrder.id;
+      }
+    }
+
+    if (!recordedOrderId) {
+      const { data: existingByRef } = await supabase
+        .from('orders')
+        .select('id')
+        .eq('paystack_reference', reference)
+        .maybeSingle();
+
+      if (existingByRef) {
+        recordedOrderId = existingByRef.id;
+      } else {
+        const amountCents = data.amount || (metadata.priceNgn ? Number(metadata.priceNgn) * 100 : 1500000);
+        const { data: newOrder } = await supabase
+          .from('orders')
+          .insert({
+            buyer_id: targetUserId,
+            status: 'paid',
+            subtotal_cents: amountCents,
+            credit_cents: 0,
+            tax_cents: 0,
+            total_cents: amountCents,
+            paystack_reference: reference,
+            created_at: new Date().toISOString()
+          })
+          .select('id')
+          .maybeSingle();
+
+        if (newOrder) {
+          recordedOrderId = newOrder.id;
+        }
+      }
     }
 
     for (const item of items) {
@@ -106,6 +156,9 @@ export async function POST(req: NextRequest) {
         } catch (e) {
           console.warn('Could not acquire exclusive lock via RPC:', e);
         }
+        try {
+          await supabase.from('beats').update({ status: 'sold' }).eq('id', item.beat_id);
+        } catch (e) {}
       }
 
       if (item.beat_id) {

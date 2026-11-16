@@ -3,6 +3,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { TrackItem } from '../types/tracks';
 import { TrackRow } from '@caution/ui';
+import { supabase } from '../lib/supabaseClient';
 import {
   Search,
   SlidersHorizontal,
@@ -27,7 +28,8 @@ import {
   CheckCircle2,
   Mic,
   Gift,
-  Lock
+  Lock,
+  Loader2
 } from 'lucide-react';
 
 export function isFreeBeat(track?: TrackItem | null): boolean {
@@ -127,6 +129,8 @@ export function UserMarketplaceView({
   const [licenseModalTrack, setLicenseModalTrack] = useState<TrackItem | null>(null);
   const [selectedTier, setSelectedTier] = useState<'premium' | 'exclusive'>('premium');
   const [purchaseSuccess, setPurchaseSuccess] = useState(false);
+  const [isCheckingOut, setIsCheckingOut] = useState(false);
+  const [checkoutError, setCheckoutError] = useState<string | null>(null);
 
   // Close open dropdown on outside click
   useEffect(() => {
@@ -199,12 +203,56 @@ export function UserMarketplaceView({
     });
   }, [tracks, selectedSection, searchQuery, selectedGenre, selectedBpmRange, sortBy]);
 
-  const handleCheckout = () => {
-    setPurchaseSuccess(true);
-    setTimeout(() => {
-      setPurchaseSuccess(false);
-      setLicenseModalTrack(null);
-    }, 2500);
+  const handleCheckout = async () => {
+    if (!licenseModalTrack) return;
+    setIsCheckingOut(true);
+    setCheckoutError(null);
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const userEmail = session?.user?.email || 'buyer@cautionstudioz.com';
+      const userId = session?.user?.id || null;
+
+      const priceNgn =
+        selectedTier === 'exclusive'
+          ? (licenseModalTrack.exclusivePriceNgn || 200000)
+          : Math.max(15000, (licenseModalTrack.priceNgn || 3000) * 3);
+
+      const orderId = `beat_${licenseModalTrack.id.slice(0, 8)}_${Date.now()}`;
+
+      const res = await fetch('/api/paystack/initialize', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: userEmail,
+          amountNgn: priceNgn,
+          orderId,
+          callbackUrl: `${window.location.origin}/?type=purchase&beat_id=${licenseModalTrack.id}`,
+          metadata: {
+            type: 'purchase',
+            order_id: orderId,
+            beat_id: licenseModalTrack.id,
+            beat_title: licenseModalTrack.title,
+            license: selectedTier,
+            priceNgn,
+            user_id: userId
+          }
+        })
+      });
+
+      const data = await res.json();
+      const redirectUrl = data.data?.authorization_url || data.authorization_url;
+      if (redirectUrl) {
+        window.location.href = redirectUrl;
+        return;
+      } else {
+        throw new Error(data.error || 'Failed to initialize Paystack checkout gateway');
+      }
+    } catch (err: any) {
+      console.error('License checkout error:', err);
+      setCheckoutError(err.message || 'Payment initialization failed. Please try again.');
+      setIsCheckingOut(false);
+    }
   };
 
   return (
@@ -711,7 +759,7 @@ export function UserMarketplaceView({
                     <span className="text-[11px] text-gray-400">Unlimited Streams · Sole Master Rights · Retired from Store</span>
                   </div>
                   <span className="text-sm font-black text-purple-400">
-                    ₦{(licenseModalTrack.exclusivePriceNgn || 50000).toLocaleString()}
+                    ₦{(licenseModalTrack.exclusivePriceNgn || 200000).toLocaleString()}
                   </span>
                 </div>
               </div>
@@ -734,22 +782,37 @@ export function UserMarketplaceView({
             </div>
 
             {/* Submit Action */}
-            <div className="mt-5">
+            <div className="mt-5 space-y-2">
+              {checkoutError && (
+                <div className="p-2.5 rounded-lg bg-red-500/10 border border-red-500/30 text-red-300 text-xs text-center font-medium">
+                  {checkoutError}
+                </div>
+              )}
               {purchaseSuccess ? (
-                <div className="w-full py-3 rounded-xl bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 text-xs font-bold text-center flex items-center justify-center gap-2">
+                <div className="w-full py-3.5 rounded-xl bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 text-xs font-bold text-center flex items-center justify-center gap-2">
                   <CheckCircle2 className="h-4 w-4" />
                   <span>License Initialized! Producer notified & files ready.</span>
                 </div>
               ) : (
                 <button
                   type="button"
+                  disabled={isCheckingOut}
                   onClick={handleCheckout}
-                  className="w-full py-3 rounded-xl bg-[#E8B896] hover:bg-[#d8a886] text-black font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-transform hover:scale-[1.01] shadow-lg shadow-[#E8B896]/20 cursor-pointer"
+                  className="w-full py-3.5 rounded-xl bg-[#E8B896] hover:bg-[#d8a886] text-black font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-transform hover:scale-[1.01] shadow-lg shadow-[#E8B896]/20 cursor-pointer disabled:opacity-60"
                 >
-                  <ShoppingBag className="h-4 w-4" />
-                  <span>
-                    Confirm & License {selectedTier === 'exclusive' ? `₦${(licenseModalTrack.exclusivePriceNgn || 50000).toLocaleString()}` : `₦${Math.max(15000, (licenseModalTrack.priceNgn || 3000) * 3).toLocaleString()}`}
-                  </span>
+                  {isCheckingOut ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin text-black" />
+                      <span>Connecting to Paystack...</span>
+                    </>
+                  ) : (
+                    <>
+                      <ShoppingBag className="h-4 w-4" />
+                      <span>
+                        Confirm & License {selectedTier === 'exclusive' ? `₦${(licenseModalTrack.exclusivePriceNgn || 200000).toLocaleString()}` : `₦${Math.max(15000, (licenseModalTrack.priceNgn || 3000) * 3).toLocaleString()}`}
+                      </span>
+                    </>
+                  )}
                 </button>
               )}
             </div>
