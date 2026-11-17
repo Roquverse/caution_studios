@@ -586,17 +586,17 @@ export function UserMarketplaceView({
                     )
                   }
                   subtitleOverride={
-                    <span className="inline-flex items-center gap-1 max-w-full truncate">
-                      <span className="truncate">{row.artist}</span>
-                      <ShieldCheck className="h-3 w-3 text-teal-400 inline shrink-0" />
-                      <span className="hidden sm:inline shrink-0">• {row.genre || 'Afrobeats'}</span>
-                      {row.bpm && <span className="hidden md:inline shrink-0">• {row.bpm} BPM</span>}
+                    <span className="block truncate">
+                      <span className="text-gray-300 font-medium">{row.artist}</span>
+                      <ShieldCheck className="h-3 w-3 text-teal-400 inline -mt-0.5 mx-1 shrink-0" />
+                      <span className="text-gray-400">• {row.genre || 'Afrobeats'}</span>
+                      {row.bpm && <span className="hidden md:inline text-gray-500"> • {row.bpm} BPM</span>}
                     </span>
                   }
                   rightSlot={
                     <div className="flex items-center gap-1.5 sm:gap-2">
                       {/* License Tier Pill / Dropdown */}
-                      <div className="hidden lg:flex items-center">
+                      <div className="hidden xl:flex items-center">
                         {isFree ? (
                           <span className="px-2.5 py-1 rounded-md text-[11px] font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 flex items-center gap-1.5 shadow-sm shadow-emerald-500/10">
                             <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />

@@ -150,7 +150,7 @@ export const TrackRow = <T extends PlayableTrackItem = PlayableTrackItem>({
       )}
     >
       {/* Left: Artwork, Play button, Title, Artist • Genre */}
-      <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0 sm:max-w-[340px]">
+      <div className="flex items-center gap-2.5 sm:gap-3 flex-1 min-w-0">
         {/* Thumbnail Cover */}
         <div
           className={cn(
@@ -198,7 +198,7 @@ export const TrackRow = <T extends PlayableTrackItem = PlayableTrackItem>({
         </button>
 
         {/* Title & Artist • Genre */}
-        <div className="flex flex-col min-w-0 pr-1 sm:pr-2">
+        <div className="flex flex-col flex-1 min-w-0 pr-1 sm:pr-2">
           <div className="flex items-center gap-1.5 min-w-0">
             <span
               className={cn(
@@ -226,62 +226,68 @@ export const TrackRow = <T extends PlayableTrackItem = PlayableTrackItem>({
       </div>
 
       {/* Middle: Live Waveform + Time or Duration */}
-      <div className="flex-1 max-w-md hidden sm:flex items-center gap-3 px-2">
+      <div className="hidden sm:flex items-center justify-end gap-2.5 px-2 shrink-0">
         {isCurrent ? (
-          <div className="w-full flex items-center gap-3">
-            <Volume2
-              className={cn(
-                'h-3.5 w-3.5 shrink-0',
-                isDark ? 'text-[#2dd4bf]' : 'text-[#04564f]',
-                isTrackPlaying && 'animate-pulse'
-              )}
-            />
+          <>
+            {/* Full waveform on wide screens (xl+ when rightSlot exists, lg+ otherwise) */}
             <div
-              onClick={handleWaveformClick}
-              className="flex-1 flex items-center gap-[2.5px] h-6 cursor-pointer"
-              title="Click to seek"
+              className={cn(
+                'items-center gap-2.5 w-48 xl:w-64 overflow-hidden',
+                rightSlot ? 'hidden xl:flex' : 'hidden lg:flex'
+              )}
             >
-              {waveformBars.map((bar, bIdx) => {
-                const barRatio = bIdx / waveformBars.length;
-                const isFilled = barRatio <= progressRatio;
-                return (
-                  <div
-                    key={bIdx}
-                    style={{ height: `${Math.max(15, bar * 100)}%` }}
-                    className={cn(
-                      'w-[2.5px] rounded-full transition-colors',
-                      isFilled
-                        ? isDark
-                          ? 'bg-[#2dd4bf]'
-                          : 'bg-[#04564f]'
-                        : isDark
-                        ? 'bg-white/20 hover:bg-white/35'
-                        : 'bg-gray-200 hover:bg-gray-300'
-                    )}
-                  />
-                );
-              })}
+              <Volume2
+                className={cn(
+                  'h-3.5 w-3.5 shrink-0',
+                  isDark ? 'text-[#2dd4bf]' : 'text-[#04564f]',
+                  isTrackPlaying && 'animate-pulse'
+                )}
+              />
+              <div
+                onClick={handleWaveformClick}
+                className="flex-1 flex items-center gap-[2px] h-6 cursor-pointer min-w-0 overflow-hidden"
+                title="Click to seek"
+              >
+                {waveformBars.map((bar, bIdx) => {
+                  const barRatio = bIdx / waveformBars.length;
+                  const isFilled = barRatio <= progressRatio;
+                  return (
+                    <div
+                      key={bIdx}
+                      style={{ height: `${Math.max(15, bar * 100)}%` }}
+                      className={cn(
+                        'w-[2px] shrink-0 rounded-full transition-colors',
+                        isFilled
+                          ? isDark
+                            ? 'bg-[#2dd4bf]'
+                            : 'bg-[#04564f]'
+                          : isDark
+                          ? 'bg-white/20 hover:bg-white/35'
+                          : 'bg-gray-200 hover:bg-gray-300'
+                      )}
+                    />
+                  );
+                })}
+              </div>
             </div>
             <span
               className={cn(
                 'text-[11px] font-mono font-medium shrink-0 tabular-nums',
-                isDark ? 'text-gray-300' : 'text-gray-600'
+                isDark ? 'text-[#2dd4bf]' : 'text-[#04564f]'
               )}
             >
               {formatTime(currentTime)} / {formattedTotalDuration}
             </span>
-          </div>
+          </>
         ) : (
-          <div className="w-full flex items-center justify-end">
-            <span
-              className={cn(
-                'text-xs font-mono tabular-nums',
-                isDark ? 'text-gray-400' : 'text-gray-400'
-              )}
-            >
-              {formattedTotalDuration}
-            </span>
-          </div>
+          <span
+            className={cn(
+              'text-xs font-mono tabular-nums shrink-0',
+              isDark ? 'text-gray-400' : 'text-gray-400'
+            )}
+          >
+            {formattedTotalDuration}
+          </span>
         )}
       </div>
 
