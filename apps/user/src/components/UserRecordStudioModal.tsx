@@ -5047,7 +5047,7 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
                 </div>
 
                 {/* 1. Move Vocal Backward / Forward on Beat Timeline */}
-                <div className="space-y-1">
+                <div className="space-y-1.5">
                   <div className="flex items-center justify-between text-[10.5px]">
                     <span className="text-[#8a8e98] font-medium">Move Vocal (Back / Fwd)</span>
                     <button
@@ -5059,23 +5059,7 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
                       {startSec >= 0 ? `+${startSec.toFixed(2)}s` : `${startSec.toFixed(2)}s`}
                     </button>
                   </div>
-                  <div className="flex items-center gap-1">
-                    <button
-                      type="button"
-                      onClick={() => handleMoveVocalClip(selectedRow.id, -0.05)}
-                      title="Move vocal backward 50ms (earlier)"
-                      className="h-5 px-1.5 rounded bg-[#1b1c22] hover:bg-[#282a33] text-[9.5px] font-semibold text-white"
-                    >
-                      ◀ -50ms
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleMoveVocalClip(selectedRow.id, -0.01)}
-                      title="Move vocal backward 10ms"
-                      className="h-5 px-1.5 rounded bg-[#1b1c22] hover:bg-[#282a33] text-[9.5px] font-semibold text-[#c9ccd3] hover:text-white"
-                    >
-                      -10ms
-                    </button>
+                  <div className="w-full">
                     <input
                       type="range"
                       min={-5}
@@ -5084,13 +5068,32 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
                       value={startSec}
                       onChange={(e) => handleSetVocalStartTime(selectedRow.id, Number(e.target.value))}
                       title="Slide vocal clip backward or forward along the beat"
-                      className="flex-1 h-1 accent-[#4fc1b5] bg-[#23242a] rounded-lg cursor-pointer"
+                      className="w-full h-1.5 accent-[#4fc1b5] bg-[#23242a] rounded-lg cursor-pointer"
                     />
+                  </div>
+                  <div className="grid grid-cols-4 gap-1">
+                    <button
+                      type="button"
+                      onClick={() => handleMoveVocalClip(selectedRow.id, -0.05)}
+                      title="Move vocal backward 50ms (earlier)"
+                      className="h-6 px-1 rounded bg-[#1b1c22] hover:bg-[#282a33] text-[9.5px] font-semibold text-white flex items-center justify-center gap-0.5 whitespace-nowrap transition-colors"
+                    >
+                      <span>◀</span>
+                      <span>-50ms</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleMoveVocalClip(selectedRow.id, -0.01)}
+                      title="Move vocal backward 10ms"
+                      className="h-6 px-1 rounded bg-[#1b1c22] hover:bg-[#282a33] text-[9.5px] font-semibold text-[#c9ccd3] hover:text-white flex items-center justify-center whitespace-nowrap transition-colors"
+                    >
+                      -10ms
+                    </button>
                     <button
                       type="button"
                       onClick={() => handleMoveVocalClip(selectedRow.id, 0.01)}
                       title="Move vocal forward 10ms"
-                      className="h-5 px-1.5 rounded bg-[#1b1c22] hover:bg-[#282a33] text-[9.5px] font-semibold text-[#c9ccd3] hover:text-white"
+                      className="h-6 px-1 rounded bg-[#1b1c22] hover:bg-[#282a33] text-[9.5px] font-semibold text-[#c9ccd3] hover:text-white flex items-center justify-center whitespace-nowrap transition-colors"
                     >
                       +10ms
                     </button>
@@ -5098,9 +5101,10 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
                       type="button"
                       onClick={() => handleMoveVocalClip(selectedRow.id, 0.05)}
                       title="Move vocal forward 50ms (later)"
-                      className="h-5 px-1.5 rounded bg-[#1b1c22] hover:bg-[#282a33] text-[9.5px] font-semibold text-white"
+                      className="h-6 px-1 rounded bg-[#1b1c22] hover:bg-[#282a33] text-[9.5px] font-semibold text-white flex items-center justify-center gap-0.5 whitespace-nowrap transition-colors"
                     >
-                      +50ms ▶
+                      <span>+50ms</span>
+                      <span>▶</span>
                     </button>
                   </div>
                 </div>
@@ -5122,8 +5126,8 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
                     )}
                   </div>
                   <div className="grid grid-cols-2 gap-2 items-center">
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-[9.5px] text-[#757983] shrink-0">In</span>
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <span className="text-[9.5px] text-[#757983] shrink-0 font-medium">In</span>
                       <input
                         type="range"
                         min={0}
@@ -5132,11 +5136,11 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
                         value={trimIn}
                         onChange={(e) => handleSetVocalTrim(selectedRow.id, Number(e.target.value), trimOut)}
                         title="Trim vocal start"
-                        className="w-full h-1 accent-[#ff5a36] bg-[#23242a] rounded-lg cursor-pointer"
+                        className="w-full min-w-0 h-1.5 accent-[#ff5a36] bg-[#23242a] rounded-lg cursor-pointer"
                       />
                     </div>
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-[9.5px] text-[#757983] shrink-0">Out</span>
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <span className="text-[9.5px] text-[#757983] shrink-0 font-medium">Out</span>
                       <input
                         type="range"
                         min={Math.min(dur, Number((trimIn + 0.15).toFixed(2)))}
@@ -5145,14 +5149,14 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
                         value={trimOut}
                         onChange={(e) => handleSetVocalTrim(selectedRow.id, trimIn, Number(e.target.value))}
                         title="Trim vocal end"
-                        className="w-full h-1 accent-[#ff5a36] bg-[#23242a] rounded-lg cursor-pointer"
+                        className="w-full min-w-0 h-1.5 accent-[#ff5a36] bg-[#23242a] rounded-lg cursor-pointer"
                       />
                     </div>
                   </div>
                 </div>
 
                 {/* 3. Vocal Playback Speed (Match Beat Tempo without changing pitch) */}
-                <div className="space-y-1 pt-1 border-t border-[#1b1c21]">
+                <div className="space-y-1.5 pt-1 border-t border-[#1b1c21]">
                   <div className="flex items-center justify-between text-[10.5px]">
                     <span className="text-[#8a8e98] font-medium">Vocal Speed (Match Beat)</span>
                     <button
@@ -5164,12 +5168,12 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
                       {speedPct}%
                     </button>
                   </div>
-                  <div className="flex items-center gap-1">
+                  <div className="flex items-center gap-1.5">
                     <button
                       type="button"
                       onClick={() => handleVocalSpeedChange(selectedRow.id, rate - 0.01)}
                       title="Slow down vocal by 1% (use if vocal is faster than beat)"
-                      className="h-5 px-1.5 rounded bg-[#1b1c22] hover:bg-[#282a33] text-[9.5px] font-semibold text-white"
+                      className="h-6 px-2 rounded bg-[#1b1c22] hover:bg-[#282a33] text-[9.5px] font-semibold text-white shrink-0 whitespace-nowrap transition-colors"
                     >
                       -1%
                     </button>
@@ -5181,13 +5185,13 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
                       value={speedPct}
                       onChange={(e) => handleVocalSpeedChange(selectedRow.id, Number(e.target.value) / 100)}
                       title="Adjust vocal speed (pitch-preserved) to match the beat"
-                      className="flex-1 h-1 accent-[#f5b841] bg-[#23242a] rounded-lg cursor-pointer"
+                      className="flex-1 min-w-0 h-1.5 accent-[#f5b841] bg-[#23242a] rounded-lg cursor-pointer"
                     />
                     <button
                       type="button"
                       onClick={() => handleVocalSpeedChange(selectedRow.id, rate + 0.01)}
                       title="Speed up vocal by 1% (use if vocal is slower than beat)"
-                      className="h-5 px-1.5 rounded bg-[#1b1c22] hover:bg-[#282a33] text-[9.5px] font-semibold text-white"
+                      className="h-6 px-2 rounded bg-[#1b1c22] hover:bg-[#282a33] text-[9.5px] font-semibold text-white shrink-0 whitespace-nowrap transition-colors"
                     >
                       +1%
                     </button>
