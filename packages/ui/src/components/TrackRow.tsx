@@ -138,7 +138,7 @@ export const TrackRow = <T extends PlayableTrackItem = PlayableTrackItem>({
     <div
       onClick={(e) => onPlayToggle && onPlayToggle(track, e)}
       className={cn(
-        'group flex items-center justify-between gap-2 sm:gap-3 px-2.5 sm:px-3.5 py-2.5 rounded-xl border transition-all cursor-pointer select-none w-full max-w-full overflow-hidden',
+        'group relative flex items-center justify-between gap-2 sm:gap-3 px-2.5 sm:px-3.5 py-2.5 rounded-xl border transition-all cursor-pointer select-none w-full max-w-full overflow-visible',
         isDark
           ? isCurrent
             ? 'bg-white/[0.06] border-white/15 shadow-sm'
@@ -150,7 +150,7 @@ export const TrackRow = <T extends PlayableTrackItem = PlayableTrackItem>({
       )}
     >
       {/* Left: Artwork, Play button, Title, Artist • Genre */}
-      <div className="flex items-center gap-2.5 sm:gap-3 flex-1 min-w-0">
+      <div className="flex items-center gap-2.5 sm:gap-3 flex-1 min-w-0 overflow-hidden">
         {/* Thumbnail Cover */}
         <div
           className={cn(

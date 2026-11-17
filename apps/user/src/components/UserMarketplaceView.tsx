@@ -326,7 +326,7 @@ export function UserMarketplaceView({
   };
 
   return (
-    <div className="space-y-5 sm:space-y-6 w-full max-w-full overflow-x-hidden">
+    <div className="space-y-5 sm:space-y-6 w-full max-w-full min-w-0">
       {/* 1. Header Banner */}
       <div className="relative rounded-2xl bg-gradient-to-br from-[#1A1325] via-[#10121A] to-[#0A0D14] border border-white/10 p-5 sm:p-8 overflow-hidden shadow-2xl">
         <div className="absolute -right-16 -top-16 w-80 h-80 bg-purple-500/10 rounded-full blur-3xl pointer-events-none" />
@@ -517,7 +517,7 @@ export function UserMarketplaceView({
       </div>
 
       {/* 6. Beats Table Layout */}
-      <div className="p-2.5 sm:p-5 rounded-2xl bg-[#121316] border border-white/[0.06] space-y-2.5 sm:space-y-3 w-full max-w-full overflow-hidden">
+      <div className="p-2.5 sm:p-5 rounded-2xl bg-[#121316] border border-white/[0.06] space-y-2.5 sm:space-y-3 w-full max-w-full overflow-visible">
         {filteredTracks.length === 0 ? (
           <div className="p-12 text-center space-y-3">
             <Music2 className="h-10 w-10 text-gray-600 mx-auto" />
@@ -573,7 +573,7 @@ export function UserMarketplaceView({
                   }}
                   onFavoriteToggle={(t) => toggleLike(t.id)}
                   onListenLaterToggle={(t) => toggleListenLater(t)}
-                  className={isDropdownOpen ? 'relative z-30 border-white/20 bg-white/[0.04]' : 'relative z-10'}
+                  className={isDropdownOpen ? 'relative z-50 border-white/20 bg-white/[0.06]' : 'relative z-10'}
                   badge={
                     !isFree ? (
                       <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30 shrink-0 font-mono">
@@ -639,7 +639,7 @@ export function UserMarketplaceView({
 
                             {isDropdownOpen && (
                               <div
-                                className="absolute top-full right-0 mt-1.5 w-60 p-1.5 rounded-xl bg-[#0F131C] border border-white/10 shadow-2xl z-50 text-white animate-in fade-in zoom-in-95 duration-150"
+                                className="absolute top-full right-0 mt-1.5 w-64 p-1.5 rounded-xl bg-[#0F131C] border border-white/15 shadow-2xl z-[100] text-white animate-in fade-in zoom-in-95 duration-150"
                                 onClick={(e) => e.stopPropagation()}
                               >
                                 <div className="px-2 py-1 text-[10px] font-mono uppercase tracking-wider text-gray-400 border-b border-white/5 mb-1">
