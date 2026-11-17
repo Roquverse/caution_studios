@@ -104,7 +104,7 @@ export function UserShell({ children, activePath }: UserShellProps) {
   ];
 
   return (
-    <div className="min-h-screen bg-[#111214] text-white flex flex-col font-sans selection:bg-[#04564f] selection:text-white">
+    <div className="min-h-screen w-full max-w-[100vw] overflow-x-hidden bg-[#111214] text-white flex flex-col font-sans selection:bg-[#04564f] selection:text-white">
       {/* 1. TOP HEADER */}
       <header className="h-14 border-b border-[#2a2d34] bg-[#16181c] px-3 sm:px-4 flex items-center justify-between gap-3 sticky top-0 z-40">
         <div className="flex items-center shrink-0">

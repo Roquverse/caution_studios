@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { User, Settings, CreditCard, LogOut, ChevronRight, Sparkles, Megaphone } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
-import { setCachedUserPlan } from '../lib/subscription';
+import { setCachedUserPlan, resolveEffectivePlan } from '../lib/subscription';
 
 export interface UserProfileData {
   id: string;
@@ -89,10 +89,12 @@ export function UserDropdown() {
             .maybeSingle();
 
           if (data) {
-            setProfile(data);
-            setCachedUserPlan(data.plan || 'free');
+            const p = resolveEffectivePlan(data, user.user_metadata);
+            setProfile({ ...data, plan: p });
+            setCachedUserPlan(p);
           } else {
             const meta = user.user_metadata || {};
+            const p = resolveEffectivePlan(null, meta);
             const fallbackName = meta.full_name || meta.name || meta.display_name || userEmail.split('@')[0] || 'User';
             const fallbackHandle = meta.handle || meta.username || userEmail.split('@')[0] || 'user';
             setProfile({
@@ -100,10 +102,10 @@ export function UserDropdown() {
               handle: fallbackHandle,
               display_name: fallbackName,
               avatar_url: meta.avatar_url || null,
-              plan: 'free',
+              plan: p,
               bio: null
             });
-            setCachedUserPlan('free');
+            setCachedUserPlan(p);
           }
           return;
         }
@@ -136,10 +138,12 @@ export function UserDropdown() {
           .eq('id', user.id)
           .maybeSingle();
         if (data) {
-          setProfile(data);
-          setCachedUserPlan(data.plan || 'free');
+          const p = resolveEffectivePlan(data, user.user_metadata);
+          setProfile({ ...data, plan: p });
+          setCachedUserPlan(p);
         } else {
           const meta = user.user_metadata || {};
+          const p = resolveEffectivePlan(null, meta);
           const fallbackName = meta.full_name || meta.name || meta.display_name || userEmail.split('@')[0] || 'User';
           const fallbackHandle = meta.handle || meta.username || userEmail.split('@')[0] || 'user';
           setProfile({
@@ -147,10 +151,10 @@ export function UserDropdown() {
             handle: fallbackHandle,
             display_name: fallbackName,
             avatar_url: meta.avatar_url || null,
-            plan: 'free',
+            plan: p,
             bio: null
           });
-          setCachedUserPlan('free');
+          setCachedUserPlan(p);
         }
       } else {
         setProfile(null);

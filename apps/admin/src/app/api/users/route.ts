@@ -40,6 +40,7 @@ export async function GET(req: NextRequest) {
 
     const enrichedUsers = (users || []).map((u) => ({
       ...u,
+      plan: u.plan === 'pro' || u.stripe_customer_id === 'plan:pro' ? 'pro' : u.plan,
       email: emailMap[u.id] || `${u.handle}@caution.studio`
     }));
 

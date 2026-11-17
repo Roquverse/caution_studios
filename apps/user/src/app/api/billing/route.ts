@@ -71,6 +71,35 @@ export async function GET(req: NextRequest) {
       };
     });
 
+    if (profile) {
+      const latestSubOrder = (orders || []).find(
+        (o: any) =>
+          o.status === 'paid' &&
+          (o.paystack_reference?.includes('sub_pro') ||
+            o.paystack_reference?.includes('sub_plus') ||
+            o.paystack_reference?.startsWith('CS-INV-') ||
+            (!o.items?.length && o.total_cents >= 300000))
+      );
+      const isProFromOrder =
+        latestSubOrder &&
+        (latestSubOrder.paystack_reference?.includes('pro') ||
+          (latestSubOrder.total_cents && latestSubOrder.total_cents >= 2500000));
+
+      if (
+        profile.plan === 'pro' ||
+        profile.stripe_customer_id === 'plan:pro' ||
+        isProFromOrder
+      ) {
+        profile.plan = 'pro';
+      } else if (
+        profile.plan === 'plus' ||
+        profile.stripe_customer_id === 'plan:plus' ||
+        latestSubOrder
+      ) {
+        profile.plan = 'plus';
+      }
+    }
+
     return NextResponse.json({
       profile,
       invoices: formattedInvoices
@@ -103,10 +132,30 @@ export async function POST(req: NextRequest) {
     }
 
     // 1. Update Profile Plan in database
-    const { error: profileErr } = await supabase
+    let { error: profileErr } = await supabase
       .from('profiles')
-      .update({ plan })
+      .update({
+        plan: plan as any,
+        stripe_customer_id: `plan:${plan}`
+      })
       .eq('id', targetUserId);
+
+    if (profileErr) {
+      const retry = await supabase
+        .from('profiles')
+        .update({
+          plan: plan === 'pro' ? 'plus' : plan,
+          stripe_customer_id: `plan:${plan}`
+        })
+        .eq('id', targetUserId);
+      profileErr = retry.error;
+    }
+
+    try {
+      await supabase.auth.admin.updateUserById(targetUserId, {
+        user_metadata: { plan }
+      });
+    } catch (e) {}
 
     if (profileErr) {
       return NextResponse.json({ error: profileErr.message }, { status: 500 });

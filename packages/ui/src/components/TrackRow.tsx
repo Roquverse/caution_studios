@@ -138,7 +138,7 @@ export const TrackRow = <T extends PlayableTrackItem = PlayableTrackItem>({
     <div
       onClick={(e) => onPlayToggle && onPlayToggle(track, e)}
       className={cn(
-        'group flex items-center justify-between gap-3 px-3.5 py-2.5 rounded-xl border transition-all cursor-pointer select-none',
+        'group flex items-center justify-between gap-2 sm:gap-3 px-2.5 sm:px-3.5 py-2.5 rounded-xl border transition-all cursor-pointer select-none w-full max-w-full overflow-hidden',
         isDark
           ? isCurrent
             ? 'bg-white/[0.06] border-white/15 shadow-sm'
@@ -150,11 +150,11 @@ export const TrackRow = <T extends PlayableTrackItem = PlayableTrackItem>({
       )}
     >
       {/* Left: Artwork, Play button, Title, Artist • Genre */}
-      <div className="flex items-center gap-3 min-w-[190px] sm:min-w-[270px] max-w-[340px]">
+      <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0 sm:max-w-[340px]">
         {/* Thumbnail Cover */}
         <div
           className={cn(
-            'relative h-10 w-10 shrink-0 rounded-lg overflow-hidden shadow-sm border',
+            'relative h-9 w-9 sm:h-10 sm:w-10 shrink-0 rounded-lg overflow-hidden shadow-sm border',
             isDark ? 'bg-black/40 border-white/10' : 'bg-gray-100 border-gray-200/60'
           )}
         >
@@ -180,7 +180,7 @@ export const TrackRow = <T extends PlayableTrackItem = PlayableTrackItem>({
           }}
           aria-label={isTrackPlaying ? `Pause ${track.title}` : `Play ${track.title}`}
           className={cn(
-            'h-7 w-7 rounded-full flex items-center justify-center shrink-0 transition-colors cursor-pointer',
+            'h-6 w-6 sm:h-7 sm:w-7 rounded-full flex items-center justify-center shrink-0 transition-colors cursor-pointer',
             isDark
               ? isTrackPlaying
                 ? 'text-[#2dd4bf] bg-[#04564f]/40'
@@ -191,15 +191,15 @@ export const TrackRow = <T extends PlayableTrackItem = PlayableTrackItem>({
           )}
         >
           {isTrackPlaying ? (
-            <Pause className="h-4 w-4 fill-current" />
+            <Pause className="h-3.5 w-3.5 sm:h-4 sm:w-4 fill-current" />
           ) : (
-            <Play className="h-4 w-4 fill-current ml-0.5" />
+            <Play className="h-3.5 w-3.5 sm:h-4 sm:w-4 fill-current ml-0.5" />
           )}
         </button>
 
         {/* Title & Artist • Genre */}
-        <div className="flex flex-col min-w-0 pr-2">
-          <div className="flex items-center gap-1.5">
+        <div className="flex flex-col min-w-0 pr-1 sm:pr-2">
+          <div className="flex items-center gap-1.5 min-w-0">
             <span
               className={cn(
                 'text-xs sm:text-sm font-bold truncate',
@@ -216,7 +216,7 @@ export const TrackRow = <T extends PlayableTrackItem = PlayableTrackItem>({
           </div>
           <span
             className={cn(
-              'text-[11px] truncate',
+              'text-[10px] sm:text-[11px] truncate block',
               isDark ? 'text-gray-400' : 'text-gray-400'
             )}
           >
@@ -288,12 +288,12 @@ export const TrackRow = <T extends PlayableTrackItem = PlayableTrackItem>({
       {/* Right: Optional custom slot + Actions (Download, Heart, Star/Clock, More) */}
       <div
         className={cn(
-          'flex items-center gap-1.5 sm:gap-2 shrink-0',
+          'flex items-center gap-1 sm:gap-2 shrink-0',
           isDark ? 'text-gray-400' : 'text-gray-400'
         )}
       >
-        {/* Mobile duration indicator */}
-        <span className="text-xs font-mono text-gray-400 sm:hidden">
+        {/* Mobile duration indicator (hidden on small screens when rightSlot button is shown) */}
+        <span className={cn('text-[11px] font-mono text-gray-400 sm:hidden', rightSlot && 'hidden')}>
           {formattedTotalDuration}
         </span>
 
@@ -309,7 +309,7 @@ export const TrackRow = <T extends PlayableTrackItem = PlayableTrackItem>({
             }}
             title="Download Locked · License Required"
             className={cn(
-              'p-1.5 rounded transition-colors cursor-pointer',
+              'p-1 sm:p-1.5 rounded transition-colors cursor-pointer',
               isDark
                 ? 'text-gray-500 hover:text-amber-400 hover:bg-amber-400/10'
                 : 'text-gray-400 hover:text-amber-600 hover:bg-amber-50'
@@ -327,7 +327,7 @@ export const TrackRow = <T extends PlayableTrackItem = PlayableTrackItem>({
               }}
               title="Download Track"
               className={cn(
-                'p-1.5 rounded transition-colors cursor-pointer',
+                'p-1 sm:p-1.5 rounded transition-colors cursor-pointer',
                 isDownloading
                   ? 'text-[#2dd4bf] bg-[#2dd4bf]/10 animate-pulse'
                   : isDark
@@ -350,7 +350,7 @@ export const TrackRow = <T extends PlayableTrackItem = PlayableTrackItem>({
             }}
             title={isFavorited ? 'Remove from Favourites' : 'Add to Favourites'}
             className={cn(
-              'p-1.5 rounded transition-colors cursor-pointer',
+              'p-1 sm:p-1.5 rounded transition-colors cursor-pointer',
               isFavorited
                 ? 'text-red-500 fill-red-500 hover:text-red-600'
                 : isDark
@@ -372,7 +372,8 @@ export const TrackRow = <T extends PlayableTrackItem = PlayableTrackItem>({
             }}
             title={isStarred ? 'Saved' : 'Save track'}
             className={cn(
-              'p-1.5 rounded transition-colors cursor-pointer',
+              'p-1 sm:p-1.5 rounded transition-colors cursor-pointer',
+              rightSlot && 'hidden sm:inline-flex',
               isStarred
                 ? 'text-amber-400 fill-amber-400 hover:text-amber-500'
                 : isDark
@@ -391,7 +392,8 @@ export const TrackRow = <T extends PlayableTrackItem = PlayableTrackItem>({
             }}
             title={isListenLater ? 'Remove from Listen Later' : 'Save to Listen Later'}
             className={cn(
-              'p-1.5 rounded transition-colors cursor-pointer',
+              'p-1 sm:p-1.5 rounded transition-colors cursor-pointer',
+              rightSlot && 'hidden sm:inline-flex',
               isListenLater
                 ? isDark
                   ? 'text-[#2dd4bf] bg-[#2dd4bf]/10'
@@ -415,7 +417,7 @@ export const TrackRow = <T extends PlayableTrackItem = PlayableTrackItem>({
             }}
             title="Share track"
             className={cn(
-              'p-1.5 rounded transition-colors cursor-pointer',
+              'hidden sm:inline-flex p-1.5 rounded transition-colors cursor-pointer',
               isDark ? 'hover:text-white hover:bg-white/10' : 'hover:text-black hover:bg-gray-100'
             )}
           >
@@ -432,7 +434,7 @@ export const TrackRow = <T extends PlayableTrackItem = PlayableTrackItem>({
           }}
           title="More options"
           className={cn(
-            'p-1.5 rounded transition-colors cursor-pointer',
+            'hidden sm:inline-flex p-1.5 rounded transition-colors cursor-pointer',
             isDark ? 'hover:text-white hover:bg-white/10' : 'hover:text-black hover:bg-gray-100'
           )}
         >

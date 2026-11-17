@@ -43,7 +43,15 @@ export async function PATCH(
     }
 
     const updateFields: Record<string, any> = {};
-    if (body.plan !== undefined) updateFields.plan = body.plan;
+    if (body.plan !== undefined) {
+      updateFields.plan = body.plan;
+      updateFields.stripe_customer_id = `plan:${body.plan}`;
+      try {
+        await supabase.auth.admin.updateUserById(params.id, {
+          user_metadata: { plan: body.plan }
+        });
+      } catch (e) {}
+    }
     if (body.display_name !== undefined) updateFields.display_name = body.display_name;
     if (body.handle !== undefined) updateFields.handle = body.handle;
 
@@ -156,8 +164,24 @@ export async function PATCH(
       error = retry.error;
     }
 
+    if (error && error.message && error.message.includes('plan_tier')) {
+      updateFields.plan = body.plan === 'pro' ? 'plus' : body.plan;
+      const retryPlan = await supabase
+        .from('profiles')
+        .update(updateFields)
+        .eq('id', params.id)
+        .select()
+        .single();
+      updated = retryPlan.data;
+      error = retryPlan.error;
+    }
+
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    if (updated && updated.stripe_customer_id === 'plan:pro') {
+      updated.plan = 'pro';
     }
 
     return NextResponse.json({ success: true, user: updated });

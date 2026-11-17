@@ -11,6 +11,27 @@ export function isPlanSubscribed(plan?: string | null): boolean {
   return normalized === 'plus' || normalized === 'pro' || normalized === 'creator' || normalized === 'label';
 }
 
+export function resolveEffectivePlan(
+  profile?: { plan?: string | null; stripe_customer_id?: string | null } | null,
+  userMetadata?: Record<string, any> | null
+): 'free' | 'plus' | 'pro' {
+  if (
+    profile?.plan === 'pro' ||
+    profile?.stripe_customer_id === 'plan:pro' ||
+    userMetadata?.plan === 'pro'
+  ) {
+    return 'pro';
+  }
+  if (
+    profile?.plan === 'plus' ||
+    profile?.stripe_customer_id === 'plan:plus' ||
+    userMetadata?.plan === 'plus'
+  ) {
+    return 'plus';
+  }
+  return 'free';
+}
+
 export function getCachedUserPlan(): string {
   if (typeof window === 'undefined') return 'free';
   return localStorage.getItem('caution:user-plan') || 'free';
@@ -124,7 +145,7 @@ export function useUserSubscription() {
           .eq('id', user.id)
           .maybeSingle();
 
-        const currentPlan = profile?.plan || meta.plan || 'free';
+        const currentPlan = resolveEffectivePlan(profile, meta);
         const profileObj: CurrentUserProfile = {
           id: user.id,
           email: user.email || '',

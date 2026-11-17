@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { UserRecordStudioModal } from '../../components/UserRecordStudioModal';
 import { TrackItem, ProducerItem } from '../../types/tracks';
 import { supabase } from '../../lib/supabaseClient';
-import { setCachedUserPlan } from '../../lib/subscription';
+import { setCachedUserPlan, resolveEffectivePlan } from '../../lib/subscription';
 import {
   Mic,
   Sparkles,
@@ -68,11 +68,11 @@ export default function StudioPageClient({
 
           const { data } = await supabase
             .from('profiles')
-            .select('plan, role')
+            .select('plan, stripe_customer_id')
             .eq('id', session.user.id)
             .maybeSingle();
 
-          const plan = data?.plan || 'free';
+          const plan = resolveEffectivePlan(data, session.user.user_metadata);
           setUserPlan(plan);
           setCachedUserPlan(plan);
         } else {

@@ -65,16 +65,17 @@ export async function POST(req: NextRequest) {
 
       let targetUserId = metadata.user_id || bodyUserId;
 
-      // If user ID was not passed, find the profile by email
+      // If user ID was not passed, find the user by email via auth.admin
       if (!targetUserId) {
-        const customerEmail = data.customer?.email || bodyEmail;
+        const customerEmail = (data.customer?.email || bodyEmail || '').toLowerCase().trim();
         if (customerEmail) {
-          const { data: prof } = await supabase
-            .from('profiles')
-            .select('id')
-            .eq('email', customerEmail)
-            .maybeSingle();
-          if (prof?.id) targetUserId = prof.id;
+          try {
+            const { data: authList } = await supabase.auth.admin.listUsers();
+            const matchedUser = authList?.users?.find(
+              (u) => u.email?.toLowerCase().trim() === customerEmail
+            );
+            if (matchedUser?.id) targetUserId = matchedUser.id;
+          } catch (e) {}
         }
       }
 
@@ -89,10 +90,30 @@ export async function POST(req: NextRequest) {
       }
 
       if (targetUserId) {
-        await supabase
+        const { error: directErr } = await supabase
           .from('profiles')
-          .update({ plan: targetPlan })
+          .update({
+            plan: targetPlan as any,
+            stripe_customer_id: `plan:${targetPlan}`
+          })
           .eq('id', targetUserId);
+
+        // Fallback if Postgres plan_tier enum only accepts ('free', 'plus')
+        if (directErr) {
+          await supabase
+            .from('profiles')
+            .update({
+              plan: targetPlan === 'pro' ? 'plus' : targetPlan,
+              stripe_customer_id: `plan:${targetPlan}`
+            })
+            .eq('id', targetUserId);
+        }
+
+        try {
+          await supabase.auth.admin.updateUserById(targetUserId, {
+            user_metadata: { plan: targetPlan }
+          });
+        } catch (e) {}
       }
 
       // Check if order already recorded

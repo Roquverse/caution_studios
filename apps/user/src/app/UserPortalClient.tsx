@@ -929,7 +929,7 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
   const progressRatio = currentTrack.durationSeconds > 0 ? (currentTime / currentTrack.durationSeconds) * 100 : 0;
 
   return (
-    <div className="min-h-screen bg-[#111214] text-[#eceef2] flex flex-col font-sans selection:bg-[#2bbbad] selection:text-black pb-20">
+    <div className="min-h-screen w-full max-w-[100vw] overflow-x-hidden bg-[#111214] text-[#eceef2] flex flex-col font-sans selection:bg-[#2bbbad] selection:text-black pb-20">
       {/* HTML5 Audio Element for Real Streaming from Cloudflare R2 & Database */}
       {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
       <audio
@@ -1247,7 +1247,7 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
       )}
 
       {/* 2. BODY CONTENT (3-COLUMN SPLIT) */}
-      <div className="flex-1 flex w-full">
+      <div className="flex-1 flex w-full max-w-full min-w-0 overflow-x-hidden">
         {/* LEFT NAVIGATION SIDEBAR */}
         <aside className="w-56 border-r border-[#2a2d34] bg-[#16181c] px-3 py-4 shrink-0 hidden md:flex flex-col justify-between">
           <div className="space-y-6">
@@ -1366,7 +1366,7 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
         </aside>
 
         {/* CENTER MAIN VIEW */}
-        <main className="flex-1 p-4 sm:p-5 lg:p-6 pb-24 overflow-y-auto min-w-0 space-y-6 bg-[#111214]">
+        <main className="flex-1 p-3 sm:p-5 lg:p-6 pb-24 overflow-y-auto overflow-x-hidden min-w-0 max-w-full space-y-5 sm:space-y-6 bg-[#111214]">
           {activeNav === 'fav' ? (
             <div className="space-y-6">
               <div className="flex items-center justify-between pb-3 border-b border-white/[0.06]">

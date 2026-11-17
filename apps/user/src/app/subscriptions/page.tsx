@@ -22,7 +22,7 @@ import {
 import { supabase } from '../../lib/supabaseClient';
 import { UserProfileData } from '../../components/UserDropdown';
 import { UserShell } from '../../components/UserShell';
-import { setCachedUserPlan } from '../../lib/subscription';
+import { setCachedUserPlan, resolveEffectivePlan } from '../../lib/subscription';
 
 interface InvoiceRecord {
   id: string;
@@ -51,7 +51,7 @@ export default function SubscriptionsPage() {
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [isSimulating, setIsSimulating] = useState(false);
 
-  async function loadBillingInvoices(userId?: string) {
+  async function loadBillingInvoices(userId?: string, forcedPlan?: 'plus' | 'pro') {
     try {
       setLoadingInvoices(true);
       const url = userId ? `/api/billing?userId=${encodeURIComponent(userId)}` : '/api/billing';
@@ -62,10 +62,10 @@ export default function SubscriptionsPage() {
           setInvoices(data.invoices);
         }
         if (data.profile) {
-          setProfile(data.profile);
-          const p = data.profile.plan === 'pro' ? 'pro' : data.profile.plan === 'plus' ? 'plus' : 'free';
-          setCurrentPlan(p);
-          setCachedUserPlan(p);
+          const resolved = forcedPlan || resolveEffectivePlan(data.profile);
+          setProfile({ ...data.profile, plan: resolved });
+          setCurrentPlan(resolved);
+          setCachedUserPlan(resolved);
         }
       }
     } catch (err) {
@@ -108,22 +108,23 @@ export default function SubscriptionsPage() {
             .maybeSingle();
 
           if (data) {
-            setProfile(data);
-            const p = data.plan === 'pro' ? 'pro' : data.plan === 'plus' ? 'plus' : 'free';
+            const p = resolveEffectivePlan(data, session.user.user_metadata);
+            setProfile({ ...data, plan: p });
             setCurrentPlan(p);
             setCachedUserPlan(p);
           } else {
             const meta = session.user.user_metadata || {};
+            const p = resolveEffectivePlan(null, meta);
             setProfile({
               id: session.user.id,
               handle: meta.handle || session.user.email?.split('@')[0] || 'user',
               display_name: meta.full_name || session.user.email?.split('@')[0] || 'User',
               avatar_url: meta.avatar_url || null,
-              plan: 'free',
+              plan: p,
               bio: null
             });
-            setCurrentPlan('free');
-            setCachedUserPlan('free');
+            setCurrentPlan(p);
+            setCachedUserPlan(p);
           }
         }
 
@@ -161,7 +162,7 @@ export default function SubscriptionsPage() {
               setCurrentPlan(targetPlan);
               setCachedUserPlan(targetPlan);
               const { data: { session } } = await supabase.auth.getSession();
-              await loadBillingInvoices(session?.user?.id || profile?.id);
+              await loadBillingInvoices(session?.user?.id || profile?.id, targetPlan);
               setNotification(
                 `🎉 Payment verified via Paystack! Caution ${targetPlan === 'pro' ? 'Pro' : 'Plus'} membership is active.`
               );
@@ -205,7 +206,7 @@ export default function SubscriptionsPage() {
       if (data.verified || data.status) {
         setCurrentPlan(pendingTier);
         setCachedUserPlan(pendingTier);
-        await loadBillingInvoices(userId || undefined);
+        await loadBillingInvoices(userId || undefined, pendingTier);
         setNotification(`🎉 Caution ${pendingTier === 'pro' ? 'Pro' : 'Plus'} membership activated! (Test simulation verified)`);
         setShowConfigModal(false);
       }
@@ -273,7 +274,7 @@ export default function SubscriptionsPage() {
                   if (verifyData.verified || verifyData.status) {
                     setCurrentPlan(tier);
                     setCachedUserPlan(tier);
-                    await loadBillingInvoices(userId || undefined);
+                    await loadBillingInvoices(userId || undefined, tier);
                     setNotification(`🎉 Payment verified via Paystack! Caution ${tier === 'pro' ? 'Pro' : 'Plus'} membership is active.`);
                   }
                 })

@@ -67,10 +67,29 @@ export async function POST(req: NextRequest) {
             : 'plus';
 
         if (metadata.user_id) {
-          await supabase
+          const { error: directErr } = await supabase
             .from('profiles')
-            .update({ plan: targetPlan })
+            .update({
+              plan: targetPlan as any,
+              stripe_customer_id: `plan:${targetPlan}`
+            })
             .eq('id', metadata.user_id);
+
+          if (directErr) {
+            await supabase
+              .from('profiles')
+              .update({
+                plan: targetPlan === 'pro' ? 'plus' : targetPlan,
+                stripe_customer_id: `plan:${targetPlan}`
+              })
+              .eq('id', metadata.user_id);
+          }
+
+          try {
+            await supabase.auth.admin.updateUserById(metadata.user_id, {
+              user_metadata: { plan: targetPlan }
+            });
+          } catch (e) {}
         }
       }
 

@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { User, Settings, CreditCard, LogOut, ChevronRight, Sparkles } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
-import { setCachedUserPlan } from '../lib/subscription';
+import { setCachedUserPlan, resolveEffectivePlan } from '../lib/subscription';
 
 import { LayoutDashboard, ShoppingBag } from 'lucide-react';
 import { APP_URL } from '../lib/urls';
@@ -50,18 +50,20 @@ export function UserDropdown({ initialProfile }: { initialProfile?: UserProfileD
 
           if (isMounted) {
             if (data) {
-              setProfile(data);
-              setCachedUserPlan(data.plan || 'free');
+              const p = resolveEffectivePlan(data, meta);
+              setProfile({ ...data, plan: p });
+              setCachedUserPlan(p);
             } else {
+              const p = resolveEffectivePlan(null, meta);
               setProfile({
                 id: user.id,
                 handle: fallbackHandle,
                 display_name: fallbackName,
                 avatar_url: meta.avatar_url || null,
-                plan: 'free',
+                plan: p,
                 bio: null
               });
-              setCachedUserPlan('free');
+              setCachedUserPlan(p);
             }
           }
           return;
@@ -91,8 +93,9 @@ export function UserDropdown({ initialProfile }: { initialProfile?: UserProfileD
           .eq('id', session.user.id)
           .maybeSingle();
         if (data && isMounted) {
-          setProfile(data);
-          setCachedUserPlan(data.plan || 'free');
+          const p = resolveEffectivePlan(data, session.user.user_metadata);
+          setProfile({ ...data, plan: p });
+          setCachedUserPlan(p);
         }
       } else {
         setProfile(null);

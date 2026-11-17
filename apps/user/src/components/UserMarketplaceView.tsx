@@ -326,9 +326,9 @@ export function UserMarketplaceView({
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5 sm:space-y-6 w-full max-w-full overflow-x-hidden">
       {/* 1. Header Banner */}
-      <div className="relative rounded-2xl bg-gradient-to-br from-[#1A1325] via-[#10121A] to-[#0A0D14] border border-white/10 p-6 sm:p-8 overflow-hidden shadow-2xl">
+      <div className="relative rounded-2xl bg-gradient-to-br from-[#1A1325] via-[#10121A] to-[#0A0D14] border border-white/10 p-5 sm:p-8 overflow-hidden shadow-2xl">
         <div className="absolute -right-16 -top-16 w-80 h-80 bg-purple-500/10 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute right-1/3 -bottom-16 w-80 h-80 bg-[#E8B896]/10 rounded-full blur-3xl pointer-events-none" />
 
@@ -445,7 +445,7 @@ export function UserMarketplaceView({
       </div>
 
       {/* 4. Search and Filters */}
-      <div className="flex flex-col md:flex-row items-center gap-3">
+      <div className="flex flex-col md:flex-row items-stretch md:items-center gap-2.5 sm:gap-3 w-full">
         <div className="relative flex-1 w-full">
           <Search className="h-4 w-4 text-gray-400 absolute left-3.5 top-3 pointer-events-none" />
           <input
@@ -466,35 +466,37 @@ export function UserMarketplaceView({
           )}
         </div>
 
-        {/* BPM Filter */}
-        <select
-          value={selectedBpmRange}
-          onChange={(e) => setSelectedBpmRange(e.target.value)}
-          aria-label="Filter beats by BPM tempo"
-          className="h-10 px-3 rounded-xl bg-[#141518] border border-white/[0.08] text-xs text-gray-300 focus:outline-none focus:border-[#E8B896] w-full md:w-36"
-        >
-          <option value="All">All BPMs</option>
-          <option value="< 100">&lt; 100 BPM</option>
-          <option value="100 - 120">100 - 120 BPM</option>
-          <option value="120 - 140">120 - 140 BPM</option>
-          <option value="140+">140+ BPM</option>
-        </select>
+        <div className="grid grid-cols-2 md:flex items-center gap-2.5 sm:gap-3 w-full md:w-auto">
+          {/* BPM Filter */}
+          <select
+            value={selectedBpmRange}
+            onChange={(e) => setSelectedBpmRange(e.target.value)}
+            aria-label="Filter beats by BPM tempo"
+            className="h-10 px-3 rounded-xl bg-[#141518] border border-white/[0.08] text-xs text-gray-300 focus:outline-none focus:border-[#E8B896] w-full md:w-36"
+          >
+            <option value="All">All BPMs</option>
+            <option value="< 100">&lt; 100 BPM</option>
+            <option value="100 - 120">100 - 120 BPM</option>
+            <option value="120 - 140">120 - 140 BPM</option>
+            <option value="140+">140+ BPM</option>
+          </select>
 
-        {/* Sort By */}
-        <select
-          value={sortBy}
-          onChange={(e) => setSortBy(e.target.value as any)}
-          aria-label="Sort beats catalog"
-          className="h-10 px-3 rounded-xl bg-[#141518] border border-white/[0.08] text-xs text-gray-300 focus:outline-none focus:border-[#E8B896] w-full md:w-36"
-        >
-          <option value="popular">Most Popular</option>
-          <option value="newest">Newest First</option>
-          <option value="bpm">BPM Tempo</option>
-        </select>
+          {/* Sort By */}
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value as any)}
+            aria-label="Sort beats catalog"
+            className="h-10 px-3 rounded-xl bg-[#141518] border border-white/[0.08] text-xs text-gray-300 focus:outline-none focus:border-[#E8B896] w-full md:w-36"
+          >
+            <option value="popular">Most Popular</option>
+            <option value="newest">Newest First</option>
+            <option value="bpm">BPM Tempo</option>
+          </select>
+        </div>
       </div>
 
       {/* 5. Genre Horizontal Pills */}
-      <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
+      <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar w-full max-w-full">
         {GENRE_LIST.map((genre) => {
           const isSelected = selectedGenre.toLowerCase() === genre.toLowerCase();
           return (
@@ -515,7 +517,7 @@ export function UserMarketplaceView({
       </div>
 
       {/* 6. Beats Table Layout */}
-      <div className="p-4 sm:p-5 rounded-2xl bg-[#121316] border border-white/[0.06] space-y-3">
+      <div className="p-2.5 sm:p-5 rounded-2xl bg-[#121316] border border-white/[0.06] space-y-2.5 sm:space-y-3 w-full max-w-full overflow-hidden">
         {filteredTracks.length === 0 ? (
           <div className="p-12 text-center space-y-3">
             <Music2 className="h-10 w-10 text-gray-600 mx-auto" />
@@ -584,15 +586,15 @@ export function UserMarketplaceView({
                     )
                   }
                   subtitleOverride={
-                    <span className="inline-flex items-center gap-1">
-                      <span>{row.artist}</span>
+                    <span className="inline-flex items-center gap-1 max-w-full truncate">
+                      <span className="truncate">{row.artist}</span>
                       <ShieldCheck className="h-3 w-3 text-teal-400 inline shrink-0" />
-                      <span>• {row.genre || 'Afrobeats'}</span>
-                      {row.bpm && <span className="hidden md:inline">• {row.bpm} BPM</span>}
+                      <span className="hidden sm:inline shrink-0">• {row.genre || 'Afrobeats'}</span>
+                      {row.bpm && <span className="hidden md:inline shrink-0">• {row.bpm} BPM</span>}
                     </span>
                   }
                   rightSlot={
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1.5 sm:gap-2">
                       {/* License Tier Pill / Dropdown */}
                       <div className="hidden lg:flex items-center">
                         {isFree ? (
@@ -732,13 +734,13 @@ export function UserMarketplaceView({
                             setSelectedTier(activeTier === 'exclusive' ? 'exclusive' : 'premium');
                             setLicenseModalTrack(row);
                           }}
-                          className={`px-3 py-1.5 rounded-lg text-xs font-black uppercase tracking-wider flex items-center gap-1.5 transition-transform hover:scale-105 shadow-sm cursor-pointer ${
+                          className={`px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-lg text-[10px] sm:text-xs font-black uppercase tracking-wider flex items-center gap-1 sm:gap-1.5 whitespace-nowrap shrink-0 transition-transform hover:scale-105 shadow-sm cursor-pointer ${
                             activeTier === 'exclusive'
                               ? 'bg-purple-500 hover:bg-purple-400 text-white'
                               : 'bg-[#E8B896] hover:bg-[#d8a886] text-black'
                           }`}
                         >
-                          <ShoppingBag className="h-3 w-3 stroke-[2.5]" />
+                          <ShoppingBag className="h-3 w-3 stroke-[2.5] shrink-0" />
                           <span>Get Beat</span>
                         </button>
                       )}

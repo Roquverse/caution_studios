@@ -61,15 +61,20 @@ export async function GET(req: NextRequest) {
     }
 
     // 3. Profiles & Subscribers
-    const { data: allProfiles, error: usersErr } = await supabase
+    const { data: rawProfiles, error: usersErr } = await supabase
       .from('profiles')
-      .select('id, handle, display_name, avatar_url, roles, plan, created_at')
+      .select('id, handle, display_name, avatar_url, roles, plan, stripe_customer_id, created_at')
       .order('created_at', { ascending: false });
     if (usersErr) console.error('usersErr:', usersErr);
 
-    const usersCount = allProfiles ? allProfiles.length : 0;
-    const plusCount = (allProfiles || []).filter((p) => p.plan === 'plus').length;
-    const proCount = (allProfiles || []).filter((p) => p.plan === 'pro').length;
+    const allProfiles = (rawProfiles || []).map((p) => ({
+      ...p,
+      plan: p.plan === 'pro' || p.stripe_customer_id === 'plan:pro' ? 'pro' : p.plan
+    }));
+
+    const usersCount = allProfiles.length;
+    const plusCount = allProfiles.filter((p) => p.plan === 'plus').length;
+    const proCount = allProfiles.filter((p) => p.plan === 'pro').length;
 
     // Match auth emails for recent profiles
     let recentUsers = (allProfiles || []).slice(0, 6);

@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '../../lib/supabaseClient';
 import { UserDropdown, UserProfileData } from '../../components/UserDropdown';
-import { setCachedUserPlan, useDailyDownloadQuota } from '../../lib/subscription';
+import { setCachedUserPlan, useDailyDownloadQuota, resolveEffectivePlan } from '../../lib/subscription';
 import { APP_URL } from '../../lib/urls';
 import { TopNav } from '../../components/layout/TopNav';
 import { HomeFooter } from '../../components/home/HomeFooter';
@@ -41,8 +41,8 @@ export default function SubscriptionsPage() {
             .maybeSingle();
 
           if (data) {
-            setProfile(data);
-            const p = data.plan === 'pro' ? 'pro' : data.plan === 'plus' ? 'plus' : 'free';
+            const p = resolveEffectivePlan(data, session.user.user_metadata);
+            setProfile({ ...data, plan: p });
             setCurrentPlan(p);
             setCachedUserPlan(p);
             return;
@@ -57,8 +57,8 @@ export default function SubscriptionsPage() {
           .maybeSingle();
 
         if (publicProfile) {
-          setProfile(publicProfile);
-          const p = publicProfile.plan === 'pro' ? 'pro' : publicProfile.plan === 'plus' ? 'plus' : 'free';
+          const p = resolveEffectivePlan(publicProfile);
+          setProfile({ ...publicProfile, plan: p });
           setCurrentPlan(p);
           setCachedUserPlan(p);
         } else {
