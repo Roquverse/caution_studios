@@ -129,9 +129,8 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
     audioSynth.stop();
     setIsPlaying(false);
     if (track) {
-      if (!isFreeBeat(track)) {
-        setPaidBeatPurchaseTrack(track);
-        setRewardNotification('Only free beats can be loaded into Studio. Purchase this beat to unlock.');
+      if (!isFreeBeat(track) && !isPro) {
+        router.push('/studio');
         return;
       }
       router.push(`/studio?beatId=${encodeURIComponent(track.id)}`);

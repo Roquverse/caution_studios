@@ -1,4 +1,4 @@
-import { supabase } from './supabaseClient';
+import { getServiceRoleClient } from './supabaseClient';
 import { TrackItem, ProducerItem, FALLBACK_BEATS, FALLBACK_PRODUCERS } from '../types/tracks';
 
 export async function getStudioBeats(): Promise<{ beats: TrackItem[]; producers: ProducerItem[] }> {
@@ -6,6 +6,7 @@ export async function getStudioBeats(): Promise<{ beats: TrackItem[]; producers:
   let producers: ProducerItem[] = FALLBACK_PRODUCERS;
 
   try {
+    const supabase = getServiceRoleClient();
     const { data: dbBeats } = await supabase
       .from('beats')
       .select(`
@@ -33,7 +34,7 @@ export async function getStudioBeats(): Promise<{ beats: TrackItem[]; producers:
         return `${r2Cdn}/${key}`;
       };
 
-      beats = dbBeats.map((b) => {
+      const allMapped: TrackItem[] = dbBeats.map((b) => {
         const masterUrl = resolveAudioKey(b.master_wav_key);
         const previewCleanUrl = resolveAudioKey(b.preview_clean_key);
         const previewTaggedUrl = resolveAudioKey(b.preview_tagged_key);
@@ -53,19 +54,28 @@ export async function getStudioBeats(): Promise<{ beats: TrackItem[]; producers:
             ? `${r2Cdn}/masters/alex-morgan-afrobeat-instrumental-summer-groove-573648-hubz_1791151613114.mp3`
             : '/api/media/masters/alex-morgan-afrobeat-instrumental-summer-groove-573648-hubz_1791151613114.mp3';
         }
-        const basicLic = b.licenses?.find((l: any) => l.type === 'basic');
-        const exclusiveLic = b.licenses?.find((l: any) => l.type === 'exclusive');
+        const licenses = Array.isArray(b.licenses) ? b.licenses : [];
+        const basicLic = licenses.find((l: any) => l.type === 'basic');
+        const premiumLic = licenses.find((l: any) => l.type === 'premium');
+        const exclusiveLic = licenses.find((l: any) => l.type === 'exclusive');
         const beatTags: string[] = Array.isArray(b.tags) ? b.tags : [];
+
+        const paidLicensesDisabled =
+          licenses.length > 0 &&
+          (!premiumLic || premiumLic.enabled === false || premiumLic.price_cents <= 100) &&
+          (!exclusiveLic || exclusiveLic.enabled === false || exclusiveLic.price_cents <= 100);
+
         const isFreeTagged =
           (basicLic?.price_cents !== undefined && basicLic.price_cents <= 100) ||
+          paidLicensesDisabled ||
           b.is_free_beat === true ||
           beatTags.some((t: string) => t.toLowerCase() === 'free' || t.toLowerCase() === 'free download') ||
           b.title?.toLowerCase().includes('(free)') ||
           b.title?.toLowerCase().includes('[free]') ||
           b.category === 'free';
 
-        const rawPrice = basicLic?.price_cents ? basicLic.price_cents / 100 : 3000;
-        const priceNgn = isFreeTagged || rawPrice <= 0.01 ? 0 : rawPrice;
+        const rawPrice = basicLic?.price_cents ? basicLic.price_cents / 100 : (isFreeTagged ? 0 : 3000);
+        const priceNgn = isFreeTagged || rawPrice <= 1 ? 0 : rawPrice;
         const exclusivePriceNgn = isFreeTagged
           ? 0
           : exclusiveLic?.price_cents
@@ -100,7 +110,13 @@ export async function getStudioBeats(): Promise<{ beats: TrackItem[]; producers:
           tags: beatTags,
           playCount: b.play_count || 0
         };
-      }).filter((b) => b.isFree || !b.priceNgn || b.priceNgn <= 0.01);
+      });
+
+      const freeBeats = allMapped.filter((b) => b.isFree || !b.priceNgn || b.priceNgn <= 1);
+      beats = [
+        ...freeBeats,
+        ...allMapped.filter((b) => !(b.isFree || !b.priceNgn || b.priceNgn <= 1))
+      ];
     }
 
     const { data: dbProfiles } = await supabase

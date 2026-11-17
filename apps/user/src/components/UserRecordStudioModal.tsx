@@ -1180,12 +1180,58 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
   const { isSubscribed } = useUserSubscription();
 
   // Active Beat & Session metadata
+  const [studioBeats, setStudioBeats] = useState<TrackItem[]>(availableTracks);
+  const [isLoadingStudioBeats, setIsLoadingStudioBeats] = useState<boolean>(false);
+  const [beatCategoryFilter, setBeatCategoryFilter] = useState<'all' | 'free'>('all');
   const [selectedTrack, setSelectedTrack] = useState<TrackItem | null>(preselectedTrack || null);
   const [projectTitle, setProjectTitle] = useState('Untitled session');
   const [beatPickerOpen, setBeatPickerOpen] = useState(false);
   const [beatSearchQuery, setBeatSearchQuery] = useState('');
   const [beatGenreFilter, setBeatGenreFilter] = useState('All');
   const [isAuditioningId, setIsAuditioningId] = useState<string | null>(null);
+
+  // Sync studioBeats when availableTracks prop updates
+  useEffect(() => {
+    if (Array.isArray(availableTracks) && availableTracks.length > 0) {
+      setStudioBeats((prev) => (prev.length >= availableTracks.length ? prev : availableTracks));
+    }
+  }, [availableTracks]);
+
+  // Fetch all free & studio beats live from /api/beats/studio
+  const fetchLiveStudioBeats = useCallback(async () => {
+    try {
+      setIsLoadingStudioBeats(true);
+      const res = await fetch('/api/beats/studio', { cache: 'no-store' });
+      if (res.ok) {
+        const data = await res.json();
+        const fetched: TrackItem[] = Array.isArray(data.allBeats) && data.allBeats.length > 0
+          ? data.allBeats
+          : Array.isArray(data.beats)
+          ? data.beats
+          : [];
+        if (fetched.length > 0) {
+          setStudioBeats(fetched);
+        }
+      }
+    } catch (err) {
+      console.warn('Could not fetch studio beats:', err);
+    } finally {
+      setIsLoadingStudioBeats(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchLiveStudioBeats();
+  }, [fetchLiveStudioBeats]);
+
+  useEffect(() => {
+    if (beatPickerOpen) {
+      fetchLiveStudioBeats();
+    } else if (auditionAudioRef.current) {
+      auditionAudioRef.current.pause();
+      setIsAuditioningId(null);
+    }
+  }, [beatPickerOpen, fetchLiveStudioBeats]);
 
   // DAW State & Transport
   const [recordState, setRecordState] = useState<'idle' | 'countdown' | 'recording' | 'preview'>('idle');
@@ -1831,16 +1877,31 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
       if (playheadIntervalRef.current) clearInterval(playheadIntervalRef.current);
     }
     setSelectedTrack(track);
+    if (track.bpm) setSessionBpm(track.bpm);
+    if (track.musicalKey) setAutoTuneKey(track.musicalKey);
     setPlayheadTime(0);
     if (beatAudioRef.current) {
       beatAudioRef.current.src = track.audioUrl || '';
       beatAudioRef.current.currentTime = 0;
     }
+    fetch('/api/beats/listen', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ beatId: track.id, action: 'play' })
+    }).catch(() => {});
     setBeatPickerOpen(false);
   };
 
-  // Filtered beats for search & genre picker
-  const filteredBeats = availableTracks.filter((b) => {
+  const effectiveStudioTracks = studioBeats.length > 0 ? studioBeats : availableTracks;
+  const freeStudioTracksCount = effectiveStudioTracks.filter(
+    (b) => b.isFree || !b.priceNgn || b.priceNgn <= 1 || b.category === 'free'
+  ).length;
+
+  // Filtered beats for search, category & genre picker
+  const filteredBeats = effectiveStudioTracks.filter((b) => {
+    const isBeatFree = Boolean(b.isFree || !b.priceNgn || b.priceNgn <= 1 || b.category === 'free');
+    if (beatCategoryFilter === 'free' && !isBeatFree) return false;
+
     const query = beatSearchQuery.trim().toLowerCase();
     const matchesSearch =
       query === '' ||
@@ -1849,7 +1910,7 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
       (b.genre && b.genre.toLowerCase().includes(query));
     const matchesGenre =
       beatGenreFilter === 'All' ||
-      (b.genre && b.genre.toLowerCase() === beatGenreFilter.toLowerCase());
+      (b.genre && b.genre.toLowerCase().replace(/s$/, '') === beatGenreFilter.toLowerCase().replace(/s$/, ''));
     return matchesSearch && matchesGenre;
   });
 
@@ -5937,13 +5998,13 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
                             {selectedTrack ? selectedTrack.title : 'No beat loaded'}
                           </div>
                           <div className="flex items-center gap-1 shrink-0">
-                            {availableTracks.length > 1 && (
+                            {effectiveStudioTracks.length > 1 && (
                               <button
                                 type="button"
-                                title="Next Free Beat"
+                                title="Next Beat"
                                 onClick={() => {
-                                  const idx = availableTracks.findIndex((b) => b.id === selectedTrack?.id);
-                                  const nextBeat = availableTracks[(idx + 1) % availableTracks.length];
+                                  const idx = effectiveStudioTracks.findIndex((b) => b.id === selectedTrack?.id);
+                                  const nextBeat = effectiveStudioTracks[(idx + 1) % effectiveStudioTracks.length];
                                   if (nextBeat) handleSelectBeat(nextBeat);
                                 }}
                                 className="h-4.5 px-1.5 rounded bg-[#1b1c22] hover:bg-[#262830] text-[9px] font-semibold text-[#c9ccd3] hover:text-white whitespace-nowrap"
@@ -6225,68 +6286,185 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
 
       {/* Beat Picker Modal */}
       {beatPickerOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-xs"
+          onClick={() => setBeatPickerOpen(false)}
+        >
           <div
-            className="relative w-full max-w-lg rounded-lg bg-[#1c1e24] border border-[#2a2d34] p-4 shadow-2xl flex flex-col max-h-[80vh] text-white"
+            className="relative w-full max-w-xl rounded-xl bg-[#1c1e24] border border-[#2a2d34] p-4 sm:p-5 shadow-2xl flex flex-col max-h-[85vh] text-white"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between pb-3 border-b border-[#2a2d34]">
               <div className="flex items-center gap-2">
-                <Folder className="h-4 w-4 text-[#8b8f98]" />
-                <h3 className="text-[14px] font-semibold text-white">Free beats · Beat Store</h3>
+                <Folder className="h-4 w-4 text-[#2dd4bf]" />
+                <h3 className="text-[14px] font-semibold text-white">Free Beats &amp; Studio Catalog · Beat Store</h3>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-white/10 text-gray-300">
+                  {filteredBeats.length} {filteredBeats.length === 1 ? 'beat' : 'beats'}
+                </span>
               </div>
-              <button
-                type="button"
-                onClick={() => setBeatPickerOpen(false)}
-                className="p-1.5 rounded-full text-gray-400 hover:text-white hover:bg-white/10"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-
-            <div className="py-3 flex gap-2">
-              <div className="relative flex-1">
-                <Search className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
-                <input
-                  type="text"
-                  value={beatSearchQuery}
-                  onChange={(e) => setBeatSearchQuery(e.target.value)}
-                  placeholder="Search beats by title, producer, genre..."
-                  className="w-full pl-9 pr-3 py-2 rounded-md bg-[#111214] border border-[#2a2d34] text-xs text-white focus:outline-none"
-                />
-              </div>
-            </div>
-
-            <div className="flex-1 overflow-y-auto space-y-2 py-2 pr-1">
-              {filteredBeats.map((b) => (
-                <div
-                  key={b.id}
-                  onClick={() => {
-                    handleSelectBeat(b);
-                    setBeatPickerOpen(false);
-                  }}
-                  className={`p-2 rounded-md border flex items-center justify-between gap-3 cursor-pointer ${
-                    selectedTrack?.id === b.id
-                      ? 'bg-[#2bbbad]/12 border-[#2bbbad]/40'
-                      : 'bg-transparent border-transparent hover:bg-white/5 text-[#d7dbe2]'
-                  }`}
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => fetchLiveStudioBeats()}
+                  title="Refresh beats from Beat Store"
+                  className="px-2.5 py-1 rounded-md bg-[#111214] hover:bg-white/10 border border-[#2a2d34] text-[11px] text-gray-300 hover:text-white flex items-center gap-1 transition-colors cursor-pointer"
                 >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <img src={b.coverUrl} alt={b.title} className="w-10 h-10 rounded-lg object-cover" />
-                    <div className="min-w-0">
-                      <p className="text-xs font-bold truncate text-white">{b.title}</p>
-                      <p className="text-[11px] text-gray-400 truncate">{b.artist} • {b.bpm || 110} BPM • {b.genre}</p>
-                    </div>
-                  </div>
+                  <RotateCcw className={`h-3 w-3 ${isLoadingStudioBeats ? 'animate-spin text-[#2dd4bf]' : ''}`} />
+                  <span>Refresh</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setBeatPickerOpen(false)}
+                  className="p-1.5 rounded-full text-gray-400 hover:text-white hover:bg-white/10"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
 
+            {/* Category & Genre Filters */}
+            <div className="pt-3 space-y-2.5">
+              <div className="flex flex-col sm:flex-row gap-2">
+                <div className="relative flex-1">
+                  <Search className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
+                  <input
+                    type="text"
+                    value={beatSearchQuery}
+                    onChange={(e) => setBeatSearchQuery(e.target.value)}
+                    placeholder="Search beats by title, producer, genre..."
+                    className="w-full pl-9 pr-3 py-2 rounded-md bg-[#111214] border border-[#2a2d34] text-xs text-white focus:outline-none focus:border-[#2dd4bf]"
+                  />
+                </div>
+                <div className="flex items-center gap-1 bg-[#111214] p-1 rounded-md border border-[#2a2d34] shrink-0">
                   <button
                     type="button"
-                    className="px-3 py-1 rounded-md bg-white text-black text-xs font-semibold shrink-0"
+                    onClick={() => setBeatCategoryFilter('all')}
+                    className={`px-2.5 py-1 rounded text-[11px] font-semibold transition-colors cursor-pointer ${
+                      beatCategoryFilter === 'all'
+                        ? 'bg-[#2dd4bf] text-black'
+                        : 'text-gray-400 hover:text-white'
+                    }`}
                   >
-                    Load
+                    All Studio Beats ({effectiveStudioTracks.length})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setBeatCategoryFilter('free')}
+                    className={`px-2.5 py-1 rounded text-[11px] font-semibold transition-colors cursor-pointer ${
+                      beatCategoryFilter === 'free'
+                        ? 'bg-emerald-400 text-black'
+                        : 'text-gray-400 hover:text-white'
+                    }`}
+                  >
+                    Free Only ({freeStudioTracksCount})
                   </button>
                 </div>
-              ))}
+              </div>
+
+              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar">
+                {['All', 'Afrobeats', 'Hip-Hop', 'Amapiano', 'Cinematic', 'Electronic'].map((genre) => (
+                  <button
+                    key={genre}
+                    type="button"
+                    onClick={() => setBeatGenreFilter(genre)}
+                    className={`px-2.5 py-1 rounded-full text-[11px] font-medium shrink-0 transition-colors cursor-pointer ${
+                      beatGenreFilter === genre
+                        ? 'bg-white text-black font-semibold'
+                        : 'bg-[#111214] text-gray-400 hover:text-white border border-[#2a2d34]'
+                    }`}
+                  >
+                    {genre}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto space-y-1.5 py-2.5 pr-1 mt-1">
+              {filteredBeats.length === 0 ? (
+                <div className="py-12 text-center text-xs text-gray-400 space-y-2">
+                  <p>No beats match your current filter.</p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setBeatSearchQuery('');
+                      setBeatGenreFilter('All');
+                      setBeatCategoryFilter('all');
+                    }}
+                    className="px-3 py-1.5 rounded bg-white/10 hover:bg-white/15 text-white text-xs font-semibold cursor-pointer"
+                  >
+                    Show All Studio Beats
+                  </button>
+                </div>
+              ) : (
+                filteredBeats.map((b) => {
+                  const isBeatFree = Boolean(b.isFree || !b.priceNgn || b.priceNgn <= 1 || b.category === 'free');
+                  const isPreviewing = isAuditioningId === b.id;
+                  return (
+                    <div
+                      key={b.id}
+                      onClick={() => {
+                        handleSelectBeat(b);
+                        setBeatPickerOpen(false);
+                      }}
+                      className={`p-2.5 rounded-lg border flex items-center justify-between gap-3 cursor-pointer transition-colors ${
+                        selectedTrack?.id === b.id
+                          ? 'bg-[#2bbbad]/15 border-[#2bbbad]/50'
+                          : 'bg-[#14161b]/70 border-white/[0.05] hover:bg-white/[0.06] text-[#d7dbe2]'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3 min-w-0 flex-1">
+                        <div className="relative w-10 h-10 shrink-0">
+                          <img src={b.coverUrl} alt={b.title} className="w-10 h-10 rounded-lg object-cover border border-white/10" />
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleAuditionToggle(b);
+                            }}
+                            title={isPreviewing ? 'Pause preview' : 'Preview beat'}
+                            className="absolute inset-0 rounded-lg bg-black/50 hover:bg-black/70 flex items-center justify-center text-white transition-opacity"
+                          >
+                            {isPreviewing ? (
+                              <Pause className="h-3.5 w-3.5 fill-current text-[#2dd4bf]" />
+                            ) : (
+                              <Play className="h-3.5 w-3.5 fill-current ml-0.5" />
+                            )}
+                          </button>
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            <p className="text-xs font-bold truncate text-white">{b.title}</p>
+                            {isBeatFree ? (
+                              <span className="px-1.5 py-0.2 rounded text-[9px] font-mono font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 shrink-0">
+                                FREE
+                              </span>
+                            ) : (
+                              <span className="px-1.5 py-0.2 rounded text-[9px] font-mono font-bold bg-[#2dd4bf]/20 text-[#2dd4bf] border border-[#2dd4bf]/30 shrink-0">
+                                PRO STUDIO
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-[11px] text-gray-400 truncate mt-0.5">
+                            {b.artist} • {b.bpm || 110} BPM • {b.musicalKey || 'C Minor'} • {b.genre}
+                          </p>
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleSelectBeat(b);
+                          setBeatPickerOpen(false);
+                        }}
+                        className="px-3.5 py-1.5 rounded-md bg-white hover:bg-gray-200 text-black text-xs font-semibold shrink-0 cursor-pointer"
+                      >
+                        {selectedTrack?.id === b.id ? 'Loaded' : 'Load'}
+                      </button>
+                    </div>
+                  );
+                })
+              )}
             </div>
           </div>
         </div>
