@@ -183,6 +183,11 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setIsPlaying(true);
     if (isDifferentBeat) {
       setCurrentTime(0);
+      fetch('/api/beats/listen', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ beatId: beat.id, action: 'play' })
+      }).catch(() => {});
     }
 
     // Stop synthesizer or previous audio
@@ -409,6 +414,11 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             const beatToDownload = pendingDownloadBeatRef.current;
             pendingDownloadBeatRef.current = null;
             recordBeatDownload(beatToDownload.id, beatToDownload.title);
+            fetch('/api/beats/listen', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ beatId: beatToDownload.id, action: 'download' })
+            }).catch(() => {});
 
             // Initiate browser file download with clean [Title] - [Producer].[ext] filename
             const producerName = beatToDownload.producer?.display_name || beatToDownload.producer?.handle || 'Caution Studio';

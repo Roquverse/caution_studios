@@ -41,6 +41,8 @@ export default function PayoutsPage() {
   const [availableBalanceNgn, setAvailableBalanceNgn] = useState(0);
   const [pendingClearanceNgn, setPendingClearanceNgn] = useState(0);
   const [totalPaidOutNgn, setTotalPaidOutNgn] = useState(0);
+  const [totalPlaysCount, setTotalPlaysCount] = useState(0);
+  const [totalDownloadsCount, setTotalDownloadsCount] = useState(0);
   const [payoutHistory, setPayoutHistory] = useState<PayoutRecord[]>([]);
 
   useEffect(() => {
@@ -48,8 +50,68 @@ export default function PayoutsPage() {
     async function loadPayoutData() {
       try {
         setLoading(true);
-        const { data: { session } } = await supabase.auth.getSession();
+        let { data: { session } } = await supabase.auth.getSession();
+
+        if (!session) {
+          const match = document.cookie.match(/(?:^|;\s*)sb-token=([^;]+)/);
+          const matchRefresh = document.cookie.match(/(?:^|;\s*)sb-refresh=([^;]+)/);
+          if (match && matchRefresh) {
+            const { data } = await supabase.auth.setSession({
+              access_token: decodeURIComponent(match[1]),
+              refresh_token: decodeURIComponent(matchRefresh[1])
+            });
+            session = data.session;
+          }
+        }
+
         const userId = session?.user?.id;
+        const accessToken = session?.access_token;
+
+        const res = await fetch(
+          `/api/creator/telemetry${userId ? `?userId=${encodeURIComponent(userId)}` : ''}`,
+          {
+            headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
+            cache: 'no-store'
+          }
+        );
+
+        if (res.ok) {
+          const payload = await res.json();
+          if (isMounted) {
+            const profile = payload.profile;
+            if (profile) {
+              setBankName(profile.paystack_bank_name || '');
+              setAccountNumber(profile.paystack_account_number || '');
+              setAccountName(profile.paystack_account_name || '');
+              setAvailableBalanceNgn(Number(profile.available_balance_ngn) || Number(payload.availableBalanceNgn) || 0);
+              setPendingClearanceNgn(Number(profile.pending_balance_ngn) || 0);
+            } else {
+              setAvailableBalanceNgn(Number(payload.availableBalanceNgn) || 0);
+            }
+
+            setTotalPlaysCount(Number(payload.totalPlaysCount || 0));
+            setTotalDownloadsCount(Number(payload.totalDownloadsCount || 0));
+
+            const payouts = Array.isArray(payload.payouts) ? payload.payouts : [];
+            const completedTotal = payouts
+              .filter((p: any) => p.status === 'completed')
+              .reduce((acc: number, p: any) => acc + (Number(p.amount_ngn) || 0), 0);
+            setTotalPaidOutNgn(completedTotal);
+
+            const formatted: PayoutRecord[] = payouts.map((p: any) => ({
+              id: p.id,
+              date: new Date(p.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+              bank: `${p.bank_name || 'Bank'} ···· ${p.account_number ? p.account_number.slice(-4) : '****'}`,
+              amountNgn: Number(p.amount_ngn) || 0,
+              feeNgn: Number(p.fee_ngn) || 100,
+              netNgn: Number(p.net_ngn) || (Number(p.amount_ngn) - 100),
+              reference: p.paystack_transfer_reference || `trf_${p.id.slice(0, 8)}`,
+              status: p.status === 'completed' ? 'Completed' : (p.status === 'failed' ? 'Failed' : 'Pending')
+            }));
+            setPayoutHistory(formatted);
+          }
+          return;
+        }
 
         if (!userId) {
           if (isMounted) setLoading(false);
@@ -300,8 +362,8 @@ export default function PayoutsPage() {
             </div>
           )}
 
-          {/* 3 Balance Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          {/* 4 Balance & Pay Threshold Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-5 shadow-sm">
               <span className="text-xs font-medium text-zinc-400 block">Available for Withdrawal</span>
               <div className="mt-2 flex items-baseline gap-2">
@@ -310,7 +372,19 @@ export default function PayoutsPage() {
                 </span>
               </div>
               <p className="text-[11px] text-[#2dd4bf] mt-1 font-medium">
-                Instant disbursement to Nigerian bank
+                Min. withdrawal threshold: ₦2,000
+              </p>
+            </div>
+
+            <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-5 shadow-sm">
+              <span className="text-xs font-medium text-zinc-400 block">Plays &amp; Downloads Threshold</span>
+              <div className="mt-2">
+                <span className="text-2xl font-bold font-mono text-[#2dd4bf]">
+                  {Math.max(totalPlaysCount, totalDownloadsCount, totalPlaysCount + totalDownloadsCount).toLocaleString()} / 10k
+                </span>
+              </div>
+              <p className="text-[11px] text-amber-300 mt-1 font-mono">
+                {totalPlaysCount.toLocaleString()} plays · {totalDownloadsCount.toLocaleString()} downloads (₦30k / 10k)
               </p>
             </div>
 
@@ -334,7 +408,7 @@ export default function PayoutsPage() {
                 </span>
               </div>
               <p className="text-[11px] text-zinc-500 mt-1">
-                Net 80% splits & streaming royalties
+                Net 80% splits &amp; threshold rewards
               </p>
             </div>
           </div>

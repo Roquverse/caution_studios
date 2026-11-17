@@ -20,7 +20,8 @@ import {
   Loader2,
   UploadCloud,
   FileCheck2,
-  Download
+  Download,
+  Headphones
 } from 'lucide-react';
 
 interface RecentSaleItem {
@@ -39,6 +40,7 @@ interface TopBeatItem {
   title: string;
   bpm: number;
   genre: string;
+  plays: number;
   downloads: number;
   earnedNgn: number;
   coverUrl: string;
@@ -60,6 +62,7 @@ export default function CreatorDashboardPage() {
   // Producer real metrics
   const [totalEarningsNgn, setTotalEarningsNgn] = useState<number>(0);
   const [downloadRewardNgn, setDownloadRewardNgn] = useState<number>(0);
+  const [totalPlaysCount, setTotalPlaysCount] = useState<number>(0);
   const [totalDownloadsCount, setTotalDownloadsCount] = useState<number>(0);
   const [liveBeatsCount, setLiveBeatsCount] = useState<number>(0);
   const [licensesSoldCount, setLicensesSoldCount] = useState<number>(0);
@@ -70,9 +73,10 @@ export default function CreatorDashboardPage() {
   const [monthlyChart, setMonthlyChart] = useState<MonthData[]>([]);
 
   const downloadThreshold = 10000;
+  const combinedActivityCount = totalPlaysCount + totalDownloadsCount;
   const downloadProgressPct = Math.min(
     100,
-    Math.round((totalDownloadsCount / downloadThreshold) * 100)
+    Number(((combinedActivityCount / downloadThreshold) * 100).toFixed(2))
   );
 
   useEffect(() => {
@@ -81,116 +85,79 @@ export default function CreatorDashboardPage() {
     async function loadDashboardData() {
       try {
         setLoading(true);
-        const { data: { session } } = await supabase.auth.getSession();
-        const userId = session?.user?.id;
+        let { data: { session } } = await supabase.auth.getSession();
 
+        if (!session?.user && typeof document !== 'undefined') {
+          const matchToken = document.cookie.match(/(?:^|;\s*)sb-token=([^;]*)/);
+          const matchRefresh = document.cookie.match(/(?:^|;\s*)sb-refresh=([^;]*)/);
+          if (matchToken && matchRefresh) {
+            try {
+              const { data: restored } = await supabase.auth.setSession({
+                access_token: decodeURIComponent(matchToken[1]),
+                refresh_token: decodeURIComponent(matchRefresh[1])
+              });
+              if (restored?.session?.user) session = restored.session;
+            } catch (e) {}
+          }
+        }
+
+        const userId = session?.user?.id;
         if (!userId) {
           if (isMounted) setLoading(false);
           return;
         }
 
-        // 1. Fetch Producer Profile
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', userId)
-          .maybeSingle();
+        // Primary: Fetch comprehensive producer telemetry via service-role API
+        const res = await fetch(`/api/creator/telemetry?userId=${encodeURIComponent(userId)}`, {
+          headers: session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}
+        });
 
-        if (profile && isMounted) {
-          setIsVerified(Boolean(profile.is_verified));
+        if (res.ok) {
+          const data = await res.json();
+          if (!isMounted) return;
 
-          if (profile.trial_ends_at) {
-            const ends = new Date(profile.trial_ends_at).getTime();
-            const now = Date.now();
-            const diffDays = Math.max(0, Math.ceil((ends - now) / (1000 * 60 * 60 * 24)));
-            setTrialDaysRemaining(diffDays);
-          } else {
-            setTrialDaysRemaining(85);
+          if (data.profile) {
+            setIsVerified(Boolean(data.profile.is_verified));
+            if (data.profile.trial_ends_at) {
+              const ends = new Date(data.profile.trial_ends_at).getTime();
+              const diffDays = Math.max(0, Math.ceil((ends - Date.now()) / (1000 * 60 * 60 * 24)));
+              setTrialDaysRemaining(diffDays);
+            } else {
+              setTrialDaysRemaining(85);
+            }
           }
-        }
 
-        // 2. Fetch Producer Beats
-        const { data: dbBeats } = await supabase
-          .from('beats')
-          .select('*')
-          .eq('producer_id', userId)
-          .order('play_count', { ascending: false });
-
-        if (dbBeats && isMounted) {
-          const live = dbBeats.filter((b) => b.status === 'live');
+          const dbBeats = data.beats || [];
+          const live = dbBeats.filter((b: any) => b.status === 'live');
           setLiveBeatsCount(live.length);
 
-          const totalDownloads = dbBeats.reduce(
-            (acc, b) => acc + (b.free_commercial_downloads_count || b.download_count || 0),
-            0
-          );
-          setTotalDownloadsCount(totalDownloads);
-          const computedReward = Math.floor(totalDownloads / 10000) * 30000;
-          setDownloadRewardNgn(computedReward);
+          setTotalPlaysCount(Number(data.totalPlaysCount) || 0);
+          setTotalDownloadsCount(Number(data.totalDownloadsCount) || 0);
+          setDownloadRewardNgn(Number(data.downloadRewardNgn) || 0);
 
-          // Check if producer has download incentives recorded
-          const { data: incentiveRows } = await supabase
-            .from('producer_download_incentives')
-            .select('reward_amount_ngn, qualifying_downloads')
-            .eq('producer_id', userId);
-
-          if (incentiveRows && incentiveRows.length > 0) {
-            const incReward = incentiveRows.reduce((acc, r) => acc + Number(r.reward_amount_ngn || 0), 0);
-            const incDownloads = incentiveRows.reduce((acc, r) => acc + Number(r.qualifying_downloads || 0), 0);
-            if (incReward > computedReward) setDownloadRewardNgn(incReward);
-            if (incDownloads > totalDownloads) setTotalDownloadsCount(incDownloads);
-          }
-
-          const topBeats: TopBeatItem[] = dbBeats.slice(0, 4).map((b) => {
+          const topBeats: TopBeatItem[] = dbBeats.slice(0, 6).map((b: any) => {
             const audioKey = b.master_wav_key || b.preview_clean_key || b.preview_tagged_key;
-            const dlCount = b.free_commercial_downloads_count || b.download_count || 0;
+            const playsCount = Number(b.play_count) || 0;
+            const dlCount = Number(b.downloads_count || b.free_commercial_downloads_count || b.download_count) || 0;
             return {
               id: b.id,
               title: b.title,
               bpm: b.bpm || 110,
               genre: b.genre || 'Afrobeats',
+              plays: playsCount,
               downloads: dlCount,
-              earnedNgn: Math.floor(dlCount / 10000) * 30000,
+              earnedNgn: Math.floor((playsCount + dlCount) / 10000) * 30000,
               coverUrl: b.cover_url || '/images/studio_mixing_console.jpg',
-              audioUrl: audioKey ? `/api/media/${audioKey}` : ''
+              audioUrl: audioKey ? (audioKey.startsWith('http') || audioKey.startsWith('/') ? audioKey : `/api/media/${audioKey}`) : ''
             };
           });
           setTopStreamingBeats(topBeats);
-        }
 
-        // 3. Fetch Producer Sales & Order Items
-        const { data: orderItems } = await supabase
-          .from('order_items')
-          .select(`
-            id,
-            price_cents,
-            producer_amount_cents,
-            license,
-            order:order_id (
-              id,
-              status,
-              created_at,
-              buyer:buyer_id (
-                display_name,
-                handle
-              )
-            ),
-            beat:beat_id (
-              title,
-              cover_url
-            )
-          `)
-          .eq('producer_id', userId)
-          .order('id', { ascending: false });
-
-        if (orderItems && isMounted) {
-          const paidItems = orderItems.filter((item: any) => item.order?.status === 'paid');
+          const paidItems = data.orderItems || [];
           setLicensesSoldCount(paidItems.length);
+          const salesNetNgn = Number(data.totalSalesEarningsNgn) || 0;
+          setTotalEarningsNgn(salesNetNgn + (Number(data.downloadRewardNgn) || 0));
 
-          const netCents = paidItems.reduce((acc: number, item: any) => acc + (item.producer_amount_cents || 0), 0);
-          setTotalEarningsNgn(Math.round(netCents / 100));
-
-          // Format recent sales
           const mappedSales: RecentSaleItem[] = paidItems.slice(0, 5).map((item: any) => {
             const dateStr = item.order?.created_at
               ? new Date(item.order.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
@@ -209,16 +176,14 @@ export default function CreatorDashboardPage() {
           });
           setRecentSales(mappedSales);
 
-          // Build Monthly Chart from real sales
-          const months = ['May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct'];
-          const currentMonthIndex = new Date().getMonth();
+          const months = ['Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov'];
           const baseData: MonthData[] = months.map((m, idx) => {
             const isCurrent = idx === months.length - 1;
-            const val = isCurrent ? Math.max(netCents / 100, 0) : 0;
+            const val = isCurrent ? Math.max(salesNetNgn, 0) : 0;
             return {
               month: m,
               value: val,
-              height: val > 0 ? `${Math.min(95, Math.max(25, (val / 100000) * 100))}%` : '8%',
+              height: val > 0 ? `${Math.min(95, Math.max(25, (val / 100000) * 100))}%` : '10%',
               isCurrent
             };
           });
@@ -274,7 +239,7 @@ export default function CreatorDashboardPage() {
             Studio Dashboard
           </h1>
           <p className="text-xs text-zinc-400 mt-0.5">
-            Real-time catalog performance, streaming royalties, and Paystack payout ledger
+            Real-time catalog performance, plays &amp; downloads pay threshold, and Paystack payout ledger
           </p>
         </div>
 
@@ -299,7 +264,7 @@ export default function CreatorDashboardPage() {
       {loading ? (
         <div className="flex flex-col items-center justify-center p-16 space-y-3">
           <Loader2 className="h-7 w-7 text-[#2dd4bf] animate-spin" />
-          <span className="text-xs font-mono text-zinc-400">Loading catalog telemetry & payouts...</span>
+          <span className="text-xs font-mono text-zinc-400">Loading catalog telemetry, plays &amp; downloads...</span>
         </div>
       ) : (
         <>
@@ -326,7 +291,7 @@ export default function CreatorDashboardPage() {
                 </span>
               </div>
               <p className="text-xs text-zinc-400 mt-3 leading-relaxed">
-                Zero subscription fees active. You keep 80% on all beat sales and earn royalties on all free streams.
+                Zero subscription fees active. You keep 80% on all beat sales and earn ₦30,000 per 10,000 plays &amp; downloads.
               </p>
               <div className="mt-3 pt-3 border-t border-zinc-800/80 flex items-center justify-between text-xs font-mono">
                 <span className="text-zinc-500">Trial Period:</span>
@@ -334,13 +299,13 @@ export default function CreatorDashboardPage() {
               </div>
             </div>
 
-            {/* Free Beat Streaming Verification Progress */}
+            {/* Plays & Downloads Pay Threshold Progress */}
             <div className="lg:col-span-2 rounded-lg border border-zinc-800 bg-zinc-900/50 p-4 shadow-sm flex flex-col justify-between">
               <div>
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-zinc-800/80">
                   <div className="flex items-center gap-2">
                     <span className="text-xs font-mono uppercase tracking-wider text-zinc-400">
-                      Partner Verification
+                      Pay Threshold &amp; Partner Verification
                     </span>
                     {isVerified ? (
                       <span className="px-2 py-0.5 rounded-full bg-[#2dd4bf]/20 border border-[#2dd4bf]/40 text-[10px] font-bold text-[#2dd4bf] flex items-center gap-1">
@@ -350,38 +315,47 @@ export default function CreatorDashboardPage() {
                     ) : (
                       <span className="px-2 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/30 text-[10px] font-bold text-amber-300 flex items-center gap-1">
                         <Sparkles className="h-3 w-3" />
-                        <span>Verification In-Progress</span>
+                        <span>Threshold Tracking Active</span>
                       </span>
                     )}
                   </div>
-                  <div className="text-right sm:text-right">
-                    <span className="text-xs font-mono text-zinc-400">Current Downloads: </span>
-                    <span className="text-xs font-mono font-bold text-[#2dd4bf]">
-                      {totalDownloadsCount.toLocaleString()} / {downloadThreshold.toLocaleString()}
+                  <div className="flex flex-wrap items-center gap-3 text-xs font-mono">
+                    <span className="text-zinc-300">
+                      Plays: <strong className="text-[#2dd4bf]">{totalPlaysCount.toLocaleString()}</strong>
+                    </span>
+                    <span className="text-zinc-600">•</span>
+                    <span className="text-zinc-300">
+                      Downloads: <strong className="text-amber-300">{totalDownloadsCount.toLocaleString()}</strong>
+                    </span>
+                    <span className="text-zinc-600">•</span>
+                    <span className="text-zinc-400">
+                      Total: <strong className="text-white">{combinedActivityCount.toLocaleString()} / {downloadThreshold.toLocaleString()}</strong>
                     </span>
                   </div>
                 </div>
 
                 <p className="text-xs text-zinc-400 mt-2 leading-relaxed">
-                  Earn ₦30,000 in royalties per 10,000 qualifying beat downloads to qualify for the <strong className="text-zinc-200">Verified Producer</strong> checkmark and direct artist recording chat.
+                  Every play and download across your catalog counts towards your <strong className="text-zinc-200">10,000 Pay Threshold (₦30,000 royalty payout)</strong>, the <strong className="text-zinc-200">Verified Producer</strong> checkmark, and direct artist recording chat.
                 </p>
               </div>
 
               <div className="mt-4 space-y-2">
                 <div className="flex justify-between text-xs font-mono">
-                  <span className="text-zinc-400">Milestone Progress</span>
+                  <span className="text-zinc-400">
+                    Pay Threshold Progress ({combinedActivityCount.toLocaleString()} / 10,000)
+                  </span>
                   <span className="text-white font-bold">{downloadProgressPct}% Completed</span>
                 </div>
-                <div className="w-full h-2 rounded-full bg-zinc-800 overflow-hidden">
+                <div className="w-full h-2.5 rounded-full bg-zinc-800 overflow-hidden">
                   <div
                     className="h-full bg-gradient-to-r from-[#2dd4bf] to-emerald-400 transition-all duration-500 rounded-full"
-                    style={{ width: `${downloadProgressPct}%` }}
+                    style={{ width: `${Math.max(downloadProgressPct, combinedActivityCount > 0 ? 2 : 0)}%` }}
                   />
                 </div>
                 <div className="flex items-center justify-between text-[11px] text-zinc-500 pt-1">
-                  <span>Goal: 10,000 downloads threshold (₦30,000 reward)</span>
+                  <span>Goal: 10,000 plays &amp; downloads threshold (₦30,000 payout)</span>
                   <Link href="/streaming" className="text-[#2dd4bf] hover:underline flex items-center gap-1">
-                    <span>View Download Telemetry</span>
+                    <span>View Full Plays &amp; Downloads Telemetry</span>
                     <ArrowRight className="h-3 w-3" />
                   </Link>
                 </div>
@@ -389,9 +363,9 @@ export default function CreatorDashboardPage() {
             </div>
           </div>
 
-          {/* 4 Metric KPI Cards */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            {/* Total Earnings */}
+          {/* 5 Metric KPI Cards */}
+          <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+            {/* 1. Total Earnings */}
             <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-4 shadow-sm">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-medium text-zinc-400">Total Net Earnings</span>
@@ -408,10 +382,27 @@ export default function CreatorDashboardPage() {
                   </span>
                 )}
               </div>
-              <p className="text-[11px] text-zinc-500 mt-1">80% creator take-home pay</p>
+              <p className="text-[11px] text-zinc-500 mt-1">80% sales + threshold rewards</p>
             </div>
 
-            {/* Beat Downloads / Download Incentives */}
+            {/* 2. Total Plays / Streams */}
+            <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-4 shadow-sm">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-medium text-zinc-400">Total Beat Plays</span>
+                <div className="p-1.5 rounded-md bg-[#2dd4bf]/10 text-[#2dd4bf]">
+                  <Headphones className="h-4 w-4" />
+                </div>
+              </div>
+              <div className="mt-2 flex items-baseline gap-2">
+                <span className="text-2xl font-bold font-mono text-[#2dd4bf]">{totalPlaysCount.toLocaleString()}</span>
+                <span className="text-xs font-mono text-zinc-500">plays</span>
+              </div>
+              <p className="text-[11px] text-zinc-500 mt-1">
+                Live streams across all beats
+              </p>
+            </div>
+
+            {/* 3. Beat Downloads */}
             <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-4 shadow-sm">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-medium text-zinc-400">Beat Downloads</span>
@@ -420,17 +411,17 @@ export default function CreatorDashboardPage() {
                 </div>
               </div>
               <div className="mt-2 flex items-baseline gap-2">
-                <span className="text-2xl font-bold font-mono text-white">{totalDownloadsCount.toLocaleString()}</span>
+                <span className="text-2xl font-bold font-mono text-amber-300">{totalDownloadsCount.toLocaleString()}</span>
                 <span className="text-xs font-mono text-zinc-500">downloads</span>
               </div>
               <p className="text-[11px] text-zinc-500 mt-1">
                 {downloadRewardNgn > 0
-                  ? `₦${downloadRewardNgn.toLocaleString()} reward earned (₦30k / 10k)`
-                  : `${totalDownloadsCount.toLocaleString()} beat downloads (Goal: 10,000)`}
+                  ? `₦${downloadRewardNgn.toLocaleString()} reward earned`
+                  : `${combinedActivityCount.toLocaleString()} / 10k pay threshold`}
               </p>
             </div>
 
-            {/* Live Uploads */}
+            {/* 4. Live Uploads */}
             <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-4 shadow-sm">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-medium text-zinc-400">Live Catalog Beats</span>
@@ -442,11 +433,11 @@ export default function CreatorDashboardPage() {
                 <span className="text-2xl font-bold font-mono text-white">{liveBeatsCount}</span>
                 <span className="text-xs text-zinc-400">active</span>
               </div>
-              <p className="text-[11px] text-zinc-500 mt-1">Ready for purchase & streaming</p>
+              <p className="text-[11px] text-zinc-500 mt-1">Ready for purchase &amp; streaming</p>
             </div>
 
-            {/* Licenses Sold */}
-            <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-4 shadow-sm">
+            {/* 5. Licenses Sold */}
+            <div className="col-span-2 lg:col-span-1 rounded-lg border border-zinc-800 bg-zinc-900/50 p-4 shadow-sm">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-medium text-zinc-400">Licenses Sold</span>
                 <div className="p-1.5 rounded-md bg-purple-500/10 text-purple-300">
@@ -465,7 +456,7 @@ export default function CreatorDashboardPage() {
           <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-5 shadow-sm">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-zinc-800">
               <div>
-                <h3 className="text-sm font-semibold text-white">Monthly Sales & Royalty Payouts</h3>
+                <h3 className="text-sm font-semibold text-white">Monthly Sales &amp; Royalty Payouts</h3>
                 <p className="text-xs text-zinc-400 mt-0.5">Estimated gross volume and net creator payouts</p>
               </div>
               <div className="flex items-center gap-2">
@@ -508,7 +499,7 @@ export default function CreatorDashboardPage() {
             </div>
           </div>
 
-          {/* Two Column Layout: Recent Sales & Top Streaming Beats */}
+          {/* Two Column Layout: Recent Sales & Top Streaming / Downloaded Beats */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Recent Beat Sales */}
             <div className="lg:col-span-2 rounded-lg border border-zinc-800 bg-zinc-900/50 p-5 shadow-sm">
@@ -571,12 +562,12 @@ export default function CreatorDashboardPage() {
               </div>
             </div>
 
-            {/* Top Downloaded Beats */}
+            {/* Top Played & Downloaded Beats */}
             <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-5 shadow-sm">
               <div className="flex items-center justify-between pb-3 border-b border-zinc-800">
                 <div>
-                  <h3 className="text-sm font-semibold text-white">Top Downloaded Beats</h3>
-                  <p className="text-xs text-zinc-400">Downloads towards ₦30,000 / 10k milestone</p>
+                  <h3 className="text-sm font-semibold text-white">Top Played &amp; Downloaded Beats</h3>
+                  <p className="text-xs text-zinc-400">Plays &amp; downloads towards ₦30,000 / 10k threshold</p>
                 </div>
                 <Link href="/streaming" className="text-xs text-[#2dd4bf] hover:underline">
                   Details
@@ -610,15 +601,17 @@ export default function CreatorDashboardPage() {
                           <span className="text-xs font-medium text-white block truncate">
                             {beat.title}
                           </span>
-                          <span className="text-[10px] text-zinc-500 block">
-                            {beat.bpm} BPM · {beat.genre} · {beat.downloads.toLocaleString()} downloads
+                          <span className="text-[10px] text-zinc-400 block font-mono">
+                            <span className="text-[#2dd4bf]">{beat.plays.toLocaleString()} plays</span>
+                            {' · '}
+                            <span className="text-amber-300">{beat.downloads.toLocaleString()} dl</span>
                           </span>
                         </div>
                       </div>
 
                       <div className="text-right shrink-0 font-mono">
                         <span className="text-xs font-bold text-[#2dd4bf] block">
-                          {beat.downloads.toLocaleString()}
+                          {(beat.plays + beat.downloads).toLocaleString()}
                         </span>
                         <span className="text-[10px] text-zinc-500 block">/ 10,000</span>
                       </div>
@@ -630,7 +623,7 @@ export default function CreatorDashboardPage() {
                   <UploadCloud className="h-8 w-8 text-zinc-600 mx-auto" />
                   <p className="text-xs text-zinc-400 font-medium">No beats uploaded yet</p>
                   <p className="text-[11px] text-zinc-500">
-                    Upload your first beat to start receiving streams & royalties!
+                    Upload your first beat to start receiving streams &amp; royalties!
                   </p>
                 </div>
               )}

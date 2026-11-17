@@ -38,6 +38,8 @@ export interface BeatTrack {
   preview_clean_key?: string;
   stems_zip_key?: string;
   duration_seconds?: number;
+  play_count?: number;
+  free_commercial_downloads_count?: number;
   status: 'draft' | 'live' | 'unlisted' | 'archived';
   created_at: string;
   producer?: {
@@ -674,6 +676,7 @@ export default function AdminTracksPage() {
                   <th className="py-3 px-4">Genre / Mood</th>
                   <th className="py-3 px-4">BPM & Key</th>
                   <th className="py-3 px-4">Duration</th>
+                  <th className="py-3 px-4 text-center">Plays / Downloads</th>
                   <th className="py-3 px-4">Basic Lease (₦)</th>
                   <th className="py-3 px-4 text-center">Status</th>
                   <th className="py-3 px-4 text-right">Actions</th>
@@ -777,6 +780,16 @@ export default function AdminTracksPage() {
                         {/* Duration */}
                         <td className="py-3 px-4 font-mono text-zinc-400">
                           {formatDuration(track.duration_seconds)}
+                        </td>
+
+                        {/* Plays / Downloads */}
+                        <td className="py-3 px-4 text-center font-mono text-[11px]">
+                          <div className="text-[#2dd4bf] font-semibold">
+                            {(track.play_count || 0).toLocaleString()} plays
+                          </div>
+                          <div className="text-emerald-400 text-[10px]">
+                            {(track.free_commercial_downloads_count || 0).toLocaleString()} dl
+                          </div>
                         </td>
 
                         {/* Basic Price */}

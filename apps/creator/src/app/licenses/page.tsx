@@ -32,6 +32,8 @@ export default function CreatorLicensesPage() {
   const [selectedLicense, setSelectedLicense] = useState<LicenseRecord | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [licenses, setLicenses] = useState<LicenseRecord[]>([]);
+  const [totalPlays, setTotalPlays] = useState(0);
+  const [totalDownloads, setTotalDownloads] = useState(0);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -39,40 +41,72 @@ export default function CreatorLicensesPage() {
     async function loadLicenses() {
       try {
         setLoading(true);
-        const { data: { session } } = await supabase.auth.getSession();
-        const userId = session?.user?.id;
+        let { data: { session } } = await supabase.auth.getSession();
 
-        if (!userId) {
-          if (isMounted) setLoading(false);
-          return;
+        if (!session) {
+          const match = document.cookie.match(/(?:^|;\s*)sb-token=([^;]+)/);
+          const matchRefresh = document.cookie.match(/(?:^|;\s*)sb-refresh=([^;]+)/);
+          if (match && matchRefresh) {
+            const { data } = await supabase.auth.setSession({
+              access_token: decodeURIComponent(match[1]),
+              refresh_token: decodeURIComponent(matchRefresh[1])
+            });
+            session = data.session;
+          }
         }
 
-        // Query order items for this producer
-        const { data: items } = await supabase
-          .from('order_items')
-          .select(`
-            id,
-            price_cents,
-            producer_amount_cents,
-            license,
-            order:order_id (
+        const userId = session?.user?.id;
+        const accessToken = session?.access_token;
+
+        const res = await fetch(
+          `/api/creator/telemetry${userId ? `?userId=${encodeURIComponent(userId)}` : ''}`,
+          {
+            headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
+            cache: 'no-store'
+          }
+        );
+
+        let items: any[] | null = null;
+        if (res.ok) {
+          const payload = await res.json();
+          if (isMounted) {
+            setTotalPlays(Number(payload.totalPlaysCount || 0));
+            setTotalDownloads(Number(payload.totalDownloadsCount || 0));
+          }
+          if (Array.isArray(payload.orderItems)) {
+            items = payload.orderItems;
+          }
+        }
+
+        if (!items && userId) {
+          // Query order items for this producer directly as fallback
+          const { data: fallbackItems } = await supabase
+            .from('order_items')
+            .select(`
               id,
-              status,
-              created_at,
-              buyer:buyer_id (
-                display_name,
-                handle
+              price_cents,
+              producer_amount_cents,
+              license,
+              order:order_id (
+                id,
+                status,
+                created_at,
+                buyer:buyer_id (
+                  display_name,
+                  handle
+                )
+              ),
+              beat:beat_id (
+                title
               )
-            ),
-            beat:beat_id (
-              title
-            )
-          `)
-          .eq('producer_id', userId)
-          .order('id', { ascending: false });
+            `)
+            .eq('producer_id', userId)
+            .order('id', { ascending: false });
+          items = fallbackItems;
+        }
 
         if (items && isMounted) {
-          const paidItems = items.filter((item: any) => item.order?.status === 'paid');
+          const paidItems = items.filter((item: any) => !item.order || item.order?.status === 'paid');
           const mapped: LicenseRecord[] = paidItems.map((item: any) => {
             const tierStr = (item.license || 'basic').toLowerCase();
             let coverage = 'Social Media Sync & Streaming';
@@ -150,8 +184,8 @@ export default function CreatorLicensesPage() {
         </div>
       </div>
 
-      {/* Search Filter */}
-      <div className="flex items-center gap-3 bg-zinc-900/40 p-3 rounded-lg border border-zinc-800">
+      {/* Search Filter & Telemetry Summary */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-zinc-900/40 p-3 rounded-lg border border-zinc-800">
         <div className="relative flex-1 max-w-sm">
           <Search className="h-3.5 w-3.5 text-zinc-500 absolute left-3 top-1/2 -translate-y-1/2" />
           <input
@@ -162,9 +196,17 @@ export default function CreatorLicensesPage() {
             className="w-full bg-zinc-950 border border-zinc-800 rounded-md py-1.5 pl-9 pr-3 text-xs text-zinc-200 placeholder:text-zinc-500 focus:outline-none focus:border-zinc-700"
           />
         </div>
-        <span className="text-xs text-zinc-500 font-mono">
-          {filteredLicenses.length} {filteredLicenses.length === 1 ? 'License' : 'Licenses'} Issued
-        </span>
+        <div className="flex flex-wrap items-center gap-4 text-xs font-mono">
+          <span className="text-zinc-400">
+            Plays: <strong className="text-[#2dd4bf]">{totalPlays.toLocaleString()}</strong>
+          </span>
+          <span className="text-zinc-400">
+            Downloads: <strong className="text-emerald-400">{totalDownloads.toLocaleString()}</strong>
+          </span>
+          <span className="text-zinc-500">
+            {filteredLicenses.length} {filteredLicenses.length === 1 ? 'License' : 'Licenses'} Issued
+          </span>
+        </div>
       </div>
 
       {loading ? (

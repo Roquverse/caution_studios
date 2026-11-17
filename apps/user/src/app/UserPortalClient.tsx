@@ -748,6 +748,15 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
       bonusUsed: quotaState.bonus > 0 && quotaState.used >= quotaState.baseLimit
     });
 
+    // Record beat download in Supabase database for creator threshold & royalty tracking
+    fetch('/api/beats/listen', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ beatId: track.id, action: 'download' })
+    }).catch((err) => {
+      console.warn('Could not sync download count to backend:', err);
+    });
+
     try {
       const safeTitle = (track.title || 'track').replace(/[/\\?%*:|"<>#]/g, '').trim();
       const safeArtist = (track.artist || 'Caution Studio').replace(/[/\\?%*:|"<>#]/g, '').trim();

@@ -17,12 +17,16 @@ export async function GET(req: NextRequest) {
     // 1. Total tracks and genre breakdown
     const { data: allBeats, error: beatsErr } = await supabase
       .from('beats')
-      .select('id, title, slug, genre, bpm, play_count, cover_url, duration_seconds, status, created_at')
+      .select('id, title, slug, genre, bpm, play_count, free_commercial_downloads_count, cover_url, duration_seconds, status, created_at')
       .order('created_at', { ascending: false });
     if (beatsErr) console.error('beatsErr:', beatsErr);
 
     const tracksCount = allBeats ? allBeats.length : 0;
     const totalPlays = (allBeats || []).reduce((acc, curr) => acc + (curr.play_count || 0), 0);
+    const totalDownloads = (allBeats || []).reduce(
+      (acc, curr) => acc + Number((curr as any).free_commercial_downloads_count || 0),
+      0
+    );
 
     // 2. Real Orders & Platform Revenue
     const { data: allOrders, error: ordersErr } = await supabase
@@ -140,6 +144,7 @@ export async function GET(req: NextRequest) {
       proCount,
       subscribersCount: plusCount + proCount,
       totalPlays,
+      totalDownloads,
       ordersCount: allOrders ? allOrders.length : 0,
       totalRevenue,
       totalRevenueCents,

@@ -81,24 +81,61 @@ export default function ProducerPromotePage() {
 
   useEffect(() => {
     async function loadProducerData() {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.user) return;
+      let { data: { session } } = await supabase.auth.getSession();
+
+      if (!session) {
+        const match = document.cookie.match(/(?:^|;\s*)sb-token=([^;]+)/);
+        const matchRefresh = document.cookie.match(/(?:^|;\s*)sb-refresh=([^;]+)/);
+        if (match && matchRefresh) {
+          const { data } = await supabase.auth.setSession({
+            access_token: decodeURIComponent(match[1]),
+            refresh_token: decodeURIComponent(matchRefresh[1])
+          });
+          session = data.session;
+        }
+      }
+
+      const userId = session?.user?.id;
+      const accessToken = session?.access_token;
+
+      try {
+        const res = await fetch(
+          `/api/creator/telemetry${userId ? `?userId=${encodeURIComponent(userId)}` : ''}`,
+          {
+            headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
+            cache: 'no-store'
+          }
+        );
+        if (res.ok) {
+          const payload = await res.json();
+          if (payload.profile?.display_name) {
+            setProducerName(payload.profile.display_name);
+          }
+          if (Array.isArray(payload.beats) && payload.beats.length > 0) {
+            setProducerBeats(payload.beats);
+          }
+        }
+      } catch (e) {
+        console.warn('Promote telemetry fetch fallback:', e);
+      }
+
+      if (!userId) return;
 
       const { data: profile } = await supabase
         .from('profiles')
         .select('*')
-        .eq('id', session.user.id)
+        .eq('id', userId)
         .maybeSingle();
 
       if (profile?.display_name) {
         setProducerName(profile.display_name);
       }
 
-      // Load producer beats
+      // Load producer beats if not already loaded
       const { data: beats } = await supabase
         .from('beats')
         .select('*')
-        .eq('producer_id', session.user.id)
+        .eq('producer_id', userId)
         .order('created_at', { ascending: false });
 
       if (beats && beats.length > 0) {
@@ -109,7 +146,7 @@ export default function ProducerPromotePage() {
       const { data: camps } = await supabase
         .from('ad_campaigns')
         .select('*')
-        .eq('advertiser_id', session.user.id)
+        .eq('advertiser_id', userId)
         .order('created_at', { ascending: false });
 
       if (camps) setMyCampaigns(camps);
@@ -314,7 +351,7 @@ export default function ProducerPromotePage() {
                   <option value="">⚡ Pick Beat from Catalog...</option>
                   {producerBeats.map((b) => (
                     <option key={b.id} value={b.id}>
-                      {b.title} ({b.genre || 'Beat'})
+                      {b.title} ({Number(b.play_count || 0).toLocaleString()} plays · {Number(b.free_commercial_downloads_count || 0).toLocaleString()} downloads)
                     </option>
                   ))}
                 </select>

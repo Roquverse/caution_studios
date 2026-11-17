@@ -35,6 +35,11 @@ function formatDbBeat(b: any) {
     audioUrl = '/api/media/masters/alex-morgan-afrobeat-instrumental-summer-groove-573648-hubz_1791151613114.mp3';
   }
 
+  const plays = Number(b.play_count || 0);
+  const downloads = Number(b.free_commercial_downloads_count || b.download_count || 0);
+  const combinedActivity = Math.max(plays, downloads, plays + downloads);
+  const thresholdPct = Math.min(100, Math.round((combinedActivity / 10000) * 100));
+
   return {
     id: b.id,
     title: b.title,
@@ -46,7 +51,10 @@ function formatDbBeat(b: any) {
     priceBasicNgn: basic ? Math.round(basic.price_cents / 100) : 3000,
     pricePremiumNgn: premium ? Math.round(premium.price_cents / 100) : 30000,
     priceExclusiveNgn: exclusive ? Math.round(exclusive.price_cents / 100) : 100000,
-    streamsCount: b.play_count || 0,
+    streamsCount: plays,
+    downloadsCount: downloads,
+    combinedActivity,
+    thresholdPct,
     salesCount: b.sales_count || (b.status === 'sold' ? 1 : 0),
     status: b.status === 'sold' ? 'sold_exclusive' : (b.status || 'live'),
     coverUrl: b.cover_url || '/images/studio_mixing_console.jpg',
@@ -60,11 +68,13 @@ export default function BeatsCatalogPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterGenre, setFilterGenre] = useState('all');
   const [beatsList, setBeatsList] = useState<any[]>([]);
+  const [totalPlays, setTotalPlays] = useState(0);
+  const [totalDownloads, setTotalDownloads] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [artworkModalBeat, setArtworkModalBeat] = useState<{ id: string; title: string; coverUrl?: string } | null>(null);
 
-  // Fetch only this producer's real beats from Supabase
+  // Fetch this producer's real beats + telemetry from Supabase
   useEffect(() => {
     let isMounted = true;
     async function loadRealBeats() {
@@ -73,18 +83,38 @@ export default function BeatsCatalogPage() {
         let { data: { session } } = await supabase.auth.getSession();
 
         if (!session) {
-          const match = document.cookie.match(/sb-token=([^;]+)/);
-          const matchRefresh = document.cookie.match(/sb-refresh=([^;]+)/);
+          const match = document.cookie.match(/(?:^|;\s*)sb-token=([^;]+)/);
+          const matchRefresh = document.cookie.match(/(?:^|;\s*)sb-refresh=([^;]+)/);
           if (match && matchRefresh) {
             const { data } = await supabase.auth.setSession({
-              access_token: match[1],
-              refresh_token: matchRefresh[1]
+              access_token: decodeURIComponent(match[1]),
+              refresh_token: decodeURIComponent(matchRefresh[1])
             });
             session = data.session;
           }
         }
 
         const userId = session?.user?.id;
+        const accessToken = session?.access_token;
+
+        const res = await fetch(
+          `/api/creator/telemetry${userId ? `?userId=${encodeURIComponent(userId)}` : ''}`,
+          {
+            headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
+            cache: 'no-store'
+          }
+        );
+
+        if (res.ok) {
+          const payload = await res.json();
+          if (isMounted && Array.isArray(payload.beats)) {
+            const formatted = payload.beats.map(formatDbBeat);
+            setBeatsList(formatted);
+            setTotalPlays(Number(payload.totalPlaysCount || 0));
+            setTotalDownloads(Number(payload.totalDownloadsCount || 0));
+            return;
+          }
+        }
 
         if (userId) {
           const { data: userBeats, error: userError } = await supabase
@@ -101,7 +131,10 @@ export default function BeatsCatalogPage() {
             .order('created_at', { ascending: false });
 
           if (!userError && userBeats && isMounted) {
-            setBeatsList(userBeats.map(formatDbBeat));
+            const formatted = userBeats.map(formatDbBeat);
+            setBeatsList(formatted);
+            setTotalPlays(formatted.reduce((sum, b) => sum + b.streamsCount, 0));
+            setTotalDownloads(formatted.reduce((sum, b) => sum + b.downloadsCount, 0));
           }
         }
       } catch (err) {
@@ -190,6 +223,45 @@ export default function BeatsCatalogPage() {
         </Link>
       </div>
 
+      {/* Catalog Telemetry & Pay Threshold Summary Bar */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-3.5 flex items-center justify-between">
+          <div>
+            <span className="text-[11px] text-zinc-400 font-medium block">Total Catalog Plays</span>
+            <span className="text-xl font-bold font-mono text-white mt-0.5 block">
+              {totalPlays.toLocaleString()}
+            </span>
+          </div>
+          <span className="text-[10px] font-mono px-2 py-1 rounded bg-[#2dd4bf]/10 text-[#2dd4bf] border border-[#2dd4bf]/20">
+            Live Streams
+          </span>
+        </div>
+
+        <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-3.5 flex items-center justify-between">
+          <div>
+            <span className="text-[11px] text-zinc-400 font-medium block">Total Catalog Downloads</span>
+            <span className="text-xl font-bold font-mono text-white mt-0.5 block">
+              {totalDownloads.toLocaleString()}
+            </span>
+          </div>
+          <span className="text-[10px] font-mono px-2 py-1 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+            Beat Downloads
+          </span>
+        </div>
+
+        <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-3.5 flex items-center justify-between">
+          <div>
+            <span className="text-[11px] text-zinc-400 font-medium block">10,000 Pay Threshold (₦30,000)</span>
+            <span className="text-xl font-bold font-mono text-[#2dd4bf] mt-0.5 block">
+              {Math.max(totalPlays, totalDownloads, totalPlays + totalDownloads).toLocaleString()} / 10,000
+            </span>
+          </div>
+          <span className="text-[10px] font-mono px-2 py-1 rounded bg-amber-500/10 text-amber-300 border border-amber-500/20">
+            {Math.min(100, Math.round((Math.max(totalPlays, totalDownloads, totalPlays + totalDownloads) / 10000) * 100))}% to ₦30k
+          </span>
+        </div>
+      </div>
+
       {/* Catalog Search & Filters */}
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-zinc-900/40 p-3 rounded-lg border border-zinc-800">
         <div className="relative flex-1 max-w-sm">
@@ -237,6 +309,8 @@ export default function BeatsCatalogPage() {
                   <th className="py-3 px-4">Stems ZIP</th>
                   <th className="py-3 px-4">License Pricing</th>
                   <th className="py-3 px-4 text-center">Plays</th>
+                  <th className="py-3 px-4 text-center">Downloads</th>
+                  <th className="py-3 px-4 text-center">Pay Threshold</th>
                   <th className="py-3 px-4 text-center">Sales</th>
                   <th className="py-3 px-4">Status</th>
                   <th className="py-3 px-4 text-right">Actions</th>
@@ -321,9 +395,20 @@ export default function BeatsCatalogPage() {
                       </div>
                     </td>
 
-                    {/* Streams */}
-                    <td className="py-3 px-4 text-center font-mono text-zinc-300">
-                      {beat.streamsCount.toLocaleString()}
+                    {/* Plays */}
+                    <td className="py-3 px-4 text-center font-mono text-[#2dd4bf] font-semibold">
+                      {(beat.streamsCount || 0).toLocaleString()}
+                    </td>
+
+                    {/* Downloads */}
+                    <td className="py-3 px-4 text-center font-mono text-emerald-400 font-semibold">
+                      {(beat.downloadsCount || 0).toLocaleString()}
+                    </td>
+
+                    {/* Pay Threshold Progress */}
+                    <td className="py-3 px-4 text-center font-mono text-[11px] text-zinc-300">
+                      <div>{(beat.combinedActivity || 0).toLocaleString()} / 10k</div>
+                      <div className="text-[10px] text-amber-300">{beat.thresholdPct || 0}%</div>
                     </td>
 
                     {/* Sales */}
