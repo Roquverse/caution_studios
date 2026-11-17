@@ -54,6 +54,7 @@ import {
   Scissors,
   Music2,
   Folder,
+  FolderOpen,
   Keyboard,
   ChevronRight,
   Settings,
@@ -66,6 +67,16 @@ import {
 } from 'lucide-react';
 import { TrackItem } from '../types/tracks';
 import { useUserSubscription } from '../lib/subscription';
+import {
+  saveLocalStudioProject,
+  loadLocalStudioProject,
+  listLocalStudioProjects,
+  deleteLocalStudioProject,
+  exportProjectToFile,
+  importProjectFromFile,
+  StudioProjectData,
+  StudioProjectSummary
+} from '../lib/studioStorage';
 
 export interface UserRecordStudioModalProps {
   isOpen?: boolean;
@@ -1189,6 +1200,17 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
   const [beatSearchQuery, setBeatSearchQuery] = useState('');
   const [beatGenreFilter, setBeatGenreFilter] = useState('All');
   const [isAuditioningId, setIsAuditioningId] = useState<string | null>(null);
+
+  // Studio Project & File Persistence State
+  const [currentProjectId, setCurrentProjectId] = useState<string>(() => `proj_${Date.now()}`);
+  const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
+  const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'unsaved'>('saved');
+  const [isProjectsModalOpen, setIsProjectsModalOpen] = useState<boolean>(false);
+  const [savedProjectsList, setSavedProjectsList] = useState<StudioProjectSummary[]>([]);
+  const [isExportingProject, setIsExportingProject] = useState<boolean>(false);
+  const [isImportingProject, setIsImportingProject] = useState<boolean>(false);
+  const [showRecentPrompt, setShowRecentPrompt] = useState<StudioProjectSummary | null>(null);
+  const projectFileInputRef = useRef<HTMLInputElement | null>(null);
 
   // Sync studioBeats when availableTracks prop updates
   useEffect(() => {
@@ -3421,6 +3443,8 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
               : t
           );
           vocalTracksRef.current = next;
+          // Auto-save the new vocal take to IndexedDB immediately so it is persisted
+          handleSaveSession(false, next);
           return next;
         });
 
@@ -4020,6 +4044,381 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
     }
   };
 
+  // Save Studio Session to IndexedDB (with all vocal Blobs intact) and sync to Cloud
+  const handleSaveSession = useCallback(
+    async (manual = false, tracksOverride?: StudioVocalTrack[]) => {
+      try {
+        setSaveStatus('saving');
+        const tracksToSave = tracksOverride || vocalTracks;
+        const projectData: StudioProjectData = {
+          id: currentProjectId,
+          title: projectTitle.trim() || 'Untitled session',
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+          beat: selectedTrack,
+          vocalTracks: tracksToSave.map((t) => ({
+            id: t.id,
+            name: t.name,
+            type: t.type,
+            color: t.color,
+            isArmed: t.isArmed,
+            isMuted: t.isMuted,
+            isSolo: t.isSolo,
+            volume: t.volume,
+            pan: t.pan,
+            vocalBlob: t.vocalBlob,
+            durationSeconds: t.durationSeconds,
+            latencyOffsetMs: t.latencyOffsetMs,
+            startTimeSec: t.startTimeSec,
+            trimStartSec: t.trimStartSec,
+            trimEndSec: t.trimEndSec,
+            playbackRate: t.playbackRate,
+            clips: t.clips,
+            undoStack: t.undoStack
+          })),
+          bpm: sessionBpm,
+          musicalKey: autoTuneKey,
+          timeSignature: timeSignature,
+          lyrics: lyricsText,
+          notes: notes,
+          effects: {
+            autoTuneEnabled,
+            autoTuneSpeed,
+            autoTuneAmount,
+            autoTuneKey,
+            reverbAmount,
+            delayAmount,
+            eqLow,
+            eqMid,
+            eqHigh,
+            compressorEnabled,
+            lowCutEnabled,
+            masteringPreset,
+            beatVolume,
+            masterVolume
+          }
+        };
+
+        await saveLocalStudioProject(projectData);
+        setLastSavedAt(new Date());
+        setSaveStatus('saved');
+
+        const updatedList = await listLocalStudioProjects();
+        setSavedProjectsList(updatedList);
+
+        // Background cloud sync
+        fetch('/api/record-studio/projects', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id: currentProjectId,
+            title: projectData.title,
+            beatId: selectedTrack?.id,
+            beatData: selectedTrack,
+            bpm: sessionBpm,
+            musicalKey: autoTuneKey,
+            timeSignature,
+            effects: projectData.effects,
+            lyrics: lyricsText,
+            notes
+          })
+        }).catch(() => {});
+      } catch (err: any) {
+        console.error('Error saving studio project:', err);
+        setSaveStatus('unsaved');
+      }
+    },
+    [
+      currentProjectId,
+      projectTitle,
+      selectedTrack,
+      vocalTracks,
+      sessionBpm,
+      autoTuneKey,
+      timeSignature,
+      lyricsText,
+      notes,
+      autoTuneEnabled,
+      autoTuneSpeed,
+      autoTuneAmount,
+      reverbAmount,
+      delayAmount,
+      eqLow,
+      eqMid,
+      eqHigh,
+      compressorEnabled,
+      lowCutEnabled,
+      masteringPreset,
+      beatVolume,
+      masterVolume
+    ]
+  );
+
+  // Load a saved studio project from IndexedDB
+  const handleLoadSession = useCallback(
+    async (projectId: string) => {
+      try {
+        if (isPlaying) {
+          if (beatAudioRef.current) beatAudioRef.current.pause();
+          vocalAudioRefs.current.forEach((el) => el.pause());
+          setIsPlaying(false);
+          if (playheadIntervalRef.current) clearInterval(playheadIntervalRef.current);
+        }
+
+        const project = await loadLocalStudioProject(projectId);
+        if (!project) {
+          alert('Could not find saved session.');
+          return;
+        }
+
+        // Revoke old object URLs to avoid memory leaks
+        vocalTracks.forEach((t) => {
+          if (t.vocalUrl) URL.revokeObjectURL(t.vocalUrl);
+        });
+
+        // Reconstruct vocal tracks with fresh object URLs
+        const reconstructedTracks: StudioVocalTrack[] = (project.vocalTracks || []).map((t) => {
+          const url = t.vocalBlob ? URL.createObjectURL(t.vocalBlob) : null;
+          return {
+            id: t.id,
+            name: t.name,
+            type: t.type,
+            color: t.color || '#2dd4bf',
+            isArmed: t.isArmed,
+            isMuted: t.isMuted,
+            isSolo: t.isSolo,
+            volume: typeof t.volume === 'number' ? t.volume : 1.0,
+            pan: typeof t.pan === 'number' ? t.pan : 0,
+            vocalBlob: t.vocalBlob,
+            vocalUrl: url,
+            durationSeconds: t.durationSeconds || 0,
+            latencyOffsetMs: t.latencyOffsetMs || 0,
+            startTimeSec: t.startTimeSec || 0,
+            trimStartSec: t.trimStartSec || 0,
+            trimEndSec: t.trimEndSec || t.durationSeconds || 0,
+            playbackRate: t.playbackRate || 1.0,
+            clips: t.clips || [],
+            undoStack: t.undoStack || []
+          };
+        });
+
+        setCurrentProjectId(project.id);
+        setProjectTitle(project.title);
+        setSelectedTrack(project.beat);
+        if (project.beat?.audioUrl && beatAudioRef.current) {
+          beatAudioRef.current.src = project.beat.audioUrl;
+          beatAudioRef.current.currentTime = 0;
+        }
+
+        setVocalTracks(reconstructedTracks);
+        vocalTracksRef.current = reconstructedTracks;
+
+        if (project.bpm) setSessionBpm(project.bpm);
+        if (project.musicalKey) setAutoTuneKey(project.musicalKey);
+        if (project.timeSignature) setTimeSignature(project.timeSignature);
+        if (typeof project.lyrics === 'string') setLyricsText(project.lyrics);
+        if (typeof project.notes === 'string') setNotes(project.notes);
+
+        if (project.effects) {
+          if (typeof project.effects.autoTuneEnabled === 'boolean') setAutoTuneEnabled(project.effects.autoTuneEnabled);
+          if (project.effects.autoTuneSpeed) setAutoTuneSpeed(project.effects.autoTuneSpeed);
+          if (typeof project.effects.autoTuneAmount === 'number') setAutoTuneAmount(project.effects.autoTuneAmount);
+          if (typeof project.effects.reverbAmount === 'number') setReverbAmount(project.effects.reverbAmount);
+          if (typeof project.effects.delayAmount === 'number') setDelayAmount(project.effects.delayAmount);
+          if (typeof project.effects.eqLow === 'number') setEqLow(project.effects.eqLow);
+          if (typeof project.effects.eqMid === 'number') setEqMid(project.effects.eqMid);
+          if (typeof project.effects.eqHigh === 'number') setEqHigh(project.effects.eqHigh);
+          if (typeof project.effects.compressorEnabled === 'boolean') setCompressorEnabled(project.effects.compressorEnabled);
+          if (typeof project.effects.lowCutEnabled === 'boolean') setLowCutEnabled(project.effects.lowCutEnabled);
+          if (typeof project.effects.beatVolume === 'number') setBeatVolume(project.effects.beatVolume);
+          if (typeof project.effects.masterVolume === 'number') setMasterVolume(project.effects.masterVolume);
+        }
+
+        setPlayheadTime(0);
+        setLastSavedAt(new Date(project.updatedAt));
+        setSaveStatus('saved');
+        setIsProjectsModalOpen(false);
+        setShowRecentPrompt(null);
+      } catch (err: any) {
+        console.error('Error loading studio project:', err);
+        alert('Failed to load project: ' + err.message);
+      }
+    },
+    [isPlaying, vocalTracks]
+  );
+
+  // Start a new blank studio session
+  const handleNewSession = useCallback(() => {
+    if (isPlaying) {
+      if (beatAudioRef.current) beatAudioRef.current.pause();
+      vocalAudioRefs.current.forEach((el) => el.pause());
+      setIsPlaying(false);
+    }
+
+    const newId = `proj_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+    setCurrentProjectId(newId);
+    setProjectTitle('Untitled session');
+    setPlayheadTime(0);
+
+    const initialTracks: StudioVocalTrack[] = [
+      {
+        id: 'trk_lead',
+        name: 'Lead Vocal',
+        type: 'lead',
+        color: '#2dd4bf',
+        isArmed: true,
+        isMuted: false,
+        isSolo: false,
+        volume: 1.0,
+        pan: 0,
+        vocalBlob: null,
+        vocalUrl: null,
+        durationSeconds: 0,
+        latencyOffsetMs: 0
+      },
+      {
+        id: 'trk_backup_1',
+        name: 'Backup 1',
+        type: 'backup',
+        color: '#f59e0b',
+        isArmed: false,
+        isMuted: false,
+        isSolo: false,
+        volume: 0.85,
+        pan: -40,
+        vocalBlob: null,
+        vocalUrl: null,
+        durationSeconds: 0,
+        latencyOffsetMs: 0
+      }
+    ];
+
+    setVocalTracks(initialTracks);
+    vocalTracksRef.current = initialTracks;
+    setLyricsText('// Write rhymes, hooks, and harmonies here while you record in the studio...\n[Lead Vocal]\n\n[Backup Vocals / Harmonies]\n');
+    setNotes('');
+    setSaveStatus('saved');
+    setIsProjectsModalOpen(false);
+  }, [isPlaying]);
+
+  // Export current session to standalone .cstudio file on computer
+  const handleExportProjectFile = async () => {
+    try {
+      setIsExportingProject(true);
+      const projectData: StudioProjectData = {
+        id: currentProjectId,
+        title: projectTitle.trim() || 'Untitled session',
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        beat: selectedTrack,
+        vocalTracks: vocalTracks.map((t) => ({
+          id: t.id,
+          name: t.name,
+          type: t.type,
+          color: t.color,
+          isArmed: t.isArmed,
+          isMuted: t.isMuted,
+          isSolo: t.isSolo,
+          volume: t.volume,
+          pan: t.pan,
+          vocalBlob: t.vocalBlob,
+          durationSeconds: t.durationSeconds,
+          latencyOffsetMs: t.latencyOffsetMs,
+          startTimeSec: t.startTimeSec,
+          trimStartSec: t.trimStartSec,
+          trimEndSec: t.trimEndSec,
+          playbackRate: t.playbackRate,
+          clips: t.clips,
+          undoStack: t.undoStack
+        })),
+        bpm: sessionBpm,
+        musicalKey: autoTuneKey,
+        timeSignature: timeSignature,
+        lyrics: lyricsText,
+        notes: notes,
+        effects: {
+          autoTuneEnabled,
+          autoTuneSpeed,
+          autoTuneAmount,
+          autoTuneKey,
+          reverbAmount,
+          delayAmount,
+          eqLow,
+          eqMid,
+          eqHigh,
+          compressorEnabled,
+          lowCutEnabled,
+          masteringPreset,
+          beatVolume,
+          masterVolume
+        }
+      };
+
+      await exportProjectToFile(projectData);
+    } catch (err: any) {
+      alert('Error exporting project file: ' + err.message);
+    } finally {
+      setIsExportingProject(false);
+    }
+  };
+
+  // Import a .cstudio file from computer
+  const handleImportProjectFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      setIsImportingProject(true);
+      const imported = await importProjectFromFile(file);
+      await handleLoadSession(imported.id);
+      const updatedList = await listLocalStudioProjects();
+      setSavedProjectsList(updatedList);
+    } catch (err: any) {
+      alert('Failed to import project file: ' + err.message);
+    } finally {
+      setIsImportingProject(false);
+      if (e.target) e.target.value = '';
+    }
+  };
+
+  // Delete a saved project
+  const handleDeleteSession = async (id: string, title: string) => {
+    if (!window.confirm(`Delete "${title}"? This cannot be undone.`)) return;
+    try {
+      await deleteLocalStudioProject(id);
+      const updatedList = await listLocalStudioProjects();
+      setSavedProjectsList(updatedList);
+    } catch (err: any) {
+      alert('Error deleting project: ' + err.message);
+    }
+  };
+
+  // Initial load of saved projects list from IndexedDB
+  useEffect(() => {
+    listLocalStudioProjects().then((projects) => {
+      setSavedProjectsList(projects);
+      if (projects.length > 0 && !preselectedTrack) {
+        const mostRecent = projects[0];
+        const ageHours = (Date.now() - mostRecent.updatedAt) / (1000 * 60 * 60);
+        if (ageHours < 24 * 7 && mostRecent.hasRecordings) {
+          setShowRecentPrompt(mostRecent);
+        }
+      }
+    });
+  }, [preselectedTrack]);
+
+  // Global Ctrl+S / Cmd+S save hotkey
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 's') {
+        e.preventDefault();
+        handleSaveSession(true);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleSaveSession]);
+
   const copyShareLink = () => {
     if (!cloudSaveResult?.masterUrl) return;
     const full = `${window.location.origin}${cloudSaveResult.masterUrl}`;
@@ -4454,7 +4853,7 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
 
       {/* HEADER */}
       <header className="shrink-0 bg-[#111215] px-2.5 sm:px-6 py-2 sm:py-3 flex items-center justify-between gap-2 sm:gap-3 z-20">
-        <div className="flex-1 min-w-0 flex items-center gap-2 sm:gap-3">
+        <div className="flex-1 min-w-0 flex items-center gap-2 sm:gap-2.5">
           <button
             type="button"
             onClick={() => {
@@ -4471,27 +4870,72 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
             <ArrowLeft className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
             <span className="hidden xs:inline sm:inline">Back</span>
           </button>
+
+          {/* Sessions & Project Browser Button */}
+          <button
+            type="button"
+            onClick={() => setIsProjectsModalOpen(true)}
+            title="Browse, save, and continue studio sessions"
+            className="h-8 sm:h-9 px-2 sm:px-3 rounded-xl bg-[#1b1c20] hover:bg-[#232429] border border-[#26272d] text-[#d8dae0] hover:text-white flex items-center gap-1.5 text-[11px] sm:text-[12px] font-medium shrink-0 transition-colors"
+          >
+            <FolderOpen className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-[#2dd4bf]" />
+            <span className="hidden xs:inline sm:inline">Sessions</span>
+            {savedProjectsList.length > 0 && (
+              <span className="px-1.5 py-0.2 rounded-full bg-[#2dd4bf]/20 text-[#2dd4bf] text-[9.5px] font-bold">
+                {savedProjectsList.length}
+              </span>
+            )}
+          </button>
+
           <div className="min-w-0 flex-1">
             <input
               type="text"
               value={projectTitle}
-              onChange={(e) => setProjectTitle(e.target.value)}
+              onChange={(e) => {
+                setProjectTitle(e.target.value);
+                setSaveStatus('unsaved');
+              }}
               aria-label="Project title"
-              className="w-full bg-transparent text-[15px] sm:text-[26px] md:text-[32px] font-medium tracking-tight text-white leading-tight focus:outline-none truncate"
+              className="w-full bg-transparent text-[15px] sm:text-[24px] md:text-[28px] font-medium tracking-tight text-white leading-tight focus:outline-none truncate"
             />
-            <div className="flex items-center gap-1.5 text-[10px] sm:text-[11px] text-[#7b7f89] min-w-0">
+            <div className="flex items-center gap-2 text-[10px] sm:text-[11px] text-[#7b7f89] min-w-0">
               <span
                 className={`w-1.5 h-1.5 rounded-full shrink-0 ${
                   isRecording ? 'bg-[#ff5a36] animate-pulse' : selectedTrack ? 'bg-[#4ade80]' : 'bg-[#5d616b]'
                 }`}
               />
-              <span className="truncate">
+              <span className="truncate max-w-[120px] sm:max-w-[200px]">
                 {isRecording
                   ? `Recording ${armedTrack?.name || 'vocal'}…`
                   : selectedTrack
                   ? `${selectedTrack.title}${selectedTrack.artist ? ` · ${selectedTrack.artist}` : ''}`
                   : 'Choose a free beat to get started'}
               </span>
+
+              {/* Quick Save button with status */}
+              <button
+                type="button"
+                onClick={() => handleSaveSession(true)}
+                title="Save session (Ctrl+S / Cmd+S)"
+                className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium transition-colors ${
+                  saveStatus === 'unsaved'
+                    ? 'bg-[#ff5a36]/20 text-[#ff7a5c] hover:bg-[#ff5a36]/30 font-semibold'
+                    : saveStatus === 'saving'
+                    ? 'bg-white/10 text-white animate-pulse'
+                    : 'text-[#5eead4] hover:bg-white/5'
+                }`}
+              >
+                <Save className="h-3 w-3" />
+                <span>
+                  {saveStatus === 'saving'
+                    ? 'Saving…'
+                    : saveStatus === 'unsaved'
+                    ? 'Save *'
+                    : lastSavedAt
+                    ? `Saved ${lastSavedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+                    : 'Saved'}
+                </span>
+              </button>
             </div>
           </div>
         </div>
@@ -4613,6 +5057,20 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
 
           <button
             type="button"
+            onClick={() => handleSaveSession(true)}
+            title="Save project file (Ctrl+S / Cmd+S)"
+            className={`h-8 sm:h-11 px-2.5 sm:px-3.5 rounded-xl border text-[11px] sm:text-[13px] font-semibold flex items-center gap-1.5 transition-colors shrink-0 ${
+              saveStatus === 'unsaved'
+                ? 'bg-[#ff5a36]/15 border-[#ff5a36]/50 text-[#ff7a5c] hover:bg-[#ff5a36]/25'
+                : 'bg-[#1b1c20] border-[#26272d] text-[#d8dae0] hover:text-white'
+            }`}
+          >
+            <Save className={`h-3.5 w-3.5 sm:h-4 sm:w-4 ${saveStatus === 'unsaved' ? 'text-[#ff7a5c]' : 'text-[#2dd4bf]'}`} />
+            <span className="hidden sm:inline">{saveStatus === 'saving' ? 'Saving…' : 'Save'}</span>
+          </button>
+
+          <button
+            type="button"
             onClick={() => setIsExportDialogOpen(true)}
             className="h-8 sm:h-11 px-2.5 sm:px-4 rounded-xl bg-[#f5f3ef] hover:bg-white text-black text-[11px] sm:text-[13px] font-semibold flex items-center gap-1.5 sm:gap-2 transition-colors shrink-0"
           >
@@ -4621,6 +5079,35 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
           </button>
         </div>
       </header>
+
+      {/* Continue Previous Session Banner */}
+      {showRecentPrompt && (
+        <div className="shrink-0 bg-gradient-to-r from-[#04564f]/40 via-[#131417] to-[#1b1c20] border-b border-[#2dd4bf]/30 px-3 sm:px-6 py-2 flex items-center justify-between gap-3 text-xs z-30">
+          <div className="flex items-center gap-2 min-w-0">
+            <Sparkles className="h-4 w-4 text-[#2dd4bf] shrink-0" />
+            <span className="text-[#d8dae0] text-[11px] sm:text-xs truncate">
+              Continue where you stopped: <strong className="text-white font-semibold">"{showRecentPrompt.title}"</strong> ({showRecentPrompt.beatTitle || 'No beat'} · {showRecentPrompt.takeCount} take{showRecentPrompt.takeCount !== 1 ? 's' : ''})
+            </span>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={() => handleLoadSession(showRecentPrompt.id)}
+              className="px-3 py-1 rounded-lg bg-[#2dd4bf] hover:bg-[#20b8a6] text-black font-semibold text-[11px] transition-colors"
+            >
+              Continue Session
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowRecentPrompt(null)}
+              className="p-1 text-gray-400 hover:text-white"
+              title="Dismiss"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* 3. WORKSPACE: TIMELINE + INSPECTOR */}
       <div className="flex-1 min-h-0 flex">
@@ -6569,6 +7056,203 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
                 <span className="text-gray-400">Toggle Loop Mode</span>
                 <span className="px-2 py-0.5 rounded bg-white/10 text-white font-bold">L</span>
               </div>
+              <div className="flex justify-between py-1 border-b border-white/5">
+                <span className="text-gray-400">Save Session</span>
+                <span className="px-2 py-0.5 rounded bg-[#2dd4bf]/20 text-[#2dd4bf] font-bold">Ctrl+S / ⌘S</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Studio Projects & Saved Sessions Modal */}
+      {isProjectsModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-md">
+          <div
+            className="relative w-full max-w-2xl rounded-2xl bg-[#14151a] border border-[#272932] shadow-2xl text-white flex flex-col max-h-[88vh] overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="px-5 py-4 border-b border-[#23252d] flex items-center justify-between gap-3 shrink-0">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-[#2dd4bf]/15 border border-[#2dd4bf]/30 text-[#2dd4bf] flex items-center justify-center shrink-0">
+                  <FolderOpen className="h-4 w-4" />
+                </div>
+                <div>
+                  <h3 className="text-[15px] font-bold text-white leading-none">Studio Projects & Sessions</h3>
+                  <p className="text-[11px] text-[#787c87] mt-1 leading-none">
+                    Save, continue where you stopped, export and load multi-track session files
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsProjectsModalOpen(false)}
+                className="w-7 h-7 rounded-lg text-gray-400 hover:text-white hover:bg-white/10 flex items-center justify-center"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            {/* Top Toolbar Actions */}
+            <div className="p-4 bg-[#111216] border-b border-[#23252d] flex flex-wrap items-center justify-between gap-2 shrink-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <button
+                  type="button"
+                  onClick={handleNewSession}
+                  className="h-8 px-3 rounded-lg bg-[#1e2027] hover:bg-[#282b34] text-[11.5px] font-semibold text-[#d7dbe2] hover:text-white flex items-center gap-1.5 transition-colors"
+                >
+                  <Plus className="h-3.5 w-3.5 text-[#2dd4bf]" />
+                  <span>New Blank Session</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleSaveSession(true)}
+                  className="h-8 px-3 rounded-lg bg-[#2dd4bf] hover:bg-[#20b8a6] text-[11.5px] font-semibold text-black flex items-center gap-1.5 transition-colors"
+                >
+                  <Save className="h-3.5 w-3.5" />
+                  <span>Save Active Session</span>
+                </button>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <input
+                  ref={projectFileInputRef}
+                  type="file"
+                  accept=".cstudio,.json"
+                  onChange={handleImportProjectFile}
+                  className="hidden"
+                />
+                <button
+                  type="button"
+                  onClick={() => projectFileInputRef.current?.click()}
+                  disabled={isImportingProject}
+                  title="Load project file from your computer (.cstudio)"
+                  className="h-8 px-3 rounded-lg bg-[#1e2027] hover:bg-[#282b34] text-[11.5px] font-semibold text-[#c9ccd3] hover:text-white flex items-center gap-1.5 transition-colors disabled:opacity-50"
+                >
+                  <Upload className="h-3.5 w-3.5 text-gray-400" />
+                  <span>{isImportingProject ? 'Importing…' : 'Open File…'}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleExportProjectFile}
+                  disabled={isExportingProject}
+                  title="Download session as a standalone .cstudio file to your computer"
+                  className="h-8 px-3 rounded-lg bg-[#1e2027] hover:bg-[#282b34] text-[11.5px] font-semibold text-[#c9ccd3] hover:text-white flex items-center gap-1.5 transition-colors disabled:opacity-50"
+                >
+                  <Download className="h-3.5 w-3.5 text-gray-400" />
+                  <span>{isExportingProject ? 'Exporting…' : 'Export .cstudio'}</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Saved Projects List */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-2.5">
+              {savedProjectsList.length === 0 ? (
+                <div className="py-12 flex flex-col items-center justify-center text-center space-y-3">
+                  <div className="w-12 h-12 rounded-2xl bg-[#1c1d23] border border-[#272932] text-gray-500 flex items-center justify-center">
+                    <Folder className="h-6 w-6" />
+                  </div>
+                  <div className="space-y-1">
+                    <h4 className="text-sm font-semibold text-white">No Saved Studio Sessions Yet</h4>
+                    <p className="text-xs text-[#7b7f89] max-w-sm">
+                      Hit "Save Active Session" above to store your vocal tracks, beats, and mixer settings so you can continue working anytime!
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                savedProjectsList.map((proj) => {
+                  const isCurrent = proj.id === currentProjectId;
+                  const dateStr = new Date(proj.updatedAt).toLocaleDateString([], {
+                    month: 'short',
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                  });
+
+                  return (
+                    <div
+                      key={proj.id}
+                      className={`p-3.5 rounded-xl border transition-colors flex items-center justify-between gap-3 ${
+                        isCurrent
+                          ? 'bg-[#2dd4bf]/10 border-[#2dd4bf]/40'
+                          : 'bg-[#181a20] border-[#252730] hover:border-[#353844]'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3 min-w-0 flex-1">
+                        {proj.beatCoverUrl ? (
+                          <img
+                            src={proj.beatCoverUrl}
+                            alt={proj.title}
+                            className="w-11 h-11 rounded-lg object-cover border border-white/10 shrink-0"
+                          />
+                        ) : (
+                          <div className="w-11 h-11 rounded-lg bg-[#22242c] border border-white/10 flex items-center justify-center text-[#2dd4bf] shrink-0">
+                            <Disc3 className="h-5 w-5" />
+                          </div>
+                        )}
+                        <div className="min-w-0 flex-1 space-y-1">
+                          <div className="flex items-center gap-2">
+                            <h4 className="text-sm font-semibold text-white truncate">{proj.title}</h4>
+                            {isCurrent && (
+                              <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-[#2dd4bf] text-black shrink-0">
+                                ACTIVE
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2 text-[11px] text-[#7b7f89] flex-wrap">
+                            <span className="text-[#a0a4af] truncate">
+                              {proj.beatTitle ? `${proj.beatTitle}${proj.beatArtist ? ` · ${proj.beatArtist}` : ''}` : 'No beat loaded'}
+                            </span>
+                            <span>•</span>
+                            <span className="text-teal-300">
+                              {proj.takeCount} take{proj.takeCount !== 1 ? 's' : ''} ({proj.trackCount} stems)
+                            </span>
+                            <span>•</span>
+                            <span>{dateStr}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        {isCurrent ? (
+                          <span className="h-8 px-3 rounded-lg bg-white/5 border border-white/10 text-xs font-semibold text-[#8a8e98] flex items-center">
+                            Open
+                          </span>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => handleLoadSession(proj.id)}
+                            className="h-8 px-3 rounded-lg bg-[#2dd4bf] hover:bg-[#20b8a6] text-black text-xs font-semibold flex items-center gap-1 transition-colors"
+                          >
+                            <span>Continue</span>
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteSession(proj.id, proj.title)}
+                          title="Delete session"
+                          className="w-8 h-8 rounded-lg text-gray-500 hover:text-[#ff5a36] hover:bg-[#ff5a36]/10 flex items-center justify-center transition-colors"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-3 bg-[#111216] border-t border-[#23252d] flex items-center justify-between text-[11px] text-[#6d717c]">
+              <span>Storage: Browser IndexedDB + Cloud Sync · Saves uncompressed WAV stems natively</span>
+              <button
+                type="button"
+                onClick={() => setIsProjectsModalOpen(false)}
+                className="px-3 py-1 rounded-md bg-white/10 hover:bg-white/15 text-white font-medium"
+              >
+                Close
+              </button>
             </div>
           </div>
         </div>
