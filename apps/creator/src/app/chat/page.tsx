@@ -128,7 +128,7 @@ export default function StudioChatPage() {
       // Fetch profiles of counterparts
       const { data: profilesData } = await supabase
         .from('profiles')
-        .select('id, display_name, handle, avatar_url, role, primary_role')
+        .select('id, display_name, handle, avatar_url, primary_role, roles')
         .in('id', counterpartIds);
 
       const profileMap = new Map<string, any>();

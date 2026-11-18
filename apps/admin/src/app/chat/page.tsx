@@ -44,6 +44,9 @@ interface ProducerThread {
   displayName: string;
   handle: string;
   avatarUrl: string;
+  email?: string;
+  beatsCount?: number;
+  latestBeat?: string;
   lastMessage: string;
   lastMessageTime: string;
   unreadCount: number;
@@ -87,97 +90,82 @@ export default function AdminProducerChatPage() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
-  // Fetch admin session and existing chat threads
+  // Fetch admin session and existing chat threads from /api/chat
   const loadChats = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        setAdminUserId(user.id);
+      const { data: { session } } = await supabase.auth.getSession();
+      const headers: Record<string, string> = {};
+      if (session?.access_token) {
+        headers['Authorization'] = `Bearer ${session.access_token}`;
       }
 
-      // Fetch all chat messages
-      const { data: chatsData, error: chatsErr } = await supabase
-        .from('chats')
-        .select('*')
-        .order('created_at', { ascending: true });
-
-      if (chatsErr) {
-        console.error('Error fetching admin chats:', chatsErr);
-        setLoading(false);
-        return;
-      }
-
-      if (!chatsData || chatsData.length === 0) {
-        setThreads([]);
-        setLoading(false);
-        return;
-      }
-
-      // Determine participants (all user IDs involved in chats)
-      const participantIds = new Set<string>();
-      chatsData.forEach((c) => {
-        if (c.sender_id) participantIds.add(c.sender_id);
-        if (c.recipient_id) participantIds.add(c.recipient_id);
-      });
-
-      // Fetch profiles of all participants
-      const { data: profilesData } = await supabase
-        .from('profiles')
-        .select('id, display_name, handle, avatar_url, role, primary_role')
-        .in('id', Array.from(participantIds));
-
-      const profileMap = new Map<string, any>();
-      (profilesData || []).forEach((p) => profileMap.set(p.id, p));
-
-      // Current admin ID
-      const curAdminId = user?.id;
-
-      // Group chats by producer counterpart
-      const threadMap = new Map<string, ChatMessage[]>();
-      chatsData.forEach((msg: ChatMessage) => {
-        // Counterpart is the other person (or whichever person is not this admin)
-        const counterpartId = msg.sender_id === curAdminId ? msg.recipient_id : msg.sender_id;
-        if (!counterpartId) return;
-
-        if (!threadMap.has(counterpartId)) {
-          threadMap.set(counterpartId, []);
+      const res = await fetch('/api/chat', { headers, cache: 'no-store' });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.adminUserId) {
+          setAdminUserId(data.adminUserId);
         }
-        threadMap.get(counterpartId)!.push(msg);
-      });
+        if (Array.isArray(data.threads)) {
+          setThreads(data.threads);
+          if (data.threads.length > 0) {
+            setActiveProducerId((prev) => {
+              if (prev && data.threads.some((t: any) => t.producerId === prev)) {
+                return prev;
+              }
+              return data.threads[0].producerId;
+            });
+          }
+        }
+      } else {
+        // Fallback to client-side supabase query if needed
+        const { data: chatsData } = await supabase
+          .from('chats')
+          .select('*')
+          .order('created_at', { ascending: true });
 
-      const builtThreads: ProducerThread[] = [];
-      threadMap.forEach((msgs, pId) => {
-        const prof = profileMap.get(pId);
-        const lastMsg = msgs[msgs.length - 1];
-        const date = new Date(lastMsg.created_at);
-        const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        if (chatsData) {
+          const participantIds = new Set<string>();
+          chatsData.forEach((c) => {
+            if (c.sender_id) participantIds.add(c.sender_id);
+            if (c.recipient_id) participantIds.add(c.recipient_id);
+          });
 
-        let previewText = lastMsg.content || '';
-        if (lastMsg.media_type === 'image') previewText = '📷 [Image attachment]';
-        else if (lastMsg.media_type === 'audio') previewText = '🎵 [Audio voice message]';
+          const { data: profilesData } = await supabase
+            .from('profiles')
+            .select('id, display_name, handle, avatar_url, primary_role, roles')
+            .in('id', Array.from(participantIds));
 
-        builtThreads.push({
-          producerId: pId,
-          displayName: prof?.display_name || prof?.handle || 'Producer',
-          handle: prof?.handle ? `@${prof.handle}` : '@creator',
-          avatarUrl: prof?.avatar_url || '',
-          lastMessage: previewText,
-          lastMessageTime: timeStr,
-          unreadCount: 0,
-          messages: msgs
-        });
-      });
+          const profileMap = new Map<string, any>();
+          (profilesData || []).forEach((p) => profileMap.set(p.id, p));
 
-      // Sort by newest message
-      builtThreads.sort((a, b) => {
-        const timeA = new Date(a.messages[a.messages.length - 1].created_at).getTime();
-        const timeB = new Date(b.messages[b.messages.length - 1].created_at).getTime();
-        return timeB - timeA;
-      });
+          const threadMap = new Map<string, ChatMessage[]>();
+          chatsData.forEach((msg: ChatMessage) => {
+            const counterpartId = msg.sender_id === adminUserId ? msg.recipient_id : msg.sender_id;
+            if (!counterpartId) return;
+            if (!threadMap.has(counterpartId)) threadMap.set(counterpartId, []);
+            threadMap.get(counterpartId)!.push(msg);
+          });
 
-      setThreads(builtThreads);
-      if (builtThreads.length > 0 && !activeProducerId) {
-        setActiveProducerId(builtThreads[0].producerId);
+          const builtThreads: ProducerThread[] = [];
+          threadMap.forEach((msgs, pId) => {
+            const prof = profileMap.get(pId);
+            const lastMsg = msgs[msgs.length - 1];
+            const date = new Date(lastMsg.created_at);
+            const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+            builtThreads.push({
+              producerId: pId,
+              displayName: prof?.display_name || prof?.handle || 'Producer',
+              handle: prof?.handle ? `@${prof.handle}` : '@creator',
+              avatarUrl: prof?.avatar_url || '',
+              lastMessage: lastMsg.content || '',
+              lastMessageTime: timeStr,
+              unreadCount: 0,
+              messages: msgs
+            });
+          });
+          setThreads(builtThreads);
+        }
       }
     } catch (err) {
       console.error('Error loading admin chats:', err);
@@ -213,13 +201,17 @@ export default function AdminProducerChatPage() {
     setIsNewChatOpen(true);
     setLoadingProducers(true);
     try {
-      const { data: producers } = await supabase
-        .from('profiles')
-        .select('id, display_name, handle, avatar_url, role, primary_role')
-        .order('created_at', { ascending: false })
-        .limit(50);
+      const { data: { session } } = await supabase.auth.getSession();
+      const headers: Record<string, string> = {};
+      if (session?.access_token) {
+        headers['Authorization'] = `Bearer ${session.access_token}`;
+      }
 
-      setAllProducers(producers || []);
+      const res = await fetch('/api/users', { headers, cache: 'no-store' });
+      if (res.ok) {
+        const data = await res.json();
+        setAllProducers(data.users || []);
+      }
     } catch (e) {
       console.error('Error fetching producers list:', e);
     } finally {
@@ -235,9 +227,11 @@ export default function AdminProducerChatPage() {
     } else {
       const newThread: ProducerThread = {
         producerId: producer.id,
-        displayName: producer.display_name || producer.handle || 'Producer',
-        handle: producer.handle ? `@${producer.handle}` : '@creator',
+        displayName: producer.display_name || producer.handle || producer.email || 'Producer',
+        handle: producer.handle ? `@${producer.handle.replace(/^@/, '')}` : '@producer',
         avatarUrl: producer.avatar_url || '',
+        email: producer.email || '',
+        beatsCount: 0,
         lastMessage: 'Conversation started',
         lastMessageTime: 'Just now',
         unreadCount: 0,
@@ -318,21 +312,43 @@ export default function AdminProducerChatPage() {
         senderId = user?.id || '64d47dcb-3d1f-41dd-8400-46f39c5b0750';
       }
 
-      // 3. Insert into chats table
-      const { error: insertErr } = await supabase.from('chats').insert({
-        sender_id: senderId,
-        recipient_id: activeThread.producerId,
-        content: newMessage.trim(),
-        media_url: mediaUrl,
-        media_key: mediaKey,
-        media_type: mediaType,
-        media_name: mediaName,
-        media_size: mediaSize,
-        is_encrypted: false,
-        has_contact_info: false
+      // 3. Send message via /api/chat
+      const { data: { session } } = await supabase.auth.getSession();
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (session?.access_token) {
+        headers['Authorization'] = `Bearer ${session.access_token}`;
+      }
+
+      const postRes = await fetch('/api/chat', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          recipientId: activeThread.producerId,
+          content: newMessage.trim(),
+          mediaUrl,
+          mediaKey,
+          mediaType,
+          mediaName,
+          mediaSize
+        })
       });
 
-      if (insertErr) throw insertErr;
+      if (!postRes.ok) {
+        // Fallback to client-side insert
+        const { error: insertErr } = await supabase.from('chats').insert({
+          sender_id: senderId,
+          recipient_id: activeThread.producerId,
+          content: newMessage.trim(),
+          media_url: mediaUrl,
+          media_key: mediaKey,
+          media_type: mediaType,
+          media_name: mediaName,
+          media_size: mediaSize,
+          is_encrypted: false,
+          has_contact_info: false
+        });
+        if (insertErr) throw insertErr;
+      }
 
       // Clean up input
       setNewMessage('');
@@ -369,6 +385,8 @@ export default function AdminProducerChatPage() {
     (t) =>
       t.displayName.toLowerCase().includes(search.toLowerCase()) ||
       t.handle.toLowerCase().includes(search.toLowerCase()) ||
+      (t.email && t.email.toLowerCase().includes(search.toLowerCase())) ||
+      (t.latestBeat && t.latestBeat.toLowerCase().includes(search.toLowerCase())) ||
       t.lastMessage.toLowerCase().includes(search.toLowerCase())
   );
 
@@ -494,14 +512,21 @@ export default function AdminProducerChatPage() {
                       {/* Content */}
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between gap-1 mb-0.5">
-                          <span className="font-semibold text-xs text-white truncate">
+                          <span className="font-bold text-xs text-white truncate">
                             {thread.displayName}
                           </span>
-                          <span className="text-[10px] text-zinc-500 flex-shrink-0">
+                          <span className="text-[10px] text-zinc-500 flex-shrink-0 font-mono">
                             {thread.lastMessageTime}
                           </span>
                         </div>
-                        <p className="text-[11px] text-zinc-400 font-mono truncate">{thread.handle}</p>
+                        <div className="flex items-center gap-1.5 text-[11px] text-zinc-400 font-mono">
+                          <span className="truncate">{thread.handle}</span>
+                          {typeof thread.beatsCount === 'number' && thread.beatsCount > 0 && (
+                            <span className="px-1.5 py-0.2 rounded bg-zinc-800 text-[10px] text-[#2dd4bf] shrink-0 font-sans">
+                              {thread.beatsCount} {thread.beatsCount === 1 ? 'beat' : 'beats'}
+                            </span>
+                          )}
+                        </div>
                         <p className="text-[11px] text-zinc-400 truncate mt-1">
                           {thread.lastMessage || 'No messages yet'}
                         </p>
@@ -535,16 +560,18 @@ export default function AdminProducerChatPage() {
                       <h2 className="text-sm font-bold text-white flex items-center gap-2">
                         {activeThread.displayName}
                         <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-[#2dd4bf]/10 text-[#2dd4bf] border border-[#2dd4bf]/20">
-                          Producer
+                          {activeThread.beatsCount ? `${activeThread.beatsCount} ${activeThread.beatsCount === 1 ? 'beat' : 'beats'}` : 'Producer'}
                         </span>
                       </h2>
-                      <p className="text-xs text-zinc-400 font-mono">{activeThread.handle}</p>
+                      <p className="text-xs text-zinc-400 font-mono">
+                        {activeThread.handle} {activeThread.email ? `• ${activeThread.email}` : ''}
+                      </p>
                     </div>
                   </div>
 
                   <div className="flex items-center gap-3">
                     <a
-                      href={`/tracks?search=${encodeURIComponent(activeThread.displayName)}`}
+                      href={`/tracks?search=${encodeURIComponent(activeThread.displayName || activeThread.handle)}`}
                       className="px-2.5 py-1 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white text-xs font-medium transition-colors flex items-center gap-1.5"
                       title="View producer beats catalog"
                     >
@@ -585,9 +612,11 @@ export default function AdminProducerChatPage() {
                             }`}
                           >
                             {/* Message Author Header */}
-                            <div className="flex items-center justify-between gap-3 text-[10px] text-zinc-400 mb-1.5 font-medium">
-                              <span>{isAdminMsg ? 'Executive Admin' : activeThread.displayName}</span>
-                              <span className="font-mono">{timeStr}</span>
+                            <div className="flex items-center justify-between gap-3 text-[10px] mb-1.5 font-medium">
+                              <span className={isAdminMsg ? 'text-[#2dd4bf] font-semibold' : 'text-zinc-300 font-semibold'}>
+                                {isAdminMsg ? 'Executive Admin' : activeThread.displayName}
+                              </span>
+                              <span className="font-mono text-zinc-500">{timeStr}</span>
                             </div>
 
                             {/* Text Content */}
@@ -842,7 +871,8 @@ export default function AdminProducerChatPage() {
                   .filter(
                     (p) =>
                       (p.display_name || '').toLowerCase().includes(producerSearch.toLowerCase()) ||
-                      (p.handle || '').toLowerCase().includes(producerSearch.toLowerCase())
+                      (p.handle || '').toLowerCase().includes(producerSearch.toLowerCase()) ||
+                      (p.email || '').toLowerCase().includes(producerSearch.toLowerCase())
                   )
                   .map((p) => (
                     <button
@@ -860,12 +890,14 @@ export default function AdminProducerChatPage() {
                           />
                         ) : (
                           <div className="h-8 w-8 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center text-white text-xs font-bold">
-                            {(p.display_name || p.handle || 'P').charAt(0).toUpperCase()}
+                            {(p.display_name || p.handle || p.email || 'P').charAt(0).toUpperCase()}
                           </div>
                         )}
                         <div>
-                          <p className="text-xs font-semibold text-white">{p.display_name || p.handle || 'Producer'}</p>
-                          <p className="text-[10px] text-zinc-400 font-mono">@{p.handle || 'creator'}</p>
+                          <p className="text-xs font-semibold text-white">{p.display_name || p.handle || p.email || 'Producer'}</p>
+                          <p className="text-[10px] text-zinc-400 font-mono">
+                            @{p.handle ? p.handle.replace(/^@/, '') : 'creator'} {p.email ? `• ${p.email}` : ''}
+                          </p>
                         </div>
                       </div>
 
