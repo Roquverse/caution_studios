@@ -663,7 +663,7 @@ export default function StudioChatPage() {
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept="image/*,audio/*,.wav,.mp3"
+                  accept="image/jpeg,image/png,image/webp,image/heic,image/*,audio/mpeg,audio/wav,audio/x-wav,audio/mp4,audio/aac,audio/x-m4a,audio/flac,audio/ogg,audio/*,.mp3,.wav,.m4a,.aac,.flac,.ogg,.jpg,.jpeg,.png,.webp"
                   onChange={handleFileSelect}
                   className="hidden"
                 />

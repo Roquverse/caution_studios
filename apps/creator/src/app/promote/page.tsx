@@ -495,14 +495,19 @@ export default function ProducerPromotePage() {
                 <div className="border border-dashed border-zinc-800 rounded-lg p-3 bg-zinc-950">
                   <input
                     type="file"
-                    accept="audio/*"
+                    accept="audio/mpeg,audio/wav,audio/x-wav,audio/mp4,audio/aac,audio/x-m4a,audio/flac,audio/ogg,audio/*,.mp3,.wav,.m4a,.aac,.flac,.ogg"
                     onChange={(e) => {
                       setAudioFile(e.target.files?.[0] || null);
                       setAudioUrl('');
                     }}
-                    className="text-xs text-zinc-400 file:mr-3 file:py-1 file:px-2.5 file:rounded file:border-0 file:text-xs file:font-semibold file:bg-zinc-800 file:text-zinc-300 hover:file:bg-zinc-700 cursor-pointer"
+                    className="w-full text-xs text-zinc-400 file:mr-3 file:py-1 file:px-2.5 file:rounded file:border-0 file:text-xs file:font-semibold file:bg-zinc-800 file:text-zinc-300 hover:file:bg-zinc-700 cursor-pointer"
                   />
-                  {audioUrl && (
+                  {audioFile && (
+                    <p className="text-[10px] text-[#2dd4bf] font-mono mt-1 truncate">
+                      ✓ Selected: {audioFile.name} ({(audioFile.size / (1024 * 1024)).toFixed(2)} MB)
+                    </p>
+                  )}
+                  {audioUrl && !audioFile && (
                     <p className="text-[10px] text-[#2dd4bf] font-mono mt-1 truncate">
                       Catalog Audio: {audioUrl}
                     </p>
@@ -517,14 +522,19 @@ export default function ProducerPromotePage() {
                 <div className="border border-dashed border-zinc-800 rounded-lg p-3 bg-zinc-950">
                   <input
                     type="file"
-                    accept="image/*"
+                    accept="image/jpeg,image/png,image/webp,image/heic,image/*,.jpg,.jpeg,.png,.webp,.heic"
                     onChange={(e) => {
                       setCoverFile(e.target.files?.[0] || null);
                       setCoverUrl('');
                     }}
-                    className="text-xs text-zinc-400 file:mr-3 file:py-1 file:px-2.5 file:rounded file:border-0 file:text-xs file:font-semibold file:bg-zinc-800 file:text-zinc-300 hover:file:bg-zinc-700 cursor-pointer"
+                    className="w-full text-xs text-zinc-400 file:mr-3 file:py-1 file:px-2.5 file:rounded file:border-0 file:text-xs file:font-semibold file:bg-zinc-800 file:text-zinc-300 hover:file:bg-zinc-700 cursor-pointer"
                   />
-                  {coverUrl && (
+                  {coverFile && (
+                    <p className="text-[10px] text-[#2dd4bf] font-mono mt-1 truncate">
+                      ✓ Selected: {coverFile.name}
+                    </p>
+                  )}
+                  {coverUrl && !coverFile && (
                     <p className="text-[10px] text-[#2dd4bf] font-mono mt-1 truncate">
                       Catalog Artwork: {coverUrl}
                     </p>

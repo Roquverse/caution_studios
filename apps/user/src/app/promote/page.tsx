@@ -560,11 +560,17 @@ export default function PromoteMusicPage() {
                 <div className="border border-dashed border-white/10 rounded-xl p-4 text-center hover:border-white/20 transition-colors bg-[#08090B]">
                   <input
                     type="file"
-                    accept="audio/*"
+                    accept="audio/mpeg,audio/wav,audio/x-wav,audio/mp4,audio/aac,audio/x-m4a,audio/flac,audio/ogg,audio/*,.mp3,.wav,.m4a,.aac,.flac,.ogg"
                     onChange={(e) => setAudioFile(e.target.files?.[0] || null)}
-                    className="text-xs text-gray-400 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-white/10 file:text-white hover:file:bg-white/20 cursor-pointer"
+                    className="w-full text-xs text-gray-400 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-white/10 file:text-white hover:file:bg-white/20 cursor-pointer"
                   />
-                  <p className="text-[10px] text-gray-500 mt-1">If empty, fallback demo audio will be used</p>
+                  {audioFile ? (
+                    <p className="text-[11px] text-[#2dd4bf] font-medium mt-1.5 truncate">
+                      ✓ Selected: {audioFile.name} ({(audioFile.size / (1024 * 1024)).toFixed(2)} MB)
+                    </p>
+                  ) : (
+                    <p className="text-[10px] text-gray-500 mt-1">Accepts MP3, WAV, M4A, AAC. If empty, fallback demo audio will be used</p>
+                  )}
                 </div>
               </div>
 
@@ -575,11 +581,17 @@ export default function PromoteMusicPage() {
                 <div className="border border-dashed border-white/10 rounded-xl p-4 text-center hover:border-white/20 transition-colors bg-[#08090B]">
                   <input
                     type="file"
-                    accept="image/*"
+                    accept="image/jpeg,image/png,image/webp,image/heic,image/*,.jpg,.jpeg,.png,.webp,.heic"
                     onChange={(e) => setCoverFile(e.target.files?.[0] || null)}
-                    className="text-xs text-gray-400 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-white/10 file:text-white hover:file:bg-white/20 cursor-pointer"
+                    className="w-full text-xs text-gray-400 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-white/10 file:text-white hover:file:bg-white/20 cursor-pointer"
                   />
-                  <p className="text-[10px] text-gray-500 mt-1">1:1 square recommended</p>
+                  {coverFile ? (
+                    <p className="text-[11px] text-[#2dd4bf] font-medium mt-1.5 truncate">
+                      ✓ Selected: {coverFile.name}
+                    </p>
+                  ) : (
+                    <p className="text-[10px] text-gray-500 mt-1">1:1 square recommended</p>
+                  )}
                 </div>
               </div>
             </div>
