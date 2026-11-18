@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyPaystack } from '../../../../lib/paystack';
 import { getServiceRoleClient } from '../../../../lib/supabaseClient';
+import { sendBeatPurchaseDeliveryEmail, PurchasedBeatEmailItem } from '../../../../lib/emailNotifier';
+import { getPresignedDownloadUrl } from '../../../../lib/r2Server';
 
 export const dynamic = 'force-dynamic';
 
@@ -212,6 +214,8 @@ export async function POST(req: NextRequest) {
     }
 
     // Process purchased items (exclusive locks, notifications, license records)
+    const emailDeliveryItems: PurchasedBeatEmailItem[] = [];
+
     if (items.length > 0) {
       for (const item of items) {
         if (!item.beat_id) continue;
@@ -230,60 +234,130 @@ export async function POST(req: NextRequest) {
         try {
           const { data: beat } = await supabase
             .from('beats')
-            .select('id, title, producer_id, producer:producer_id(id, display_name, handle)')
+            .select('id, title, producer_id, master_wav_key, stems_zip_key, cover_url, producer:producer_id(id, display_name, handle)')
             .eq('id', item.beat_id)
             .maybeSingle();
 
-          if (beat && beat.producer_id) {
+          if (beat) {
             const producerName = (beat.producer as any)?.display_name || 'Producer';
             const priceNgn = item.price || 15000;
             const earningsNgn = Math.round(priceNgn * 0.8).toLocaleString();
+            const licenseType = item.license === 'exclusive' ? 'exclusive' : 'premium';
 
-            await supabase.from('chats').insert({
-              sender_id: beat.producer_id,
-              recipient_id: beat.producer_id,
-              beat_id: beat.id,
-              content: `🎉 CONGRATULATIONS ${producerName}! Your beat "${beat.title}" has just been purchased via Paystack on Caution Studio for ₦${priceNgn.toLocaleString()}. Your 80% creator share (₦${earningsNgn}) has been credited.`,
-              is_encrypted: false,
-              has_contact_info: false
+            // Generate presigned download links for Stems ZIP & Master WAV (7-day validity)
+            let stemsDownloadUrl: string | null = null;
+            let masterWavDownloadUrl: string | null = null;
+
+            if (beat.stems_zip_key) {
+              try {
+                stemsDownloadUrl = await getPresignedDownloadUrl(
+                  beat.stems_zip_key,
+                  `${beat.title} - Stems.zip`,
+                  60 * 60 * 24 * 7
+                );
+              } catch (err) {
+                stemsDownloadUrl = `https://cautionstudioz.com/api/media/${encodeURIComponent(beat.stems_zip_key)}?download=1&filename=${encodeURIComponent(`${beat.title} - Stems.zip`)}`;
+              }
+            }
+
+            if (beat.master_wav_key) {
+              try {
+                masterWavDownloadUrl = await getPresignedDownloadUrl(
+                  beat.master_wav_key,
+                  `${beat.title} - Master WAV.wav`,
+                  60 * 60 * 24 * 7
+                );
+              } catch (err) {
+                masterWavDownloadUrl = `https://cautionstudioz.com/api/media/${encodeURIComponent(beat.master_wav_key)}?download=1&filename=${encodeURIComponent(`${beat.title} - Master WAV.wav`)}`;
+              }
+            }
+
+            emailDeliveryItems.push({
+              beatTitle: beat.title,
+              producerName,
+              licenseType,
+              priceNgn,
+              stemsDownloadUrl,
+              masterWavDownloadUrl,
+              hasStems: !!beat.stems_zip_key
             });
 
-            if (recordedOrderId) {
-              const itemTotalCents = priceNgn * 100;
-              const platformFeeCents = Math.round(itemTotalCents * 0.2);
-              const producerAmountCents = itemTotalCents - platformFeeCents;
-              const licenseType = item.license === 'exclusive' ? 'exclusive' : 'premium';
+            if (beat.producer_id) {
+              await supabase.from('chats').insert({
+                sender_id: beat.producer_id,
+                recipient_id: beat.producer_id,
+                beat_id: beat.id,
+                content: `🎉 CONGRATULATIONS ${producerName}! Your beat "${beat.title}" has just been purchased via Paystack on Caution Studio for ₦${priceNgn.toLocaleString()}. Your 80% creator share (₦${earningsNgn}) has been credited.`,
+                is_encrypted: false,
+                has_contact_info: false
+              });
 
-              const { data: orderItem } = await supabase
-                .from('order_items')
-                .insert({
-                  order_id: recordedOrderId,
-                  beat_id: beat.id,
-                  producer_id: beat.producer_id,
-                  license: licenseType,
-                  price_cents: itemTotalCents,
-                  platform_fee_cents: platformFeeCents,
-                  producer_amount_cents: producerAmountCents
-                })
-                .select('id')
-                .maybeSingle();
+              if (recordedOrderId) {
+                const itemTotalCents = priceNgn * 100;
+                const platformFeeCents = Math.round(itemTotalCents * 0.2);
+                const producerAmountCents = itemTotalCents - platformFeeCents;
 
-              if (orderItem && targetUserId) {
-                try {
-                  await supabase.from('licenses').insert({
-                    order_item_id: orderItem.id,
-                    buyer_id: targetUserId,
+                const { data: orderItem } = await supabase
+                  .from('order_items')
+                  .insert({
+                    order_id: recordedOrderId,
                     beat_id: beat.id,
-                    type: licenseType,
-                    stream_cap: licenseType === 'exclusive' ? null : 500000,
-                    agreement_pdf_key: `licenses/${orderItem.id}/agreement.pdf`
-                  });
-                } catch (e) {}
+                    producer_id: beat.producer_id,
+                    license: licenseType,
+                    price_cents: itemTotalCents,
+                    platform_fee_cents: platformFeeCents,
+                    producer_amount_cents: producerAmountCents
+                  })
+                  .select('id')
+                  .maybeSingle();
+
+                if (orderItem && targetUserId) {
+                  try {
+                    await supabase.from('licenses').insert({
+                      order_item_id: orderItem.id,
+                      buyer_id: targetUserId,
+                      beat_id: beat.id,
+                      type: licenseType,
+                      stream_cap: licenseType === 'exclusive' ? null : 500000,
+                      agreement_pdf_key: `licenses/${orderItem.id}/agreement.pdf`
+                    });
+                  } catch (e) {}
+                }
               }
             }
           }
         } catch (e) {
           console.warn('Error recording beat purchase in database:', e);
+        }
+      }
+
+      // Send delivery email to customer with stems and master audio
+      if (emailDeliveryItems.length > 0) {
+        let buyerEmail = (data.customer?.email || bodyEmail || metadata.email || '').toLowerCase().trim();
+        let buyerName = data.customer?.first_name || (data.customer?.metadata as any)?.name;
+
+        if (!buyerEmail && targetUserId) {
+          try {
+            const { data: userRecord } = await supabase.auth.admin.getUserById(targetUserId);
+            if (userRecord?.user?.email) {
+              buyerEmail = userRecord.user.email.toLowerCase().trim();
+              buyerName = buyerName || userRecord.user.user_metadata?.name || userRecord.user.user_metadata?.full_name;
+            }
+          } catch (e) {}
+        }
+
+        if (buyerEmail) {
+          const totalPaid = Math.round(
+            (data.amount || items.reduce((acc: number, item: any) => acc + (item.price || 0), 0) * 100) / 100
+          );
+          await sendBeatPurchaseDeliveryEmail({
+            buyerEmail,
+            buyerName,
+            orderId: recordedOrderId || orderId,
+            reference,
+            totalAmountNgn: totalPaid,
+            items: emailDeliveryItems
+          });
         }
       }
     }

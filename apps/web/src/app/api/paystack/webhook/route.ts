@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { getServiceRoleClient } from '../../../../lib/supabaseClient';
-import { sendAdminNotification } from '../../../../lib/emailNotifier';
+import { sendAdminNotification, sendBeatPurchaseDeliveryEmail, PurchasedBeatEmailItem } from '../../../../lib/emailNotifier';
+import { getPresignedDownloadUrl } from '../../../../lib/r2Server';
 
 export async function POST(req: NextRequest) {
   try {
@@ -105,6 +106,8 @@ export async function POST(req: NextRequest) {
       }
 
       // Atomic lock for any exclusive items and dispatch congratulations notifications to producers
+      const emailDeliveryItems: PurchasedBeatEmailItem[] = [];
+
       for (const item of items) {
         if (item.license === 'exclusive' && item.beat_id) {
           await supabase.rpc('acquire_exclusive_beat', {
@@ -112,35 +115,103 @@ export async function POST(req: NextRequest) {
           });
         }
 
-        // Notify producer
+        // Notify producer & collect download links
         if (item.beat_id) {
           try {
             const { data: beat } = await supabase
               .from('beats')
-              .select('id, title, producer_id, producer:producer_id(id, display_name, handle)')
+              .select('id, title, producer_id, master_wav_key, stems_zip_key, producer:producer_id(id, display_name, handle)')
               .eq('id', item.beat_id)
               .maybeSingle();
 
-            if (beat && beat.producer_id) {
+            if (beat) {
               const producerName = (beat.producer as any)?.display_name || 'Producer';
               const beatTitle = beat.title;
               const priceNgn = item.price ? Number(item.price) : 30000;
               const earningsNgn = Math.round(priceNgn * 0.8).toLocaleString();
+              const licenseType = item.license === 'exclusive' ? 'exclusive' : 'premium';
 
-              await supabase.from('chats').insert({
-                sender_id: beat.producer_id,
-                recipient_id: beat.producer_id,
-                beat_id: beat.id,
-                content: `🎉 CONGRATULATIONS ${producerName}! Your beat "${beatTitle}" has just been licensed on Caution Studio Beat Store for ₦${priceNgn.toLocaleString()}. Your 80% creator share (₦${earningsNgn}) has been credited to your royalty balance.`,
-                is_encrypted: false,
-                has_contact_info: false
+              let stemsDownloadUrl: string | null = null;
+              let masterWavDownloadUrl: string | null = null;
+
+              if (beat.stems_zip_key) {
+                try {
+                  stemsDownloadUrl = await getPresignedDownloadUrl(
+                    beat.stems_zip_key,
+                    `${beat.title} - Stems.zip`,
+                    60 * 60 * 24 * 7
+                  );
+                } catch (err) {
+                  stemsDownloadUrl = `https://cautionstudioz.com/api/media/${encodeURIComponent(beat.stems_zip_key)}?download=1&filename=${encodeURIComponent(`${beat.title} - Stems.zip`)}`;
+                }
+              }
+
+              if (beat.master_wav_key) {
+                try {
+                  masterWavDownloadUrl = await getPresignedDownloadUrl(
+                    beat.master_wav_key,
+                    `${beat.title} - Master WAV.wav`,
+                    60 * 60 * 24 * 7
+                  );
+                } catch (err) {
+                  masterWavDownloadUrl = `https://cautionstudioz.com/api/media/${encodeURIComponent(beat.master_wav_key)}?download=1&filename=${encodeURIComponent(`${beat.title} - Master WAV.wav`)}`;
+                }
+              }
+
+              emailDeliveryItems.push({
+                beatTitle: beat.title,
+                producerName,
+                licenseType,
+                priceNgn,
+                stemsDownloadUrl,
+                masterWavDownloadUrl,
+                hasStems: !!beat.stems_zip_key
               });
 
-              console.log(`[PRODUCER EMAIL NOTIFICATION] 🎉 Congratulations ${producerName}! Beat "${beatTitle}" sold for ₦${priceNgn}. ₦${earningsNgn} credited.`);
+              if (beat.producer_id) {
+                await supabase.from('chats').insert({
+                  sender_id: beat.producer_id,
+                  recipient_id: beat.producer_id,
+                  beat_id: beat.id,
+                  content: `🎉 CONGRATULATIONS ${producerName}! Your beat "${beatTitle}" has just been licensed on Caution Studio Beat Store for ₦${priceNgn.toLocaleString()}. Your 80% creator share (₦${earningsNgn}) has been credited to your royalty balance.`,
+                  is_encrypted: false,
+                  has_contact_info: false
+                });
+
+                console.log(`[PRODUCER EMAIL NOTIFICATION] 🎉 Congratulations ${producerName}! Beat "${beatTitle}" sold for ₦${priceNgn}. ₦${earningsNgn} credited.`);
+              }
             }
           } catch (notifErr) {
             console.warn('Failed to send producer notification:', notifErr);
           }
+        }
+      }
+
+      // Send delivery email to customer with stems and master audio
+      if (emailDeliveryItems.length > 0) {
+        let buyerEmail = (data.customer?.email || metadata.email || '').toLowerCase().trim();
+        let buyerName = data.customer?.first_name || (data.customer?.metadata as any)?.name;
+
+        if (!buyerEmail && metadata.user_id) {
+          try {
+            const { data: userRecord } = await supabase.auth.admin.getUserById(metadata.user_id);
+            if (userRecord?.user?.email) {
+              buyerEmail = userRecord.user.email.toLowerCase().trim();
+              buyerName = buyerName || userRecord.user.user_metadata?.name || userRecord.user.user_metadata?.full_name;
+            }
+          } catch (e) {}
+        }
+
+        if (buyerEmail) {
+          const totalPaid = Math.round((data.amount || 0) / 100);
+          await sendBeatPurchaseDeliveryEmail({
+            buyerEmail,
+            buyerName,
+            orderId,
+            reference,
+            totalAmountNgn: totalPaid,
+            items: emailDeliveryItems
+          });
         }
       }
 

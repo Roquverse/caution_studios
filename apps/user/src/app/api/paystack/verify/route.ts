@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyPaystack } from '../../../../lib/paystack';
 import { getServiceRoleClient } from '../../../../lib/supabaseClient';
+import { sendBeatPurchaseDeliveryEmail, PurchasedBeatEmailItem } from '../../../../lib/emailNotifier';
+import { getPresignedDownloadUrl } from '../../../../lib/r2Server';
 
 export const dynamic = 'force-dynamic';
 
@@ -208,45 +210,86 @@ export async function POST(req: NextRequest) {
 
     // Single beat purchase handling (Exclusive buyout / Premium stems)
     let purchasedBeatTitle = metadata.beat_title || null;
-    if (beatId) {
-      if (metadata.license === 'exclusive') {
+    const emailDeliveryItems: PurchasedBeatEmailItem[] = [];
+
+    // Helper to process beat item
+    const processBeatItem = async (bId: string, bLicense: string, bPriceNgn: number) => {
+      if (bLicense === 'exclusive') {
         try {
-          await supabase.rpc('acquire_exclusive_beat', { p_beat_id: beatId });
+          await supabase.rpc('acquire_exclusive_beat', { p_beat_id: bId });
         } catch (e) {
           console.warn('Exclusive lock error:', e);
         }
         try {
-          await supabase.from('beats').update({ status: 'sold' }).eq('id', beatId);
+          await supabase.from('beats').update({ status: 'sold' }).eq('id', bId);
         } catch (e) {}
       }
 
       try {
         const { data: beat } = await supabase
           .from('beats')
-          .select('id, title, producer_id, producer:producer_id(id, display_name, handle)')
-          .eq('id', beatId)
+          .select('id, title, producer_id, master_wav_key, stems_zip_key, cover_url, producer:producer_id(id, display_name, handle)')
+          .eq('id', bId)
           .maybeSingle();
 
         if (beat) {
           purchasedBeatTitle = beat.title;
-          if (beat.producer_id) {
-            const producerName = (beat.producer as any)?.display_name || 'Producer';
-            const priceNgn = metadata.priceNgn ? Number(metadata.priceNgn) : Math.round(totalAmountCents / 100);
-            const earningsNgn = Math.round(priceNgn * 0.8).toLocaleString();
+          const producerName = (beat.producer as any)?.display_name || 'Producer';
+          const earningsNgn = Math.round(bPriceNgn * 0.8).toLocaleString();
+          const licenseType = bLicense === 'exclusive' ? 'exclusive' : 'premium';
 
+          // Generate presigned download links for Stems ZIP & Master WAV (7-day validity)
+          let stemsDownloadUrl: string | null = null;
+          let masterWavDownloadUrl: string | null = null;
+
+          if (beat.stems_zip_key) {
+            try {
+              stemsDownloadUrl = await getPresignedDownloadUrl(
+                beat.stems_zip_key,
+                `${beat.title} - Stems.zip`,
+                60 * 60 * 24 * 7
+              );
+            } catch (err) {
+              stemsDownloadUrl = `https://cautionstudioz.com/api/media/${encodeURIComponent(beat.stems_zip_key)}?download=1&filename=${encodeURIComponent(`${beat.title} - Stems.zip`)}`;
+            }
+          }
+
+          if (beat.master_wav_key) {
+            try {
+              masterWavDownloadUrl = await getPresignedDownloadUrl(
+                beat.master_wav_key,
+                `${beat.title} - Master WAV.wav`,
+                60 * 60 * 24 * 7
+              );
+            } catch (err) {
+              masterWavDownloadUrl = `https://cautionstudioz.com/api/media/${encodeURIComponent(beat.master_wav_key)}?download=1&filename=${encodeURIComponent(`${beat.title} - Master WAV.wav`)}`;
+            }
+          }
+
+          emailDeliveryItems.push({
+            beatTitle: beat.title,
+            producerName,
+            licenseType,
+            priceNgn: bPriceNgn,
+            stemsDownloadUrl,
+            masterWavDownloadUrl,
+            hasStems: !!beat.stems_zip_key
+          });
+
+          if (beat.producer_id) {
             await supabase.from('chats').insert({
               sender_id: beat.producer_id,
               recipient_id: beat.producer_id,
               beat_id: beat.id,
-              content: `🎉 CONGRATULATIONS ${producerName}! Your beat "${beat.title}" has just been purchased via Paystack on Caution Studio for ₦${priceNgn.toLocaleString()}. Your 80% creator share (₦${earningsNgn}) has been credited.`,
+              content: `🎉 CONGRATULATIONS ${producerName}! Your beat "${beat.title}" has just been purchased via Paystack on Caution Studio for ₦${bPriceNgn.toLocaleString()}. Your 80% creator share (₦${earningsNgn}) has been credited.`,
               is_encrypted: false,
               has_contact_info: false
             });
 
             if (recordedOrderId) {
-              const platformFeeCents = Math.round(totalAmountCents * 0.2);
-              const producerAmountCents = totalAmountCents - platformFeeCents;
-              const licenseType = metadata.license === 'exclusive' ? 'exclusive' : 'premium';
+              const itemTotalCents = bPriceNgn * 100;
+              const platformFeeCents = Math.round(itemTotalCents * 0.2);
+              const producerAmountCents = itemTotalCents - platformFeeCents;
 
               const { data: orderItem } = await supabase
                 .from('order_items')
@@ -255,7 +298,7 @@ export async function POST(req: NextRequest) {
                   beat_id: beat.id,
                   producer_id: beat.producer_id,
                   license: licenseType,
-                  price_cents: totalAmountCents,
+                  price_cents: itemTotalCents,
                   platform_fee_cents: platformFeeCents,
                   producer_amount_cents: producerAmountCents
                 })
@@ -279,6 +322,44 @@ export async function POST(req: NextRequest) {
         }
       } catch (e) {
         console.warn('Error recording beat purchase in database:', e);
+      }
+    };
+
+    if (beatId) {
+      const priceNgn = metadata.priceNgn ? Number(metadata.priceNgn) : Math.round(totalAmountCents / 100);
+      await processBeatItem(beatId, metadata.license || 'premium', priceNgn);
+    } else if (items.length > 0) {
+      for (const item of items) {
+        if (!item.beat_id) continue;
+        await processBeatItem(item.beat_id, item.license || 'premium', item.price || 15000);
+      }
+    }
+
+    // Send delivery email to customer with stems and master audio
+    if (emailDeliveryItems.length > 0) {
+      let buyerEmail = (data.customer?.email || bodyEmail || metadata.email || '').toLowerCase().trim();
+      let buyerName = data.customer?.first_name || (data.customer?.metadata as any)?.name;
+
+      if (!buyerEmail && targetUserId) {
+        try {
+          const { data: userRecord } = await supabase.auth.admin.getUserById(targetUserId);
+          if (userRecord?.user?.email) {
+            buyerEmail = userRecord.user.email.toLowerCase().trim();
+            buyerName = buyerName || userRecord.user.user_metadata?.name || userRecord.user.user_metadata?.full_name;
+          }
+        } catch (e) {}
+      }
+
+      if (buyerEmail) {
+        const totalPaid = Math.round(totalAmountCents / 100);
+        await sendBeatPurchaseDeliveryEmail({
+          buyerEmail,
+          buyerName,
+          orderId: recordedOrderId || orderId,
+          reference,
+          totalAmountNgn: totalPaid,
+          items: emailDeliveryItems
+        });
       }
     }
 

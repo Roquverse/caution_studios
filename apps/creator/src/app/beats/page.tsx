@@ -11,8 +11,6 @@ import {
   Play,
   Pause,
   Trash2,
-  CheckCircle2,
-  AlertCircle,
   UploadCloud,
   Loader2,
   Image as ImageIcon
@@ -306,7 +304,6 @@ export default function BeatsCatalogPage() {
                 <tr>
                   <th className="py-3 px-4">Track</th>
                   <th className="py-3 px-4">BPM / Key</th>
-                  <th className="py-3 px-4">Stems ZIP</th>
                   <th className="py-3 px-4">License Pricing</th>
                   <th className="py-3 px-4 text-center">Plays</th>
                   <th className="py-3 px-4 text-center">Downloads</th>
@@ -365,21 +362,6 @@ export default function BeatsCatalogPage() {
                     <td className="py-3 px-4 font-mono text-zinc-300">
                       <div>{beat.bpm} BPM</div>
                       <div className="text-[10px] text-zinc-500">{beat.key}</div>
-                    </td>
-
-                    {/* Stems Status */}
-                    <td className="py-3 px-4">
-                      {beat.stemsUploaded ? (
-                        <span className="inline-flex items-center gap-1 text-[11px] text-emerald-400 font-medium">
-                          <CheckCircle2 className="h-3.5 w-3.5" />
-                          <span>Ready (WAV)</span>
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 text-[11px] text-amber-400 font-medium">
-                          <AlertCircle className="h-3.5 w-3.5" />
-                          <span>Stems Missing</span>
-                        </span>
-                      )}
                     </td>
 
                     {/* License Pricing */}
