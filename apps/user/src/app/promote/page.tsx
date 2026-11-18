@@ -24,47 +24,28 @@ import { UserProfileData } from '../../components/UserDropdown';
 import { UserShell } from '../../components/UserShell';
 import { UserAdModal } from '../../components/UserAdModal';
 
-interface CampaignTier {
-  id: 'starter' | 'pro' | 'studio';
-  name: string;
-  priceNgn: number;
-  plays: number;
-  cpm: string;
-  badge?: string;
-  description: string;
+interface AdPricingConfig {
+  stream_ad_price_ngn: number;
+  download_ad_price_ngn: number;
+  both_placements_price_ngn: number;
+  stream_ad_plays: number;
+  download_ad_plays: number;
+  both_placements_plays: number;
 }
 
-const TIERS: CampaignTier[] = [
-  {
-    id: 'starter',
-    name: 'Starter Spotlight',
-    priceNgn: 15000,
-    plays: 5000,
-    cpm: '₦3,000 / 1k plays',
-    description: '5,000 guaranteed unskippable 15-second audio plays across all active listeners.'
-  },
-  {
-    id: 'pro',
-    name: 'Pro Rotation',
-    priceNgn: 35000,
-    plays: 15000,
-    cpm: '₦2,333 / 1k plays',
-    badge: 'MOST POPULAR',
-    description: '15,000 guaranteed plays + high-priority queue injection in every 3-song cycle.'
-  },
-  {
-    id: 'studio',
-    name: 'Studio Blast',
-    priceNgn: 75000,
-    plays: 40000,
-    cpm: '₦1,875 / 1k plays',
-    description: '40,000 guaranteed plays + featured artist homepage spotlight.'
-  }
-];
+const DEFAULT_PRICING: AdPricingConfig = {
+  stream_ad_price_ngn: 15000,
+  download_ad_price_ngn: 15000,
+  both_placements_price_ngn: 25000,
+  stream_ad_plays: 5000,
+  download_ad_plays: 5000,
+  both_placements_plays: 12000
+};
 
 export default function PromoteMusicPage() {
   const [profile, setProfile] = useState<UserProfileData | null>(null);
-  const [selectedTier, setSelectedTier] = useState<CampaignTier>(TIERS[1]);
+  const [pricing, setPricing] = useState<AdPricingConfig>(DEFAULT_PRICING);
+  const [adType, setAdType] = useState<'listening' | 'download' | 'all'>('listening');
   const [songTitle, setSongTitle] = useState('');
   const [artistName, setArtistName] = useState('');
   const [tagline, setTagline] = useState('');
@@ -72,7 +53,6 @@ export default function PromoteMusicPage() {
   const [appleMusicUrl, setAppleMusicUrl] = useState('');
   const [audiomackUrl, setAudiomackUrl] = useState('');
   const [youtubeUrl, setYoutubeUrl] = useState('');
-  const [adType, setAdType] = useState<'listening' | 'download' | 'all'>('listening');
   const [audioFile, setAudioFile] = useState<File | null>(null);
   const [coverFile, setCoverFile] = useState<File | null>(null);
 
@@ -83,6 +63,20 @@ export default function PromoteMusicPage() {
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [myCampaigns, setMyCampaigns] = useState<any[]>([]);
+
+  const currentPriceNgn =
+    adType === 'listening'
+      ? pricing.stream_ad_price_ngn
+      : adType === 'download'
+      ? pricing.download_ad_price_ngn
+      : pricing.both_placements_price_ngn;
+
+  const currentPlays =
+    adType === 'listening'
+      ? pricing.stream_ad_plays
+      : adType === 'download'
+      ? pricing.download_ad_plays
+      : pricing.both_placements_plays;
 
   useEffect(() => {
     async function loadUser() {
@@ -118,6 +112,19 @@ export default function PromoteMusicPage() {
           .order('created_at', { ascending: false });
 
         if (camps) setMyCampaigns(camps);
+      }
+
+      // Fetch dynamic ad pricing configured by Admin
+      try {
+        const pricingRes = await fetch('/api/ads/pricing');
+        if (pricingRes.ok) {
+          const pricingData = await pricingRes.json();
+          if (pricingData.stream_ad_price_ngn) {
+            setPricing((prev) => ({ ...prev, ...pricingData }));
+          }
+        }
+      } catch (err) {
+        console.warn('Failed fetching dynamic ad pricing:', err);
       }
     }
     loadUser();
@@ -248,9 +255,9 @@ export default function PromoteMusicPage() {
         songTitle: songTitle.trim(),
         artistName: artistName.trim(),
         campaignName: tagline.trim() || `Promote "${songTitle.trim()}"`,
-        packageName: selectedTier.id,
-        priceNgn: selectedTier.priceNgn,
-        targetPlays: selectedTier.plays,
+        packageName: adType,
+        priceNgn: currentPriceNgn,
+        targetPlays: currentPlays,
         adType,
         audioUrl: audioUrl || undefined,
         coverUrl: coverUrl || undefined,
@@ -368,48 +375,116 @@ export default function PromoteMusicPage() {
           </div>
         </div>
 
-        {/* TIER SELECTION */}
+        {/* AD PLACEMENT & PACKAGE SELECTION */}
         <div className="space-y-3">
-          <h2 className="text-sm font-bold uppercase tracking-wider text-gray-300">
-            1. Select Your Ad Package Tier
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {TIERS.map((tier) => {
-              const isSelected = selectedTier.id === tier.id;
-              return (
-                <div
-                  key={tier.id}
-                  onClick={() => setSelectedTier(tier)}
-                  className={`p-5 rounded-2xl border transition-all cursor-pointer relative flex flex-col justify-between ${
-                    isSelected
-                      ? 'bg-[#2dd4bf]/10 border-[#2dd4bf] shadow-lg shadow-[#2dd4bf]/10 ring-1 ring-[#2dd4bf]'
-                      : 'bg-[#12141a] border-white/10 hover:border-white/20 hover:bg-white/[0.03]'
-                  }`}
-                >
-                  {tier.badge && (
-                    <span className="absolute -top-2.5 right-4 px-2 py-0.5 rounded-full text-[9px] font-mono font-bold bg-[#2dd4bf] text-black uppercase">
-                      {tier.badge}
-                    </span>
-                  )}
-                  <div>
-                    <h3 className="text-sm font-bold text-white">{tier.name}</h3>
-                    <div className="mt-2 flex items-baseline gap-1">
-                      <span className="text-2xl font-black font-mono text-white">
-                        ₦{tier.priceNgn.toLocaleString()}
-                      </span>
-                    </div>
-                    <p className="text-xs text-gray-400 mt-2">{tier.description}</p>
-                  </div>
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-bold uppercase tracking-wider text-gray-300">
+              1. Select Your Ad Placement
+            </h2>
+            <span className="text-xs text-[#2dd4bf] font-medium font-mono">
+              Prices set & verified by platform
+            </span>
+          </div>
 
-                  <div className="mt-4 pt-3 border-t border-white/5 flex items-center justify-between text-xs font-mono">
-                    <span className="text-[#2dd4bf] font-bold">
-                      {tier.plays.toLocaleString()} plays
-                    </span>
-                    <span className="text-gray-500 text-[10px]">{tier.cpm}</span>
-                  </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Stream Audio Ad */}
+            <div
+              onClick={() => setAdType('listening')}
+              className={`p-5 rounded-2xl border transition-all cursor-pointer relative flex flex-col justify-between ${
+                adType === 'listening'
+                  ? 'bg-[#2dd4bf]/10 border-[#2dd4bf] shadow-lg shadow-[#2dd4bf]/10 ring-1 ring-[#2dd4bf]'
+                  : 'bg-[#12141a] border-white/10 hover:border-white/20 hover:bg-white/[0.03]'
+              }`}
+            >
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <Radio className="h-4 w-4 text-[#2dd4bf]" />
+                  <h3 className="text-sm font-bold text-white">Stream Audio Ad</h3>
                 </div>
-              );
-            })}
+                <div className="mt-2 flex items-baseline gap-1">
+                  <span className="text-2xl font-black font-mono text-white">
+                    ₦{pricing.stream_ad_price_ngn.toLocaleString()}
+                  </span>
+                </div>
+                <p className="text-xs text-gray-400 mt-2">
+                  Plays unskippable 15-second audio break during free beat audition streaming across all active listeners.
+                </p>
+              </div>
+
+              <div className="mt-4 pt-3 border-t border-white/5 flex items-center justify-between text-xs font-mono">
+                <span className="text-[#2dd4bf] font-bold">
+                  ~{pricing.stream_ad_plays.toLocaleString()} plays
+                </span>
+                <span className="text-gray-500 text-[10px]">Guaranteed</span>
+              </div>
+            </div>
+
+            {/* Download Unlock Ad */}
+            <div
+              onClick={() => setAdType('download')}
+              className={`p-5 rounded-2xl border transition-all cursor-pointer relative flex flex-col justify-between ${
+                adType === 'download'
+                  ? 'bg-[#2dd4bf]/10 border-[#2dd4bf] shadow-lg shadow-[#2dd4bf]/10 ring-1 ring-[#2dd4bf]'
+                  : 'bg-[#12141a] border-white/10 hover:border-white/20 hover:bg-white/[0.03]'
+              }`}
+            >
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <Sparkles className="h-4 w-4 text-amber-400" />
+                  <h3 className="text-sm font-bold text-white">Download Unlock Ad</h3>
+                </div>
+                <div className="mt-2 flex items-baseline gap-1">
+                  <span className="text-2xl font-black font-mono text-white">
+                    ₦{pricing.download_ad_price_ngn.toLocaleString()}
+                  </span>
+                </div>
+                <p className="text-xs text-gray-400 mt-2">
+                  Rewarded audio/video ad shown when artists reach their 2-download limit to unlock free commercial licenses.
+                </p>
+              </div>
+
+              <div className="mt-4 pt-3 border-t border-white/5 flex items-center justify-between text-xs font-mono">
+                <span className="text-[#2dd4bf] font-bold">
+                  ~{pricing.download_ad_plays.toLocaleString()} plays
+                </span>
+                <span className="text-gray-500 text-[10px]">Guaranteed</span>
+              </div>
+            </div>
+
+            {/* Both Placements */}
+            <div
+              onClick={() => setAdType('all')}
+              className={`p-5 rounded-2xl border transition-all cursor-pointer relative flex flex-col justify-between ${
+                adType === 'all'
+                  ? 'bg-[#2dd4bf]/10 border-[#2dd4bf] shadow-lg shadow-[#2dd4bf]/10 ring-1 ring-[#2dd4bf]'
+                  : 'bg-[#12141a] border-white/10 hover:border-white/20 hover:bg-white/[0.03]'
+              }`}
+            >
+              <span className="absolute -top-2.5 right-4 px-2 py-0.5 rounded-full text-[9px] font-mono font-bold bg-[#2dd4bf] text-black uppercase">
+                BUNDLE SAVINGS
+              </span>
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <Megaphone className="h-4 w-4 text-[#2dd4bf]" />
+                  <h3 className="text-sm font-bold text-white">Both Placements</h3>
+                </div>
+                <div className="mt-2 flex items-baseline gap-1">
+                  <span className="text-2xl font-black font-mono text-[#2dd4bf]">
+                    ₦{pricing.both_placements_price_ngn.toLocaleString()}
+                  </span>
+                </div>
+                <p className="text-xs text-gray-400 mt-2">
+                  Maximum coverage across all audio breaks and download unlock moments across Caution Studioz.
+                </p>
+              </div>
+
+              <div className="mt-4 pt-3 border-t border-white/5 flex items-center justify-between text-xs font-mono">
+                <span className="text-[#2dd4bf] font-bold">
+                  ~{pricing.both_placements_plays.toLocaleString()} plays
+                </span>
+                <span className="text-emerald-400 text-[10px] font-bold">Save ₦5,000</span>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -509,62 +584,6 @@ export default function PromoteMusicPage() {
               </div>
             </div>
 
-            {/* Ad Placement Selector */}
-            <div className="space-y-2 pt-2 border-t border-white/5">
-              <label className="text-xs font-bold text-gray-300 block">
-                Ad Placement / Category
-              </label>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-                <button
-                  type="button"
-                  onClick={() => setAdType('listening')}
-                  className={`p-3 rounded-xl border text-left text-xs transition-all cursor-pointer ${
-                    adType === 'listening'
-                      ? 'bg-[#2dd4bf]/15 border-[#2dd4bf] text-white ring-1 ring-[#2dd4bf]'
-                      : 'bg-[#08090B] border-white/10 text-gray-400 hover:text-white'
-                  }`}
-                >
-                  <div className="font-bold flex items-center gap-1.5 text-white">
-                    <Radio className="h-3.5 w-3.5 text-[#2dd4bf]" />
-                    <span>Stream Audio Ad</span>
-                  </div>
-                  <div className="text-[10px] text-gray-400 mt-1">Plays during free beat audition streaming</div>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setAdType('download')}
-                  className={`p-3 rounded-xl border text-left text-xs transition-all cursor-pointer ${
-                    adType === 'download'
-                      ? 'bg-[#2dd4bf]/15 border-[#2dd4bf] text-white ring-1 ring-[#2dd4bf]'
-                      : 'bg-[#08090B] border-white/10 text-gray-400 hover:text-white'
-                  }`}
-                >
-                  <div className="font-bold flex items-center gap-1.5 text-white">
-                    <Sparkles className="h-3.5 w-3.5 text-[#2dd4bf]" />
-                    <span>Download Unlock Ad</span>
-                  </div>
-                  <div className="text-[10px] text-gray-400 mt-1">Rewarded ad when 2-download limit is reached</div>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setAdType('all')}
-                  className={`p-3 rounded-xl border text-left text-xs transition-all cursor-pointer ${
-                    adType === 'all'
-                      ? 'bg-[#2dd4bf]/15 border-[#2dd4bf] text-white ring-1 ring-[#2dd4bf]'
-                      : 'bg-[#08090B] border-white/10 text-gray-400 hover:text-white'
-                  }`}
-                >
-                  <div className="font-bold flex items-center gap-1.5 text-white">
-                    <Megaphone className="h-3.5 w-3.5 text-[#2dd4bf]" />
-                    <span>Both Placements</span>
-                  </div>
-                  <div className="text-[10px] text-gray-400 mt-1">Maximum coverage across audio breaks & downloads</div>
-                </button>
-              </div>
-            </div>
-
             {/* DSP Links */}
             <div className="space-y-3 pt-2 border-t border-white/5">
               <label className="text-xs font-bold text-gray-300 block">
@@ -619,10 +638,10 @@ export default function PromoteMusicPage() {
               <div>
                 <span className="text-xs text-gray-400 block">Total Due:</span>
                 <span className="text-2xl font-black font-mono text-[#2dd4bf]">
-                  ₦{selectedTier.priceNgn.toLocaleString()}
+                  ₦{currentPriceNgn.toLocaleString()}
                 </span>
                 <span className="text-[11px] text-gray-500 block mt-0.5">
-                  Includes {selectedTier.plays.toLocaleString()} unskippable plays & email verification to support
+                  Includes ~{currentPlays.toLocaleString()} unskippable plays & email verification to support
                 </span>
               </div>
 
@@ -657,7 +676,7 @@ export default function PromoteMusicPage() {
                 ) : (
                   <>
                     <Megaphone className="h-4 w-4" />
-                    <span>Launch Campaign (₦{selectedTier.priceNgn.toLocaleString()})</span>
+                    <span>Launch Campaign (₦{currentPriceNgn.toLocaleString()})</span>
                   </>
                 )}
               </button>

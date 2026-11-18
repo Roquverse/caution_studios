@@ -64,6 +64,51 @@ export default function AdminAdsManagerPage() {
   // Campaigns State
   const [campaigns, setCampaigns] = useState<AdCampaign[]>([]);
 
+  // Ad Placement Pricing Controller State (Controllable by Admin)
+  const [streamPriceNgn, setStreamPriceNgn] = useState<number>(15000);
+  const [downloadPriceNgn, setDownloadPriceNgn] = useState<number>(15000);
+  const [bothPriceNgn, setBothPriceNgn] = useState<number>(25000);
+  const [isSavingPricing, setIsSavingPricing] = useState(false);
+  const [pricingSavedNotice, setPricingSavedNotice] = useState(false);
+
+  const fetchPricing = async () => {
+    try {
+      const res = await fetch('/api/ads/pricing');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.stream_ad_price_ngn) setStreamPriceNgn(data.stream_ad_price_ngn);
+        if (data.download_ad_price_ngn) setDownloadPriceNgn(data.download_ad_price_ngn);
+        if (data.both_placements_price_ngn) setBothPriceNgn(data.both_placements_price_ngn);
+      }
+    } catch (e) {
+      console.warn('Failed fetching ad pricing:', e);
+    }
+  };
+
+  const handleSavePricing = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSavingPricing(true);
+    try {
+      const res = await fetch('/api/ads/pricing', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          stream_ad_price_ngn: streamPriceNgn,
+          download_ad_price_ngn: downloadPriceNgn,
+          both_placements_price_ngn: bothPriceNgn
+        })
+      });
+      if (res.ok) {
+        setPricingSavedNotice(true);
+        setTimeout(() => setPricingSavedNotice(false), 3000);
+      }
+    } catch (e) {
+      alert('Failed to save ad pricing');
+    } finally {
+      setIsSavingPricing(false);
+    }
+  };
+
   const fetchCampaigns = async () => {
     setIsLoading(true);
     try {
@@ -110,6 +155,7 @@ export default function AdminAdsManagerPage() {
 
   useEffect(() => {
     fetchCampaigns();
+    fetchPricing();
   }, []);
 
   // Form State for New Campaign
@@ -117,7 +163,6 @@ export default function AdminAdsManagerPage() {
   const [formArtistHandle, setFormArtistHandle] = useState('');
   const [formSongTitle, setFormSongTitle] = useState('');
   const [formGenre, setFormGenre] = useState('Afrobeats');
-  const [formTier, setFormTier] = useState<'Starter Spotlight' | 'Pro Rotation' | 'Studio Blast'>('Pro Rotation');
   const [formAdType, setFormAdType] = useState<'listening' | 'download' | 'all'>('listening');
   const [formAudioUrl, setFormAudioUrl] = useState('');
   const [formCoverUrl, setFormCoverUrl] = useState('');
@@ -166,13 +211,19 @@ export default function AdminAdsManagerPage() {
     setIsSubmitting(true);
     setErrorMsg('');
 
-    const tierPrices = {
-      'Starter Spotlight': { price: 15000, impressions: 5000, pkg: 'starter' },
-      'Pro Rotation': { price: 35000, impressions: 15000, pkg: 'pro' },
-      'Studio Blast': { price: 75000, impressions: 40000, pkg: 'studio' }
-    };
+    const calculatedPrice =
+      formAdType === 'listening'
+        ? streamPriceNgn
+        : formAdType === 'download'
+        ? downloadPriceNgn
+        : bothPriceNgn;
 
-    const selectedTier = tierPrices[formTier];
+    const calculatedPlays =
+      formAdType === 'listening'
+        ? 5000
+        : formAdType === 'download'
+        ? 5000
+        : 12000;
 
     try {
       const res = await fetch('/api/ads', {
@@ -182,9 +233,9 @@ export default function AdminAdsManagerPage() {
           songTitle: formSongTitle,
           artistName: formArtistName,
           campaignName: formArtistHandle.startsWith('@') ? formArtistHandle : `@${formArtistHandle || 'artist'}`,
-          packageName: selectedTier.pkg,
-          priceNgn: selectedTier.price,
-          targetPlays: selectedTier.impressions,
+          packageName: formAdType,
+          priceNgn: calculatedPrice,
+          targetPlays: calculatedPlays,
           adType: formAdType,
           audioUrl: formAudioUrl || undefined,
           coverUrl: formCoverUrl || '/images/hero_boombox.jpg',
@@ -417,59 +468,128 @@ export default function AdminAdsManagerPage() {
         </div>
       </div>
 
-      {/* Ad Packages & Pricing Rates */}
-      <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-5 shadow-sm">
-        <h3 className="text-sm font-semibold text-white mb-1">
-          Caution Studios Ad Packages (Advertiser Rates)
-        </h3>
-        <p className="text-xs text-zinc-400 mb-4">
-          Standardized pricing tiers where artists and record labels pay for guaranteed audio placements
-        </p>
+      {/* Ad Placement Pricing Controller (Controllable by Admin) */}
+      <form onSubmit={handleSavePricing} className="rounded-xl border border-zinc-800 bg-[#0A0D14] p-5 shadow-sm space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <h3 className="text-sm font-bold text-white flex items-center gap-2">
+              <Sliders className="h-4 w-4 text-[#2dd4bf]" />
+              <span>Ad Placement Pricing Controller</span>
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                Live Pricing
+              </span>
+            </h3>
+            <p className="text-xs text-zinc-400 mt-0.5">
+              Control the exact prices charged to artists and record labels for audio promotion placements across Caution Studio.
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2">
+            {pricingSavedNotice && (
+              <span className="text-xs text-emerald-400 font-semibold flex items-center gap-1">
+                <CheckCircle2 className="h-3.5 w-3.5" /> Saved Live!
+              </span>
+            )}
+            <button
+              type="submit"
+              disabled={isSavingPricing}
+              className="px-4 py-2 rounded-lg bg-[#2dd4bf] hover:bg-[#20b8a4] text-zinc-950 font-bold text-xs transition-colors flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
+            >
+              <CheckCircle2 className="h-3.5 w-3.5" />
+              <span>{isSavingPricing ? 'Saving...' : 'Save Ad Prices'}</span>
+            </button>
+          </div>
+        </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="p-4 rounded-lg bg-zinc-950 border border-zinc-800 space-y-2">
-            <div className="flex justify-between items-center">
-              <span className="text-xs font-bold text-zinc-200">Starter Spotlight</span>
-              <span className="text-xs font-mono font-bold text-white">₦15,000</span>
+          {/* 1. Stream Audio Ad */}
+          <div className="p-4 rounded-xl bg-zinc-950 border border-zinc-800 space-y-3">
+            <div className="flex justify-between items-start">
+              <div>
+                <span className="text-xs font-bold text-white flex items-center gap-1.5">
+                  <Radio className="h-3.5 w-3.5 text-[#2dd4bf]" />
+                  <span>Stream Audio Ad</span>
+                </span>
+                <span className="text-[10px] text-zinc-400 block mt-0.5">
+                  15s unskippable audio break every 3 free songs
+                </span>
+              </div>
             </div>
-            <p className="text-[11px] text-zinc-400">
-              5,000 guaranteed unskippable 15s audio plays across all active listeners.
-            </p>
-            <div className="pt-2 text-[10px] text-zinc-500 font-mono">
-              CPM: ₦3,000 / 1k plays · All DSP links
+
+            <div className="space-y-1">
+              <label className="text-[10px] font-mono text-zinc-400">Price (NGN ₦)</label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-mono text-zinc-400">₦</span>
+                <input
+                  type="number"
+                  value={streamPriceNgn}
+                  onChange={(e) => setStreamPriceNgn(Number(e.target.value))}
+                  className="w-full pl-7 pr-3 py-2 text-xs font-mono font-bold bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-[#2dd4bf]"
+                />
+              </div>
             </div>
           </div>
 
-          <div className="p-4 rounded-lg bg-zinc-950 border border-[#2dd4bf]/40 space-y-2 relative">
-            <span className="absolute -top-2 right-3 px-2 py-0.2 bg-[#2dd4bf] text-zinc-950 rounded text-[9px] font-bold uppercase">
-              Most Popular
+          {/* 2. Download Unlock Ad */}
+          <div className="p-4 rounded-xl bg-zinc-950 border border-zinc-800 space-y-3">
+            <div className="flex justify-between items-start">
+              <div>
+                <span className="text-xs font-bold text-white flex items-center gap-1.5">
+                  <Sparkles className="h-3.5 w-3.5 text-amber-400" />
+                  <span>Download Unlock Ad</span>
+                </span>
+                <span className="text-[10px] text-zinc-400 block mt-0.5">
+                  Rewarded audio/video ad on free downloads
+                </span>
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-[10px] font-mono text-zinc-400">Price (NGN ₦)</label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-mono text-zinc-400">₦</span>
+                <input
+                  type="number"
+                  value={downloadPriceNgn}
+                  onChange={(e) => setDownloadPriceNgn(Number(e.target.value))}
+                  className="w-full pl-7 pr-3 py-2 text-xs font-mono font-bold bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-[#2dd4bf]"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* 3. Both Placements */}
+          <div className="p-4 rounded-xl bg-zinc-950 border border-[#2dd4bf]/40 space-y-3 relative">
+            <span className="absolute -top-2 right-3 px-2 py-0.5 bg-[#2dd4bf] text-zinc-950 rounded text-[9px] font-bold uppercase">
+              Bundle Deal
             </span>
-            <div className="flex justify-between items-center">
-              <span className="text-xs font-bold text-[#2dd4bf]">Pro Rotation</span>
-              <span className="text-xs font-mono font-bold text-white">₦35,000</span>
+            <div className="flex justify-between items-start">
+              <div>
+                <span className="text-xs font-bold text-[#2dd4bf] flex items-center gap-1.5">
+                  <Megaphone className="h-3.5 w-3.5 text-[#2dd4bf]" />
+                  <span>Both Placements</span>
+                </span>
+                <span className="text-[10px] text-zinc-400 block mt-0.5">
+                  Full audio streaming rotation + download unlocks
+                </span>
+              </div>
             </div>
-            <p className="text-[11px] text-zinc-400">
-              15,000 guaranteed unskippable plays + high-priority queue injection.
-            </p>
-            <div className="pt-2 text-[10px] text-zinc-500 font-mono">
-              CPM: ₦2,333 / 1k plays · Spotify/Apple/Audiomack links
-            </div>
-          </div>
 
-          <div className="p-4 rounded-lg bg-zinc-950 border border-purple-500/40 space-y-2">
-            <div className="flex justify-between items-center">
-              <span className="text-xs font-bold text-purple-300">Studio Blast</span>
-              <span className="text-xs font-mono font-bold text-white">₦75,000</span>
-            </div>
-            <p className="text-[11px] text-zinc-400">
-              40,000 guaranteed plays + featured homepage artist spotlight.
-            </p>
-            <div className="pt-2 text-[10px] text-zinc-500 font-mono">
-              CPM: ₦1,875 / 1k plays · Maximum reach & CTR
+            <div className="space-y-1">
+              <label className="text-[10px] font-mono text-zinc-400">Bundle Price (NGN ₦)</label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-mono text-zinc-400">₦</span>
+                <input
+                  type="number"
+                  value={bothPriceNgn}
+                  onChange={(e) => setBothPriceNgn(Number(e.target.value))}
+                  className="w-full pl-7 pr-3 py-2 text-xs font-mono font-bold bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-[#2dd4bf]"
+                />
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      </form>
 
       {/* Campaigns Table */}
       <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 shadow-sm overflow-hidden">
@@ -698,28 +818,15 @@ export default function AdminAdsManagerPage() {
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-xs font-medium text-zinc-300">Ad Package *</label>
-                  <select
-                    value={formTier}
-                    onChange={(e) => setFormTier(e.target.value as any)}
-                    className="w-full bg-zinc-950 border border-zinc-800 rounded-md py-1.5 px-3 text-xs text-zinc-100 focus:outline-none"
-                  >
-                    <option value="Starter Spotlight">Starter Spotlight (₦15,000 · 5k plays)</option>
-                    <option value="Pro Rotation">Pro Rotation (₦35,000 · 15k plays)</option>
-                    <option value="Studio Blast">Studio Blast (₦75,000 · 40k plays)</option>
-                  </select>
-                </div>
-
-                <div className="space-y-1 col-span-2">
                   <label className="text-xs font-medium text-zinc-300">Ad Placement / Category *</label>
                   <select
                     value={formAdType}
                     onChange={(e) => setFormAdType(e.target.value as any)}
                     className="w-full bg-zinc-950 border border-zinc-800 rounded-md py-1.5 px-3 text-xs text-zinc-100 focus:outline-none"
                   >
-                    <option value="listening">Music Stream Ad (Plays during beat streaming/auditions)</option>
-                    <option value="download">Download Unlock Ad (Rewarded ad when 2-download daily limit is reached)</option>
-                    <option value="all">All Placements (Both listening break and download unlock)</option>
+                    <option value="listening">Stream Audio Ad (₦{streamPriceNgn.toLocaleString()})</option>
+                    <option value="download">Download Unlock Ad (₦{downloadPriceNgn.toLocaleString()})</option>
+                    <option value="all">Both Placements (₦{bothPriceNgn.toLocaleString()})</option>
                   </select>
                 </div>
               </div>
@@ -790,11 +897,7 @@ export default function AdminAdsManagerPage() {
                 <div className="flex items-center justify-between text-xs">
                   <span className="text-zinc-400">Total Campaign Cost:</span>
                   <span className="text-[#2dd4bf] font-bold font-mono">
-                    {formTier === 'Starter Spotlight'
-                      ? '₦15,000'
-                      : formTier === 'Pro Rotation'
-                      ? '₦35,000'
-                      : '₦75,000'}
+                    ₦{(formAdType === 'listening' ? streamPriceNgn : formAdType === 'download' ? downloadPriceNgn : bothPriceNgn).toLocaleString()}
                   </span>
                 </div>
                 <div className="flex items-center justify-between text-xs">
