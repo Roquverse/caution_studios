@@ -11,19 +11,29 @@ import { APP_URL } from '../../lib/urls';
 import { Check, Sparkles, ArrowRight, ShieldCheck } from 'lucide-react';
 
 export default function PricingPage() {
-  const licenseTiers = [
+  const adPackages = [
     {
-      name: 'Starter Lease',
-      priceNgn: 3000,
-      period: 'per beat',
-      features: [
-        'Untagged 320kbps MP3 Master',
-        'Up to 100,000 monetized streams',
-        '1 monetized music video',
-        'Non-exclusive commercial distribution',
-        'Instant signed PDF license'
-      ]
+      name: 'Starter Spotlight',
+      priceNgn: 15000,
+      plays: 5000,
+      description: '5,000 guaranteed unskippable 15-second audio plays across all active listeners.'
     },
+    {
+      name: 'Pro Rotation',
+      priceNgn: 35000,
+      plays: 15000,
+      isPopular: true,
+      description: '15,000 guaranteed plays + high-priority queue injection in every 3-song cycle.'
+    },
+    {
+      name: 'Studio Blast',
+      priceNgn: 75000,
+      plays: 40000,
+      description: '40,000 guaranteed plays + featured artist homepage spotlight.'
+    }
+  ];
+
+  const licenseTiers = [
     {
       name: 'Premium Beat Plan',
       priceNgn: 30000,
@@ -67,7 +77,7 @@ export default function PricingPage() {
             Built for independent artists
           </h1>
           <p className="text-sm text-text-muted mt-3">
-            Choose single beat licenses or subscribe to Plus for monthly lease credits and clean, untagged preview streaming.
+            Subscribe to Plus or Pro for monthly downloads and studio recordings, license beats from ₦30,000+, or promote your music with audio ads.
           </p>
         </div>
 
@@ -93,7 +103,7 @@ export default function PricingPage() {
                   <span className="text-xs text-text-muted">/ month</span>
                 </div>
                 <p className="text-xs text-text-muted mt-2">
-                  Ad-supported studio access with 62 beats per month.
+                  Ad-supported access with 62 beats &amp; 2 studio recordings per month.
                 </p>
 
                 <ul className="mt-6 pt-5 border-t border-border space-y-2.5 text-xs text-text-muted">
@@ -104,6 +114,10 @@ export default function PricingPage() {
                   <li className="flex items-center gap-2 text-text font-medium">
                     <Check className="h-4 w-4 text-accent-live" />
                     <span>+2 Bonus Downloads daily via 15s sponsored ads</span>
+                  </li>
+                  <li className="flex items-center gap-2 text-text font-medium">
+                    <Check className="h-4 w-4 text-accent-live" />
+                    <span>2 Studio recording sessions every month</span>
                   </li>
                   <li className="flex items-center gap-2">
                     <Check className="h-4 w-4 text-accent-live" />
@@ -155,7 +169,7 @@ export default function PricingPage() {
                   </li>
                   <li className="flex items-center gap-2 text-text font-medium">
                     <Check className="h-4 w-4 text-accent-live" />
-                    <span><strong>Studio Page Enabled (/studio)</strong> &bull; Vocal recording suite</span>
+                    <span><strong>Unlimited Studio Recordings</strong> &bull; Full vocal recording suite</span>
                   </li>
                   <li className="flex items-center gap-2">
                     <Check className="h-4 w-4 text-accent-live" />
@@ -194,7 +208,7 @@ export default function PricingPage() {
             Per-Beat License Tiers
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto">
             {licenseTiers.map((tier) => (
               <div
                 key={tier.name}
@@ -213,7 +227,7 @@ export default function PricingPage() {
                   </div>
                   <div className="mt-3 flex items-baseline gap-1">
                     <span className="text-2xl sm:text-3xl font-black font-mono text-text">
-                      {formatNaira(tier.priceNgn)}
+                      {formatNaira(tier.priceNgn)}+
                     </span>
                     <span className="text-xs text-text-muted">{tier.period}</span>
                   </div>
@@ -239,6 +253,70 @@ export default function PricingPage() {
               </div>
             ))}
           </div>
+          <p className="text-[11px] text-text-muted text-center mt-4">
+            Prices start from the amounts shown. Final price is set by each producer per beat.
+          </p>
+        </div>
+
+        {/* Audio Ads & Promotion Pricing */}
+        <div className="mt-20">
+          <div className="text-center max-w-2xl mx-auto mb-8">
+            <div className="text-xs font-bold uppercase tracking-wider text-text-muted">
+              Audio Ads &amp; Song Promotion
+            </div>
+            <p className="text-sm text-text-muted mt-3">
+              Promote your song with guaranteed, unskippable 15-second audio ads played to active listeners on Caution Studioz.
+              Every play links listeners straight to your song on Spotify, Apple Music, Audiomack and YouTube.
+              Free &amp; Plus listeners hear these sponsor breaks — Pro members are 100% ad-free.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {adPackages.map((pkg) => (
+              <div
+                key={pkg.name}
+                className={`p-6 rounded-sm bg-surface border ${
+                  pkg.isPopular ? 'border-accent-live bg-surface-2' : 'border-border'
+                } flex flex-col justify-between`}
+              >
+                <div>
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-base font-bold text-text">{pkg.name}</h3>
+                    {pkg.isPopular && (
+                      <span className="px-2 py-0.5 rounded-sm bg-accent text-[10px] font-bold text-text uppercase">
+                        Most Popular
+                      </span>
+                    )}
+                  </div>
+                  <div className="mt-3 flex items-baseline gap-1">
+                    <span className="text-2xl sm:text-3xl font-black font-mono text-text">
+                      {formatNaira(pkg.priceNgn)}
+                    </span>
+                    <span className="text-xs text-text-muted">per campaign</span>
+                  </div>
+                  <div className="mt-2 text-xs font-semibold text-accent-live">
+                    {pkg.plays.toLocaleString()} guaranteed plays
+                  </div>
+                  <p className="mt-4 pt-4 border-t border-border text-xs text-text-muted">{pkg.description}</p>
+                </div>
+
+                <div className="pt-6">
+                  <a
+                    href={`${APP_URL}/promote`}
+                    className="w-full h-9 rounded-pill bg-surface hover:bg-surface-2 text-text text-xs font-medium border border-border flex items-center justify-center"
+                  >
+                    Start a campaign
+                  </a>
+                </div>
+              </div>
+            ))}
+          </div>
+          <p className="text-[11px] text-text-muted text-center mt-4">
+            Questions about ads or pricing? Email{' '}
+            <a href="mailto:support@cautionstudioz.com" className="text-accent-live hover:underline">
+              support@cautionstudioz.com
+            </a>
+          </p>
         </div>
       </main>
 

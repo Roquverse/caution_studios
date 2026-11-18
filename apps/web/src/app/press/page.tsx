@@ -25,7 +25,7 @@ export default function PressPage() {
   const [copiedEmail, setCopiedEmail] = useState(false);
 
   const handleCopyEmail = () => {
-    navigator.clipboard.writeText('press@cautionstudioz.com');
+    navigator.clipboard.writeText('support@cautionstudioz.com');
     setCopiedEmail(true);
     setTimeout(() => setCopiedEmail(false), 2000);
   };
@@ -125,7 +125,7 @@ export default function PressPage() {
               className="h-11 px-6 rounded-full bg-[#04564f] hover:bg-[#03453f] text-white font-bold text-xs sm:text-sm flex items-center gap-2 shadow-lg shadow-[#04564f]/30 transition-all hover:scale-105 border border-[#2dd4bf]/30"
             >
               <Mail className="h-4 w-4 text-[#2dd4bf]" />
-              <span>{copiedEmail ? 'Email Copied (press@cautionstudioz.com)!' : 'Media Inquiry: press@cautionstudioz.com'}</span>
+              <span>{copiedEmail ? 'Email Copied (support@cautionstudioz.com)!' : 'Media Inquiry: support@cautionstudioz.com'}</span>
             </button>
 
             <a
@@ -280,11 +280,11 @@ export default function PressPage() {
             </p>
             <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
               <a
-                href="mailto:press@cautionstudioz.com"
+                href="mailto:support@cautionstudioz.com"
                 className="h-11 px-7 rounded-full bg-[#04564f] hover:bg-[#03453f] text-white font-bold text-xs sm:text-sm flex items-center gap-2 shadow-lg shadow-[#04564f]/30 transition-transform hover:scale-105 border border-[#2dd4bf]/30"
               >
                 <Mail className="h-4 w-4" />
-                <span>Email: press@cautionstudioz.com</span>
+                <span>Email: support@cautionstudioz.com</span>
               </a>
               <Link
                 href="/about"

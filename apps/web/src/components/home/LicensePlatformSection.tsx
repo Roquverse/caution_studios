@@ -9,20 +9,6 @@ import { Check, ShieldCheck, ArrowRight } from 'lucide-react';
 export const LicensePlatformSection: React.FC = () => {
   const tiers = [
     {
-      name: 'Starter Lease',
-      priceNgn: 3000,
-      period: 'per month',
-      description: 'Perfect for artists starting out on streaming and social platforms.',
-      isPopular: false,
-      features: [
-        'Untagged 320kbps MP3 audio master',
-        'Up to 100,000 monetized audio streams',
-        '1 monetized music video',
-        'Non-exclusive distribution rights',
-        'Instant digital agreement delivery'
-      ]
-    },
-    {
       name: 'Premium Beat Plan',
       priceNgn: 30000,
       period: 'one-time purchase',
@@ -70,8 +56,8 @@ export const LicensePlatformSection: React.FC = () => {
           </p>
         </div>
 
-        {/* 3 Tier Cards Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {/* Tier Cards Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl">
           {tiers.map((tier) => (
             <div
               key={tier.name}
@@ -93,7 +79,7 @@ export const LicensePlatformSection: React.FC = () => {
 
                 <div className="mt-4 flex items-baseline gap-1.5">
                   <span className="text-3xl sm:text-4xl font-black font-mono text-text">
-                    {formatNaira(tier.priceNgn)}
+                    {formatNaira(tier.priceNgn)}+
                   </span>
                   <span className="text-xs text-text-muted font-normal">
                     {tier.period}
