@@ -73,6 +73,29 @@ const EVENT_CONFIG: Record<
   }
 };
 
+function getSmtpTransporter() {
+  const host = (process.env.SMTP_HOST || '').trim();
+  const user = (process.env.SMTP_USER || '').trim().replace(/^['"]|['"]$/g, '');
+  const pass = (process.env.SMTP_PASS || '').trim().replace(/^['"]|['"]$/g, '');
+  const port = parseInt(process.env.SMTP_PORT || '587', 10);
+  const secure = process.env.SMTP_SECURE === 'true' || port === 465;
+
+  if (!host || !user || !pass) return null;
+
+  return {
+    transporter: nodemailer.createTransport({
+      host,
+      port,
+      secure,
+      auth: { user, pass },
+      connectionTimeout: 12000,
+      greetingTimeout: 8000,
+      socketTimeout: 15000
+    }),
+    user
+  };
+}
+
 /**
  * Dispatches an automated email alert for platform activity directly to support@cautionstudioz.com.
  * Supports Resend API, SMTP, or graceful structured console logging.
@@ -206,20 +229,12 @@ export async function sendAdminNotification(
   }
 
   // 2. Try SMTP Transport via Nodemailer
-  if (process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS) {
+  const smtpSetup = getSmtpTransporter();
+  if (smtpSetup) {
     try {
-      const transporter = nodemailer.createTransport({
-        host: process.env.SMTP_HOST,
-        port: parseInt(process.env.SMTP_PORT || '587', 10),
-        secure: process.env.SMTP_SECURE === 'true' || process.env.SMTP_PORT === '465',
-        auth: {
-          user: process.env.SMTP_USER,
-          pass: process.env.SMTP_PASS
-        }
-      });
-
-      const info = await transporter.sendMail({
-        from: process.env.EMAIL_FROM || `"Caution Studio" <${process.env.SMTP_USER}>`,
+      const fromAddr = process.env.EMAIL_FROM || `"Caution Studio" <${smtpSetup.user}>`;
+      const info = await smtpSetup.transporter.sendMail({
+        from: fromAddr,
         to: recipient,
         subject: `${cfg.icon} ${notification.subject}`,
         html: htmlContent
@@ -228,7 +243,7 @@ export async function sendAdminNotification(
       console.log(`[Notification Sent via SMTP to ${recipient}]`, notification.subject, info.messageId);
       return { success: true, id: info.messageId };
     } catch (smtpErr: any) {
-      console.warn('SMTP dispatch error:', smtpErr?.message);
+      console.error('[SMTP notification error]:', smtpErr?.message, smtpErr?.code, smtpErr?.response || '');
     }
   }
 
@@ -477,20 +492,12 @@ export async function sendBeatPurchaseDeliveryEmail(
   }
 
   // 2. Try SMTP Transport via Nodemailer
-  if (process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS) {
+  const smtpSetup = getSmtpTransporter();
+  if (smtpSetup) {
     try {
-      const transporter = nodemailer.createTransport({
-        host: process.env.SMTP_HOST,
-        port: parseInt(process.env.SMTP_PORT || '587', 10),
-        secure: process.env.SMTP_SECURE === 'true' || process.env.SMTP_PORT === '465',
-        auth: {
-          user: process.env.SMTP_USER,
-          pass: process.env.SMTP_PASS
-        }
-      });
-
-      const info = await transporter.sendMail({
-        from: process.env.EMAIL_FROM || `"Caution Studio" <${process.env.SMTP_USER}>`,
+      const fromAddr = process.env.EMAIL_FROM || `"Caution Studio" <${smtpSetup.user}>`;
+      const info = await smtpSetup.transporter.sendMail({
+        from: fromAddr,
         to: recipient,
         subject: emailSubject,
         html: htmlContent
@@ -499,7 +506,7 @@ export async function sendBeatPurchaseDeliveryEmail(
       console.log(`[Beat Purchase Email Sent via SMTP to ${recipient}]`, emailSubject, info.messageId);
       return { success: true, id: info.messageId };
     } catch (smtpErr: any) {
-      console.warn('SMTP dispatch error:', smtpErr?.message);
+      console.error('[SMTP beat purchase email error]:', smtpErr?.message, smtpErr?.code, smtpErr?.response || '');
     }
   }
 
