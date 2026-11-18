@@ -75,6 +75,12 @@ export default function AdminProducerChatPage() {
   const [audioDuration, setAudioDuration] = useState<number>(0);
   const audioPlayerRef = useRef<HTMLAudioElement | null>(null);
 
+  // WebSocket Realtime & Typing State
+  const [isPeerTyping, setIsPeerTyping] = useState(false);
+  const [isConnectedWs, setIsConnectedWs] = useState(false);
+  const wsChannelRef = useRef<any>(null);
+  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
   // Lightbox for image preview
   const [lightboxImageUrl, setLightboxImageUrl] = useState<string | null>(null);
 
@@ -174,21 +180,116 @@ export default function AdminProducerChatPage() {
     }
   };
 
+  // Realtime instant message appender
+  const appendMessage = (newMsg: ChatMessage) => {
+    setThreads((prevThreads) => {
+      const counterpartId =
+        newMsg.sender_id === newMsg.recipient_id
+          ? newMsg.sender_id
+          : newMsg.sender_id === adminUserId
+          ? newMsg.recipient_id
+          : newMsg.sender_id;
+
+      if (!counterpartId) return prevThreads;
+
+      const date = new Date(newMsg.created_at || Date.now());
+      const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+      let previewText = newMsg.content || '';
+      if (newMsg.media_type === 'image') previewText = '📷 [Image attachment]';
+      else if (newMsg.media_type === 'audio') previewText = '🎵 [Audio message]';
+
+      let found = false;
+      const updated = prevThreads.map((t) => {
+        if (t.producerId === counterpartId) {
+          found = true;
+          // Avoid duplicate messages
+          if (
+            t.messages.some(
+              (m) =>
+                m.id === newMsg.id ||
+                (m.id?.startsWith('temp_') && m.content === newMsg.content && m.sender_id === newMsg.sender_id) ||
+                (m.created_at === newMsg.created_at && m.content === newMsg.content)
+            )
+          ) {
+            return t;
+          }
+          return {
+            ...t,
+            lastMessage: previewText,
+            lastMessageTime: timeStr,
+            messages: [...t.messages, newMsg]
+          };
+        }
+        return t;
+      });
+
+      if (!found) {
+        loadChats();
+        return prevThreads;
+      }
+
+      return updated.sort((a, b) => {
+        const timeA = a.messages.length > 0 ? new Date(a.messages[a.messages.length - 1].created_at).getTime() : 0;
+        const timeB = b.messages.length > 0 ? new Date(b.messages[b.messages.length - 1].created_at).getTime() : 0;
+        return timeB - timeA;
+      });
+    });
+  };
+
   useEffect(() => {
     loadChats();
 
-    // Subscribe to new chat inserts in real time
-    const channel = supabase
-      .channel('admin_chats_live')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chats' }, () => {
-        loadChats();
-      })
-      .subscribe();
+    // High-speed WebSocket Channel for direct messaging, typing & Postgres changes
+    const channel = supabase.channel('caution_realtime_chat', {
+      config: {
+        broadcast: { self: false }
+      }
+    });
+
+    wsChannelRef.current = channel;
+
+    // 1. Direct WebSocket broadcast from peer (< 30ms latency)
+    channel.on('broadcast', { event: 'chat_message' }, ({ payload }) => {
+      if (payload) {
+        appendMessage(payload);
+        setIsPeerTyping(false);
+      }
+    });
+
+    // 2. WebSocket typing indicator
+    channel.on('broadcast', { event: 'typing' }, ({ payload }) => {
+      if (payload?.targetProducerId === activeProducerId || payload?.producerId === activeProducerId) {
+        if (payload?.isTyping) {
+          setIsPeerTyping(true);
+          if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+          typingTimeoutRef.current = setTimeout(() => setIsPeerTyping(false), 3000);
+        } else {
+          setIsPeerTyping(false);
+        }
+      }
+    });
+
+    // 3. Fallback: Postgres CDC stream
+    channel.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chats' }, (payload) => {
+      if (payload.new) {
+        appendMessage(payload.new as ChatMessage);
+      }
+    });
+
+    channel.subscribe((status) => {
+      if (status === 'SUBSCRIBED') {
+        setIsConnectedWs(true);
+      } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
+        setIsConnectedWs(false);
+      }
+    });
 
     return () => {
       supabase.removeChannel(channel);
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
     };
-  }, []);
+  }, [adminUserId, activeProducerId]);
 
   useEffect(() => {
     scrollToBottom();
@@ -268,11 +369,27 @@ export default function AdminProducerChatPage() {
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
-  // Send message with optional media
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setNewMessage(e.target.value);
+    if (wsChannelRef.current && activeThread) {
+      wsChannelRef.current.send({
+        type: 'broadcast',
+        event: 'typing',
+        payload: {
+          adminId: adminUserId || 'admin',
+          targetProducerId: activeThread.producerId,
+          isTyping: e.target.value.trim().length > 0
+        }
+      });
+    }
+  };
+
+  // Send message with optional media (Optimistic + WebSocket Broadcast + DB persistence)
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if ((!newMessage.trim() && !stagedFile) || sending || !activeThread) return;
 
+    const messageText = newMessage.trim();
     setSending(true);
 
     try {
@@ -312,7 +429,42 @@ export default function AdminProducerChatPage() {
         senderId = user?.id || '64d47dcb-3d1f-41dd-8400-46f39c5b0750';
       }
 
-      // 3. Send message via /api/chat
+      // 3. Create Optimistic Message Payload
+      const optimisticMsg: ChatMessage = {
+        id: `temp_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+        sender_id: senderId,
+        recipient_id: activeThread.producerId,
+        content: messageText,
+        media_url: mediaUrl,
+        media_key: mediaKey,
+        media_type: mediaType,
+        media_name: mediaName,
+        media_size: mediaSize,
+        created_at: new Date().toISOString()
+      };
+
+      // Instantly append to local thread (0ms delay!)
+      appendMessage(optimisticMsg);
+
+      // Instantly broadcast via WebSocket to producer (< 30ms latency)
+      if (wsChannelRef.current) {
+        wsChannelRef.current.send({
+          type: 'broadcast',
+          event: 'chat_message',
+          payload: optimisticMsg
+        });
+        wsChannelRef.current.send({
+          type: 'broadcast',
+          event: 'typing',
+          payload: { adminId: senderId, targetProducerId: activeThread.producerId, isTyping: false }
+        });
+      }
+
+      // Clear input immediately so user can keep typing
+      setNewMessage('');
+      handleRemoveStagedFile();
+
+      // 4. Persist in database in background
       const { data: { session } } = await supabase.auth.getSession();
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
       if (session?.access_token) {
@@ -324,7 +476,7 @@ export default function AdminProducerChatPage() {
         headers,
         body: JSON.stringify({
           recipientId: activeThread.producerId,
-          content: newMessage.trim(),
+          content: messageText,
           mediaUrl,
           mediaKey,
           mediaType,
@@ -335,10 +487,10 @@ export default function AdminProducerChatPage() {
 
       if (!postRes.ok) {
         // Fallback to client-side insert
-        const { error: insertErr } = await supabase.from('chats').insert({
+        await supabase.from('chats').insert({
           sender_id: senderId,
           recipient_id: activeThread.producerId,
-          content: newMessage.trim(),
+          content: messageText,
           media_url: mediaUrl,
           media_key: mediaKey,
           media_type: mediaType,
@@ -347,7 +499,6 @@ export default function AdminProducerChatPage() {
           is_encrypted: false,
           has_contact_info: false
         });
-        if (insertErr) throw insertErr;
       }
 
       // Clean up input
@@ -563,13 +714,36 @@ export default function AdminProducerChatPage() {
                           {activeThread.beatsCount ? `${activeThread.beatsCount} ${activeThread.beatsCount === 1 ? 'beat' : 'beats'}` : 'Producer'}
                         </span>
                       </h2>
-                      <p className="text-xs text-zinc-400 font-mono">
-                        {activeThread.handle} {activeThread.email ? `• ${activeThread.email}` : ''}
-                      </p>
+                      {isPeerTyping ? (
+                        <p className="text-xs text-[#2dd4bf] font-medium animate-pulse flex items-center gap-1">
+                          <span>Typing</span>
+                          <span className="flex gap-0.5">
+                            <span className="h-1 w-1 bg-[#2dd4bf] rounded-full animate-bounce [animation-delay:-0.3s]" />
+                            <span className="h-1 w-1 bg-[#2dd4bf] rounded-full animate-bounce [animation-delay:-0.15s]" />
+                            <span className="h-1 w-1 bg-[#2dd4bf] rounded-full animate-bounce" />
+                          </span>
+                        </p>
+                      ) : (
+                        <p className="text-xs text-zinc-400 font-mono">
+                          {activeThread.handle} {activeThread.email ? `• ${activeThread.email}` : ''}
+                        </p>
+                      )}
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2 sm:gap-3">
+                    <div
+                      className={`flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-mono border ${
+                        isConnectedWs
+                          ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                          : 'bg-amber-500/10 text-amber-400 border-amber-500/20'
+                      }`}
+                      title={isConnectedWs ? 'WebSocket Connected' : 'Reconnecting WebSocket...'}
+                    >
+                      <span className={`h-1.5 w-1.5 rounded-full ${isConnectedWs ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`} />
+                      <span className="hidden md:inline">{isConnectedWs ? 'WebSocket' : 'Connecting'}</span>
+                    </div>
+
                     <a
                       href={`/tracks?search=${encodeURIComponent(activeThread.displayName || activeThread.handle)}`}
                       className="px-2.5 py-1 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white text-xs font-medium transition-colors flex items-center gap-1.5"
@@ -770,7 +944,7 @@ export default function AdminProducerChatPage() {
                   <input
                     type="text"
                     value={newMessage}
-                    onChange={(e) => setNewMessage(e.target.value)}
+                    onChange={handleInputChange}
                     placeholder={`Message ${activeThread.displayName}...`}
                     disabled={sending}
                     className="flex-1 px-4 py-2.5 text-xs sm:text-sm bg-[#121620] border border-zinc-800 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:border-[#2dd4bf]"

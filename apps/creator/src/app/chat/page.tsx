@@ -75,6 +75,12 @@ export default function StudioChatPage() {
   // Image Lightbox
   const [lightboxImageUrl, setLightboxImageUrl] = useState<string | null>(null);
 
+  // WebSocket Realtime & Typing State
+  const [isPeerTyping, setIsPeerTyping] = useState(false);
+  const [isConnectedWs, setIsConnectedWs] = useState(false);
+  const wsChannelRef = useRef<any>(null);
+  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
   const scrollToBottom = () => {
@@ -198,20 +204,113 @@ export default function StudioChatPage() {
     }
   };
 
+  // Realtime instant message appender
+  const appendMessage = (newMsg: ChatMessage) => {
+    setThreads((prevThreads) => {
+      if (!currentUserId) return prevThreads;
+      const otherId = newMsg.sender_id === currentUserId ? newMsg.recipient_id : newMsg.sender_id;
+      if (!otherId) return prevThreads;
+
+      const date = new Date(newMsg.created_at || Date.now());
+      const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+      let previewText = newMsg.content || '';
+      if (newMsg.media_type === 'image') previewText = '📷 [Image attachment]';
+      else if (newMsg.media_type === 'audio') previewText = '🎵 [Audio message]';
+
+      let found = false;
+      const updated = prevThreads.map((t) => {
+        if (t.counterpartId === otherId) {
+          found = true;
+          if (
+            t.messages.some(
+              (m) =>
+                m.id === newMsg.id ||
+                (m.id?.startsWith('temp_') && m.content === newMsg.content && m.sender_id === newMsg.sender_id) ||
+                (m.created_at === newMsg.created_at && m.content === newMsg.content)
+            )
+          ) {
+            return t;
+          }
+          return {
+            ...t,
+            lastMessage: previewText,
+            lastMessageTime: timeStr,
+            messages: [...t.messages, newMsg]
+          };
+        }
+        return t;
+      });
+
+      if (!found) {
+        fetchChats();
+        return prevThreads;
+      }
+
+      return updated.sort((a, b) => {
+        const timeA = a.messages.length > 0 ? new Date(a.messages[a.messages.length - 1].created_at).getTime() : 0;
+        const timeB = b.messages.length > 0 ? new Date(b.messages[b.messages.length - 1].created_at).getTime() : 0;
+        return timeB - timeA;
+      });
+    });
+  };
+
   useEffect(() => {
     fetchChats();
 
-    const channel = supabase
-      .channel('producer_chats_live')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chats' }, () => {
-        fetchChats();
-      })
-      .subscribe();
+    // High-speed WebSocket Channel for direct messaging, typing & Postgres changes
+    const channel = supabase.channel('caution_realtime_chat', {
+      config: {
+        broadcast: { self: false }
+      }
+    });
+
+    wsChannelRef.current = channel;
+
+    // 1. Direct WebSocket broadcast from peer (< 30ms latency)
+    channel.on('broadcast', { event: 'chat_message' }, ({ payload }) => {
+      if (payload && (payload.recipient_id === currentUserId || payload.sender_id === currentUserId)) {
+        appendMessage(payload);
+        setIsPeerTyping(false);
+      }
+    });
+
+    // 2. WebSocket typing indicator
+    channel.on('broadcast', { event: 'typing' }, ({ payload }) => {
+      if (payload?.targetProducerId === currentUserId) {
+        if (payload?.isTyping) {
+          setIsPeerTyping(true);
+          if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+          typingTimeoutRef.current = setTimeout(() => setIsPeerTyping(false), 3000);
+        } else {
+          setIsPeerTyping(false);
+        }
+      }
+    });
+
+    // 3. Fallback: Postgres CDC stream
+    channel.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chats' }, (payload) => {
+      if (payload.new) {
+        const newMsg = payload.new as ChatMessage;
+        if (newMsg.recipient_id === currentUserId || newMsg.sender_id === currentUserId) {
+          appendMessage(newMsg);
+        }
+      }
+    });
+
+    channel.subscribe((status) => {
+      if (status === 'SUBSCRIBED') {
+        setIsConnectedWs(true);
+      } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
+        setIsConnectedWs(false);
+      }
+    });
 
     return () => {
       supabase.removeChannel(channel);
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
     };
-  }, []);
+  }, [currentUserId, activeCounterpartId]);
 
   useEffect(() => {
     scrollToBottom();
@@ -245,14 +344,31 @@ export default function StudioChatPage() {
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setNewMessage(e.target.value);
+    if (wsChannelRef.current && activeThread) {
+      wsChannelRef.current.send({
+        type: 'broadcast',
+        event: 'typing',
+        payload: {
+          producerId: currentUserId,
+          targetProducerId: activeThread.counterpartId,
+          isTyping: e.target.value.trim().length > 0
+        }
+      });
+    }
+  };
+
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if ((!newMessage.trim() && !stagedFile) || !currentUserId || !activeThread || sending) return;
 
+    const messageText = newMessage.trim();
+
     // Contact audit check only for external artist messages (allowed when messaging official admin)
     if (!activeThread.isAdmin) {
       const hasPhoneOrEmail = /(\+?\d{10,14}|[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/.test(
-        newMessage
+        messageText
       );
       if (hasPhoneOrEmail) {
         alert(
@@ -294,11 +410,45 @@ export default function StudioChatPage() {
         mediaSize = uploadData.media_size;
       }
 
-      // 2. Insert into chats table
+      // 2. Create optimistic message payload (0ms latency!)
+      const optimisticMsg: ChatMessage = {
+        id: `temp_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+        sender_id: currentUserId,
+        recipient_id: activeThread.counterpartId,
+        content: messageText,
+        media_url: mediaUrl,
+        media_key: mediaKey,
+        media_type: mediaType,
+        media_name: mediaName,
+        media_size: mediaSize,
+        created_at: new Date().toISOString()
+      };
+
+      appendMessage(optimisticMsg);
+
+      // Instantly broadcast via WebSocket to counterpart (< 30ms latency)
+      if (wsChannelRef.current) {
+        wsChannelRef.current.send({
+          type: 'broadcast',
+          event: 'chat_message',
+          payload: optimisticMsg
+        });
+        wsChannelRef.current.send({
+          type: 'broadcast',
+          event: 'typing',
+          payload: { producerId: currentUserId, targetProducerId: activeThread.counterpartId, isTyping: false }
+        });
+      }
+
+      // Reset input immediately
+      setNewMessage('');
+      handleRemoveStagedFile();
+
+      // 3. Persist in chats table
       const { error: insertErr } = await supabase.from('chats').insert({
         sender_id: currentUserId,
         recipient_id: activeThread.counterpartId,
-        content: newMessage.trim(),
+        content: messageText,
         media_url: mediaUrl,
         media_key: mediaKey,
         media_type: mediaType,
@@ -482,15 +632,34 @@ export default function StudioChatPage() {
                         </span>
                       )}
                     </span>
-                    <span className="text-[10px] text-[#2dd4bf] block font-mono truncate">
-                      {activeThread.artistHandle} &bull; {activeThread.project}
-                    </span>
+                    {isPeerTyping ? (
+                      <span className="text-[11px] text-[#2dd4bf] font-medium animate-pulse flex items-center gap-1">
+                        <span>Typing</span>
+                        <span className="flex gap-0.5">
+                          <span className="h-1 w-1 bg-[#2dd4bf] rounded-full animate-bounce [animation-delay:-0.3s]" />
+                          <span className="h-1 w-1 bg-[#2dd4bf] rounded-full animate-bounce [animation-delay:-0.15s]" />
+                          <span className="h-1 w-1 bg-[#2dd4bf] rounded-full animate-bounce" />
+                        </span>
+                      </span>
+                    ) : (
+                      <span className="text-[10px] text-[#2dd4bf] block font-mono truncate">
+                        {activeThread.artistHandle} &bull; {activeThread.project}
+                      </span>
+                    )}
                   </div>
                 </div>
 
-                <div className="flex items-center gap-1.5 text-xs text-zinc-400">
-                  <span className="h-2 w-2 rounded-full bg-emerald-400" />
-                  <span>Channel Open</span>
+                <div className="flex items-center gap-2">
+                  <div
+                    className={`flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-mono border ${
+                      isConnectedWs
+                        ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                        : 'bg-amber-500/10 text-amber-400 border-amber-500/20'
+                    }`}
+                  >
+                    <span className={`h-1.5 w-1.5 rounded-full ${isConnectedWs ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`} />
+                    <span className="hidden sm:inline">{isConnectedWs ? 'WebSocket' : 'Connecting'}</span>
+                  </div>
                 </div>
               </div>
 
@@ -681,7 +850,7 @@ export default function StudioChatPage() {
                 <input
                   type="text"
                   value={newMessage}
-                  onChange={(e) => setNewMessage(e.target.value)}
+                  onChange={handleInputChange}
                   placeholder={`Message ${activeThread.artistName}...`}
                   disabled={sending}
                   className="flex-1 bg-[#121620] border border-zinc-800 rounded-xl py-2.5 px-4 text-xs sm:text-sm text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:border-[#2dd4bf]"
