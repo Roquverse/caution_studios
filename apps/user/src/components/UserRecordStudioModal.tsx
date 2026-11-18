@@ -189,8 +189,8 @@ function audioBufferToWav(buffer: AudioBuffer): Blob {
   return new Blob([header, data.buffer], { type: 'audio/wav' });
 }
 
-// Normalize vocal audio buffer so mobile & low-gain microphone takes are brought up to professional loudness
-function normalizeVocalBuffer(buffer: AudioBuffer, targetPeak = 0.88): AudioBuffer {
+// Normalize vocal audio buffer so mobile & low-gain microphone takes are brought up to clean studio loudness
+function normalizeVocalBuffer(buffer: AudioBuffer, targetPeak = 0.82): AudioBuffer {
   let maxPeak = 0;
   for (let c = 0; c < buffer.numberOfChannels; c++) {
     const data = buffer.getChannelData(c);
@@ -199,9 +199,9 @@ function normalizeVocalBuffer(buffer: AudioBuffer, targetPeak = 0.88): AudioBuff
       if (abs > maxPeak) maxPeak = abs;
     }
   }
-  // If recording is quiet (maxPeak between 0.002 and 0.65), apply clean linear boost up to targetPeak (max 10x / +20dB boost)
-  if (maxPeak > 0.002 && maxPeak < 0.65) {
-    const gainMultiplier = Math.min(10.0, targetPeak / maxPeak);
+  // If recording is quiet (maxPeak between 0.002 and 0.60), apply clean linear boost up to targetPeak (max 6x / +15dB boost)
+  if (maxPeak > 0.002 && maxPeak < 0.60) {
+    const gainMultiplier = Math.min(6.0, targetPeak / maxPeak);
     for (let c = 0; c < buffer.numberOfChannels; c++) {
       const data = buffer.getChannelData(c);
       for (let i = 0; i < data.length; i++) {
@@ -1700,7 +1700,11 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
   const dspGraphVersionRef = useRef<number>(0);
   // Per-element nodes: MediaElementSource, GainNode, StereoPannerNode
   type ElNodes = { source: MediaElementAudioSourceNode; gain: GainNode; panner: StereoPannerNode };
+  const beatNodesRef = useRef<ElNodes | null>(null);
   const vocalNodesRef = useRef<Map<string, ElNodes>>(new Map());
+  // Dedicated clean beat bus & panner that connects directly to masterGain (bypasses vocal compressor & ducking)
+  const dspBeatBusRef = useRef<GainNode | null>(null);
+  const dspBeatPanRef = useRef<StereoPannerNode | null>(null);
   // Global shared DSP chain nodes (created once, connected to destination)
   const dspVocalSyncDelayRef = useRef<DelayNode | null>(null);
   const dspAutoTuneFilterRef = useRef<BiquadFilterNode | null>(null);
@@ -2583,12 +2587,42 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
     reverbToneFilter.connect(reverbGain);
     reverbGain.connect(compressor);
 
-    // Master output stage (for Vocals Web Audio chain)
+    // Master output stage (connected to destination)
     compressor.connect(makeupGain);
     makeupGain.connect(masterGain);
     masterGain.connect(ctx.destination);
 
-    // Re-attach any existing vocal element nodes to the freshly built vocal bus
+    // Dedicated clean Beat Bus: beatBus → beatPanNode → masterGain
+    // (Bypasses vocal compressor, auto-tune, and FX so beat retains full dynamic range, zero ducking)
+    const beatBus = ctx.createGain();
+    const anySolo = vocalTracks.some((t) => t.isSolo) || beatSolo;
+    const beatShouldPlay = anySolo ? beatSolo : !beatMuted;
+    beatBus.gain.value = beatShouldPlay ? beatVolume : 0;
+    dspBeatBusRef.current = beatBus;
+
+    let beatPanNode: StereoPannerNode | null = null;
+    if (typeof ctx.createStereoPanner === 'function') {
+      try {
+        beatPanNode = ctx.createStereoPanner();
+        beatPanNode.pan.value = Math.max(-1, Math.min(1, beatPan / 100));
+        beatBus.connect(beatPanNode);
+        beatPanNode.connect(masterGain);
+      } catch (_) {
+        beatBus.connect(masterGain);
+      }
+    } else {
+      beatBus.connect(masterGain);
+    }
+    dspBeatPanRef.current = beatPanNode;
+
+    // Re-attach existing beat/vocal element nodes to the freshly built buses
+    if (beatNodesRef.current) {
+      try {
+        const targetNode = beatNodesRef.current.panner || beatNodesRef.current.gain;
+        targetNode.disconnect();
+        targetNode.connect(beatBus);
+      } catch (_) {}
+    }
     vocalNodesRef.current.forEach((nodes) => {
       try {
         const targetNode = nodes.panner || nodes.gain;
@@ -2642,18 +2676,18 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
   }, [ensurePlaybackCtx, applyAudioOutputSinkId, audioOutputDevice]);
 
   // ─── Connect a single HTMLAudioElement into the live playback graph ──────
-  const connectElToPlayback = useCallback((el: HTMLAudioElement, nodeKey: string, vol: number, pan: number): ElNodes | null => {
+  const connectElToPlayback = useCallback((el: HTMLAudioElement, nodeKey: 'beat' | string, vol: number, pan: number): ElNodes | null => {
     try {
       const ctx = ensurePlaybackCtx();
       if (!ctx || !dspMasterGainRef.current || !dspBusRef.current) return null;
 
-      // Ensure HTMLAudioElement is at unity volume (1.0) and unmuted so Web Audio GainNode has full dynamic range
+      // Ensure HTMLAudioElement is unmuted
       el.muted = false;
-      el.volume = 1.0;
 
-      const destBus = dspBusRef.current;
+      const isBeat = nodeKey === 'beat';
+      const destBus = isBeat ? (dspBeatBusRef.current || dspMasterGainRef.current) : dspBusRef.current;
 
-      const existing = vocalNodesRef.current.get(nodeKey);
+      const existing = isBeat ? beatNodesRef.current : vocalNodesRef.current.get(nodeKey);
       if (existing) {
         if ((existing.source as any).mediaElement === el) {
           existing.gain.gain.value = vol;
@@ -2710,7 +2744,11 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
       }
 
       const nodes: ElNodes = { source, gain, panner: panner || (gain as any) };
-      vocalNodesRef.current.set(nodeKey, nodes);
+      if (isBeat) {
+        beatNodesRef.current = nodes;
+      } else {
+        vocalNodesRef.current.set(nodeKey, nodes);
+      }
       return nodes;
     } catch (e) {
       console.warn('connectElToPlayback error:', e);
@@ -2719,16 +2757,28 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
   }, [ensurePlaybackCtx]);
 
   // Real-time audio volume & solo/mute sync:
-  // Backing Beat plays directly via native HTMLAudioElement (100% original Beat Store master quality, zero DSP coloration or ducking).
-  // Vocal tracks route through the Web Audio Vocal DSP chain.
+  // Backing Beat routes through clean dedicated beatBus; Vocal tracks route through Web Audio Vocal DSP chain.
   useEffect(() => {
     const anySolo = vocalTracks.some((t) => t.isSolo) || beatSolo;
     const beatShouldPlay = anySolo ? beatSolo : !beatMuted;
+    const ctx = playCtxRef.current;
 
-    // 1. Backing Beat (100% Pure Native Master Output - zero CORS or Web Audio issues)
+    // 1. Backing Beat
     if (beatAudioRef.current) {
       beatAudioRef.current.muted = !beatShouldPlay;
-      beatAudioRef.current.volume = beatShouldPlay ? Math.max(0, Math.min(1, beatVolume * masterVolume)) : 0;
+      const targetBeatVol = beatShouldPlay ? beatVolume : 0;
+      if (dspBeatBusRef.current && ctx) {
+        dspBeatBusRef.current.gain.setValueAtTime(targetBeatVol, ctx.currentTime);
+      }
+      if (dspBeatPanRef.current && ctx) {
+        dspBeatPanRef.current.pan.setValueAtTime(Math.max(-1, Math.min(1, beatPan / 100)), ctx.currentTime);
+      }
+      if (beatNodesRef.current && ctx) {
+        beatNodesRef.current.gain.gain.setValueAtTime(targetBeatVol, ctx.currentTime);
+      }
+      try {
+        beatAudioRef.current.volume = beatShouldPlay ? Math.max(0, Math.min(1, beatVolume * masterVolume)) : 0;
+      } catch (_) {}
     }
 
     // 2. Master gain node (for Vocal Bus)
@@ -3107,14 +3157,24 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
     }
   };
 
-  // Beat volume fader (native master fidelity)
+  // Beat volume fader (instant fader response across mobile and desktop)
   const handleBeatVolumeChange = (val: number) => {
     setBeatVolume(val);
+    const ctx = ensurePlaybackCtx();
+    const anySolo = vocalTracks.some((t) => t.isSolo) || beatSolo;
+    const beatShouldPlay = anySolo ? beatSolo : !beatMuted;
+    const targetGain = beatShouldPlay ? val : 0;
+    if (dspBeatBusRef.current && ctx) {
+      dspBeatBusRef.current.gain.setValueAtTime(targetGain, ctx.currentTime);
+    }
+    if (beatNodesRef.current && ctx) {
+      beatNodesRef.current.gain.gain.setValueAtTime(targetGain, ctx.currentTime);
+    }
     if (beatAudioRef.current) {
-      const anySolo = vocalTracks.some((t) => t.isSolo) || beatSolo;
-      const beatShouldPlay = anySolo ? beatSolo : !beatMuted;
       beatAudioRef.current.muted = !beatShouldPlay;
-      beatAudioRef.current.volume = beatShouldPlay ? Math.max(0, Math.min(1, val * masterVolume)) : 0;
+      try {
+        beatAudioRef.current.volume = beatShouldPlay ? Math.max(0, Math.min(1, val * masterVolume)) : 0;
+      } catch (_) {}
     }
   };
 
@@ -3122,11 +3182,21 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
   const handleToggleBeatMute = () => {
     setBeatMuted((prev) => {
       const next = !prev;
+      const ctx = ensurePlaybackCtx();
+      const anySolo = vocalTracks.some((t) => t.isSolo) || beatSolo;
+      const beatShouldPlay = anySolo ? beatSolo : !next;
+      const targetGain = beatShouldPlay ? beatVolume : 0;
+      if (dspBeatBusRef.current && ctx) {
+        dspBeatBusRef.current.gain.setValueAtTime(targetGain, ctx.currentTime);
+      }
+      if (beatNodesRef.current && ctx) {
+        beatNodesRef.current.gain.gain.setValueAtTime(targetGain, ctx.currentTime);
+      }
       if (beatAudioRef.current) {
-        const anySolo = vocalTracks.some((t) => t.isSolo) || beatSolo;
-        const beatShouldPlay = anySolo ? beatSolo : !next;
         beatAudioRef.current.muted = !beatShouldPlay;
-        beatAudioRef.current.volume = beatShouldPlay ? Math.max(0, Math.min(1, beatVolume * masterVolume)) : 0;
+        try {
+          beatAudioRef.current.volume = beatShouldPlay ? Math.max(0, Math.min(1, beatVolume * masterVolume)) : 0;
+        } catch (_) {}
       }
       return next;
     });
@@ -3136,19 +3206,29 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
   const handleToggleBeatSolo = () => {
     setBeatSolo((prev) => {
       const next = !prev;
+      const ctx = ensurePlaybackCtx();
       const anySolo = vocalTracks.some((t) => t.isSolo) || next;
+      const beatShouldPlay = anySolo ? next : !beatMuted;
+      const targetGain = beatShouldPlay ? beatVolume : 0;
+      if (dspBeatBusRef.current && ctx) {
+        dspBeatBusRef.current.gain.setValueAtTime(targetGain, ctx.currentTime);
+      }
+      if (beatNodesRef.current && ctx) {
+        beatNodesRef.current.gain.gain.setValueAtTime(targetGain, ctx.currentTime);
+      }
       if (beatAudioRef.current) {
-        const beatShouldPlay = anySolo ? next : !beatMuted;
         beatAudioRef.current.muted = !beatShouldPlay;
-        beatAudioRef.current.volume = beatShouldPlay ? Math.max(0, Math.min(1, beatVolume * masterVolume)) : 0;
+        try {
+          beatAudioRef.current.volume = beatShouldPlay ? Math.max(0, Math.min(1, beatVolume * masterVolume)) : 0;
+        } catch (_) {}
       }
       vocalTracks.forEach((t) => {
         const trackShouldPlay = anySolo ? t.isSolo : !t.isMuted;
         const nodes = vocalNodesRef.current.get(t.id);
-        if (nodes && playCtxRef.current) {
+        if (nodes && ctx) {
           nodes.gain.gain.setValueAtTime(
             trackShouldPlay ? Math.max(0, Math.min(2, t.volume)) : 0,
-            playCtxRef.current.currentTime
+            ctx.currentTime
           );
         }
       });
@@ -3271,20 +3351,17 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
         const devConstraint =
           audioInputDevice && audioInputDevice !== 'default' ? { deviceId: { ideal: audioInputDevice } } : {};
 
-        // On mobile: autoGainControl & echoCancellation are essential to avoid faint whisper vocals and mobile speaker feedback
-        const micConstraints = isMobile
-          ? {
-              echoCancellation: true,
-              noiseSuppression: false,
-              autoGainControl: true,
-              ...devConstraint
-            }
-          : {
-              echoCancellation: false,
-              noiseSuppression: false,
-              autoGainControl: false,
-              ...devConstraint
-            };
+        // Raw studio recording constraints:
+        // Disabling echoCancellation & autoGainControl prevents mobile phones (iOS & Android)
+        // from engaging low-quality telephone voice mode, preventing mic ducking and keeping playback on the main loudspeakers!
+        const micConstraints: MediaTrackConstraints = {
+          channelCount: { ideal: 1 },
+          sampleRate: { ideal: 48000 },
+          echoCancellation: false,
+          noiseSuppression: false,
+          autoGainControl: false,
+          ...devConstraint
+        };
 
         stream = await navigator.mediaDevices.getUserMedia({ audio: micConstraints });
       } catch (err1) {
@@ -3349,7 +3426,7 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
         beatAudioRef.current.playbackRate = 1.0;
         beatAudioRef.current.currentTime = initialPunchStartSec;
         beatAudioRef.current.muted = beatMuted;
-        beatAudioRef.current.volume = beatMuted ? 0 : Math.max(0, Math.min(1, beatVolume * masterVolume));
+        connectElToPlayback(beatAudioRef.current, 'beat', beatMuted ? 0 : beatVolume, beatPan);
         await beatAudioRef.current.play().catch(() => {});
       }
 
@@ -3373,6 +3450,14 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
         if (micStreamRef.current) {
           micStreamRef.current.getTracks().forEach((t) => t.stop());
           micStreamRef.current = null;
+        }
+
+        // Close recording AudioContext so iOS Safari releases telephony session
+        if (audioContextRef.current) {
+          try {
+            audioContextRef.current.close();
+          } catch (_) {}
+          audioContextRef.current = null;
         }
 
         const rawBlob = new Blob(recordedChunksRef.current, {
@@ -3647,7 +3732,34 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
       } catch (_) {}
       mediaRecorderRef.current.stop();
     }
-    // Note: micStream tracks are stopped inside recorder.onstop after data is safely flushed
+
+    // Safely stop microphone hardware tracks immediately
+    if (micStreamRef.current) {
+      micStreamRef.current.getTracks().forEach((t) => t.stop());
+      micStreamRef.current = null;
+    }
+
+    // Close recording AudioContext so mobile OS completely exits telephone earpiece mode
+    if (audioContextRef.current) {
+      try {
+        audioContextRef.current.close();
+      } catch (_) {}
+      audioContextRef.current = null;
+    }
+
+    // On mobile, also reset playCtxRef so next play action creates a fresh context in loudspeaker mode
+    const isMobile =
+      typeof window !== 'undefined' &&
+      (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent) || window.innerWidth < 768);
+    if (isMobile && playCtxRef.current) {
+      try {
+        playCtxRef.current.close();
+      } catch (_) {}
+      playCtxRef.current = null;
+      beatNodesRef.current = null;
+      vocalNodesRef.current.clear();
+    }
+
     if (beatAudioRef.current) {
       beatAudioRef.current.pause();
     }
@@ -3713,7 +3825,7 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
         beatAudioRef.current.playbackRate = 1.0;
         beatAudioRef.current.currentTime = currentTime;
         beatAudioRef.current.muted = !beatShouldPlay;
-        beatAudioRef.current.volume = beatShouldPlay ? Math.max(0, Math.min(1, beatVolume * masterVolume)) : 0;
+        connectElToPlayback(beatAudioRef.current, 'beat', beatShouldPlay ? beatVolume : 0, beatPan);
       }
 
       const promises: Promise<void>[] = [];
@@ -4942,11 +5054,12 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
       {/* Hidden Playback Track Audio Elements */}
       {selectedTrack && (
         <audio
-          key={`native-beat-${selectedTrack.id}-v8`}
+          key={`native-beat-${selectedTrack.id}-v10`}
           ref={(el) => {
             beatAudioRef.current = el;
           }}
           src={selectedTrack.audioUrl || ''}
+          crossOrigin="anonymous"
           preload="auto"
           playsInline
           onEnded={() => {
