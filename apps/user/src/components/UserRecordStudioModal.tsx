@@ -1700,7 +1700,6 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
   const dspGraphVersionRef = useRef<number>(0);
   // Per-element nodes: MediaElementSource, GainNode, StereoPannerNode
   type ElNodes = { source: MediaElementAudioSourceNode; gain: GainNode; panner: StereoPannerNode };
-  const beatNodesRef = useRef<ElNodes | null>(null);
   const vocalNodesRef = useRef<Map<string, ElNodes>>(new Map());
   // Global shared DSP chain nodes (created once, connected to destination)
   const dspVocalSyncDelayRef = useRef<DelayNode | null>(null);
@@ -1729,8 +1728,6 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
   const dspMasterGainRef = useRef<GainNode | null>(null);
   // DSP vocal input bus (all vocal track panners connect here)
   const dspBusRef = useRef<GainNode | null>(null);
-  // Dedicated clean beat bus that connects directly to master (never through vocal compressor or ducking)
-  const dspBeatBusRef = useRef<GainNode | null>(null);
 
   // Apply chosen audio output device (sinkId) to AudioContext and all HTMLAudioElements
   const applyAudioOutputSinkId = useCallback(async (deviceId: string) => {
@@ -2586,24 +2583,12 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
     reverbToneFilter.connect(reverbGain);
     reverbGain.connect(compressor);
 
-    // Master output stage
+    // Master output stage (for Vocals Web Audio chain)
     compressor.connect(makeupGain);
     makeupGain.connect(masterGain);
     masterGain.connect(ctx.destination);
 
-    // Dedicated clean beat bus that connects directly to master (never through vocal compressor or ducking)
-    const beatBus = ctx.createGain();
-    beatBus.connect(masterGain);
-    dspBeatBusRef.current = beatBus;
-
-    // Re-attach any existing beat/vocal element nodes to the freshly built buses
-    if (beatNodesRef.current) {
-      try {
-        const targetNode = beatNodesRef.current.panner || beatNodesRef.current.gain;
-        targetNode.disconnect();
-        targetNode.connect(beatBus);
-      } catch (_) {}
-    }
+    // Re-attach any existing vocal element nodes to the freshly built vocal bus
     vocalNodesRef.current.forEach((nodes) => {
       try {
         const targetNode = nodes.panner || nodes.gain;
@@ -2657,7 +2642,7 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
   }, [ensurePlaybackCtx, applyAudioOutputSinkId, audioOutputDevice]);
 
   // ─── Connect a single HTMLAudioElement into the live playback graph ──────
-  const connectElToPlayback = useCallback((el: HTMLAudioElement, nodeKey: 'beat' | string, vol: number, pan: number): ElNodes | null => {
+  const connectElToPlayback = useCallback((el: HTMLAudioElement, nodeKey: string, vol: number, pan: number): ElNodes | null => {
     try {
       const ctx = ensurePlaybackCtx();
       if (!ctx || !dspMasterGainRef.current || !dspBusRef.current) return null;
@@ -2665,12 +2650,10 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
       // Ensure HTMLAudioElement is at unity volume (1.0) and unmuted so Web Audio GainNode has full dynamic range
       el.muted = false;
       el.volume = 1.0;
-      if (nodeKey === 'beat') el.playbackRate = 1.0;
 
-      const beatTarget = dspBeatBusRef.current || dspMasterGainRef.current;
-      const destBus = nodeKey === 'beat' ? beatTarget : dspBusRef.current;
+      const destBus = dspBusRef.current;
 
-      const existing = nodeKey === 'beat' ? beatNodesRef.current : vocalNodesRef.current.get(nodeKey);
+      const existing = vocalNodesRef.current.get(nodeKey);
       if (existing) {
         if ((existing.source as any).mediaElement === el) {
           existing.gain.gain.value = vol;
@@ -2727,11 +2710,7 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
       }
 
       const nodes: ElNodes = { source, gain, panner: panner || (gain as any) };
-      if (nodeKey === 'beat') {
-        beatNodesRef.current = nodes;
-      } else {
-        vocalNodesRef.current.set(nodeKey, nodes);
-      }
+      vocalNodesRef.current.set(nodeKey, nodes);
       return nodes;
     } catch (e) {
       console.warn('connectElToPlayback error:', e);
@@ -2746,11 +2725,10 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
     const anySolo = vocalTracks.some((t) => t.isSolo) || beatSolo;
     const beatShouldPlay = anySolo ? beatSolo : !beatMuted;
 
-    // 1. Backing Beat (Dedicated clean beat bus, aligned with Web Audio pipeline, zero ducking)
+    // 1. Backing Beat (100% Pure Native Master Output - zero CORS or Web Audio issues)
     if (beatAudioRef.current) {
       beatAudioRef.current.muted = !beatShouldPlay;
       beatAudioRef.current.volume = beatShouldPlay ? Math.max(0, Math.min(1, beatVolume * masterVolume)) : 0;
-      connectElToPlayback(beatAudioRef.current, 'beat', beatShouldPlay ? beatVolume : 0, beatPan);
     }
 
     // 2. Master gain node (for Vocal Bus)
@@ -3372,7 +3350,6 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
         beatAudioRef.current.currentTime = initialPunchStartSec;
         beatAudioRef.current.muted = beatMuted;
         beatAudioRef.current.volume = beatMuted ? 0 : Math.max(0, Math.min(1, beatVolume * masterVolume));
-        connectElToPlayback(beatAudioRef.current, 'beat', beatMuted ? 0 : beatVolume, beatPan);
         await beatAudioRef.current.play().catch(() => {});
       }
 
@@ -3740,7 +3717,7 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
       }
 
       const promises: Promise<void>[] = [];
-      if (beatAudioRef.current) promises.push(beatAudioRef.current.play());
+      if (beatAudioRef.current) promises.push(beatAudioRef.current.play().catch((e) => console.warn('Beat audio play error:', e)));
 
       vocalTracksRef.current.forEach((t) => {
         if (t.vocalUrl) {
@@ -4965,7 +4942,7 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
       {/* Hidden Playback Track Audio Elements */}
       {selectedTrack && (
         <audio
-          key={`native-beat-${selectedTrack.id}-v7`}
+          key={`native-beat-${selectedTrack.id}-v8`}
           ref={(el) => {
             beatAudioRef.current = el;
           }}
