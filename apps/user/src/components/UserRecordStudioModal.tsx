@@ -1800,6 +1800,44 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
       if (preselectedTrack && preselectedTrack.id !== lastPreselectedIdRef.current) {
         lastPreselectedIdRef.current = preselectedTrack.id;
         setSelectedTrack(preselectedTrack);
+        // Clear previous beat's vocal takes so they don't bleed or composite into the new beat
+        vocalBuffersRef.current.clear();
+        stopVocalBuffersPlaybackRef.current();
+        const initialTracks: StudioVocalTrack[] = [
+          {
+            id: 'trk_lead',
+            name: 'Lead Vocal',
+            type: 'lead',
+            color: '#2dd4bf',
+            isArmed: true,
+            isMuted: false,
+            isSolo: false,
+            volume: 1.0,
+            pan: 0,
+            vocalBlob: null,
+            vocalUrl: null,
+            durationSeconds: 0,
+            latencyOffsetMs: 0
+          },
+          {
+            id: 'trk_backup_1',
+            name: 'Backup 1',
+            type: 'backup',
+            color: '#f59e0b',
+            isArmed: false,
+            isMuted: false,
+            isSolo: false,
+            volume: 0.85,
+            pan: -40,
+            vocalBlob: null,
+            vocalUrl: null,
+            durationSeconds: 0,
+            latencyOffsetMs: 0
+          }
+        ];
+        setVocalTracks(initialTracks);
+        vocalTracksRef.current = initialTracks;
+        setPlayheadTime(0);
       }
     } else {
       lastPreselectedIdRef.current = null;
@@ -1990,9 +2028,14 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
     }
     if (isPlaying) {
       if (beatAudioRef.current) beatAudioRef.current.pause();
+      stopVocalBuffersPlaybackRef.current();
       vocalAudioRefs.current.forEach((el) => el.pause());
       setIsPlaying(false);
       if (playheadIntervalRef.current) clearInterval(playheadIntervalRef.current);
+    }
+    if (selectedTrack && selectedTrack.id !== track.id) {
+      vocalBuffersRef.current.clear();
+      stopVocalBuffersPlaybackRef.current();
     }
     setSelectedTrack(track);
     if (track.bpm) setSessionBpm(track.bpm);
@@ -2530,8 +2573,6 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
     // Master output stage (connected to destination)
     compressor.connect(makeupGain);
     makeupGain.connect(masterGain);
-    // Direct clean vocal bus connection to masterGain (ensures vocals are 100% audible and never squashed)
-    vocalBus.connect(masterGain);
     masterGain.connect(ctx.destination);
 
     // Dedicated clean Beat Bus: beatBus → beatPanNode → masterGain
@@ -2752,10 +2793,21 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
     }
   }, [ensurePlaybackCtx, ensureVocalTrackNodes]);
 
+  // Helper to get cache key for a vocal track based on its exact audio content
+  const getTrackBufferKey = (track: StudioVocalTrack): string => {
+    if (track.vocalUrl) return `${track.id}_${track.vocalUrl}`;
+    if (track.vocalBlob) {
+      return `${track.id}_${track.vocalBlob.size}_${track.durationSeconds || ''}`;
+    }
+    return `${track.id}_empty`;
+  };
+
   // Helper to ensure vocal track audio buffers are decoded and loaded in memory
   const getOrDecodeVocalBuffer = useCallback(async (track: StudioVocalTrack, ctx: AudioContext): Promise<AudioBuffer | null> => {
-    if (vocalBuffersRef.current.has(track.id)) {
-      return vocalBuffersRef.current.get(track.id)!;
+    if (!track.vocalBlob && !track.vocalUrl) return null;
+    const key = getTrackBufferKey(track);
+    if (vocalBuffersRef.current.has(key)) {
+      return vocalBuffersRef.current.get(key)!;
     }
     try {
       let arrBuf: ArrayBuffer | null = null;
@@ -2768,7 +2820,7 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
       if (arrBuf) {
         const decoded = await ctx.decodeAudioData(arrBuf);
         if (decoded) {
-          vocalBuffersRef.current.set(track.id, decoded);
+          vocalBuffersRef.current.set(key, decoded);
           return decoded;
         }
       }
@@ -2810,7 +2862,8 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
       const nodes = ensureVocalTrackNodes(t.id, targetVol, t.pan);
       if (!nodes) continue;
 
-      let buf: AudioBuffer | null | undefined = vocalBuffersRef.current.get(t.id);
+      const key = getTrackBufferKey(t);
+      let buf: AudioBuffer | null | undefined = vocalBuffersRef.current.get(key);
       if (!buf) {
         buf = await getOrDecodeVocalBuffer(t, ctx);
       }
@@ -3102,7 +3155,9 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
 
   // Delete / Clear a recorded vocal take on any track (Lead or Backup) so user can re-record cleanly
   const handleClearVocalTake = (trackId: string) => {
-    // 1. Stop audio playback for this take
+    // 1. Stop audio playback for this take and purge buffer cache
+    vocalBuffersRef.current.clear();
+    stopVocalBuffersPlayback();
     const el = vocalAudioRefs.current.get(trackId);
     if (el) {
       el.pause();
@@ -3562,6 +3617,17 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
           audioContextRef.current = null;
         }
 
+        // Close and reset playback AudioContext so iOS releases telephony earpiece mode!
+        if (playCtxRef.current) {
+          try {
+            playCtxRef.current.close();
+          } catch (_) {}
+          playCtxRef.current = null;
+        }
+        vocalNodesRef.current.clear();
+        beatNodesRef.current = null;
+        dspGraphVersionRef.current = 0;
+
         const rawBlob = new Blob(recordedChunksRef.current, {
           type: supportedMime || 'audio/webm'
         });
@@ -3576,11 +3642,12 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
           vocalTracks.find((t) => t.id === armedTrack.id) ||
           armedTrack;
 
-        // Decode true audio sample duration from the recorded Blob AND composite with any existing recording on this channel!
+        // Decode true audio sample duration from the recorded Blob
         let finalDurationSeconds = beatElapsedSec;
         let finalStartTimeSec = Number(beatStart.toFixed(3));
         let finalPlaybackRate = 1.0;
         let finalBlob: Blob = rawBlob;
+        let finalBuffer: AudioBuffer | null = null;
         let updatedClips: StudioVocalClipSegment[] = [];
         let updatedUndoStack: StudioVocalUndoSnapshot[] = prevTrack.undoStack ? [...prevTrack.undoStack] : [];
 
@@ -3601,8 +3668,10 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
                 }
               }
 
-              // Check if this vocal channel ALREADY has a previous recording -> Cubase Non-Destructive Punch-In!
-              if (prevTrack.vocalBlob && prevTrack.durationSeconds > 0.15) {
+              // Only composite punch-in if recording started MID-TIMELINE (> 0.5s into beat).
+              // When recording from beginning (0:00), always record a clean new take!
+              const isMidTimelinePunchIn = initialPunchStartSec > 0.5;
+              if (isMidTimelinePunchIn && prevTrack.vocalBlob && prevTrack.durationSeconds > 0.15) {
                 const existRate = Math.max(0.75, Math.min(1.25, prevTrack.playbackRate ?? 1.0));
                 const existStartSec = Math.max(0, prevTrack.startTimeSec ?? 0);
                 const existTrimIn = Math.max(0, prevTrack.trimStartSec ?? 0);
@@ -3657,7 +3726,7 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
                 finalStartTimeSec = mergedStartSec;
                 finalDurationSeconds = mergedDurationSec;
                 finalPlaybackRate = 1.0; // Both existing and new takes are time-aligned at 1.0x in the composite WAV
-                vocalBuffersRef.current.set(armedTrack.id, mergedBuffer);
+                finalBuffer = mergedBuffer;
 
                 // 3. Split/trim existing clip segments around `[newStart, newEnd]` and insert the new take segment
                 const newStart = Number(beatStart.toFixed(3));
@@ -3696,12 +3765,25 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
                 nextSegments.sort((a, b) => a.startTimeSec - b.startTimeSec);
                 updatedClips = nextSegments;
               } else {
-                // First recording on this vocal channel (placed at `beatStart` on the timeline)
+                // Clean new recording on this vocal channel
+                if (prevTrack.vocalBlob && prevTrack.durationSeconds > 0.15) {
+                  const undoSnapshot: StudioVocalUndoSnapshot = {
+                    vocalBlob: prevTrack.vocalBlob,
+                    vocalUrl: prevTrack.vocalUrl || URL.createObjectURL(prevTrack.vocalBlob),
+                    durationSeconds: prevTrack.durationSeconds,
+                    startTimeSec: prevTrack.startTimeSec || 0,
+                    trimStartSec: prevTrack.trimStartSec || 0,
+                    trimEndSec: prevTrack.trimEndSec || prevTrack.durationSeconds,
+                    playbackRate: prevTrack.playbackRate || 1.0,
+                    clips: prevTrack.clips || []
+                  };
+                  updatedUndoStack = [...updatedUndoStack.slice(-6), undoSnapshot];
+                }
                 finalBlob = audioBufferToWav(newDecoded);
                 finalDurationSeconds = trueSampleDuration;
                 finalStartTimeSec = Number(beatStart.toFixed(3));
                 finalPlaybackRate = autoCalibratedRate;
-                vocalBuffersRef.current.set(armedTrack.id, newDecoded);
+                finalBuffer = newDecoded;
                 const newTimelineDur = Number((trueSampleDuration / autoCalibratedRate).toFixed(3));
                 updatedClips = [
                   {
@@ -3720,6 +3802,19 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
         }
 
         const objectUrl = URL.createObjectURL(finalBlob);
+
+        // Cache the newly recorded AudioBuffer with its content-based key
+        if (finalBuffer) {
+          const trackSnap: StudioVocalTrack = {
+            ...armedTrack,
+            id: armedTrack.id,
+            vocalBlob: finalBlob,
+            vocalUrl: objectUrl,
+            durationSeconds: finalDurationSeconds
+          };
+          const cacheKey = getTrackBufferKey(trackSnap);
+          vocalBuffersRef.current.set(cacheKey, finalBuffer);
+        }
 
         // Assign composite or newly recorded WAV take into the armed track
         setVocalTracks((prev) => {
@@ -3850,6 +3945,17 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
       } catch (_) {}
       audioContextRef.current = null;
     }
+
+    // Close and reset playback AudioContext so iOS releases telephony earpiece mode!
+    if (playCtxRef.current) {
+      try {
+        playCtxRef.current.close();
+      } catch (_) {}
+      playCtxRef.current = null;
+    }
+    vocalNodesRef.current.clear();
+    beatNodesRef.current = null;
+    dspGraphVersionRef.current = 0;
 
     if (beatAudioRef.current) {
       beatAudioRef.current.pause();
@@ -4482,6 +4588,10 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
         vocalTracks.forEach((t) => {
           if (t.vocalUrl) URL.revokeObjectURL(t.vocalUrl);
         });
+
+        // Purge old vocal buffer cache so other sessions' takes never bleed into this one!
+        vocalBuffersRef.current.clear();
+        stopVocalBuffersPlayback();
 
         // Reconstruct vocal tracks with fresh object URLs
         const reconstructedTracks: StudioVocalTrack[] = (project.vocalTracks || []).map((t) => {
