@@ -189,6 +189,29 @@ function audioBufferToWav(buffer: AudioBuffer): Blob {
   return new Blob([header, data.buffer], { type: 'audio/wav' });
 }
 
+// Normalize vocal audio buffer so mobile & low-gain microphone takes are brought up to professional loudness
+function normalizeVocalBuffer(buffer: AudioBuffer, targetPeak = 0.88): AudioBuffer {
+  let maxPeak = 0;
+  for (let c = 0; c < buffer.numberOfChannels; c++) {
+    const data = buffer.getChannelData(c);
+    for (let i = 0; i < data.length; i++) {
+      const abs = Math.abs(data[i]);
+      if (abs > maxPeak) maxPeak = abs;
+    }
+  }
+  // If recording is quiet (maxPeak between 0.002 and 0.65), apply clean linear boost up to targetPeak (max 10x / +20dB boost)
+  if (maxPeak > 0.002 && maxPeak < 0.65) {
+    const gainMultiplier = Math.min(10.0, targetPeak / maxPeak);
+    for (let c = 0; c < buffer.numberOfChannels; c++) {
+      const data = buffer.getChannelData(c);
+      for (let i = 0; i < data.length; i++) {
+        data[i] = Math.max(-1, Math.min(1, data[i] * gainMultiplier));
+      }
+    }
+  }
+  return buffer;
+}
+
 // Cubase-style Non-Destructive Punch-In / Multi-Region Audio Compositor:
 // Merges an existing vocal track buffer with a newly recorded take at `newStartSec`
 // while preserving everything before `newStartSec` and after `newEndSec` with a smooth 15ms crossfade.
@@ -1706,6 +1729,8 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
   const dspMasterGainRef = useRef<GainNode | null>(null);
   // DSP vocal input bus (all vocal track panners connect here)
   const dspBusRef = useRef<GainNode | null>(null);
+  // Dedicated clean beat bus that connects directly to master (never through vocal compressor or ducking)
+  const dspBeatBusRef = useRef<GainNode | null>(null);
 
   // Apply chosen audio output device (sinkId) to AudioContext and all HTMLAudioElements
   const applyAudioOutputSinkId = useCallback(async (deviceId: string) => {
@@ -2566,12 +2591,17 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
     makeupGain.connect(masterGain);
     masterGain.connect(ctx.destination);
 
+    // Dedicated clean beat bus that connects directly to master (never through vocal compressor or ducking)
+    const beatBus = ctx.createGain();
+    beatBus.connect(masterGain);
+    dspBeatBusRef.current = beatBus;
+
     // Re-attach any existing beat/vocal element nodes to the freshly built buses
     if (beatNodesRef.current) {
       try {
         const targetNode = beatNodesRef.current.panner || beatNodesRef.current.gain;
         targetNode.disconnect();
-        targetNode.connect(fxBus);
+        targetNode.connect(beatBus);
       } catch (_) {}
     }
     vocalNodesRef.current.forEach((nodes) => {
@@ -2637,7 +2667,7 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
       el.volume = 1.0;
       if (nodeKey === 'beat') el.playbackRate = 1.0;
 
-      const beatTarget = dspFxBusRef.current || dspMasterGainRef.current;
+      const beatTarget = dspBeatBusRef.current || dspMasterGainRef.current;
       const destBus = nodeKey === 'beat' ? beatTarget : dspBusRef.current;
 
       const existing = nodeKey === 'beat' ? beatNodesRef.current : vocalNodesRef.current.get(nodeKey);
@@ -2716,10 +2746,11 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
     const anySolo = vocalTracks.some((t) => t.isSolo) || beatSolo;
     const beatShouldPlay = anySolo ? beatSolo : !beatMuted;
 
-    // 1. Backing Beat (100% Pure Native Master Output)
+    // 1. Backing Beat (Dedicated clean beat bus, aligned with Web Audio pipeline, zero ducking)
     if (beatAudioRef.current) {
       beatAudioRef.current.muted = !beatShouldPlay;
       beatAudioRef.current.volume = beatShouldPlay ? Math.max(0, Math.min(1, beatVolume * masterVolume)) : 0;
+      connectElToPlayback(beatAudioRef.current, 'beat', beatShouldPlay ? beatVolume : 0, beatPan);
     }
 
     // 2. Master gain node (for Vocal Bus)
@@ -3251,19 +3282,33 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
       }
       await applyAudioOutputSinkId(audioOutputDevice);
 
+      // Detect mobile device
+      const isMobile =
+        typeof window !== 'undefined' &&
+        (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent) || window.innerWidth < 768);
+
       // Access User Microphone at native hardware sample rate (prevents sample-clock speed drift!)
       let stream: MediaStream;
       try {
         const devConstraint =
           audioInputDevice && audioInputDevice !== 'default' ? { deviceId: { ideal: audioInputDevice } } : {};
-        stream = await navigator.mediaDevices.getUserMedia({
-          audio: {
-            echoCancellation: false,
-            noiseSuppression: false,
-            autoGainControl: false,
-            ...devConstraint
-          }
-        });
+
+        // On mobile: autoGainControl & echoCancellation are essential to avoid faint whisper vocals and mobile speaker feedback
+        const micConstraints = isMobile
+          ? {
+              echoCancellation: true,
+              noiseSuppression: false,
+              autoGainControl: true,
+              ...devConstraint
+            }
+          : {
+              echoCancellation: false,
+              noiseSuppression: false,
+              autoGainControl: false,
+              ...devConstraint
+            };
+
+        stream = await navigator.mediaDevices.getUserMedia({ audio: micConstraints });
       } catch (err1) {
         console.warn('Studio audio constraints fallback to standard audio:', err1);
         try {
@@ -3294,13 +3339,26 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
       gainNode.connect(analyser);
       analyserRef.current = analyser;
 
-      // Record directly from the hardware MediaStream (zero frame drops or sample-rate clock drift)
-      const mimeTypes = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/ogg'];
-      const supportedMime = mimeTypes.find((m) => MediaRecorder.isTypeSupported(m)) || '';
-      const recorder = new MediaRecorder(
-        stream,
-        supportedMime ? { mimeType: supportedMime, audioBitsPerSecond: 256000 } : undefined
-      );
+      // Record directly from the hardware MediaStream (safe initialization across mobile & desktop)
+      let supportedMime = '';
+      if (typeof MediaRecorder !== 'undefined' && typeof MediaRecorder.isTypeSupported === 'function') {
+        const mimeTypes = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/aac', 'audio/ogg'];
+        supportedMime = mimeTypes.find((m) => MediaRecorder.isTypeSupported(m)) || '';
+      }
+
+      let recorder: MediaRecorder;
+      try {
+        if (supportedMime && !isMobile && supportedMime.includes('webm')) {
+          recorder = new MediaRecorder(stream, { mimeType: supportedMime, audioBitsPerSecond: 256000 });
+        } else if (supportedMime) {
+          recorder = new MediaRecorder(stream, { mimeType: supportedMime });
+        } else {
+          recorder = new MediaRecorder(stream);
+        }
+      } catch (recInitErr) {
+        console.warn('MediaRecorder with mimeType failed, falling back to default:', recInitErr);
+        recorder = new MediaRecorder(stream);
+      }
 
       recorder.ondataavailable = (e) => {
         if (e.data && e.data.size > 0) {
@@ -3314,6 +3372,7 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
         beatAudioRef.current.currentTime = initialPunchStartSec;
         beatAudioRef.current.muted = beatMuted;
         beatAudioRef.current.volume = beatMuted ? 0 : Math.max(0, Math.min(1, beatVolume * masterVolume));
+        connectElToPlayback(beatAudioRef.current, 'beat', beatMuted ? 0 : beatVolume, beatPan);
         await beatAudioRef.current.play().catch(() => {});
       }
 
@@ -3333,6 +3392,12 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
       };
 
       recorder.onstop = async () => {
+        // Safely stop microphone hardware tracks AFTER chunks are fully captured
+        if (micStreamRef.current) {
+          micStreamRef.current.getTracks().forEach((t) => t.stop());
+          micStreamRef.current = null;
+        }
+
         const rawBlob = new Blob(recordedChunksRef.current, {
           type: supportedMime || 'audio/webm'
         });
@@ -3359,8 +3424,9 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
           const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
           if (AudioCtx) {
             const tempCtx = new AudioCtx();
-            const arrBuf = await rawBlob.arrayBuffer();
-            const newDecoded = await tempCtx.decodeAudioData(arrBuf);
+            const rawBuf = await rawBlob.arrayBuffer();
+            const rawDecoded = await tempCtx.decodeAudioData(rawBuf);
+            const newDecoded = normalizeVocalBuffer(rawDecoded);
             if (newDecoded && newDecoded.duration > 0.2 && Number.isFinite(newDecoded.duration)) {
               const trueSampleDuration = Number(newDecoded.duration.toFixed(3));
               let autoCalibratedRate = 1.0;
@@ -3531,7 +3597,12 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
       };
 
       mediaRecorderRef.current = recorder;
-      recorder.start(100);
+      // On mobile devices and Safari MP4 recording, start without small timeslices to prevent container corruption
+      if (isMobile || (supportedMime && supportedMime.includes('mp4'))) {
+        recorder.start();
+      } else {
+        recorder.start(100);
+      }
 
       // Live Timer & Playhead Tracker (locked to beatAudioRef.currentTime when running)
       timerIntervalRef.current = setInterval(() => {
@@ -3592,11 +3663,14 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
       recBeatEndSecRef.current = recordingSecondsRef.current;
     }
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      try {
+        if (typeof mediaRecorderRef.current.requestData === 'function') {
+          mediaRecorderRef.current.requestData();
+        }
+      } catch (_) {}
       mediaRecorderRef.current.stop();
     }
-    if (micStreamRef.current) {
-      micStreamRef.current.getTracks().forEach((t) => t.stop());
-    }
+    // Note: micStream tracks are stopped inside recorder.onstop after data is safely flushed
     if (beatAudioRef.current) {
       beatAudioRef.current.pause();
     }
@@ -4948,267 +5022,282 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
       )}
 
       {/* HEADER */}
-      <header className="shrink-0 bg-[#111215] px-2.5 sm:px-6 py-2 sm:py-3 flex items-center justify-between gap-2 sm:gap-3 z-20">
-        <div className="flex-1 min-w-0 flex items-center gap-2 sm:gap-2.5">
-          <button
-            type="button"
-            onClick={() => {
-              if (onClose) {
-                onClose();
-              } else if (typeof window !== 'undefined') {
-                if (window.history.length > 1) window.history.back();
-                else window.location.href = '/';
-              }
-            }}
-            title="Back"
-            className="h-8 sm:h-9 px-2.5 sm:px-3 rounded-xl bg-[#1b1c20] hover:bg-[#232429] border border-[#26272d] text-[#d8dae0] hover:text-white flex items-center gap-1.5 text-[11px] sm:text-[12px] font-medium shrink-0 transition-colors"
-          >
-            <ArrowLeft className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-            <span className="hidden xs:inline sm:inline">Back</span>
-          </button>
-
-          {/* Sessions & Project Browser Button */}
-          <button
-            type="button"
-            onClick={() => setIsProjectsModalOpen(true)}
-            title="Browse, save, and continue studio sessions"
-            className="h-8 sm:h-9 px-2 sm:px-3 rounded-xl bg-[#1b1c20] hover:bg-[#232429] border border-[#26272d] text-[#d8dae0] hover:text-white flex items-center gap-1.5 text-[11px] sm:text-[12px] font-medium shrink-0 transition-colors"
-          >
-            <FolderOpen className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-[#2dd4bf]" />
-            <span className="hidden xs:inline sm:inline">Sessions</span>
-            {savedProjectsList.length > 0 && (
-              <span className="px-1.5 py-0.2 rounded-full bg-[#2dd4bf]/20 text-[#2dd4bf] text-[9.5px] font-bold">
-                {savedProjectsList.length}
-              </span>
-            )}
-          </button>
-
-          <div className="min-w-0 flex-1">
-            <input
-              type="text"
-              value={projectTitle}
-              onChange={(e) => {
-                setProjectTitle(e.target.value);
-                setSaveStatus('unsaved');
-              }}
-              aria-label="Project title"
-              className="w-full bg-transparent text-[15px] sm:text-[24px] md:text-[28px] font-medium tracking-tight text-white leading-tight focus:outline-none truncate"
-            />
-            <div className="flex items-center gap-2 text-[10px] sm:text-[11px] text-[#7b7f89] min-w-0">
-              <span
-                className={`w-1.5 h-1.5 rounded-full shrink-0 ${
-                  isRecording ? 'bg-[#ff5a36] animate-pulse' : selectedTrack ? 'bg-[#4ade80]' : 'bg-[#5d616b]'
-                }`}
-              />
-              <span className="truncate max-w-[120px] sm:max-w-[200px]">
-                {isRecording
-                  ? `Recording ${armedTrack?.name || 'vocal'}…`
-                  : selectedTrack
-                  ? `${selectedTrack.title}${selectedTrack.artist ? ` · ${selectedTrack.artist}` : ''}`
-                  : 'Choose a free beat to get started'}
-              </span>
-
-              {/* Quick Save button with status */}
-              <button
-                type="button"
-                onClick={() => {
-                  if (!isPro) setIsProSaveModalOpen(true);
-                  else handleSaveSession(true);
-                }}
-                title={isPro ? "Save session (Ctrl+S / Cmd+S)" : "Saving sessions is exclusive to Caution Pro"}
-                className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium transition-colors ${
-                  !isPro
-                    ? 'bg-amber-500/10 text-amber-300 hover:bg-amber-500/20'
-                    : saveStatus === 'unsaved'
-                    ? 'bg-[#ff5a36]/20 text-[#ff7a5c] hover:bg-[#ff5a36]/30 font-semibold'
-                    : saveStatus === 'saving'
-                    ? 'bg-white/10 text-white animate-pulse'
-                    : 'text-[#5eead4] hover:bg-white/5'
-                }`}
-              >
-                {!isPro ? (
-                  <>
-                    <Lock className="h-2.5 w-2.5 text-amber-400" />
-                    <span>Pro to Save</span>
-                  </>
-                ) : (
-                  <>
-                    <Save className="h-3 w-3" />
-                    <span>
-                      {saveStatus === 'saving'
-                        ? 'Saving…'
-                        : saveStatus === 'unsaved'
-                        ? 'Save *'
-                        : lastSavedAt
-                        ? `Saved ${lastSavedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
-                        : 'Saved'}
-                    </span>
-                  </>
-                )}
-              </button>
-
-              {/* Plus User Monthly Session Badge */}
-              {isPlus && sessionUsage && sessionUsage.limit !== null && (
-                <span className="hidden md:inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#04564f]/40 border border-[#2dd4bf]/30 text-[10px] font-medium text-[#2dd4bf]">
-                  <Mic className="h-2.5 w-2.5" />
-                  <span>Session {sessionUsage.used}/{sessionUsage.limit} this month</span>
-                </span>
-              )}
-            </div>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
-          <button
-            type="button"
-            onClick={handleReturnToZero}
-            title="Return to start"
-            className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-[#1b1c20] hover:bg-[#232429] text-[#c9ccd3] flex items-center justify-center transition-colors"
-          >
-            <SkipBack className="h-3.5 w-3.5 sm:h-4 sm:w-4 fill-current" />
-          </button>
-          <button
-            type="button"
-            onClick={onStudioPlay}
-            disabled={isRecording}
-            title="Play / Pause"
-            className="w-10 h-9 sm:w-14 sm:h-11 rounded-xl bg-[#ff5a36] hover:bg-[#ff6b49] text-white flex items-center justify-center shadow-[0_0_22px_rgba(255,90,54,0.35)] transition-colors disabled:opacity-50"
-          >
-            {isPlaying ? <Pause className="h-4 w-4 fill-current" /> : <Play className="h-4 w-4 fill-current ml-0.5" />}
-          </button>
-          <button
-            type="button"
-            onClick={onStudioRecord}
-            title={
-              isRecording
-                ? 'Stop recording'
-                : `Record ${armedTrack?.name || 'vocal'} from ${formatTimecode(playheadTime)} (Non-destructive Punch-In)`
-            }
-            className={`w-8 h-8 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center transition-colors ${
-              isRecording ? 'bg-[#ff5a36]' : 'bg-[#1b1c20] hover:bg-[#232429]'
-            }`}
-          >
-            {isRecording ? (
-              <span className="w-3 h-3 rounded-[3px] bg-white" />
-            ) : (
-              <span className="w-2.5 h-2.5 rounded-full bg-[#ff5a36]" />
-            )}
-          </button>
-          <button
-            type="button"
-            onClick={() => setIsLoopEnabled(!isLoopEnabled)}
-            title="Loop"
-            className={`hidden sm:flex w-9 h-9 sm:w-10 sm:h-10 rounded-xl items-center justify-center transition-colors ${
-              isLoopEnabled ? 'bg-[#3a1e18] text-[#ff5a36]' : 'bg-[#2a1b18] text-[#ff5a36] opacity-80 hover:opacity-100'
-            }`}
-          >
-            <Repeat className="h-4 w-4" />
-          </button>
-
-          <div className="pl-1 sm:pl-3">
-            <div className="text-[18px] sm:text-[36px] md:text-[44px] font-medium text-white tabular-nums tracking-tight leading-none">
-              {formattedBeatCounter}
-            </div>
-            <div className="hidden sm:flex gap-1 mt-1.5">
-              <span className="h-[3px] w-4 rounded-full bg-[#ff5a36]" />
-              <span className="h-[3px] w-4 rounded-full bg-[#2a2b30]" />
-              <span className="h-[3px] w-4 rounded-full bg-[#2a2b30]" />
-              <span className="h-[3px] w-4 rounded-full bg-[#2a2b30]" />
-            </div>
-          </div>
-        </div>
-
-        <div className="flex-1 flex items-center justify-end gap-1.5 sm:gap-2.5 min-w-0">
-          <div className="relative hidden md:block">
+      <header className="shrink-0 bg-[#111215] border-b border-[#26272d] z-20">
+        {/* Row 1: Top Navigation, Project Title & Action Controls */}
+        <div className="px-2.5 sm:px-6 py-2 sm:py-3 flex items-center justify-between gap-2 sm:gap-3">
+          <div className="flex-1 min-w-0 flex items-center gap-1.5 sm:gap-2.5">
             <button
               type="button"
-              onClick={() => setBpmInputOpen(!bpmInputOpen)}
-              title="Tempo"
-              className="w-[60px] h-11 rounded-xl bg-[#1b1c20] hover:bg-[#232429] flex flex-col items-center justify-center transition-colors"
+              onClick={() => {
+                if (onClose) {
+                  onClose();
+                } else if (typeof window !== 'undefined') {
+                  if (window.history.length > 1) window.history.back();
+                  else window.location.href = '/';
+                }
+              }}
+              title="Back"
+              className="h-8 sm:h-9 px-2 sm:px-3 rounded-xl bg-[#1b1c20] hover:bg-[#232429] border border-[#26272d] text-[#d8dae0] hover:text-white flex items-center gap-1.5 text-[11px] sm:text-[12px] font-medium shrink-0 transition-colors"
             >
-              <span className="text-[17px] font-semibold text-white leading-none tabular-nums">{sessionBpm}</span>
-              <span className="text-[10px] text-[#757983] leading-none mt-1">BPM</span>
+              <ArrowLeft className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+              <span className="hidden xs:inline">Back</span>
             </button>
-            {bpmInputOpen && (
-              <div className="absolute top-full right-0 mt-2 w-40 p-2.5 rounded-xl bg-[#1b1c20] border border-[#2a2b31] shadow-2xl z-50 space-y-2">
-                <span className="text-[10px] text-[#757983] block">Tempo (BPM)</span>
-                <input
-                  type="number"
-                  min="60"
-                  max="200"
-                  value={sessionBpm}
-                  onChange={(e) => setSessionBpm(parseInt(e.target.value, 10) || 92)}
-                  className="w-full bg-[#111215] border border-[#2a2b31] rounded-md px-2 py-1 text-white text-xs focus:outline-none"
+
+            {/* Sessions & Project Browser Button */}
+            <button
+              type="button"
+              onClick={() => setIsProjectsModalOpen(true)}
+              title="Browse, save, and continue studio sessions"
+              className="h-8 sm:h-9 px-2 sm:px-3 rounded-xl bg-[#1b1c20] hover:bg-[#232429] border border-[#26272d] text-[#d8dae0] hover:text-white flex items-center gap-1.5 text-[11px] sm:text-[12px] font-medium shrink-0 transition-colors"
+            >
+              <FolderOpen className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-[#2dd4bf]" />
+              <span className="hidden xs:inline">Sessions</span>
+              {savedProjectsList.length > 0 && (
+                <span className="px-1.5 py-0.2 rounded-full bg-[#2dd4bf]/20 text-[#2dd4bf] text-[9.5px] font-bold">
+                  {savedProjectsList.length}
+                </span>
+              )}
+            </button>
+
+            <div className="min-w-0 flex-1 pl-1">
+              <input
+                type="text"
+                value={projectTitle}
+                onChange={(e) => {
+                  setProjectTitle(e.target.value);
+                  setSaveStatus('unsaved');
+                }}
+                aria-label="Project title"
+                className="w-full bg-transparent text-[14px] sm:text-[22px] md:text-[26px] font-semibold tracking-tight text-white leading-tight focus:outline-none truncate"
+              />
+              <div className="hidden sm:flex items-center gap-2 text-[10px] sm:text-[11px] text-[#7b7f89] min-w-0 mt-0.5">
+                <span
+                  className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                    isRecording ? 'bg-[#ff5a36] animate-pulse' : selectedTrack ? 'bg-[#4ade80]' : 'bg-[#5d616b]'
+                  }`}
                 />
-                <button
-                  type="button"
-                  onClick={() => setBpmInputOpen(false)}
-                  className="w-full py-1 rounded-md bg-[#ff5a36] text-white text-[11px] font-semibold"
-                >
-                  Done
-                </button>
+                <span className="truncate max-w-[150px] md:max-w-[240px]">
+                  {isRecording
+                    ? `Recording ${armedTrack?.name || 'vocal'}…`
+                    : selectedTrack
+                    ? `${selectedTrack.title}${selectedTrack.artist ? ` · ${selectedTrack.artist}` : ''}`
+                    : 'Choose a free beat to get started'}
+                </span>
               </div>
-            )}
+            </div>
           </div>
 
-          <div
-            className="hidden md:flex w-[68px] h-11 rounded-xl bg-[#1b1c20] flex-col items-center justify-center"
-            title="Beat key & time signature"
-          >
-            <span className="text-[17px] font-semibold text-white leading-none">{studioKeyLabel}</span>
-            <span className="text-[10px] text-[#757983] leading-none mt-1">{timeSignature}</span>
+          {/* Center Transport Controls (Desktop / Tablet >= md) */}
+          <div className="hidden md:flex items-center gap-2.5 shrink-0">
+            <button
+              type="button"
+              onClick={handleReturnToZero}
+              title="Return to start"
+              className="w-10 h-10 rounded-xl bg-[#1b1c20] hover:bg-[#232429] text-[#c9ccd3] flex items-center justify-center transition-colors"
+            >
+              <SkipBack className="h-4 w-4 fill-current" />
+            </button>
+            <button
+              type="button"
+              onClick={onStudioPlay}
+              disabled={isRecording}
+              title="Play / Pause"
+              className="w-14 h-11 rounded-xl bg-[#ff5a36] hover:bg-[#ff6b49] text-white flex items-center justify-center shadow-[0_0_22px_rgba(255,90,54,0.35)] transition-colors disabled:opacity-50"
+            >
+              {isPlaying ? <Pause className="h-4 w-4 fill-current" /> : <Play className="h-4 w-4 fill-current ml-0.5" />}
+            </button>
+            <button
+              type="button"
+              onClick={onStudioRecord}
+              title={
+                isRecording
+                  ? 'Stop recording'
+                  : `Record ${armedTrack?.name || 'vocal'} from ${formatTimecode(playheadTime)}`
+              }
+              className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors ${
+                isRecording ? 'bg-[#ff5a36]' : 'bg-[#1b1c20] hover:bg-[#232429]'
+              }`}
+            >
+              {isRecording ? (
+                <span className="w-3 h-3 rounded-[3px] bg-white" />
+              ) : (
+                <span className="w-2.5 h-2.5 rounded-full bg-[#ff5a36]" />
+              )}
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsLoopEnabled(!isLoopEnabled)}
+              title="Loop"
+              className={`flex w-10 h-10 rounded-xl items-center justify-center transition-colors ${
+                isLoopEnabled ? 'bg-[#3a1e18] text-[#ff5a36]' : 'bg-[#2a1b18] text-[#ff5a36] opacity-80 hover:opacity-100'
+              }`}
+            >
+              <Repeat className="h-4 w-4" />
+            </button>
+
+            <div className="pl-3">
+              <div className="text-[32px] md:text-[38px] font-medium text-white tabular-nums tracking-tight leading-none">
+                {formattedBeatCounter}
+              </div>
+            </div>
           </div>
 
+          {/* Right: BPM, Key, FX, Save & Share */}
+          <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
+            <div className="relative hidden md:block">
+              <button
+                type="button"
+                onClick={() => setBpmInputOpen(!bpmInputOpen)}
+                title="Tempo"
+                className="w-[60px] h-11 rounded-xl bg-[#1b1c20] hover:bg-[#232429] flex flex-col items-center justify-center transition-colors"
+              >
+                <span className="text-[17px] font-semibold text-white leading-none tabular-nums">{sessionBpm}</span>
+                <span className="text-[10px] text-[#757983] leading-none mt-1">BPM</span>
+              </button>
+              {bpmInputOpen && (
+                <div className="absolute top-full right-0 mt-2 w-40 p-2.5 rounded-xl bg-[#1b1c20] border border-[#2a2b31] shadow-2xl z-50 space-y-2">
+                  <span className="text-[10px] text-[#757983] block">Tempo (BPM)</span>
+                  <input
+                    type="number"
+                    min="60"
+                    max="200"
+                    value={sessionBpm}
+                    onChange={(e) => setSessionBpm(parseInt(e.target.value, 10) || 92)}
+                    className="w-full bg-[#111215] border border-[#2a2b31] rounded-md px-2 py-1 text-white text-xs focus:outline-none"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setBpmInputOpen(false)}
+                    className="w-full py-1 rounded-md bg-[#ff5a36] text-white text-[11px] font-semibold"
+                  >
+                    Done
+                  </button>
+                </div>
+              )}
+            </div>
+
+            <div
+              className="hidden md:flex w-[68px] h-11 rounded-xl bg-[#1b1c20] flex-col items-center justify-center"
+              title="Beat key & time signature"
+            >
+              <span className="text-[17px] font-semibold text-white leading-none">{studioKeyLabel}</span>
+              <span className="text-[10px] text-[#757983] leading-none mt-1">{timeSignature}</span>
+            </div>
+
+            {/* Mobile FX Inspector Toggle Button */}
+            <button
+              type="button"
+              onClick={() => setMobileInspectorOpen((v) => !v)}
+              title="Toggle Vocal Editor & FX Inspector"
+              className={`md:hidden h-8 px-2.5 rounded-xl border text-[11px] font-semibold flex items-center gap-1 transition-colors shrink-0 ${
+                mobileInspectorOpen
+                  ? 'bg-[#ff5a36] border-[#ff5a36] text-white'
+                  : 'bg-[#1b1c20] border-[#26272d] text-[#d8dae0] hover:text-white'
+              }`}
+            >
+              <SlidersHorizontal className="h-3.5 w-3.5" />
+              <span>FX</span>
+            </button>
+
+            {/* Save Button */}
+            <button
+              type="button"
+              onClick={() => {
+                if (!isPro) setIsProSaveModalOpen(true);
+                else handleSaveSession(true);
+              }}
+              title={isPro ? "Save project file (Ctrl+S / Cmd+S)" : "Saving sessions is exclusive to Caution Pro"}
+              className={`h-8 sm:h-11 px-2.5 sm:px-3.5 rounded-xl border text-[11px] sm:text-[13px] font-semibold flex items-center gap-1.5 transition-colors shrink-0 ${
+                !isPro
+                  ? 'bg-amber-500/10 border-amber-500/30 text-amber-300 hover:bg-amber-500/20'
+                  : saveStatus === 'unsaved'
+                  ? 'bg-[#ff5a36]/15 border-[#ff5a36]/50 text-[#ff7a5c] hover:bg-[#ff5a36]/25'
+                  : 'bg-[#1b1c20] border-[#26272d] text-[#d8dae0] hover:text-white'
+              }`}
+            >
+              {!isPro ? (
+                <>
+                  <Lock className="h-3 w-3 sm:h-4 sm:w-4 text-amber-400" />
+                  <span>Save (Pro)</span>
+                </>
+              ) : (
+                <>
+                  <Save className={`h-3 w-3 sm:h-4 sm:w-4 ${saveStatus === 'unsaved' ? 'text-[#ff7a5c]' : 'text-[#2dd4bf]'}`} />
+                  <span>{saveStatus === 'saving' ? 'Saving…' : 'Save'}</span>
+                </>
+              )}
+            </button>
+
+            {/* Share / Export Master WAV Button */}
+            <button
+              type="button"
+              onClick={() => setIsExportDialogOpen(true)}
+              className="h-8 sm:h-11 px-2.5 sm:px-4 rounded-xl bg-[#f5f3ef] hover:bg-white text-black text-[11px] sm:text-[13px] font-semibold flex items-center gap-1.5 sm:gap-2 transition-colors shrink-0"
+            >
+              <Upload className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+              <span className="hidden xs:inline">Share</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Row 2: Mobile Dedicated Transport Bar (< md screens) */}
+        <div className="md:hidden px-3 py-2 bg-[#16171b] border-t border-[#23242a] flex items-center justify-between gap-2">
+          {/* Active Beat / Store button */}
           <button
             type="button"
-            onClick={() => setMobileInspectorOpen((v) => !v)}
-            title="Toggle Vocal Editor & FX Inspector"
-            className={`lg:hidden h-8 sm:h-10 px-2.5 rounded-xl border text-[11px] font-semibold flex items-center gap-1 transition-colors shrink-0 ${
-              mobileInspectorOpen
-                ? 'bg-[#ff5a36] border-[#ff5a36] text-white'
-                : 'bg-[#1b1c20] border-[#26272d] text-[#d8dae0] hover:text-white'
-            }`}
+            onClick={() => setBeatPickerOpen(true)}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[#202228] active:bg-[#282a32] border border-[#2b2d35] text-[11px] font-medium text-zinc-300 max-w-[130px] truncate"
           >
-            <SlidersHorizontal className="h-3.5 w-3.5" />
-            <span className="hidden xs:inline">FX</span>
+            <Disc3 className="h-3.5 w-3.5 text-[#2dd4bf] shrink-0" />
+            <span className="truncate">{selectedTrack ? selectedTrack.title : 'Choose Beat'}</span>
           </button>
 
-          <button
-            type="button"
-            onClick={() => {
-              if (!isPro) setIsProSaveModalOpen(true);
-              else handleSaveSession(true);
-            }}
-            title={isPro ? "Save project file (Ctrl+S / Cmd+S)" : "Saving sessions is exclusive to Caution Pro"}
-            className={`h-8 sm:h-11 px-2.5 sm:px-3.5 rounded-xl border text-[11px] sm:text-[13px] font-semibold flex items-center gap-1.5 transition-colors shrink-0 ${
-              !isPro
-                ? 'bg-amber-500/10 border-amber-500/30 text-amber-300 hover:bg-amber-500/20'
-                : saveStatus === 'unsaved'
-                ? 'bg-[#ff5a36]/15 border-[#ff5a36]/50 text-[#ff7a5c] hover:bg-[#ff5a36]/25'
-                : 'bg-[#1b1c20] border-[#26272d] text-[#d8dae0] hover:text-white'
-            }`}
-          >
-            {!isPro ? (
-              <>
-                <Lock className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-amber-400" />
-                <span className="hidden sm:inline">Save (Pro)</span>
-              </>
-            ) : (
-              <>
-                <Save className={`h-3.5 w-3.5 sm:h-4 sm:w-4 ${saveStatus === 'unsaved' ? 'text-[#ff7a5c]' : 'text-[#2dd4bf]'}`} />
-                <span className="hidden sm:inline">{saveStatus === 'saving' ? 'Saving…' : 'Save'}</span>
-              </>
-            )}
-          </button>
+          {/* Central Touch Transport Controls */}
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleReturnToZero}
+              title="Return to start"
+              className="w-9 h-9 rounded-xl bg-[#202228] active:bg-[#282a32] text-[#c9ccd3] flex items-center justify-center transition-colors"
+            >
+              <SkipBack className="h-4 w-4 fill-current" />
+            </button>
 
-          <button
-            type="button"
-            onClick={() => setIsExportDialogOpen(true)}
-            className="h-8 sm:h-11 px-2.5 sm:px-4 rounded-xl bg-[#f5f3ef] hover:bg-white text-black text-[11px] sm:text-[13px] font-semibold flex items-center gap-1.5 sm:gap-2 transition-colors shrink-0"
-          >
-            <Upload className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-            <span className="hidden sm:inline">Share</span>
-          </button>
+            <button
+              type="button"
+              onClick={onStudioPlay}
+              disabled={isRecording}
+              title="Play / Pause"
+              className="h-9 px-4 rounded-xl bg-[#ff5a36] active:bg-[#ff6b49] text-white flex items-center justify-center shadow-[0_0_16px_rgba(255,90,54,0.4)] transition-colors disabled:opacity-50"
+            >
+              {isPlaying ? <Pause className="h-4 w-4 fill-current" /> : <Play className="h-4 w-4 fill-current ml-0.5" />}
+            </button>
+
+            <button
+              type="button"
+              onClick={onStudioRecord}
+              title={isRecording ? 'Stop recording' : 'Record'}
+              className={`w-9 h-9 rounded-xl flex items-center justify-center transition-colors ${
+                isRecording ? 'bg-[#ff5a36] animate-pulse' : 'bg-[#202228] active:bg-[#282a32]'
+              }`}
+            >
+              {isRecording ? (
+                <span className="w-3.5 h-3.5 rounded-[3px] bg-white" />
+              ) : (
+                <span className="w-3 h-3 rounded-full bg-[#ff5a36]" />
+              )}
+            </button>
+          </div>
+
+          {/* Beat Counter & BPM */}
+          <div className="text-right min-w-[55px]">
+            <span className="text-[15px] font-mono font-bold text-white tabular-nums tracking-tight">
+              {formattedBeatCounter}
+            </span>
+            <span className="block text-[9px] text-zinc-500 font-mono -mt-0.5">
+              {sessionBpm} BPM
+            </span>
+          </div>
         </div>
       </header>
 

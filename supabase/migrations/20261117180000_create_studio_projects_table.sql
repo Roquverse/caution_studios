@@ -41,3 +41,4 @@ create policy "Admins have full access to studio projects"
       where admin_users.user_id = auth.uid() and admin_users.is_active = true
     )
   );
+
