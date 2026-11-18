@@ -1698,10 +1698,14 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
   // Persistent AudioContext used ONLY for live playback (separate from recording ctx)
   const playCtxRef = useRef<AudioContext | null>(null);
   const dspGraphVersionRef = useRef<number>(0);
-  // Per-element nodes: MediaElementSource, GainNode, StereoPannerNode
-  type ElNodes = { source: MediaElementAudioSourceNode; gain: GainNode; panner: StereoPannerNode };
+  // Per-element nodes: GainNode, StereoPannerNode, optional AudioNode
+  type ElNodes = { source?: AudioNode; gain: GainNode; panner: StereoPannerNode };
   const beatNodesRef = useRef<ElNodes | null>(null);
   const vocalNodesRef = useRef<Map<string, ElNodes>>(new Map());
+  const vocalBuffersRef = useRef<Map<string, AudioBuffer>>(new Map());
+  const activeVocalSourcesRef = useRef<Map<string, AudioBufferSourceNode>>(new Map());
+  const startVocalBuffersPlaybackRef = useRef<(currentTime: number) => Promise<void>>(async () => {});
+  const stopVocalBuffersPlaybackRef = useRef<() => void>(() => {});
   // Dedicated clean beat bus & panner that connects directly to masterGain (bypasses vocal compressor & ducking)
   const dspBeatBusRef = useRef<GainNode | null>(null);
   const dspBeatPanRef = useRef<StereoPannerNode | null>(null);
@@ -2146,79 +2150,15 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
     return playheadTime;
   };
 
-  // Authoritative sync for a single vocal track <audio> element at timeline position `masterSec`
+  // Authoritative sync for a single vocal track at timeline position `masterSec`
   const syncSingleVocalTrackToMasterTime = (
-    t: StudioVocalTrack,
+    _t: StudioVocalTrack,
     masterSec: number,
     currentlyPlaying: boolean,
     forceSeek: boolean = false
   ) => {
-    const el = vocalAudioRefs.current.get(t.id);
-    if (!el || !t.vocalUrl) return;
-
-    const rate = Math.max(0.75, Math.min(1.25, t.playbackRate ?? 1.0));
-    if ('preservesPitch' in el) (el as any).preservesPitch = true;
-    if ('mozPreservesPitch' in el) (el as any).mozPreservesPitch = true;
-    if ('webkitPreservesPitch' in el) (el as any).webkitPreservesPitch = true;
-    if (Math.abs(el.playbackRate - rate) > 0.002) {
-      el.playbackRate = rate;
-    }
-
-    const offsetSec = (t.latencyOffsetMs !== undefined ? t.latencyOffsetMs : globalLatencyMs) / 1000;
-    const trimIn = Math.max(0, t.trimStartSec ?? 0);
-    const fileDur =
-      el.duration && Number.isFinite(el.duration) && el.duration > 0.1
-        ? el.duration
-        : t.durationSeconds || 999;
-    const trimOut = Math.min(fileDur, Math.max(trimIn + 0.1, t.trimEndSec ?? t.durationSeconds ?? fileDur));
-
-    // Exact timeline window [clipStart, clipEnd) where this vocal clip exists on the beat
-    const clipStart = (t.startTimeSec ?? 0) - offsetSec;
-    const clipEnd = clipStart + (trimOut - trimIn) / rate;
-
-    const anySoloNow = vocalTracksRef.current.some((tr) => tr.isSolo) || beatSolo;
-    const trackShouldBeAudible = anySoloNow ? t.isSolo : !t.isMuted;
-    const nodes = vocalNodesRef.current.get(t.id);
-
-    if (masterSec >= clipStart && masterSec < clipEnd - 0.03) {
-      // Playhead is INSIDE the vocal clip's timeline region -> unmute track gain & play from exact offset!
-      if (nodes && playCtxRef.current) {
-        const targetG = trackShouldBeAudible ? Math.max(0, Math.min(2, t.volume)) : 0;
-        nodes.gain.gain.value = targetG;
-        nodes.gain.gain.setValueAtTime(targetG, playCtxRef.current.currentTime);
-      }
-      const expectedVocalSec = Math.max(trimIn, Math.min(trimOut - 0.03, trimIn + (masterSec - clipStart) * rate));
-      if (currentlyPlaying) {
-        if (el.paused) {
-          try {
-            el.currentTime = expectedVocalSec;
-          } catch (_) {}
-          el.play().catch(() => {});
-        } else if (forceSeek || Math.abs(el.currentTime - expectedVocalSec) > 0.065) {
-          try {
-            el.currentTime = expectedVocalSec;
-          } catch (_) {}
-        }
-      } else {
-        if (!el.paused) el.pause();
-        try {
-          el.currentTime = expectedVocalSec;
-        } catch (_) {}
-      }
-    } else {
-      // Playhead is BEFORE clipStart or AFTER clipEnd -> strictly silence gain!
-      if (nodes && playCtxRef.current) {
-        nodes.gain.gain.value = 0;
-        nodes.gain.gain.setValueAtTime(0, playCtxRef.current.currentTime);
-      }
-      if (!currentlyPlaying && !el.paused) {
-        el.pause();
-      }
-      if (forceSeek) {
-        try {
-          el.currentTime = trimIn;
-        } catch (_) {}
-      }
+    if (currentlyPlaying && forceSeek) {
+      startVocalBuffersPlaybackRef.current(masterSec);
     }
   };
 
@@ -2677,27 +2617,76 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
     } catch (_) {}
   }, [ensurePlaybackCtx, applyAudioOutputSinkId, audioOutputDevice]);
 
-  // ─── Connect a single HTMLAudioElement into the live playback graph ──────
+  // ─── Ensure vocal track Web Audio channel strip (gain -> panner -> vocalBus) ──
+  const ensureVocalTrackNodes = useCallback((trackId: string, vol: number, pan: number): ElNodes | null => {
+    try {
+      const ctx = ensurePlaybackCtx();
+      if (!ctx || !dspMasterGainRef.current || !dspBusRef.current) return null;
+      const destBus = dspBusRef.current;
+
+      const existing = vocalNodesRef.current.get(trackId);
+      if (existing && existing.gain && (existing.gain.context as any) === ctx) {
+        existing.gain.gain.value = vol;
+        existing.gain.gain.setValueAtTime(vol, ctx.currentTime);
+        if (existing.panner && existing.panner.pan?.setValueAtTime) {
+          try { existing.panner.pan.setValueAtTime(Math.max(-1, Math.min(1, pan / 100)), ctx.currentTime); } catch (_) {}
+        }
+        return existing;
+      }
+
+      const gain = ctx.createGain();
+      gain.gain.value = vol;
+      gain.gain.setValueAtTime(vol, ctx.currentTime);
+
+      let panner: StereoPannerNode | null = null;
+      if (typeof ctx.createStereoPanner === 'function') {
+        try {
+          panner = ctx.createStereoPanner();
+          panner.pan.setValueAtTime(Math.max(-1, Math.min(1, pan / 100)), ctx.currentTime);
+        } catch (_) {
+          panner = null;
+        }
+      }
+
+      if (panner) {
+        gain.connect(panner);
+        panner.connect(destBus);
+      } else {
+        gain.connect(destBus);
+      }
+
+      const nodes: ElNodes = { gain, panner: panner || (gain as any) };
+      vocalNodesRef.current.set(trackId, nodes);
+      return nodes;
+    } catch (e) {
+      console.warn('ensureVocalTrackNodes error:', e);
+      return null;
+    }
+  }, [ensurePlaybackCtx]);
+
+  // ─── Connect Backing Beat HTMLAudioElement into dedicated beatBus ──────
   const connectElToPlayback = useCallback((el: HTMLAudioElement, nodeKey: 'beat' | string, vol: number, pan: number): ElNodes | null => {
     try {
       const ctx = ensurePlaybackCtx();
       if (!ctx || !dspMasterGainRef.current || !dspBusRef.current) return null;
 
-      // Ensure HTMLAudioElement is unmuted
+      // Vocal tracks use AudioBufferSourceNode directly into Web Audio.
+      // Never attach MediaElementSource to vocal blob audio elements to prevent WebKit silence bugs on iOS!
+      if (nodeKey !== 'beat') {
+        return ensureVocalTrackNodes(nodeKey, vol, pan);
+      }
+
       el.muted = false;
+      const destBus = dspBeatBusRef.current || dspMasterGainRef.current;
 
-      const isBeat = nodeKey === 'beat';
-      const destBus = isBeat ? (dspBeatBusRef.current || dspMasterGainRef.current) : dspBusRef.current;
-
-      const existing = isBeat ? beatNodesRef.current : vocalNodesRef.current.get(nodeKey);
+      const existing = beatNodesRef.current;
       if (existing) {
-        if ((existing.source as any).mediaElement === el) {
+        if ((existing.source as any)?.mediaElement === el) {
           existing.gain.gain.value = vol;
           existing.gain.gain.setValueAtTime(vol, ctx.currentTime);
           if (existing.panner && existing.panner.pan?.setValueAtTime) {
             try { existing.panner.pan.setValueAtTime(Math.max(-1, Math.min(1, pan / 100)), ctx.currentTime); } catch(_) {}
           }
-          // Ensure connected to active bus
           try {
             const outNode = existing.panner || existing.gain;
             outNode.disconnect();
@@ -2706,7 +2695,7 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
           return existing;
         }
         try {
-          existing.source.disconnect();
+          existing.source?.disconnect();
           existing.gain.disconnect();
           if (existing.panner?.disconnect) existing.panner.disconnect();
         } catch (_) {}
@@ -2755,17 +2744,127 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
       }
 
       const nodes: ElNodes = { source, gain, panner: panner || (gain as any) };
-      if (isBeat) {
-        beatNodesRef.current = nodes;
-      } else {
-        vocalNodesRef.current.set(nodeKey, nodes);
-      }
+      beatNodesRef.current = nodes;
       return nodes;
     } catch (e) {
       console.warn('connectElToPlayback error:', e);
       return null;
     }
-  }, [ensurePlaybackCtx]);
+  }, [ensurePlaybackCtx, ensureVocalTrackNodes]);
+
+  // Helper to ensure vocal track audio buffers are decoded and loaded in memory
+  const getOrDecodeVocalBuffer = useCallback(async (track: StudioVocalTrack, ctx: AudioContext): Promise<AudioBuffer | null> => {
+    if (vocalBuffersRef.current.has(track.id)) {
+      return vocalBuffersRef.current.get(track.id)!;
+    }
+    try {
+      let arrBuf: ArrayBuffer | null = null;
+      if (track.vocalBlob) {
+        arrBuf = await track.vocalBlob.arrayBuffer();
+      } else if (track.vocalUrl) {
+        const res = await fetch(track.vocalUrl);
+        arrBuf = await res.arrayBuffer();
+      }
+      if (arrBuf) {
+        const decoded = await ctx.decodeAudioData(arrBuf);
+        if (decoded) {
+          vocalBuffersRef.current.set(track.id, decoded);
+          return decoded;
+        }
+      }
+    } catch (err) {
+      console.warn('getOrDecodeVocalBuffer failed for track:', track.id, err);
+    }
+    return null;
+  }, []);
+
+  // Stop all active AudioBufferSourceNodes playing vocal takes
+  const stopVocalBuffersPlayback = useCallback(() => {
+    activeVocalSourcesRef.current.forEach((src) => {
+      try {
+        src.stop();
+        src.disconnect();
+      } catch (_) {}
+    });
+    activeVocalSourcesRef.current.clear();
+  }, []);
+  stopVocalBuffersPlaybackRef.current = stopVocalBuffersPlayback;
+
+  // Authoritative Web Audio playback engine for all vocal tracks using raw PCM AudioBufferSourceNodes.
+  // Completely eliminates HTMLMediaElement seeking chokes, autoplay restrictions, and WebKit blob routing bugs!
+  const startVocalBuffersPlayback = useCallback(async (currentTime: number) => {
+    stopVocalBuffersPlayback();
+    const ctx = ensurePlaybackCtx();
+    if (!ctx) return;
+    if (ctx.state === 'suspended' || (ctx.state as any) === 'interrupted') {
+      await ctx.resume().catch(() => {});
+    }
+
+    const anySolo = vocalTracksRef.current.some((t) => t.isSolo) || beatSolo;
+    const ctxNow = ctx.currentTime;
+
+    for (const t of vocalTracksRef.current) {
+      if (!t.vocalUrl && !t.vocalBlob) continue;
+      const vocalShouldPlay = anySolo ? t.isSolo : !t.isMuted;
+      const targetVol = vocalShouldPlay ? Math.max(0, Math.min(2, t.volume)) : 0;
+      const nodes = ensureVocalTrackNodes(t.id, targetVol, t.pan);
+      if (!nodes) continue;
+
+      let buf: AudioBuffer | null | undefined = vocalBuffersRef.current.get(t.id);
+      if (!buf) {
+        buf = await getOrDecodeVocalBuffer(t, ctx);
+      }
+      if (!buf) continue;
+
+      const offsetMs = t.latencyOffsetMs !== undefined ? t.latencyOffsetMs : globalLatencyMs;
+      const offsetSec = offsetMs / 1000;
+      if (dspVocalSyncDelayRef.current && t.type === 'lead') {
+        const delaySec = offsetMs < 0 ? Math.min(0.5, Math.abs(offsetMs) / 1000) : 0;
+        dspVocalSyncDelayRef.current.delayTime.setValueAtTime(delaySec, ctx.currentTime);
+      }
+
+      const trimIn = Math.max(0, t.trimStartSec ?? 0);
+      const fileDur = buf.duration || t.durationSeconds || 999;
+      const trimOut = Math.min(fileDur, Math.max(trimIn + 0.1, t.trimEndSec ?? t.durationSeconds ?? fileDur));
+      const rate = Math.max(0.75, Math.min(1.25, t.playbackRate ?? 1.0));
+
+      const clipStart = (t.startTimeSec ?? 0) - offsetSec;
+      const clipEnd = clipStart + (trimOut - trimIn) / rate;
+
+      if (currentTime < clipEnd) {
+        try {
+          const src = ctx.createBufferSource();
+          src.buffer = buf;
+          src.playbackRate.value = rate;
+          src.connect(nodes.gain);
+
+          src.onended = () => {
+            if (activeVocalSourcesRef.current.get(t.id) === src) {
+              activeVocalSourcesRef.current.delete(t.id);
+            }
+          };
+
+          if (currentTime >= clipStart) {
+            const timeIntoClip = currentTime - clipStart;
+            const offsetInAudio = trimIn + timeIntoClip * rate;
+            const durRemaining = (trimOut - offsetInAudio) / rate;
+            if (durRemaining > 0.02) {
+              src.start(ctxNow, offsetInAudio, durRemaining);
+              activeVocalSourcesRef.current.set(t.id, src);
+            }
+          } else {
+            const delayUntilStart = clipStart - currentTime;
+            const durToPlay = (trimOut - trimIn) / rate;
+            src.start(ctxNow + delayUntilStart, trimIn, durToPlay);
+            activeVocalSourcesRef.current.set(t.id, src);
+          }
+        } catch (playErr) {
+          console.warn('startVocalBuffersPlayback track error:', t.id, playErr);
+        }
+      }
+    }
+  }, [ensurePlaybackCtx, ensureVocalTrackNodes, getOrDecodeVocalBuffer, stopVocalBuffersPlayback, beatSolo, globalLatencyMs]);
+  startVocalBuffersPlaybackRef.current = startVocalBuffersPlayback;
 
   // Real-time audio volume & solo/mute sync:
   // Backing Beat routes through clean dedicated beatBus; Vocal tracks route through Web Audio Vocal DSP chain.
@@ -3445,15 +3544,7 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
         const punchStart = beatAudioRef.current ? beatAudioRef.current.currentTime : initialPunchStartSec;
         recBeatStartSecRef.current = punchStart;
         // Play other (non-armed) vocal tracks synced to the exact punch-in position for headphone monitoring
-        vocalTracksRef.current.forEach((t) => {
-          if (!t.isArmed && t.vocalUrl) {
-            const audioEl = vocalAudioRefs.current.get(t.id);
-            if (audioEl) {
-              connectElToPlayback(audioEl, t.id, t.isMuted ? 0 : t.volume, t.pan);
-              syncSingleVocalTrackToMasterTime(t, punchStart, true, true);
-            }
-          }
-        });
+        startVocalBuffersPlayback(punchStart);
       };
 
       recorder.onstop = async () => {
@@ -3566,6 +3657,7 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
                 finalStartTimeSec = mergedStartSec;
                 finalDurationSeconds = mergedDurationSec;
                 finalPlaybackRate = 1.0; // Both existing and new takes are time-aligned at 1.0x in the composite WAV
+                vocalBuffersRef.current.set(armedTrack.id, mergedBuffer);
 
                 // 3. Split/trim existing clip segments around `[newStart, newEnd]` and insert the new take segment
                 const newStart = Number(beatStart.toFixed(3));
@@ -3609,6 +3701,7 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
                 finalDurationSeconds = trueSampleDuration;
                 finalStartTimeSec = Number(beatStart.toFixed(3));
                 finalPlaybackRate = autoCalibratedRate;
+                vocalBuffersRef.current.set(armedTrack.id, newDecoded);
                 const newTimelineDur = Number((trueSampleDuration / autoCalibratedRate).toFixed(3));
                 updatedClips = [
                   {
@@ -3761,6 +3854,7 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
     if (beatAudioRef.current) {
       beatAudioRef.current.pause();
     }
+    stopVocalBuffersPlayback();
     vocalAudioRefs.current.forEach((el) => el.pause());
 
     if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
@@ -3775,12 +3869,14 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
     const wasPlaying = isPlaying;
     if (wasPlaying) {
       if (beatAudioRef.current) beatAudioRef.current.pause();
+      stopVocalBuffersPlayback();
       vocalAudioRefs.current.forEach((el) => el.pause());
       setIsPlaying(false);
       if (playheadIntervalRef.current) clearInterval(playheadIntervalRef.current);
     }
     setPlayheadTime(0);
     if (beatAudioRef.current) beatAudioRef.current.currentTime = 0;
+    stopVocalBuffersPlayback();
     vocalTracks.forEach((t) => {
       const el = vocalAudioRefs.current.get(t.id);
       if (el) {
@@ -3796,6 +3892,7 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
   const togglePlayCombinedPreview = async () => {
     if (isPlaying) {
       if (beatAudioRef.current) beatAudioRef.current.pause();
+      stopVocalBuffersPlayback();
       vocalAudioRefs.current.forEach((el) => el.pause());
       setIsPlaying(false);
       if (playheadIntervalRef.current) clearInterval(playheadIntervalRef.current);
@@ -3829,47 +3926,8 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
       const promises: Promise<void>[] = [];
       if (beatAudioRef.current) promises.push(beatAudioRef.current.play().catch((e) => console.warn('Beat audio play error:', e)));
 
-      vocalTracksRef.current.forEach((t) => {
-        if (t.vocalUrl) {
-          const el = vocalAudioRefs.current.get(t.id);
-          if (el) {
-            const vocalShouldPlay = anySolo ? t.isSolo : !t.isMuted;
-            connectElToPlayback(el, t.id, vocalShouldPlay ? t.volume : 0, t.pan);
-
-            const rate = Math.max(0.75, Math.min(1.25, t.playbackRate ?? 1.0));
-            if ('preservesPitch' in el) (el as any).preservesPitch = true;
-            if ('mozPreservesPitch' in el) (el as any).mozPreservesPitch = true;
-            if ('webkitPreservesPitch' in el) (el as any).webkitPreservesPitch = true;
-            el.playbackRate = rate;
-
-            const offsetMs = t.latencyOffsetMs !== undefined ? t.latencyOffsetMs : globalLatencyMs;
-            if (dspVocalSyncDelayRef.current && ctx && t.type === 'lead') {
-              const delaySec = offsetMs < 0 ? Math.min(0.5, Math.abs(offsetMs) / 1000) : 0;
-              dspVocalSyncDelayRef.current.delayTime.setValueAtTime(delaySec, ctx.currentTime);
-            }
-
-            if (el.readyState === HTMLMediaElement.HAVE_NOTHING || el.src !== (t.vocalUrl || '')) {
-              el.load();
-            }
-            el.muted = false;
-            el.volume = 1.0;
-            const nodes = vocalNodesRef.current.get(t.id);
-            if (nodes) {
-              nodes.gain.gain.value = vocalShouldPlay ? Math.max(0, Math.min(2, t.volume)) : 0;
-              nodes.panner.pan.value = Math.max(-1, Math.min(1, t.pan / 100));
-            }
-
-            // Start playing during user interaction gesture so iOS Safari unlocks the audio element
-            const p = el.play();
-            if (p !== undefined) {
-              promises.push(p.catch((e) => console.warn('Vocal play error:', e)));
-            }
-
-            // Cue or start vocal track strictly based on whether `currentTime` is inside `[clipStart, clipEnd)`
-            syncSingleVocalTrackToMasterTime(t, currentTime, true, true);
-          }
-        }
-      });
+      // Authoritative Web Audio vocal buffer playback (frame-accurate, zero WebKit blob bugs)
+      await startVocalBuffersPlayback(currentTime);
 
       Promise.all(promises)
         .then(() => {
@@ -3880,20 +3938,21 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
             if (masterTimeSource) {
               const masterSec = masterTimeSource.currentTime;
               setPlayheadTime(masterSec);
-
-              // Continuously sync every vocal track against its LIVE `startTimeSec`, `trimStartSec`, `trimEndSec`, and `playbackRate`
-              if (beatAudioRef.current && !beatAudioRef.current.paused) {
-                latestTracks.forEach((t) => {
-                  if (t.vocalUrl) {
-                    syncSingleVocalTrackToMasterTime(t, masterSec, true, false);
-                  }
-                });
-              }
             }
             const beatVolNorm = (!beatShouldPlay || beatMuted) ? 0 : beatVolume * 55;
             const hasVocalsPlaying = latestTracks.some((t) => {
-              const el = vocalAudioRefs.current.get(t.id);
-              return t.vocalUrl && el && !el.paused && !t.isMuted && (!anySolo || t.isSolo);
+              if (!t.vocalUrl && !t.vocalBlob) return false;
+              if (t.isMuted) return false;
+              if (anySolo && !t.isSolo) return false;
+              const offsetSec = (t.latencyOffsetMs !== undefined ? t.latencyOffsetMs : globalLatencyMs) / 1000;
+              const trimIn = Math.max(0, t.trimStartSec ?? 0);
+              const fileDur = t.durationSeconds || 999;
+              const trimOut = Math.min(fileDur, Math.max(trimIn + 0.1, t.trimEndSec ?? t.durationSeconds ?? fileDur));
+              const rate = Math.max(0.75, Math.min(1.25, t.playbackRate ?? 1.0));
+              const clipStart = (t.startTimeSec ?? 0) - offsetSec;
+              const clipEnd = clipStart + (trimOut - trimIn) / rate;
+              const curTime = beatAudioRef.current?.currentTime ?? playheadTime;
+              return curTime >= clipStart && curTime < clipEnd;
             });
             const vocalVolNorm = hasVocalsPlaying ? 40 : 0;
             const tot = Math.min(95, Math.round(beatVolNorm + vocalVolNorm));
@@ -3918,9 +3977,11 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
 
     setPlayheadTime(seekTime);
     if (beatAudioRef.current) beatAudioRef.current.currentTime = seekTime;
-    vocalTracksRef.current.forEach((t) => {
-      syncSingleVocalTrackToMasterTime(t, seekTime, isPlaying, true);
-    });
+    if (isPlaying) {
+      startVocalBuffersPlayback(seekTime);
+    } else {
+      stopVocalBuffersPlayback();
+    }
   };
 
   // Render Full Multi-Track Master Mix WAV (Beat + Lead + All Backup Vocals with Pan & Gain)
@@ -4990,8 +5051,21 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
     if (row.kind === 'beat') {
       base = selectedTrack && (isPlaying || isRecording) ? 0.62 : 0;
     } else if (row.track) {
-      if (isRecording && row.track.isArmed) base = Math.min(1, inputLevelMeter / 100);
-      else if (isPlaying && row.track.vocalUrl) base = 0.55;
+      if (isRecording && row.track.isArmed) {
+        base = Math.min(1, inputLevelMeter / 100);
+      } else if (isPlaying && (row.track.vocalUrl || row.track.vocalBlob)) {
+        const t = row.track;
+        const offsetSec = (t.latencyOffsetMs !== undefined ? t.latencyOffsetMs : globalLatencyMs) / 1000;
+        const trimIn = Math.max(0, t.trimStartSec ?? 0);
+        const fileDur = t.durationSeconds || 999;
+        const trimOut = Math.min(fileDur, Math.max(trimIn + 0.1, t.trimEndSec ?? t.durationSeconds ?? fileDur));
+        const rate = Math.max(0.75, Math.min(1.25, t.playbackRate ?? 1.0));
+        const clipStart = (t.startTimeSec ?? 0) - offsetSec;
+        const clipEnd = clipStart + (trimOut - trimIn) / rate;
+        if (playheadTime >= clipStart && playheadTime < clipEnd) {
+          base = 0.65;
+        }
+      }
     }
     if (base <= 0) return 0;
     const jitter = 0.8 + 0.3 * Math.abs(Math.sin(playheadTime * 9 + idx * 1.7 + row.id.length));
@@ -5010,9 +5084,11 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
     const seekTime = ratio * studioViewSpan;
     setPlayheadTime(seekTime);
     if (beatAudioRef.current) beatAudioRef.current.currentTime = seekTime;
-    vocalTracksRef.current.forEach((t) => {
-      syncSingleVocalTrackToMasterTime(t, seekTime, isPlaying, true);
-    });
+    if (isPlaying) {
+      startVocalBuffersPlayback(seekTime);
+    } else {
+      stopVocalBuffersPlayback();
+    }
   };
 
   const onStudioRecord = () => {
@@ -5067,6 +5143,7 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
           preload="auto"
           playsInline
           onEnded={() => {
+            stopVocalBuffersPlayback();
             setIsPlaying(false);
             setPlayheadTime(0);
           }}
@@ -5081,21 +5158,17 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
             playsInline
             ref={(el) => {
               if (el) {
-                const prevEl = vocalAudioRefs.current.get(t.id);
                 vocalAudioRefs.current.set(t.id, el);
-                if (prevEl !== el && playCtxRef.current && playCtxRef.current.state === 'running') {
-                  const trackShouldPlay = anySolo ? t.isSolo : !t.isMuted;
-                  connectElToPlayback(el, t.id, trackShouldPlay ? t.volume : 0, t.pan);
-                }
               } else {
                 vocalAudioRefs.current.delete(t.id);
               }
             }}
             onEnded={() => {
               const anyOtherVocal = vocalTracks.some(
-                (other) => other.id !== t.id && other.vocalUrl && (!anySolo || other.isSolo) && !other.isMuted
+                (other) => other.id !== t.id && (other.vocalUrl || other.vocalBlob) && (!anySolo || other.isSolo) && !other.isMuted
               );
               if (!anyOtherVocal && !beatShouldPlay) {
+                stopVocalBuffersPlayback();
                 setIsPlaying(false);
               }
             }}
