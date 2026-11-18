@@ -24,6 +24,7 @@ import {
   Sliders,
   Flame,
   Radio,
+  MessageSquare,
   Tag,
   Megaphone
 } from 'lucide-react';
@@ -189,6 +190,12 @@ export function AdminShell({ children, activePath, onOpenUpload }: AdminShellPro
       badge: null
     },
     {
+      label: 'Producer Chat',
+      href: '/chat',
+      icon: MessageSquare,
+      badge: 'Live'
+    },
+    {
       label: 'Licenses',
       href: '/licenses',
       icon: ShieldCheck,
@@ -212,6 +219,7 @@ export function AdminShell({ children, activePath, onOpenUpload }: AdminShellPro
     if (pathname === '/tracks') return 'Master Catalog';
     if (pathname === '/genres') return 'Genre Management';
     if (pathname === '/users') return 'Subscribers & Users';
+    if (pathname === '/chat') return 'Producer Support & Direct Chat';
     if (pathname === '/licenses') return 'Licenses';
     if (pathname === '/ads') return 'Ads Manager & Sponsored Music';
     if (pathname === '/settings') return 'Admin Settings';

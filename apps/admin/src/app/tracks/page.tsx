@@ -20,6 +20,7 @@ import {
   Music,
   Sliders,
   Sparkles,
+  Download,
   Loader2
 } from 'lucide-react';
 
@@ -66,6 +67,36 @@ export default function AdminTracksPage() {
   const [playingTrackId, setPlayingTrackId] = useState<string | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [openDownloadMenuId, setOpenDownloadMenuId] = useState<string | null>(null);
+
+  const handleAdminDownload = async (track: BeatTrack, type: 'wav' | 'stems' | 'preview') => {
+    try {
+      setDownloadingId(`${track.id}-${type}`);
+      const res = await fetch('/api/tracks/download-url', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ beatId: track.id, type })
+      });
+      const data = await res.json();
+      if (!res.ok || !data.downloadUrl) {
+        throw new Error(data.error || 'Failed to generate download URL');
+      }
+
+      // Trigger instant browser download
+      const a = document.createElement('a');
+      a.href = data.downloadUrl;
+      a.download = data.filename || `${track.title}.${type === 'stems' ? 'zip' : type === 'wav' ? 'wav' : 'mp3'}`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setOpenDownloadMenuId(null);
+    } catch (err: any) {
+      alert(err.message || 'Error downloading beat asset');
+    } finally {
+      setDownloadingId(null);
+    }
+  };
 
   // Upload Modal State
   const [isUploadOpen, setIsUploadOpen] = useState(false);
@@ -820,6 +851,54 @@ export default function AdminTracksPage() {
                         {/* Actions */}
                         <td className="py-3 px-4 text-right">
                           <div className="flex items-center justify-end gap-1">
+                            {/* Admin Instant Download Menu */}
+                            <div className="relative">
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setOpenDownloadMenuId(openDownloadMenuId === track.id ? null : track.id)
+                                }
+                                className="p-1.5 rounded-md text-zinc-400 hover:text-[#2dd4bf] hover:bg-[#2dd4bf]/10 transition-colors"
+                                title="Download beat assets (Master WAV / Stems / MP3)"
+                              >
+                                <Download className="h-3.5 w-3.5" />
+                              </button>
+                              {openDownloadMenuId === track.id && (
+                                <div className="absolute right-0 top-8 z-30 w-48 rounded-lg bg-zinc-900 border border-zinc-700 shadow-2xl p-1 text-left text-xs font-sans">
+                                  <div className="px-2 py-1 text-[10px] font-semibold text-zinc-500 uppercase tracking-wider">
+                                    Admin Beat Download
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleAdminDownload(track, 'wav')}
+                                    disabled={!track.master_wav_key || !!downloadingId}
+                                    className="w-full text-left px-2.5 py-1.5 rounded text-zinc-200 hover:bg-zinc-800 hover:text-[#2dd4bf] flex items-center justify-between disabled:opacity-40"
+                                  >
+                                    <span>🎵 24-bit WAV</span>
+                                    {downloadingId === `${track.id}-wav` && <Loader2 className="h-3 w-3 animate-spin text-[#2dd4bf]" />}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleAdminDownload(track, 'stems')}
+                                    disabled={!track.stems_zip_key || !!downloadingId}
+                                    className="w-full text-left px-2.5 py-1.5 rounded text-zinc-200 hover:bg-zinc-800 hover:text-[#2dd4bf] flex items-center justify-between disabled:opacity-40"
+                                  >
+                                    <span>🎛️ Stems (.ZIP)</span>
+                                    {downloadingId === `${track.id}-stems` && <Loader2 className="h-3 w-3 animate-spin text-[#2dd4bf]" />}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleAdminDownload(track, 'preview')}
+                                    disabled={(!track.preview_clean_key && !track.master_wav_key) || !!downloadingId}
+                                    className="w-full text-left px-2.5 py-1.5 rounded text-zinc-200 hover:bg-zinc-800 hover:text-[#2dd4bf] flex items-center justify-between disabled:opacity-40"
+                                  >
+                                    <span>🎧 Clean MP3</span>
+                                    {downloadingId === `${track.id}-preview` && <Loader2 className="h-3 w-3 animate-spin text-[#2dd4bf]" />}
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+
                             <button
                               type="button"
                               onClick={() => {
