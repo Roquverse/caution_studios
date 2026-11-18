@@ -195,6 +195,8 @@ export default function StudioPageClient({
   };
 
   const isPro = userPlan === 'pro';
+  const isPlus = userPlan === 'plus';
+  const hasStudioAccess = isPro || isPlus;
 
   // 1. Loading State
   if (userPlan === 'loading') {
@@ -210,8 +212,8 @@ export default function StudioPageClient({
     );
   }
 
-  // 2. Pro Gated Lock Screen: Displayed if not Caution Pro
-  if (!isPro) {
+  // 2. Free Gated Lock Screen: Displayed if not Caution Pro and not Caution Plus
+  if (!hasStudioAccess) {
     return (
       <main className="w-full min-h-screen bg-[#07090E] text-white flex flex-col justify-between selection:bg-[#04564f] selection:text-white relative overflow-hidden">
         {/* Ambient Studio Lighting Glow */}
@@ -230,11 +232,11 @@ export default function StudioPageClient({
 
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#04564f]/30 border border-[#2dd4bf]/30 text-[11px] font-mono text-[#2dd4bf] uppercase tracking-wider">
             <Sparkles className="h-3 w-3" />
-            <span>Caution Pro Studio Suite</span>
+            <span>Caution Studio Suite</span>
           </div>
         </header>
 
-        {/* Center Pro Upgrade Showcase */}
+        {/* Center Upgrade Showcase */}
         <div className="flex-1 flex items-center justify-center p-6 relative z-10">
           <div className="max-w-2xl w-full p-8 sm:p-12 rounded-3xl bg-[#0C0F17]/90 border border-[#2dd4bf]/30 shadow-2xl backdrop-blur-xl text-center space-y-6">
             
@@ -244,13 +246,13 @@ export default function StudioPageClient({
 
             <div className="space-y-2">
               <span className="px-3 py-1 rounded-full text-[10px] font-mono font-bold bg-[#04564f] text-[#2dd4bf] border border-[#2dd4bf]/30 uppercase tracking-widest inline-block">
-                Exclusive Pro Feature
+                Membership Feature
               </span>
               <h1 className="text-3xl sm:text-4xl font-black text-white tracking-tight">
                 Unlock Caution Recording Studio
               </h1>
               <p className="text-xs sm:text-sm text-gray-400 max-w-lg mx-auto leading-relaxed">
-                The in-browser Studio Suite is enabled exclusively for <strong>Caution Pro</strong> members (₦30,000 / month). Record vocal tracks over beats, apply real-time DSP effects, mix stems, and export uncompressed masters directly from your browser.
+                The in-browser Studio Suite is available with <strong>Caution Plus</strong> (2 sessions / month at ₦3,000) and unlimited with <strong>Caution Pro</strong> (₦30,000 / month with project file saving).
               </p>
             </div>
 
@@ -279,15 +281,15 @@ export default function StudioPageClient({
               <div className="p-3.5 rounded-xl bg-white/[0.03] border border-white/[0.06] flex items-start gap-3">
                 <CheckCircle2 className="h-4 w-4 text-[#2dd4bf] shrink-0 mt-0.5" />
                 <div>
-                  <h4 className="text-xs font-bold text-white">Unlimited Downloads &bull; No Ads</h4>
-                  <p className="text-[11px] text-gray-400 mt-0.5">Never hit a daily download limit or sit through audio ad interruptions.</p>
+                  <h4 className="text-xs font-bold text-white">Plus: 2 Sessions / Month</h4>
+                  <p className="text-[11px] text-gray-400 mt-0.5">Get 2 recording sessions each month on Caution Plus (₦3,000/mo).</p>
                 </div>
               </div>
               <div className="p-3.5 rounded-xl bg-white/[0.03] border border-white/[0.06] flex items-start gap-3">
                 <CheckCircle2 className="h-4 w-4 text-[#2dd4bf] shrink-0 mt-0.5" />
                 <div>
-                  <h4 className="text-xs font-bold text-white">Full WAV Trackout Stems</h4>
-                  <p className="text-[11px] text-gray-400 mt-0.5">Download full stem archive (.ZIP) for every beat in the catalog.</p>
+                  <h4 className="text-xs font-bold text-white">Pro: Unlimited &amp; File Saving</h4>
+                  <p className="text-[11px] text-gray-400 mt-0.5">Unlimited recording sessions, multi-track project saving, and no ads.</p>
                 </div>
               </div>
             </div>
@@ -308,7 +310,7 @@ export default function StudioPageClient({
                 ) : (
                   <>
                     <Zap className="h-4 w-4" />
-                    <span>Unlock Studio Page with Caution Pro (₦30,000)</span>
+                    <span>Unlock Studio with Caution Pro (₦30,000)</span>
                   </>
                 )}
               </button>
@@ -318,7 +320,7 @@ export default function StudioPageClient({
                 onClick={() => router.push('/subscriptions')}
                 className="w-full sm:w-auto px-6 py-3.5 rounded-full bg-white/5 hover:bg-white/10 text-gray-300 text-xs font-semibold border border-white/10 transition-colors cursor-pointer"
               >
-                Compare Plans
+                Subscribe to Plus (₦3,000)
               </button>
             </div>
           </div>
@@ -332,7 +334,7 @@ export default function StudioPageClient({
     );
   }
 
-  // 3. Pro Active: Unlocked Full Recording Studio Suite
+  // 3. Studio Active: Unlocked for Caution Pro and Caution Plus
   return (
     <main className="w-full min-h-screen bg-[#07090E] text-white">
       <UserRecordStudioModal
@@ -341,6 +343,7 @@ export default function StudioPageClient({
         onClose={handleExitStudio}
         preselectedTrack={preselectedTrack}
         availableTracks={initialBeats}
+        userPlan={userPlan}
       />
     </main>
   );

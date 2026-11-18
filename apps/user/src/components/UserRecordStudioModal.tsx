@@ -66,7 +66,8 @@ import {
   Lock
 } from 'lucide-react';
 import { TrackItem } from '../types/tracks';
-import { useUserSubscription } from '../lib/subscription';
+import { useUserSubscription, getCachedUserPlan } from '../lib/subscription';
+import { supabase } from '../lib/supabaseClient';
 import {
   saveLocalStudioProject,
   loadLocalStudioProject,
@@ -84,6 +85,7 @@ export interface UserRecordStudioModalProps {
   preselectedTrack?: TrackItem | null;
   availableTracks?: TrackItem[];
   isStandalonePage?: boolean;
+  userPlan?: string;
 }
 
 export interface StudioVocalClipSegment {
@@ -1186,9 +1188,23 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
   onClose,
   preselectedTrack,
   availableTracks = [],
-  isStandalonePage = false
+  isStandalonePage = false,
+  userPlan
 }) => {
-  const { isSubscribed } = useUserSubscription();
+  const { isSubscribed, plan } = useUserSubscription();
+  const effectivePlan = userPlan || plan || getCachedUserPlan() || 'free';
+  const isPro = effectivePlan === 'pro';
+  const isPlus = effectivePlan === 'plus';
+
+  // Studio Session Usage Tracking (Plus = 2 sessions / month, Pro = unlimited)
+  const [sessionUsage, setSessionUsage] = useState<{
+    used: number;
+    limit: number | null;
+    remaining: number | null;
+    month?: string;
+  } | null>(null);
+  const [isSessionLimitReachedModalOpen, setIsSessionLimitReachedModalOpen] = useState<boolean>(false);
+  const [isProSaveModalOpen, setIsProSaveModalOpen] = useState<boolean>(false);
 
   // Active Beat & Session metadata
   const [studioBeats, setStudioBeats] = useState<TrackItem[]>(availableTracks);
@@ -1211,6 +1227,56 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
   const [isImportingProject, setIsImportingProject] = useState<boolean>(false);
   const [showRecentPrompt, setShowRecentPrompt] = useState<StudioProjectSummary | null>(null);
   const projectFileInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Plus Monthly Session Usage Fetcher
+  const fetchSessionUsage = useCallback(async () => {
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData?.session?.access_token;
+      if (!token) return;
+      const res = await fetch('/api/record-studio/usage', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setSessionUsage(data);
+      }
+    } catch (err) {
+      console.warn('Could not fetch studio session usage:', err);
+    }
+  }, []);
+
+  // Register session consumption for Plus users (idempotent per sessionKey)
+  const registerSessionConsumption = useCallback(async () => {
+    if (!isPlus) return;
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData?.session?.access_token;
+      if (!token) return;
+      const res = await fetch('/api/record-studio/usage', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ sessionKey: currentProjectId })
+      });
+      const data = await res.json();
+      if (data.allowed === false) {
+        setIsSessionLimitReachedModalOpen(true);
+      } else if (data.used !== undefined) {
+        setSessionUsage(data);
+      }
+    } catch (err) {
+      console.warn('Could not register studio session consumption:', err);
+    }
+  }, [isPlus, currentProjectId]);
+
+  useEffect(() => {
+    if (isPlus) {
+      fetchSessionUsage();
+    }
+  }, [isPlus, fetchSessionUsage]);
 
   // Sync studioBeats when availableTracks prop updates
   useEffect(() => {
@@ -3443,8 +3509,10 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
               : t
           );
           vocalTracksRef.current = next;
-          // Auto-save the new vocal take to IndexedDB immediately so it is persisted
-          handleSaveSession(false, next);
+          // Auto-save the new vocal take to IndexedDB immediately so it is persisted (Caution Pro only)
+          if (isPro) {
+            handleSaveSession(false, next);
+          }
           return next;
         });
 
@@ -3956,6 +4024,10 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
   // Wire to Cloud Storage and Supabase Database (Uploading Lead + All Backup Stems)
   const handleSaveToCloud = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
+    if (!isPro) {
+      setIsProSaveModalOpen(true);
+      return;
+    }
     const recordedTracks = vocalTracks.filter((t) => t.vocalBlob !== null);
     if (recordedTracks.length === 0 || !selectedTrack) {
       alert('Record at least one vocal track first before saving to cloud.');
@@ -4044,9 +4116,15 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
     }
   };
 
-  // Save Studio Session to IndexedDB (with all vocal Blobs intact) and sync to Cloud
+  // Save Studio Session to IndexedDB (with all vocal Blobs intact) and sync to Cloud (Caution Pro only)
   const handleSaveSession = useCallback(
     async (manual = false, tracksOverride?: StudioVocalTrack[]) => {
+      if (!isPro) {
+        if (manual) {
+          setIsProSaveModalOpen(true);
+        }
+        return;
+      }
       try {
         setSaveStatus('saving');
         const tracksToSave = tracksOverride || vocalTracks;
@@ -4150,7 +4228,8 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
       lowCutEnabled,
       masteringPreset,
       beatVolume,
-      masterVolume
+      masterVolume,
+      isPro
     ]
   );
 
@@ -4301,8 +4380,12 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
     setIsProjectsModalOpen(false);
   }, [isPlaying]);
 
-  // Export current session to standalone .cstudio file on computer
+  // Export current session to standalone .cstudio file on computer (Caution Pro only)
   const handleExportProjectFile = async () => {
+    if (!isPro) {
+      setIsProSaveModalOpen(true);
+      return;
+    }
     try {
       setIsExportingProject(true);
       const projectData: StudioProjectData = {
@@ -4362,8 +4445,13 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
     }
   };
 
-  // Import a .cstudio file from computer
+  // Import a .cstudio file from computer (Caution Pro only)
   const handleImportProjectFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!isPro) {
+      setIsProSaveModalOpen(true);
+      if (e.target) e.target.value = '';
+      return;
+    }
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -4765,6 +4853,14 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
       setBeatPickerOpen(true);
       return;
     }
+    // Plus limit check: 2 recording sessions per month
+    if (!isRecording && isPlus && sessionUsage && sessionUsage.remaining !== null && sessionUsage.remaining <= 0) {
+      setIsSessionLimitReachedModalOpen(true);
+      return;
+    }
+    if (!isRecording && isPlus) {
+      registerSessionConsumption();
+    }
     handleRecordTrigger();
   };
 
@@ -4915,27 +5011,49 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
               {/* Quick Save button with status */}
               <button
                 type="button"
-                onClick={() => handleSaveSession(true)}
-                title="Save session (Ctrl+S / Cmd+S)"
+                onClick={() => {
+                  if (!isPro) setIsProSaveModalOpen(true);
+                  else handleSaveSession(true);
+                }}
+                title={isPro ? "Save session (Ctrl+S / Cmd+S)" : "Saving sessions is exclusive to Caution Pro"}
                 className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium transition-colors ${
-                  saveStatus === 'unsaved'
+                  !isPro
+                    ? 'bg-amber-500/10 text-amber-300 hover:bg-amber-500/20'
+                    : saveStatus === 'unsaved'
                     ? 'bg-[#ff5a36]/20 text-[#ff7a5c] hover:bg-[#ff5a36]/30 font-semibold'
                     : saveStatus === 'saving'
                     ? 'bg-white/10 text-white animate-pulse'
                     : 'text-[#5eead4] hover:bg-white/5'
                 }`}
               >
-                <Save className="h-3 w-3" />
-                <span>
-                  {saveStatus === 'saving'
-                    ? 'Saving…'
-                    : saveStatus === 'unsaved'
-                    ? 'Save *'
-                    : lastSavedAt
-                    ? `Saved ${lastSavedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
-                    : 'Saved'}
-                </span>
+                {!isPro ? (
+                  <>
+                    <Lock className="h-2.5 w-2.5 text-amber-400" />
+                    <span>Pro to Save</span>
+                  </>
+                ) : (
+                  <>
+                    <Save className="h-3 w-3" />
+                    <span>
+                      {saveStatus === 'saving'
+                        ? 'Saving…'
+                        : saveStatus === 'unsaved'
+                        ? 'Save *'
+                        : lastSavedAt
+                        ? `Saved ${lastSavedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+                        : 'Saved'}
+                    </span>
+                  </>
+                )}
               </button>
+
+              {/* Plus User Monthly Session Badge */}
+              {isPlus && sessionUsage && sessionUsage.limit !== null && (
+                <span className="hidden md:inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#04564f]/40 border border-[#2dd4bf]/30 text-[10px] font-medium text-[#2dd4bf]">
+                  <Mic className="h-2.5 w-2.5" />
+                  <span>Session {sessionUsage.used}/{sessionUsage.limit} this month</span>
+                </span>
+              )}
             </div>
           </div>
         </div>
@@ -5057,16 +5175,30 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
 
           <button
             type="button"
-            onClick={() => handleSaveSession(true)}
-            title="Save project file (Ctrl+S / Cmd+S)"
+            onClick={() => {
+              if (!isPro) setIsProSaveModalOpen(true);
+              else handleSaveSession(true);
+            }}
+            title={isPro ? "Save project file (Ctrl+S / Cmd+S)" : "Saving sessions is exclusive to Caution Pro"}
             className={`h-8 sm:h-11 px-2.5 sm:px-3.5 rounded-xl border text-[11px] sm:text-[13px] font-semibold flex items-center gap-1.5 transition-colors shrink-0 ${
-              saveStatus === 'unsaved'
+              !isPro
+                ? 'bg-amber-500/10 border-amber-500/30 text-amber-300 hover:bg-amber-500/20'
+                : saveStatus === 'unsaved'
                 ? 'bg-[#ff5a36]/15 border-[#ff5a36]/50 text-[#ff7a5c] hover:bg-[#ff5a36]/25'
                 : 'bg-[#1b1c20] border-[#26272d] text-[#d8dae0] hover:text-white'
             }`}
           >
-            <Save className={`h-3.5 w-3.5 sm:h-4 sm:w-4 ${saveStatus === 'unsaved' ? 'text-[#ff7a5c]' : 'text-[#2dd4bf]'}`} />
-            <span className="hidden sm:inline">{saveStatus === 'saving' ? 'Saving…' : 'Save'}</span>
+            {!isPro ? (
+              <>
+                <Lock className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-amber-400" />
+                <span className="hidden sm:inline">Save (Pro)</span>
+              </>
+            ) : (
+              <>
+                <Save className={`h-3.5 w-3.5 sm:h-4 sm:w-4 ${saveStatus === 'unsaved' ? 'text-[#ff7a5c]' : 'text-[#2dd4bf]'}`} />
+                <span className="hidden sm:inline">{saveStatus === 'saving' ? 'Saving…' : 'Save'}</span>
+              </>
+            )}
           </button>
 
           <button
@@ -5079,6 +5211,27 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
           </button>
         </div>
       </header>
+
+      {/* Plus Monthly Sessions Usage & Saving Info Banner */}
+      {isPlus && (
+        <div className="shrink-0 bg-gradient-to-r from-[#04564f]/30 via-[#131417] to-[#1b1c20] border-b border-[#2dd4bf]/20 px-3 sm:px-6 py-1.5 flex items-center justify-between gap-3 text-xs z-25">
+          <div className="flex items-center gap-2 min-w-0">
+            <Mic className="h-3.5 w-3.5 text-[#2dd4bf] shrink-0" />
+            <span className="text-[#a1a1aa] text-[11px] sm:text-xs truncate">
+              <strong className="text-[#2dd4bf] font-semibold">Caution Plus Studio:</strong> {sessionUsage ? `${sessionUsage.used} of ${sessionUsage.limit ?? 2} recording sessions used this month.` : '2 recording sessions included monthly.'}{' '}
+              <span className="hidden md:inline text-zinc-400">· Session files cannot be saved on Plus. Upgrade to Pro to save & reload projects.</span>
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setIsProSaveModalOpen(true)}
+            className="shrink-0 px-2 py-0.5 rounded text-[10px] font-semibold bg-amber-500/15 border border-amber-500/40 text-amber-300 hover:bg-amber-500/25 transition-colors flex items-center gap-1"
+          >
+            <Lock className="h-2.5 w-2.5" />
+            <span>Unlock Saving</span>
+          </button>
+        </div>
+      )}
 
       {/* Continue Previous Session Banner */}
       {showRecentPrompt && (
@@ -7107,11 +7260,18 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
                 </button>
                 <button
                   type="button"
-                  onClick={() => handleSaveSession(true)}
-                  className="h-8 px-3 rounded-lg bg-[#2dd4bf] hover:bg-[#20b8a6] text-[11.5px] font-semibold text-black flex items-center gap-1.5 transition-colors"
+                  onClick={() => {
+                    if (!isPro) setIsProSaveModalOpen(true);
+                    else handleSaveSession(true);
+                  }}
+                  className={`h-8 px-3 rounded-lg text-[11.5px] font-semibold flex items-center gap-1.5 transition-colors ${
+                    !isPro
+                      ? 'bg-amber-500/15 border border-amber-500/40 text-amber-300 hover:bg-amber-500/25'
+                      : 'bg-[#2dd4bf] hover:bg-[#20b8a6] text-black'
+                  }`}
                 >
-                  <Save className="h-3.5 w-3.5" />
-                  <span>Save Active Session</span>
+                  {!isPro ? <Lock className="h-3.5 w-3.5 text-amber-400" /> : <Save className="h-3.5 w-3.5" />}
+                  <span>{isPro ? 'Save Active Session' : 'Save Session (Pro)'}</span>
                 </button>
               </div>
 
@@ -7125,7 +7285,10 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
                 />
                 <button
                   type="button"
-                  onClick={() => projectFileInputRef.current?.click()}
+                  onClick={() => {
+                    if (!isPro) setIsProSaveModalOpen(true);
+                    else projectFileInputRef.current?.click();
+                  }}
                   disabled={isImportingProject}
                   title="Load project file from your computer (.cstudio)"
                   className="h-8 px-3 rounded-lg bg-[#1e2027] hover:bg-[#282b34] text-[11.5px] font-semibold text-[#c9ccd3] hover:text-white flex items-center gap-1.5 transition-colors disabled:opacity-50"
@@ -7145,6 +7308,24 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
                 </button>
               </div>
             </div>
+
+            {/* Non-Pro Warning Banner */}
+            {!isPro && (
+              <div className="p-3 mx-4 mt-3 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-between gap-3 text-xs shrink-0">
+                <div className="flex items-center gap-2">
+                  <Lock className="h-4 w-4 text-amber-400 shrink-0" />
+                  <span className="text-zinc-300">
+                    <strong className="text-amber-300">Caution Pro Feature:</strong> Saving session files, audio stems, and importing/exporting <code className="text-amber-200">.cstudio</code> projects requires Caution Pro.
+                  </span>
+                </div>
+                <a
+                  href="/subscriptions"
+                  className="px-2.5 py-1 rounded-lg bg-amber-400 hover:bg-amber-300 text-black text-[11px] font-bold shrink-0 transition-colors"
+                >
+                  Upgrade to Pro
+                </a>
+              </div>
+            )}
 
             {/* Saved Projects List */}
             <div className="flex-1 overflow-y-auto p-4 space-y-2.5">
@@ -7250,6 +7431,136 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
                 type="button"
                 onClick={() => setIsProjectsModalOpen(false)}
                 className="px-3 py-1 rounded-md bg-white/10 hover:bg-white/15 text-white font-medium"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Pro Required to Save Modal */}
+      {isProSaveModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="w-full max-w-md rounded-2xl bg-[#141519] border border-amber-500/30 p-6 space-y-5 shadow-2xl relative animate-in fade-in zoom-in-95 duration-150">
+            <button
+              type="button"
+              onClick={() => setIsProSaveModalOpen(false)}
+              className="absolute top-4 right-4 w-8 h-8 rounded-lg text-gray-400 hover:text-white hover:bg-white/10 flex items-center justify-center transition-colors"
+            >
+              <X className="h-4 w-4" />
+            </button>
+
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0">
+                <Lock className="h-6 w-6" />
+              </div>
+              <div>
+                <span className="text-[10px] uppercase tracking-wider font-bold text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20">
+                  Caution Pro Exclusive
+                </span>
+                <h3 className="text-lg font-bold text-white mt-1">Save & Continue Sessions</h3>
+              </div>
+            </div>
+
+            <p className="text-xs text-[#a0a4af] leading-relaxed">
+              Saving multi-track sessions, vocal takes, and project files (<code className="text-amber-300">.cstudio</code>) to continue where you stopped is reserved for <strong className="text-white">Caution Pro</strong> members.
+            </p>
+
+            <div className="p-3.5 rounded-xl bg-[#1a1c22] border border-white/5 space-y-2 text-xs text-[#d8dae0]">
+              <div className="flex items-center gap-2">
+                <Sparkles className="h-3.5 w-3.5 text-[#2dd4bf] shrink-0" />
+                <span>Unlimited studio recording sessions every month</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Sparkles className="h-3.5 w-3.5 text-[#2dd4bf] shrink-0" />
+                <span>Auto-save vocal takes to continue where you stop</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Sparkles className="h-3.5 w-3.5 text-[#2dd4bf] shrink-0" />
+                <span>Export & import multi-track <code className="text-teal-300">.cstudio</code> projects</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Sparkles className="h-3.5 w-3.5 text-[#2dd4bf] shrink-0" />
+                <span>Cloud project sync across devices</span>
+              </div>
+            </div>
+
+            <p className="text-[11px] text-[#717580]">
+              As a Caution Plus member, you can still record vocals, tweak FX, and export your finished song to WAV in this session!
+            </p>
+
+            <div className="flex items-center gap-3 pt-2">
+              <a
+                href="/subscriptions"
+                className="flex-1 py-2.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-black font-bold text-xs text-center transition-colors shadow-lg shadow-amber-500/20"
+              >
+                Upgrade to Pro (₦30,000/mo)
+              </a>
+              <button
+                type="button"
+                onClick={() => setIsProSaveModalOpen(false)}
+                className="px-4 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-white text-xs font-semibold transition-colors"
+              >
+                Keep Recording
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Monthly Session Limit Reached Modal */}
+      {isSessionLimitReachedModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="w-full max-w-md rounded-2xl bg-[#141519] border border-[#ff5a36]/30 p-6 space-y-5 shadow-2xl relative animate-in fade-in zoom-in-95 duration-150">
+            <button
+              type="button"
+              onClick={() => setIsSessionLimitReachedModalOpen(false)}
+              className="absolute top-4 right-4 w-8 h-8 rounded-lg text-gray-400 hover:text-white hover:bg-white/10 flex items-center justify-center transition-colors"
+            >
+              <X className="h-4 w-4" />
+            </button>
+
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-2xl bg-[#ff5a36]/15 border border-[#ff5a36]/30 flex items-center justify-center text-[#ff7a5c] shrink-0">
+                <Mic className="h-6 w-6" />
+              </div>
+              <div>
+                <span className="text-[10px] uppercase tracking-wider font-bold text-[#ff7a5c] bg-[#ff5a36]/10 px-2 py-0.5 rounded-full border border-[#ff5a36]/20">
+                  Monthly Limit Reached
+                </span>
+                <h3 className="text-lg font-bold text-white mt-1">2/2 Studio Sessions Used</h3>
+              </div>
+            </div>
+
+            <p className="text-xs text-[#a0a4af] leading-relaxed">
+              You have completed both of the <strong className="text-white">2 complimentary studio recording sessions</strong> included in your <strong className="text-white">Caution Plus</strong> plan for this month.
+            </p>
+
+            <div className="p-3.5 rounded-xl bg-[#1a1c22] border border-white/5 space-y-2 text-xs text-[#d8dae0]">
+              <p className="text-[11px] text-[#8e929e]">
+                Your 2 free monthly sessions will refresh automatically on the 1st of next month.
+              </p>
+              <div className="pt-1 border-t border-white/5">
+                <span className="font-semibold text-white">Need unlimited sessions & session saving right now?</span>
+              </div>
+              <div className="flex items-center gap-2 text-[#2dd4bf]">
+                <Sparkles className="h-3.5 w-3.5 shrink-0" />
+                <span>Caution Pro gives you unlimited recording sessions every month</span>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3 pt-2">
+              <a
+                href="/subscriptions"
+                className="flex-1 py-2.5 rounded-xl bg-[#2dd4bf] hover:bg-[#20b8a6] text-black font-bold text-xs text-center transition-colors shadow-lg shadow-[#2dd4bf]/20"
+              >
+                Upgrade to Pro for Unlimited (₦30,000/mo)
+              </a>
+              <button
+                type="button"
+                onClick={() => setIsSessionLimitReachedModalOpen(false)}
+                className="px-4 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-white text-xs font-semibold transition-colors"
               >
                 Close
               </button>

@@ -1,9 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServiceRoleClient } from '../../../../lib/supabaseClient';
 import { uploadToR2 } from '../../../../lib/r2Server';
+import { authenticateStudioRequest } from '../../../../lib/studioAuth';
 
 export async function POST(req: NextRequest) {
   try {
+    // Only Caution Pro members can save studio recording sessions to the cloud
+    const ctx = await authenticateStudioRequest(req);
+    if (!ctx) {
+      return NextResponse.json({ error: 'Please sign in to save studio sessions.' }, { status: 401 });
+    }
+    if (ctx.plan !== 'pro') {
+      return NextResponse.json(
+        { error: 'Saving studio sessions is a Caution Pro feature. Upgrade to Pro to save your recordings.', reason: 'pro_required' },
+        { status: 403 }
+      );
+    }
+
     const formData = await req.formData();
     const artistName = (formData.get('artistName') as string) || 'Anonymous Artist';
     const projectTitle = (formData.get('projectTitle') as string) || 'Record Studio Session';
@@ -95,6 +108,7 @@ export async function POST(req: NextRequest) {
     let submissionRecord = null;
 
     const sessionPayload = {
+      artist_id: ctx.user.id,
       artist_name: artistName,
       contact_phone: contactPhone,
       social_handle: socialHandle,

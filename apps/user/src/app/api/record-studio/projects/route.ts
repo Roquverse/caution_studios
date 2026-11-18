@@ -1,25 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServiceRoleClient } from '../../../../lib/supabaseClient';
+import { authenticateStudioRequest } from '../../../../lib/studioAuth';
 
 export const dynamic = 'force-dynamic';
 
-// GET /api/record-studio/projects - List saved studio projects for the user
+// GET /api/record-studio/projects - List saved studio projects for the signed-in user
 export async function GET(req: NextRequest) {
   try {
-    const supabase = getServiceRoleClient();
-    const { searchParams } = new URL(req.url);
-    const userId = searchParams.get('userId');
+    const ctx = await authenticateStudioRequest(req);
+    if (!ctx) return NextResponse.json({ projects: [] }, { status: 401 });
 
-    let query = supabase
+    const { data, error } = await ctx.supabase
       .from('studio_projects')
       .select('id, title, beat_id, beat_data, bpm, musical_key, time_signature, lyrics, notes, created_at, updated_at')
-      .order('updated_at', { ascending: false });
-
-    if (userId) {
-      query = query.eq('user_id', userId);
-    }
-
-    const { data, error } = await query.limit(30);
+      .eq('user_id', ctx.user.id)
+      .order('updated_at', { ascending: false })
+      .limit(30);
 
     if (error) {
       console.warn('Could not fetch studio projects from db:', error.message);
@@ -33,30 +28,25 @@ export async function GET(req: NextRequest) {
   }
 }
 
-// POST /api/record-studio/projects - Save or update studio project in cloud database
+// POST /api/record-studio/projects - Save or update studio project (Caution Pro only)
 export async function POST(req: NextRequest) {
   try {
-    const supabase = getServiceRoleClient();
-    const body = await req.json();
+    const ctx = await authenticateStudioRequest(req);
+    if (!ctx) {
+      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+    }
+    if (ctx.plan !== 'pro') {
+      return NextResponse.json(
+        { success: false, error: 'Saving studio sessions is a Caution Pro feature.', reason: 'pro_required' },
+        { status: 403 }
+      );
+    }
 
-    const {
-      id,
-      userId,
-      title,
-      beatId,
-      beatData,
-      vocalTracks,
-      masterUrl,
-      bpm,
-      musicalKey,
-      timeSignature,
-      effects,
-      lyrics,
-      notes
-    } = body;
+    const body = await req.json();
+    const { id, title, beatId, beatData, vocalTracks, masterUrl, bpm, musicalKey, timeSignature, effects, lyrics, notes } = body;
 
     const payload = {
-      user_id: userId || null,
+      user_id: ctx.user.id,
       title: (title || 'Untitled Session').trim(),
       beat_id: beatId || null,
       beat_data: beatData || null,
@@ -71,50 +61,27 @@ export async function POST(req: NextRequest) {
       updated_at: new Date().toISOString()
     };
 
+    const isUuid = typeof id === 'string' && /^[0-9a-f-]{36}$/i.test(id);
+
     let result;
-    if (id && !id.startsWith('proj_')) {
-      // Valid UUID, update existing record
-      const { data, error } = await supabase
+    if (isUuid) {
+      const { data, error } = await ctx.supabase
         .from('studio_projects')
-        .update(payload)
-        .eq('id', id)
+        .upsert({ id, ...payload })
+        .eq('user_id', ctx.user.id)
         .select()
         .single();
-
-      if (error) {
-        // Fallback to insert if not found
-        const { data: inserted, error: insertErr } = await supabase
-          .from('studio_projects')
-          .insert({ id, ...payload })
-          .select()
-          .single();
-        if (insertErr) throw insertErr;
-        result = inserted;
-      } else {
-        result = data;
-      }
+      if (error) throw error;
+      result = data;
     } else {
-      // Insert new project
-      const { data, error } = await supabase
-        .from('studio_projects')
-        .insert(payload)
-        .select()
-        .single();
-
+      const { data, error } = await ctx.supabase.from('studio_projects').insert(payload).select().single();
       if (error) throw error;
       result = data;
     }
 
-    return NextResponse.json({
-      success: true,
-      message: 'Studio project saved to cloud database',
-      project: result
-    });
+    return NextResponse.json({ success: true, message: 'Studio project saved to cloud database', project: result });
   } catch (err: any) {
     console.warn('Could not save studio project to cloud:', err);
-    return NextResponse.json(
-      { success: false, error: err?.message || 'Database save skipped' },
-      { status: 500 }
-    );
+    return NextResponse.json({ success: false, error: err?.message || 'Database save skipped' }, { status: 500 });
   }
 }

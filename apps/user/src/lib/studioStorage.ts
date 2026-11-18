@@ -351,3 +351,4 @@ export async function importProjectFromFile(file: File): Promise<StudioProjectDa
 
   return restoredProject;
 }
+
