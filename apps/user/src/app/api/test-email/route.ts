@@ -16,6 +16,8 @@ export async function GET(req: NextRequest) {
   const resendKey = process.env.RESEND_API_KEY;
 
   const diagnostics = {
+    deploymentTimestamp: "2026-11-18T20:34:00Z",
+    app: "user (app.cautionstudioz.com)",
     resendConfigured: !!resendKey,
     smtpHost: host || null,
     smtpPort: port,
@@ -146,3 +148,4 @@ export async function GET(req: NextRequest) {
     );
   }
 }
+
