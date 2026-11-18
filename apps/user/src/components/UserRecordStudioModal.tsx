@@ -2367,7 +2367,7 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
       playCtxRef.current.state !== 'closed' &&
       dspGraphVersionRef.current === CURRENT_DSP_VERSION
     ) {
-      if (playCtxRef.current.state === 'suspended') {
+      if (playCtxRef.current.state === 'suspended' || (playCtxRef.current.state as any) === 'interrupted') {
         playCtxRef.current.resume().catch(() => {});
       }
       return playCtxRef.current;
@@ -2640,7 +2640,7 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
     async (deviceId: string) => {
       setAudioOutputDevice(deviceId);
       const ctx = ensurePlaybackCtx();
-      if (ctx && ctx.state === 'suspended') {
+      if (ctx && (ctx.state === 'suspended' || (ctx.state as any) === 'interrupted')) {
         await ctx.resume().catch(() => {});
       }
       await applyAudioOutputSinkId(deviceId);
@@ -2711,14 +2711,23 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
       }
 
       let source: MediaElementAudioSourceNode;
-      if ((el as any).__sourceNode) {
+      if ((el as any).__sourceNode && (el as any).__sourceNode.context === ctx) {
         source = (el as any).__sourceNode;
         try {
           source.disconnect();
         } catch (_) {}
       } else {
-        source = ctx.createMediaElementSource(el);
-        (el as any).__sourceNode = source;
+        try {
+          source = ctx.createMediaElementSource(el);
+          (el as any).__sourceNode = source;
+        } catch (srcErr) {
+          if ((el as any).__sourceNode) {
+            source = (el as any).__sourceNode;
+          } else {
+            console.warn('createMediaElementSource error:', srcErr);
+            return null;
+          }
+        }
       }
 
       const gain = ctx.createGain();
@@ -3739,25 +3748,12 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
       micStreamRef.current = null;
     }
 
-    // Close recording AudioContext so mobile OS completely exits telephone earpiece mode
+    // Close recording AudioContext so mobile OS exits microphone session
     if (audioContextRef.current) {
       try {
         audioContextRef.current.close();
       } catch (_) {}
       audioContextRef.current = null;
-    }
-
-    // On mobile, also reset playCtxRef so next play action creates a fresh context in loudspeaker mode
-    const isMobile =
-      typeof window !== 'undefined' &&
-      (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent) || window.innerWidth < 768);
-    if (isMobile && playCtxRef.current) {
-      try {
-        playCtxRef.current.close();
-      } catch (_) {}
-      playCtxRef.current = null;
-      beatNodesRef.current = null;
-      vocalNodesRef.current.clear();
     }
 
     if (beatAudioRef.current) {
@@ -3805,7 +3801,7 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
       setMasterMeterR(0);
     } else {
       const ctx = ensurePlaybackCtx();
-      if (ctx && ctx.state === 'suspended') {
+      if (ctx && (ctx.state === 'suspended' || (ctx.state as any) === 'interrupted')) {
         await ctx.resume().catch(() => {});
       }
       await applyAudioOutputSinkId(audioOutputDevice);
