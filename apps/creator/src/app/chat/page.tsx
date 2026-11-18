@@ -81,10 +81,34 @@ export default function StudioChatPage() {
   const wsChannelRef = useRef<any>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Designated Executive Admin IDs
+  const adminIdsRef = useRef<Set<string>>(
+    new Set([
+      'c855e1b8-b34c-4b1d-986b-373e70ec423f', // Studio Admin (admin@cautionstudioz.com)
+      '9db03bfb-2dc1-42dd-888c-32daa24fe93a'  // Caution Admin (admin@caution.studio)
+    ])
+  );
+  const primaryAdminIdRef = useRef<string>('c855e1b8-b34c-4b1d-986b-373e70ec423f');
+  const activeCounterpartIdRef = useRef<string | null>(null);
+
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  useEffect(() => {
+    activeCounterpartIdRef.current = activeCounterpartId;
+  }, [activeCounterpartId]);
+
+  // Checks whether a message belongs to the official executive admin support thread
+  const isMessageAdminSupport = (msg: { sender_id?: string; recipient_id?: string }) => {
+    if (!msg.sender_id || !msg.recipient_id) return false;
+    return (
+      adminIdsRef.current.has(msg.sender_id) ||
+      adminIdsRef.current.has(msg.recipient_id) ||
+      msg.sender_id === msg.recipient_id // System automated beat purchase notifications
+    );
   };
 
   const fetchChats = async () => {
@@ -96,13 +120,19 @@ export default function StudioChatPage() {
       }
       setCurrentUserId(user.id);
 
-      // 1. Fetch Admin Info for support chat
-      let adminId = '64d47dcb-3d1f-41dd-8400-46f39c5b0750';
+      // 1. Fetch Official Studio Admin Info
+      let adminId = primaryAdminIdRef.current;
       try {
-        const adminRes = await fetch('/api/chat/admin-info');
+        const adminRes = await fetch('/api/chat/admin-info', { cache: 'no-store' });
         if (adminRes.ok) {
           const adminData = await adminRes.json();
-          if (adminData.adminId) adminId = adminData.adminId;
+          if (adminData.adminId) {
+            adminId = adminData.adminId;
+            primaryAdminIdRef.current = adminData.adminId;
+          }
+          if (Array.isArray(adminData.allAdminIds)) {
+            adminData.allAdminIds.forEach((id: string) => adminIdsRef.current.add(id));
+          }
         }
       } catch (e) {}
 
@@ -119,44 +149,47 @@ export default function StudioChatPage() {
 
       const chats = chatsData || [];
 
-      // Collect counterpart user IDs
-      const counterpartIds = Array.from(
-        new Set(
-          chats.map((c) => (c.sender_id === user.id ? c.recipient_id : c.sender_id))
-        )
-      );
-
-      // Always include admin ID in counterparts if not present
-      if (!counterpartIds.includes(adminId)) {
-        counterpartIds.push(adminId);
-      }
-
-      // Fetch profiles of counterparts
-      const { data: profilesData } = await supabase
-        .from('profiles')
-        .select('id, display_name, handle, avatar_url, primary_role, roles')
-        .in('id', counterpartIds);
-
-      const profileMap = new Map<string, any>();
-      (profilesData || []).forEach((p) => profileMap.set(p.id, p));
-
       // Group messages by counterpart
+      // All admin messages and automated system purchase notifications route to the official admin support thread
       const threadMap = new Map<string, ChatMessage[]>();
       chats.forEach((msg: ChatMessage) => {
-        const otherId = msg.sender_id === user.id ? msg.recipient_id : msg.sender_id;
-        if (!threadMap.has(otherId)) {
-          threadMap.set(otherId, []);
+        let threadKey: string;
+        if (isMessageAdminSupport(msg)) {
+          threadKey = adminId;
+        } else {
+          threadKey = msg.sender_id === user.id ? msg.recipient_id : msg.sender_id;
         }
-        threadMap.get(otherId)!.push(msg);
+
+        if (!threadKey) return;
+        if (!threadMap.has(threadKey)) {
+          threadMap.set(threadKey, []);
+        }
+        threadMap.get(threadKey)!.push(msg);
       });
 
-      // Ensure Admin thread is present even if no messages sent yet
+      // Ensure Admin thread is ALWAYS present and pinned
       if (!threadMap.has(adminId)) {
         threadMap.set(adminId, []);
       }
 
+      // Collect external artist counterpart IDs (excluding admin)
+      const nonAdminCounterparts = Array.from(threadMap.keys()).filter(
+        (id) => !adminIdsRef.current.has(id) && id !== adminId
+      );
+
+      const profileMap = new Map<string, any>();
+      if (nonAdminCounterparts.length > 0) {
+        const { data: profilesData } = await supabase
+          .from('profiles')
+          .select('id, display_name, handle, avatar_url, primary_role, roles')
+          .in('id', nonAdminCounterparts);
+
+        (profilesData || []).forEach((p) => profileMap.set(p.id, p));
+      }
+
       const builtThreads: ChatThread[] = [];
       threadMap.forEach((msgs, otherId) => {
+        const isAdmin = otherId === adminId || adminIdsRef.current.has(otherId);
         const profile = profileMap.get(otherId);
         const lastMsg = msgs[msgs.length - 1];
         const date = lastMsg ? new Date(lastMsg.created_at) : new Date();
@@ -164,17 +197,15 @@ export default function StudioChatPage() {
           ? date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
           : 'Support';
 
-        let lastPreview = lastMsg?.content || 'Direct conversation with Caution Studio Admin';
+        let lastPreview = lastMsg?.content || 'Direct conversation with Caution Studio Executive Admin';
         if (lastMsg?.media_type === 'image') lastPreview = '📷 [Image attachment]';
         else if (lastMsg?.media_type === 'audio') lastPreview = '🎵 [Audio voice message]';
-
-        const isAdmin = otherId === adminId || profile?.role === 'admin' || profile?.primary_role === 'admin';
 
         builtThreads.push({
           counterpartId: otherId,
           artistName: isAdmin ? 'Caution Studio Executive Admin' : profile?.display_name || 'Verified Artist',
-          artistHandle: isAdmin ? '@caution_admin' : profile?.handle ? `@${profile.handle}` : '@artist',
-          avatar: profile?.avatar_url || '',
+          artistHandle: isAdmin ? '@caution_admin' : profile?.handle ? `@${profile.handle.replace(/^@/, '')}` : '@artist',
+          avatar: isAdmin ? '/images/caution_admin_avatar.png' : profile?.avatar_url || '',
           lastMessage: lastPreview,
           time: timeStr,
           unread: false,
@@ -194,7 +225,7 @@ export default function StudioChatPage() {
       });
 
       setThreads(builtThreads);
-      if (builtThreads.length > 0 && !activeCounterpartId) {
+      if (builtThreads.length > 0 && !activeCounterpartIdRef.current) {
         setActiveCounterpartId(builtThreads[0].counterpartId);
       }
     } catch (err: any) {
@@ -208,8 +239,16 @@ export default function StudioChatPage() {
   const appendMessage = (newMsg: ChatMessage) => {
     setThreads((prevThreads) => {
       if (!currentUserId) return prevThreads;
-      const otherId = newMsg.sender_id === currentUserId ? newMsg.recipient_id : newMsg.sender_id;
-      if (!otherId) return prevThreads;
+
+      const targetAdminId = primaryAdminIdRef.current;
+      let counterpartId: string;
+      if (isMessageAdminSupport(newMsg)) {
+        counterpartId = targetAdminId;
+      } else {
+        counterpartId = newMsg.sender_id === currentUserId ? newMsg.recipient_id : newMsg.sender_id;
+      }
+
+      if (!counterpartId) return prevThreads;
 
       const date = new Date(newMsg.created_at || Date.now());
       const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -220,7 +259,7 @@ export default function StudioChatPage() {
 
       let found = false;
       const updated = prevThreads.map((t) => {
-        if (t.counterpartId === otherId) {
+        if (t.counterpartId === counterpartId) {
           found = true;
           if (
             t.messages.some(
@@ -235,7 +274,7 @@ export default function StudioChatPage() {
           return {
             ...t,
             lastMessage: previewText,
-            lastMessageTime: timeStr,
+            time: timeStr,
             messages: [...t.messages, newMsg]
           };
         }
@@ -248,6 +287,8 @@ export default function StudioChatPage() {
       }
 
       return updated.sort((a, b) => {
+        if (a.isAdmin && !b.isAdmin) return -1;
+        if (!a.isAdmin && b.isAdmin) return 1;
         const timeA = a.messages.length > 0 ? new Date(a.messages[a.messages.length - 1].created_at).getTime() : 0;
         const timeB = b.messages.length > 0 ? new Date(b.messages[b.messages.length - 1].created_at).getTime() : 0;
         return timeB - timeA;
@@ -269,7 +310,12 @@ export default function StudioChatPage() {
 
     // 1. Direct WebSocket broadcast from peer (< 30ms latency)
     channel.on('broadcast', { event: 'chat_message' }, ({ payload }) => {
-      if (payload && (payload.recipient_id === currentUserId || payload.sender_id === currentUserId)) {
+      if (
+        payload &&
+        (payload.recipient_id === currentUserId ||
+          payload.sender_id === currentUserId ||
+          isMessageAdminSupport(payload))
+      ) {
         appendMessage(payload);
         setIsPeerTyping(false);
       }
@@ -292,7 +338,11 @@ export default function StudioChatPage() {
     channel.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chats' }, (payload) => {
       if (payload.new) {
         const newMsg = payload.new as ChatMessage;
-        if (newMsg.recipient_id === currentUserId || newMsg.sender_id === currentUserId) {
+        if (
+          newMsg.recipient_id === currentUserId ||
+          newMsg.sender_id === currentUserId ||
+          isMessageAdminSupport(newMsg)
+        ) {
           appendMessage(newMsg);
         }
       }
@@ -310,7 +360,7 @@ export default function StudioChatPage() {
       supabase.removeChannel(channel);
       if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
     };
-  }, [currentUserId, activeCounterpartId]);
+  }, [currentUserId]);
 
   useEffect(() => {
     scrollToBottom();
@@ -410,11 +460,15 @@ export default function StudioChatPage() {
         mediaSize = uploadData.media_size;
       }
 
+      const targetRecipientId = activeThread.isAdmin
+        ? primaryAdminIdRef.current
+        : activeThread.counterpartId;
+
       // 2. Create optimistic message payload (0ms latency!)
       const optimisticMsg: ChatMessage = {
         id: `temp_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
         sender_id: currentUserId,
-        recipient_id: activeThread.counterpartId,
+        recipient_id: targetRecipientId,
         content: messageText,
         media_url: mediaUrl,
         media_key: mediaKey,
@@ -436,7 +490,7 @@ export default function StudioChatPage() {
         wsChannelRef.current.send({
           type: 'broadcast',
           event: 'typing',
-          payload: { producerId: currentUserId, targetProducerId: activeThread.counterpartId, isTyping: false }
+          payload: { producerId: currentUserId, targetProducerId: targetRecipientId, isTyping: false }
         });
       }
 
@@ -447,7 +501,7 @@ export default function StudioChatPage() {
       // 3. Persist in chats table
       const { error: insertErr } = await supabase.from('chats').insert({
         sender_id: currentUserId,
-        recipient_id: activeThread.counterpartId,
+        recipient_id: targetRecipientId,
         content: messageText,
         media_url: mediaUrl,
         media_key: mediaKey,

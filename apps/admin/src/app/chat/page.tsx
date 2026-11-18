@@ -53,11 +53,28 @@ interface ProducerThread {
   messages: ChatMessage[];
 }
 
+function extractProducerNameFromContent(content: string): string | null {
+  if (!content) return null;
+  const match = content.match(/CONGRATULATIONS\s+([A-Za-z0-9\s._'-]+?)[!]/i);
+  if (match && match[1]) {
+    const cleaned = match[1].trim();
+    if (cleaned && cleaned.toLowerCase() !== 'producer') {
+      return cleaned;
+    }
+  }
+  return null;
+}
+
 export default function AdminProducerChatPage() {
   const [loading, setLoading] = useState(true);
   const [adminUserId, setAdminUserId] = useState<string | null>(null);
   const [threads, setThreads] = useState<ProducerThread[]>([]);
   const [activeProducerId, setActiveProducerId] = useState<string | null>(null);
+  const activeProducerIdRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    activeProducerIdRef.current = activeProducerId;
+  }, [activeProducerId]);
   const [search, setSearch] = useState('');
   const [newMessage, setNewMessage] = useState('');
   const [sending, setSending] = useState(false);
@@ -105,7 +122,7 @@ export default function AdminProducerChatPage() {
         headers['Authorization'] = `Bearer ${session.access_token}`;
       }
 
-      const res = await fetch('/api/chat', { headers, cache: 'no-store' });
+      const res = await fetch('/api/chat', { headers, credentials: 'include', cache: 'no-store' });
       if (res.ok) {
         const data = await res.json();
         if (data.adminUserId) {
@@ -144,10 +161,21 @@ export default function AdminProducerChatPage() {
           const profileMap = new Map<string, any>();
           (profilesData || []).forEach((p) => profileMap.set(p.id, p));
 
+          const effectiveAdminId = adminUserId || 'c855e1b8-b34c-4b1d-986b-373e70ec423f';
           const threadMap = new Map<string, ChatMessage[]>();
           chatsData.forEach((msg: ChatMessage) => {
-            const counterpartId = msg.sender_id === adminUserId ? msg.recipient_id : msg.sender_id;
-            if (!counterpartId) return;
+            let counterpartId: string | null = null;
+            if (msg.sender_id === msg.recipient_id) {
+              counterpartId = msg.sender_id;
+            } else if (msg.sender_id === effectiveAdminId) {
+              counterpartId = msg.recipient_id;
+            } else if (msg.recipient_id === effectiveAdminId) {
+              counterpartId = msg.sender_id;
+            } else {
+              counterpartId = msg.sender_id === effectiveAdminId ? msg.recipient_id : msg.sender_id;
+            }
+
+            if (!counterpartId || counterpartId === effectiveAdminId) return;
             if (!threadMap.has(counterpartId)) threadMap.set(counterpartId, []);
             threadMap.get(counterpartId)!.push(msg);
           });
@@ -155,14 +183,43 @@ export default function AdminProducerChatPage() {
           const builtThreads: ProducerThread[] = [];
           threadMap.forEach((msgs, pId) => {
             const prof = profileMap.get(pId);
+            let resolvedName = prof?.display_name?.trim();
+
+            if (!resolvedName || resolvedName.toLowerCase() === 'producer' || resolvedName.toLowerCase() === 'user') {
+              for (const m of msgs) {
+                const extracted = extractProducerNameFromContent(m.content);
+                if (extracted) {
+                  resolvedName = extracted;
+                  break;
+                }
+              }
+            }
+
+            if (!resolvedName || resolvedName.toLowerCase() === 'producer') {
+              if (prof?.handle) {
+                resolvedName = prof.handle;
+              } else {
+                resolvedName = `Producer (${pId.slice(0, 5)})`;
+              }
+            }
+
+            let resolvedHandle = prof?.handle ? `@${prof.handle.replace(/^@/, '')}` : null;
+            if (!resolvedHandle || resolvedHandle === '@creator' || resolvedHandle === '@producer') {
+              if (resolvedName && resolvedName.toLowerCase() !== 'producer' && !resolvedName.startsWith('Producer (')) {
+                resolvedHandle = `@${resolvedName.toLowerCase().replace(/[^a-z0-9_]/g, '')}`;
+              } else {
+                resolvedHandle = '@producer';
+              }
+            }
+
             const lastMsg = msgs[msgs.length - 1];
             const date = new Date(lastMsg.created_at);
             const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
             builtThreads.push({
               producerId: pId,
-              displayName: prof?.display_name || prof?.handle || 'Producer',
-              handle: prof?.handle ? `@${prof.handle}` : '@creator',
+              displayName: resolvedName,
+              handle: resolvedHandle,
               avatarUrl: prof?.avatar_url || '',
               lastMessage: lastMsg.content || '',
               lastMessageTime: timeStr,
@@ -259,7 +316,8 @@ export default function AdminProducerChatPage() {
 
     // 2. WebSocket typing indicator
     channel.on('broadcast', { event: 'typing' }, ({ payload }) => {
-      if (payload?.targetProducerId === activeProducerId || payload?.producerId === activeProducerId) {
+      const curActiveId = activeProducerIdRef.current;
+      if (payload?.targetProducerId === curActiveId || payload?.producerId === curActiveId) {
         if (payload?.isTyping) {
           setIsPeerTyping(true);
           if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
@@ -289,7 +347,7 @@ export default function AdminProducerChatPage() {
       supabase.removeChannel(channel);
       if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
     };
-  }, [adminUserId, activeProducerId]);
+  }, [adminUserId]);
 
   useEffect(() => {
     scrollToBottom();
@@ -426,7 +484,7 @@ export default function AdminProducerChatPage() {
       let senderId = adminUserId;
       if (!senderId) {
         const { data: { user } } = await supabase.auth.getUser();
-        senderId = user?.id || '64d47dcb-3d1f-41dd-8400-46f39c5b0750';
+        senderId = user?.id || 'c855e1b8-b34c-4b1d-986b-373e70ec423f';
       }
 
       // 3. Create Optimistic Message Payload

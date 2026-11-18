@@ -40,7 +40,7 @@ export async function verifyAdminRequest(req: NextRequest): Promise<AdminAuthRes
     if (process.env.NODE_ENV !== 'production') {
       return {
         isAdmin: true,
-        user: { id: '64d47dcb-3d1f-41dd-8400-46f39c5b0750', email: 'damicoledj@gmail.com', role: 'admin' }
+        user: { id: 'c855e1b8-b34c-4b1d-986b-373e70ec423f', email: 'admin@cautionstudioz.com', role: 'superadmin' }
       };
     }
 

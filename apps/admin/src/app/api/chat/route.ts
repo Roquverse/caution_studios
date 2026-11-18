@@ -25,7 +25,7 @@ export async function GET(req: NextRequest) {
     }
 
     const supabase = getServiceRoleClient();
-    const adminUserId = authCheck.user?.id || '64d47dcb-3d1f-41dd-8400-46f39c5b0750';
+    const adminUserId = authCheck.user?.id || 'c855e1b8-b34c-4b1d-986b-373e70ec423f';
 
     // 1. Fetch active admin IDs from admin_users
     const { data: adminUsers } = await supabase
@@ -34,7 +34,11 @@ export async function GET(req: NextRequest) {
       .eq('is_active', true);
     
     const adminIds = new Set<string>((adminUsers || []).map((a) => a.user_id).filter(Boolean));
+    adminIds.add('c855e1b8-b34c-4b1d-986b-373e70ec423f');
+    adminIds.add('9db03bfb-2dc1-42dd-888c-32daa24fe93a');
     adminIds.add(adminUserId);
+    // Ensure producer Cole is never treated as admin in thread counterpart grouping
+    adminIds.delete('64d47dcb-3d1f-41dd-8400-46f39c5b0750');
 
     // 2. Fetch all chats ordered chronologically
     const { data: chatsData, error: chatsErr } = await supabase
@@ -163,11 +167,19 @@ export async function GET(req: NextRequest) {
       }
 
       // Handle
-      const resolvedHandle = prof?.handle
+      let resolvedHandle = prof?.handle
         ? `@${prof.handle.replace(/^@/, '')}`
         : authInfo?.email
         ? `@${authInfo.email.split('@')[0]}`
-        : '@producer';
+        : null;
+
+      if (!resolvedHandle || resolvedHandle === '@creator' || resolvedHandle === '@producer') {
+        if (resolvedName && resolvedName.toLowerCase() !== 'producer' && !resolvedName.startsWith('Producer (')) {
+          resolvedHandle = `@${resolvedName.toLowerCase().replace(/[^a-z0-9_]/g, '')}`;
+        } else {
+          resolvedHandle = '@producer';
+        }
+      }
 
       // Avatar
       const resolvedAvatar = prof?.avatar_url || beatsInfo.coverUrl || '';
@@ -218,7 +230,7 @@ export async function POST(req: NextRequest) {
     }
 
     const supabase = getServiceRoleClient();
-    const adminUserId = authCheck.user?.id || '64d47dcb-3d1f-41dd-8400-46f39c5b0750';
+    const adminUserId = authCheck.user?.id || 'c855e1b8-b34c-4b1d-986b-373e70ec423f';
 
     const body = await req.json();
     const {
