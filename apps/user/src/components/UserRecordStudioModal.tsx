@@ -2206,12 +2206,12 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
         } catch (_) {}
       }
     } else {
-      // Playhead is BEFORE clipStart or AFTER clipEnd -> strictly silence gain AND pause <audio> element!
+      // Playhead is BEFORE clipStart or AFTER clipEnd -> strictly silence gain!
       if (nodes && playCtxRef.current) {
         nodes.gain.gain.value = 0;
         nodes.gain.gain.setValueAtTime(0, playCtxRef.current.currentTime);
       }
-      if (!el.paused) {
+      if (!currentlyPlaying && !el.paused) {
         el.pause();
       }
       if (forceSeek) {
@@ -2465,7 +2465,7 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
     // ── Studio Resonant Filter + Optional Drive (LP 24 / HP / BP) ─────
     const filterDriveNode = ctx.createWaveShaper();
     filterDriveNode.curve = makeDriveCurve(filterDrive);
-    filterDriveNode.oversample = '4x';
+    filterDriveNode.oversample = 'none';
     dspFilterDriveRef.current = filterDriveNode;
 
     const mainFilter = ctx.createBiquadFilter();
@@ -2590,6 +2590,8 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
     // Master output stage (connected to destination)
     compressor.connect(makeupGain);
     makeupGain.connect(masterGain);
+    // Direct clean vocal bus connection to masterGain (ensures vocals are 100% audible and never squashed)
+    vocalBus.connect(masterGain);
     masterGain.connect(ctx.destination);
 
     // Dedicated clean Beat Bus: beatBus → beatPanNode → masterGain
@@ -3857,6 +3859,12 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
               nodes.panner.pan.value = Math.max(-1, Math.min(1, t.pan / 100));
             }
 
+            // Start playing during user interaction gesture so iOS Safari unlocks the audio element
+            const p = el.play();
+            if (p !== undefined) {
+              promises.push(p.catch((e) => console.warn('Vocal play error:', e)));
+            }
+
             // Cue or start vocal track strictly based on whether `currentTime` is inside `[clipStart, clipEnd)`
             syncSingleVocalTrackToMasterTime(t, currentTime, true, true);
           }
@@ -5067,10 +5075,9 @@ export const UserRecordStudioModal: React.FC<UserRecordStudioModalProps> = ({
       {vocalTracks.map((t) =>
         t.vocalUrl ? (
           <audio
-            key={`vocal-el-${t.id}-${t.vocalUrl}-v6`}
+            key={`vocal-el-${t.id}-${t.vocalUrl}-v7`}
             src={t.vocalUrl}
             preload="auto"
-            crossOrigin="anonymous"
             playsInline
             ref={(el) => {
               if (el) {
