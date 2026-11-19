@@ -2795,7 +2795,7 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
                   <span className="text-[11px] text-gray-400">24-Bit WAV Master + Trackout ZIP Stems · 500,000 Streams</span>
                 </div>
                 <span className="text-sm font-black text-amber-400">
-                  ₦{Math.max(15000, (paidBeatPurchaseTrack.priceNgn || 3000) * 3).toLocaleString()}
+                  ₦{(paidBeatPurchaseTrack.premiumPriceNgn || paidBeatPurchaseTrack.priceNgn || 50000).toLocaleString()}
                 </span>
               </div>
 
@@ -2843,7 +2843,7 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
                       const priceNgn =
                         purchaseTier === 'exclusive'
                           ? (paidBeatPurchaseTrack.exclusivePriceNgn || 200000)
-                          : Math.max(15000, (paidBeatPurchaseTrack.priceNgn || 3000) * 3);
+                          : (paidBeatPurchaseTrack.premiumPriceNgn || paidBeatPurchaseTrack.priceNgn || 50000);
 
                       const orderId = `beat_${paidBeatPurchaseTrack.id.slice(0, 8)}_${Date.now()}`;
 
@@ -2893,8 +2893,8 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
                       ? 'Connecting to Paystack...'
                       : `Pay & License ${
                           purchaseTier === 'premium'
-                            ? `₦${Math.max(15000, (paidBeatPurchaseTrack.priceNgn || 3000) * 3).toLocaleString()}`
-                            : `₦${(paidBeatPurchaseTrack.exclusivePriceNgn || 50000).toLocaleString()}`
+                            ? `₦${(paidBeatPurchaseTrack.premiumPriceNgn || paidBeatPurchaseTrack.priceNgn || 50000).toLocaleString()}`
+                            : `₦${(paidBeatPurchaseTrack.exclusivePriceNgn || 200000).toLocaleString()}`
                         }`}
                   </span>
                 </button>

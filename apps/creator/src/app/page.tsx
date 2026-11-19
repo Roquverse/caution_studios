@@ -26,7 +26,10 @@ import {
   Building,
   CheckCircle2,
   X,
-  AlertCircle
+  AlertCircle,
+  Search,
+  ShoppingBag,
+  Tag
 } from 'lucide-react';
 
 interface RecentSaleItem {
@@ -53,6 +56,25 @@ interface TopBeatItem {
   audioUrl?: string;
 }
 
+interface BeatCatalogItem {
+  id: string;
+  title: string;
+  bpm: number;
+  genre: string;
+  key?: string;
+  plays: number;
+  downloads: number;
+  earnedNgn: number;
+  coverUrl: string;
+  audioUrl?: string;
+  status: string;
+  isFree: boolean;
+  priceBasicNgn?: number;
+  pricePremiumNgn?: number;
+  priceExclusiveNgn?: number;
+  createdAt?: string;
+}
+
 interface MonthData {
   month: string;
   value: number;
@@ -77,6 +99,9 @@ export default function CreatorDashboardPage() {
   const [trialDaysRemaining, setTrialDaysRemaining] = useState<number>(90);
   const [recentSales, setRecentSales] = useState<RecentSaleItem[]>([]);
   const [topStreamingBeats, setTopStreamingBeats] = useState<TopBeatItem[]>([]);
+  const [allUploadedBeats, setAllUploadedBeats] = useState<BeatCatalogItem[]>([]);
+  const [beatSearchQuery, setBeatSearchQuery] = useState('');
+  const [beatFilterTab, setBeatFilterTab] = useState<'all' | 'paid' | 'free'>('all');
   const [monthlyChart, setMonthlyChart] = useState<MonthData[]>([]);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
@@ -176,6 +201,37 @@ export default function CreatorDashboardPage() {
             };
           });
           setTopStreamingBeats(topBeats);
+
+          const mappedAllBeats: BeatCatalogItem[] = dbBeats.map((b: any) => {
+            const audioKey = b.master_wav_key || b.preview_clean_key || b.preview_tagged_key;
+            const playsCount = Number(b.play_count) || 0;
+            const dlCount = Number(b.downloads_count || b.free_commercial_downloads_count || b.download_count) || 0;
+            const licenses = b.licenses || b.beat_licenses || [];
+            const basicLic = licenses.find((l: any) => l.type === 'basic');
+            const premiumLic = licenses.find((l: any) => l.type === 'premium');
+            const exclusiveLic = licenses.find((l: any) => l.type === 'exclusive');
+            const isFree = b.is_free_stream_enabled === true || (basicLic?.price_cents !== undefined && basicLic.price_cents <= 100);
+
+            return {
+              id: b.id,
+              title: b.title,
+              bpm: b.bpm || 110,
+              genre: b.genre || 'Afrobeats',
+              key: b.musical_key || 'C Minor',
+              plays: playsCount,
+              downloads: dlCount,
+              earnedNgn: Math.floor((playsCount + dlCount) / 10000) * 30000,
+              coverUrl: b.cover_url || '/images/studio_mixing_console.jpg',
+              audioUrl: audioKey ? (audioKey.startsWith('http') || audioKey.startsWith('/') ? audioKey : `/api/media/${audioKey}`) : '',
+              status: b.status || 'live',
+              isFree,
+              priceBasicNgn: basicLic ? Math.round(basicLic.price_cents / 100) : 3000,
+              pricePremiumNgn: premiumLic ? Math.round(premiumLic.price_cents / 100) : 50000,
+              priceExclusiveNgn: exclusiveLic ? Math.round(exclusiveLic.price_cents / 100) : 200000,
+              createdAt: b.created_at ? new Date(b.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Recently'
+            };
+          });
+          setAllUploadedBeats(mappedAllBeats);
 
           const paidItems = data.orderItems || [];
           setLicensesSoldCount(paidItems.length);
@@ -807,6 +863,207 @@ export default function CreatorDashboardPage() {
                 </Link>
               </div>
             </div>
+          </div>
+
+          {/* 6. ALL UPLOADED & CREATED BEATS SECTION */}
+          <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-5 shadow-sm space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-3 border-b border-zinc-800">
+              <div>
+                <div className="flex items-center gap-2.5">
+                  <h3 className="text-sm font-semibold text-white">All Uploaded &amp; Created Beats</h3>
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-[#2dd4bf]/15 text-[#2dd4bf] border border-[#2dd4bf]/30">
+                    {allUploadedBeats.length} {allUploadedBeats.length === 1 ? 'Beat' : 'Beats'}
+                  </span>
+                </div>
+                <p className="text-xs text-zinc-400 mt-0.5">
+                  Every beat created or uploaded to your catalog, with live license pricing and streaming activity.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <Link
+                  href="/beats/upload"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-[#2dd4bf] hover:bg-[#20b8a4] text-zinc-950 text-xs font-semibold transition-colors shadow-xs"
+                >
+                  <Plus className="h-3.5 w-3.5 stroke-[2.5]" />
+                  <span>Upload Beat</span>
+                </Link>
+                <Link
+                  href="/beats"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-medium transition-colors"
+                >
+                  <span>Catalog View</span>
+                  <ArrowRight className="h-3.5 w-3.5" />
+                </Link>
+              </div>
+            </div>
+
+            {/* Filters & Search */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-1.5 bg-zinc-950 p-1 rounded-lg border border-zinc-800 w-fit">
+                <button
+                  type="button"
+                  onClick={() => setBeatFilterTab('all')}
+                  className={`px-3 py-1 rounded-md text-xs font-medium transition-colors cursor-pointer ${
+                    beatFilterTab === 'all'
+                      ? 'bg-zinc-800 text-white font-semibold'
+                      : 'text-zinc-400 hover:text-white'
+                  }`}
+                >
+                  All ({allUploadedBeats.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setBeatFilterTab('paid')}
+                  className={`px-3 py-1 rounded-md text-xs font-medium transition-colors cursor-pointer ${
+                    beatFilterTab === 'paid'
+                      ? 'bg-amber-500/20 text-amber-300 font-semibold border border-amber-500/30'
+                      : 'text-zinc-400 hover:text-amber-300'
+                  }`}
+                >
+                  Paid Beats ({allUploadedBeats.filter((b) => !b.isFree).length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setBeatFilterTab('free')}
+                  className={`px-3 py-1 rounded-md text-xs font-medium transition-colors cursor-pointer ${
+                    beatFilterTab === 'free'
+                      ? 'bg-emerald-500/20 text-emerald-300 font-semibold border border-emerald-500/30'
+                      : 'text-zinc-400 hover:text-emerald-300'
+                  }`}
+                >
+                  Free Beats ({allUploadedBeats.filter((b) => b.isFree).length})
+                </button>
+              </div>
+
+              <div className="relative w-full sm:w-64">
+                <Search className="h-3.5 w-3.5 text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <input
+                  type="text"
+                  value={beatSearchQuery}
+                  onChange={(e) => setBeatSearchQuery(e.target.value)}
+                  placeholder="Search beats by title..."
+                  className="w-full h-8 pl-8 pr-3 rounded-md bg-zinc-950 border border-zinc-800 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-zinc-700"
+                />
+              </div>
+            </div>
+
+            {/* Table */}
+            {allUploadedBeats.filter((b) => {
+              if (beatFilterTab === 'paid' && b.isFree) return false;
+              if (beatFilterTab === 'free' && !b.isFree) return false;
+              if (!beatSearchQuery.trim()) return true;
+              const q = beatSearchQuery.toLowerCase();
+              return b.title.toLowerCase().includes(q) || b.genre.toLowerCase().includes(q);
+            }).length > 0 ? (
+              <div className="overflow-x-auto rounded-lg border border-zinc-800/80">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-zinc-950/80 text-zinc-400 font-mono text-[11px] border-b border-zinc-800">
+                    <tr>
+                      <th className="py-2.5 px-3">Beat</th>
+                      <th className="py-2.5 px-3">Genre / BPM</th>
+                      <th className="py-2.5 px-3">Pricing Added</th>
+                      <th className="py-2.5 px-3">Activity</th>
+                      <th className="py-2.5 px-3">Status</th>
+                      <th className="py-2.5 px-3 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-zinc-800/50">
+                    {allUploadedBeats.filter((b) => {
+                      if (beatFilterTab === 'paid' && b.isFree) return false;
+                      if (beatFilterTab === 'free' && !b.isFree) return false;
+                      if (!beatSearchQuery.trim()) return true;
+                      const q = beatSearchQuery.toLowerCase();
+                      return b.title.toLowerCase().includes(q) || b.genre.toLowerCase().includes(q);
+                    }).map((beat) => (
+                      <tr key={'all-beat-' + beat.id} className="hover:bg-zinc-900/60 transition-colors">
+                        <td className="py-2.5 px-3">
+                          <div className="flex items-center gap-2.5 min-w-[200px]">
+                            <button
+                              type="button"
+                              onClick={() => togglePlay(beat.id, beat.audioUrl)}
+                              className="h-7 w-7 rounded bg-zinc-800 hover:bg-[#2dd4bf] hover:text-black flex items-center justify-center shrink-0 transition-colors text-zinc-300 cursor-pointer"
+                              title="Preview Beat"
+                            >
+                              {playingId === beat.id ? (
+                                <Pause className="h-3 w-3" />
+                              ) : (
+                                <Play className="h-3 w-3 fill-current ml-0.5" />
+                              )}
+                            </button>
+                            <div className="h-8 w-8 rounded overflow-hidden shrink-0 border border-zinc-800 bg-black">
+                              <img src={beat.coverUrl} alt={beat.title} className="w-full h-full object-cover" />
+                            </div>
+                            <div className="min-w-0">
+                              <span className="font-semibold text-white block truncate">{beat.title}</span>
+                              <span className="text-[10px] text-zinc-500 font-mono block">Added {beat.createdAt}</span>
+                            </div>
+                          </div>
+                        </td>
+
+                        <td className="py-2.5 px-3 font-mono text-zinc-300">
+                          <div>{beat.genre}</div>
+                          <div className="text-[10px] text-zinc-500">{beat.bpm} BPM · {beat.key}</div>
+                        </td>
+
+                        <td className="py-2.5 px-3 font-mono text-[11px]">
+                          {beat.isFree ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+                              <Sparkles className="h-2.5 w-2.5" />
+                              <span>100% Free Beat</span>
+                            </span>
+                          ) : (
+                            <div className="space-y-0.5">
+                              <div className="text-amber-300 font-semibold">
+                                Prem: ₦{(beat.pricePremiumNgn || 50000).toLocaleString()}
+                              </div>
+                              <div className="text-purple-300 text-[10px]">
+                                Excl: ₦{(beat.priceExclusiveNgn || 200000).toLocaleString()}
+                              </div>
+                            </div>
+                          )}
+                        </td>
+
+                        <td className="py-2.5 px-3 font-mono text-[11px]">
+                          <span className="text-[#2dd4bf] font-bold">{beat.plays.toLocaleString()} plays</span>
+                          <span className="text-zinc-500"> · </span>
+                          <span className="text-amber-300">{beat.downloads.toLocaleString()} dl</span>
+                        </td>
+
+                        <td className="py-2.5 px-3">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
+                            {beat.status.toUpperCase()}
+                          </span>
+                        </td>
+
+                        <td className="py-2.5 px-3 text-right">
+                          <Link
+                            href="/beats"
+                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-medium transition-colors"
+                          >
+                            <span>Manage</span>
+                          </Link>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="py-12 text-center space-y-2 border border-dashed border-zinc-800 rounded-lg">
+                <UploadCloud className="h-8 w-8 text-zinc-600 mx-auto" />
+                <p className="text-xs text-zinc-400 font-medium">No beats matching your filter</p>
+                <div className="pt-1">
+                  <Link
+                    href="/beats/upload"
+                    className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-md bg-[#2dd4bf] text-zinc-950 text-xs font-semibold"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    <span>Upload Beat</span>
+                  </Link>
+                </div>
+              </div>
+            )}
           </div>
           {/* Quick Paystack Withdrawal Modal */}
           {isWithdrawModalOpen && (

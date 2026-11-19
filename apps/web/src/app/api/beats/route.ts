@@ -62,8 +62,8 @@ export async function GET(req: NextRequest) {
         const hasExclusive = rawLicenses.some((l: any) => l.type === 'exclusive');
 
         if (!hasBasic) fullLicenses.push({ beat_id: b.id, type: 'basic', price_cents: 1500000, enabled: true });
-        if (!hasPremium) fullLicenses.push({ beat_id: b.id, type: 'premium', price_cents: 3500000, enabled: true });
-        if (!hasExclusive) fullLicenses.push({ beat_id: b.id, type: 'exclusive', price_cents: 10000000, enabled: true });
+        if (!hasPremium) fullLicenses.push({ beat_id: b.id, type: 'premium', price_cents: 5000000, enabled: true });
+        if (!hasExclusive) fullLicenses.push({ beat_id: b.id, type: 'exclusive', price_cents: 20000000, enabled: true });
       }
 
       const normalizedGenre = (b.genre || 'Afrobeats').trim();

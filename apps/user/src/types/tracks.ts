@@ -16,6 +16,7 @@ export interface TrackItem {
   previewCleanUrl?: string;
   previewTaggedUrl?: string;
   priceNgn?: number;
+  premiumPriceNgn?: number;
   exclusivePriceNgn?: number;
   isFree?: boolean;
   tags?: string[];

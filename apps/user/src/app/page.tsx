@@ -48,6 +48,7 @@ export default async function UserPortalPage() {
             : '/api/media/masters/alex-morgan-afrobeat-instrumental-summer-groove-573648-hubz_1791151613114.mp3';
         }
         const basicLic = b.licenses?.find((l: any) => l.type === 'basic') || b.beat_licenses?.find((l: any) => l.type === 'basic');
+        const premiumLic = b.licenses?.find((l: any) => l.type === 'premium') || b.beat_licenses?.find((l: any) => l.type === 'premium');
         const exclusiveLic = b.licenses?.find((l: any) => l.type === 'exclusive') || b.beat_licenses?.find((l: any) => l.type === 'exclusive');
         const beatTags: string[] = Array.isArray(b.tags) ? b.tags : [];
         const isFreeTagged =
@@ -60,11 +61,16 @@ export default async function UserPortalPage() {
 
         const rawPrice = basicLic?.price_cents ? basicLic.price_cents / 100 : (isFreeTagged ? 0 : 3000);
         const priceNgn = isFreeTagged || rawPrice <= 1 ? 0 : rawPrice;
+        const premiumPriceNgn = isFreeTagged
+          ? 0
+          : premiumLic?.price_cents && premiumLic.price_cents > 100
+          ? Math.round(premiumLic.price_cents / 100)
+          : (priceNgn ? priceNgn * 3 : 50000);
         const exclusivePriceNgn = isFreeTagged
           ? 0
-          : exclusiveLic?.price_cents
-          ? exclusiveLic.price_cents / 100
-          : 50000;
+          : exclusiveLic?.price_cents && exclusiveLic.price_cents > 100
+          ? Math.round(exclusiveLic.price_cents / 100)
+          : 200000;
 
         const durationSec = b.duration_seconds || 180;
         const mins = Math.floor(durationSec / 60);
@@ -86,6 +92,7 @@ export default async function UserPortalPage() {
           genre: b.genre || 'Electronic',
           musicalKey: b.musical_key || 'C Minor',
           priceNgn,
+          premiumPriceNgn,
           exclusivePriceNgn,
           isFree: isFreeTagged,
           tags: beatTags,

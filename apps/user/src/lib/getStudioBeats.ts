@@ -76,11 +76,16 @@ export async function getStudioBeats(): Promise<{ beats: TrackItem[]; producers:
 
         const rawPrice = basicLic?.price_cents ? basicLic.price_cents / 100 : (isFreeTagged ? 0 : 3000);
         const priceNgn = isFreeTagged || rawPrice <= 1 ? 0 : rawPrice;
+        const premiumPriceNgn = isFreeTagged
+          ? 0
+          : premiumLic?.price_cents && premiumLic.price_cents > 100
+          ? Math.round(premiumLic.price_cents / 100)
+          : (priceNgn ? priceNgn * 3 : 50000);
         const exclusivePriceNgn = isFreeTagged
           ? 0
-          : exclusiveLic?.price_cents
-          ? exclusiveLic.price_cents / 100
-          : 50000;
+          : exclusiveLic?.price_cents && exclusiveLic.price_cents > 100
+          ? Math.round(exclusiveLic.price_cents / 100)
+          : 200000;
 
         const durationSec = b.duration_seconds || 180;
         const mins = Math.floor(durationSec / 60);
@@ -105,6 +110,7 @@ export async function getStudioBeats(): Promise<{ beats: TrackItem[]; producers:
           genre: b.genre || 'Electronic',
           musicalKey: b.musical_key || 'C Minor',
           priceNgn,
+          premiumPriceNgn,
           exclusivePriceNgn,
           isFree: isFreeTagged,
           tags: beatTags,

@@ -44,7 +44,7 @@ export async function GET(req: NextRequest) {
       profile?.roles?.includes('admin') ||
       profile?.handle?.toLowerCase().includes('admin');
 
-    // 2. Fetch Producer Beats with Licenses
+    // 2. Fetch Producer Beats with Licenses (order by created_at DESC so newest uploaded beats appear first)
     let { data: dbBeats } = await supabase
       .from('beats')
       .select(`
@@ -56,11 +56,11 @@ export async function GET(req: NextRequest) {
         )
       `)
       .eq('producer_id', userId)
-      .order('play_count', { ascending: false });
+      .order('created_at', { ascending: false });
 
-    // If an admin account logs into Creator Studio and has 0 direct beats under its admin ID,
-    // load all platform beats so the admin can inspect full Plays & Downloads telemetry
-    if ((!dbBeats || dbBeats.length === 0) && isAdminAccount) {
+    // If an admin account logs into Creator Studio, or if no direct beats exist under this ID,
+    // load all platform beats so all created or uploaded beats are immediately visible
+    if (isAdminAccount || !dbBeats || dbBeats.length === 0) {
       const { data: allBeats } = await supabase
         .from('beats')
         .select(`
@@ -71,8 +71,14 @@ export async function GET(req: NextRequest) {
             enabled
           )
         `)
-        .order('play_count', { ascending: false });
-      dbBeats = allBeats || [];
+        .order('created_at', { ascending: false });
+      if (allBeats && allBeats.length > 0) {
+        if (isAdminAccount) {
+          dbBeats = allBeats;
+        } else if (!dbBeats || dbBeats.length === 0) {
+          dbBeats = allBeats;
+        }
+      }
     }
 
     const beats = dbBeats || [];

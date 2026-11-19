@@ -18,7 +18,7 @@ import {
 import { UpdateArtworkModal } from '../../components/UpdateArtworkModal';
 
 function formatDbBeat(b: any) {
-  const licenses = b.licenses || [];
+  const licenses = b.licenses || b.beat_licenses || [];
   const basic = licenses.find((l: any) => l.type === 'basic');
   const premium = licenses.find((l: any) => l.type === 'premium');
   const exclusive = licenses.find((l: any) => l.type === 'exclusive');
@@ -47,8 +47,8 @@ function formatDbBeat(b: any) {
     duration: `${durM}:${durS.toString().padStart(2, '0')}`,
     stemsUploaded: Boolean(b.stems_zip_key),
     priceBasicNgn: basic ? Math.round(basic.price_cents / 100) : 3000,
-    pricePremiumNgn: premium ? Math.round(premium.price_cents / 100) : 30000,
-    priceExclusiveNgn: exclusive ? Math.round(exclusive.price_cents / 100) : 100000,
+    pricePremiumNgn: premium ? Math.round(premium.price_cents / 100) : 50000,
+    priceExclusiveNgn: exclusive ? Math.round(exclusive.price_cents / 100) : 200000,
     streamsCount: plays,
     downloadsCount: downloads,
     combinedActivity,

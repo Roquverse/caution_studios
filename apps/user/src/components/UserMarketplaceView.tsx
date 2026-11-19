@@ -216,7 +216,7 @@ export function UserMarketplaceView({
       const priceNgn =
         selectedTier === 'exclusive'
           ? (licenseModalTrack.exclusivePriceNgn || 200000)
-          : Math.max(15000, (licenseModalTrack.priceNgn || 3000) * 3);
+          : (licenseModalTrack.premiumPriceNgn || licenseModalTrack.priceNgn || 50000);
 
       const orderId = `beat_${licenseModalTrack.id.slice(0, 8)}_${Date.now()}`;
 
@@ -548,8 +548,8 @@ export function UserMarketplaceView({
 
               // License tier choice for priced beat
               const activeTier = selectedTiers[row.id] || 'premium';
-              const premiumPrice = Math.max(15000, (row.priceNgn && row.priceNgn > 0 ? row.priceNgn : 5000) * 3);
-              const exclusivePrice = row.exclusivePriceNgn && row.exclusivePriceNgn > 0 ? row.exclusivePriceNgn : 50000;
+              const premiumPrice = row.premiumPriceNgn && row.premiumPriceNgn > 0 ? row.premiumPriceNgn : (row.priceNgn && row.priceNgn > 0 ? row.priceNgn : 50000);
+              const exclusivePrice = row.exclusivePriceNgn && row.exclusivePriceNgn > 0 ? row.exclusivePriceNgn : 200000;
               const isDropdownOpen = openDropdownId === row.id;
 
               return (
@@ -806,7 +806,7 @@ export function UserMarketplaceView({
                     <span className="text-[11px] text-gray-400">24-Bit WAV Master + Trackout ZIP Stems · 500,000 Streams</span>
                   </div>
                   <span className="text-sm font-black text-amber-400">
-                    ₦{Math.max(15000, (licenseModalTrack.priceNgn || 3000) * 3).toLocaleString()}
+                    ₦{(licenseModalTrack.premiumPriceNgn || licenseModalTrack.priceNgn || 50000).toLocaleString()}
                   </span>
                 </div>
               </div>
@@ -881,7 +881,7 @@ export function UserMarketplaceView({
                     <>
                       <ShoppingBag className="h-4 w-4" />
                       <span>
-                        Confirm & License {selectedTier === 'exclusive' ? `₦${(licenseModalTrack.exclusivePriceNgn || 200000).toLocaleString()}` : `₦${Math.max(15000, (licenseModalTrack.priceNgn || 3000) * 3).toLocaleString()}`}
+                        Confirm & License {selectedTier === 'exclusive' ? `₦${(licenseModalTrack.exclusivePriceNgn || 200000).toLocaleString()}` : `₦${(licenseModalTrack.premiumPriceNgn || licenseModalTrack.priceNgn || 50000).toLocaleString()}`}
                       </span>
                     </>
                   )}
