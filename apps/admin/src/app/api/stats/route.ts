@@ -120,15 +120,18 @@ export async function GET(req: NextRequest) {
     });
 
     // 5. Recent formatted orders
-    const recentOrders = (allOrders || []).slice(0, 8).map((o: any) => ({
-      id: o.id,
-      buyer_name: o.profiles?.display_name || 'Guest Creator',
-      buyer_handle: o.profiles?.handle || 'creator',
-      total: (o.total_cents || 0) / 100,
-      status: o.status,
-      reference: o.paystack_reference || `REF-${o.id.substring(0, 8).toUpperCase()}`,
-      created_at: o.created_at
-    }));
+    const recentOrders = (allOrders || []).slice(0, 8).map((o: any) => {
+      const buyerProf = Array.isArray(o.profiles) ? o.profiles[0] : o.profiles;
+      return {
+        id: o.id,
+        buyer_name: buyerProf?.display_name || 'Guest Creator',
+        buyer_handle: buyerProf?.handle || 'creator',
+        total: (o.total_cents || 0) / 100,
+        status: o.status,
+        reference: o.paystack_reference || `REF-${o.id.substring(0, 8).toUpperCase()}`,
+        created_at: o.created_at
+      };
+    });
 
     // 6. Genre analytics breakdown
     const genreCounts: { [key: string]: number } = {};

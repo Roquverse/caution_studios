@@ -239,18 +239,21 @@ export default function CreatorDashboardPage() {
           setTotalEarningsNgn(salesNetNgn + (Number(data.downloadRewardNgn) || 0));
 
           const mappedSales: RecentSaleItem[] = paidItems.map((item: any) => {
-            const dateStr = item.order?.created_at
-              ? new Date(item.order.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+            const orderObj = Array.isArray(item.order) ? item.order[0] : item.order;
+            const buyerObj = Array.isArray(orderObj?.buyer) ? orderObj.buyer[0] : orderObj?.buyer;
+            const beatObj = Array.isArray(item.beat) ? item.beat[0] : item.beat;
+            const dateStr = orderObj?.created_at
+              ? new Date(orderObj.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
               : 'Recent';
 
             return {
               id: item.id,
-              beat: item.beat?.title || 'Studio Instrumental',
-              coverUrl: item.beat?.cover_url || '',
-              buyer: item.order?.buyer?.handle ? `@${item.order.buyer.handle}` : (item.order?.buyer?.display_name || '@artist'),
+              beat: beatObj?.title || 'Studio Instrumental',
+              coverUrl: beatObj?.cover_url || '',
+              buyer: buyerObj?.handle ? `@${buyerObj.handle}` : (buyerObj?.display_name || '@artist'),
               tier: `${item.license || 'premium'} License`,
               amountNgn: Math.round((item.price_cents || 0) / 100),
-              payoutNgn: Math.round((item.producer_amount_cents || 0) / 100),
+              payoutNgn: Math.round((item.producer_amount_cents || (item.price_cents ? item.price_cents * 0.8 : 0)) / 100),
               date: dateStr,
               status: 'Paid'
             };

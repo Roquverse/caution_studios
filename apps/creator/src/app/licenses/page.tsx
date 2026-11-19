@@ -11,27 +11,44 @@ import {
   X,
   UserCheck,
   Loader2,
-  FileCheck2
+  FileCheck2,
+  Download,
+  Filter,
+  Sparkles,
+  Layers,
+  Music
 } from 'lucide-react';
 
 interface LicenseRecord {
   id: string;
   licenseNumber: string;
+  reference: string;
+  beatId: string;
   beatTitle: string;
+  beatCoverUrl?: string;
+  buyerId?: string;
   buyerName: string;
   buyerHandle: string;
+  producerId?: string;
+  producerName?: string;
+  producerHandle?: string;
   tier: string;
+  rawTier?: string;
   priceNgn: number;
   creatorPayoutNgn: number;
   issuedAt: string;
   coverage: string;
   status: string;
+  agreementPdfKey?: string | null;
+  isOwnBeat?: boolean;
 }
 
 export default function CreatorLicensesPage() {
   const [selectedLicense, setSelectedLicense] = useState<LicenseRecord | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [licenses, setLicenses] = useState<LicenseRecord[]>([]);
+  const [activeScope, setActiveScope] = useState<'all' | 'my'>('all');
+  const [isExecutiveAdmin, setIsExecutiveAdmin] = useState(false);
   const [totalPlays, setTotalPlays] = useState(0);
   const [totalDownloads, setTotalDownloads] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -59,89 +76,71 @@ export default function CreatorLicensesPage() {
         const accessToken = session?.access_token;
 
         const res = await fetch(
-          `/api/creator/telemetry${userId ? `?userId=${encodeURIComponent(userId)}` : ''}`,
+          `/api/creator/licenses${userId ? `?userId=${encodeURIComponent(userId)}` : ''}`,
           {
             headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
             cache: 'no-store'
           }
         );
 
-        let items: any[] | null = null;
         if (res.ok) {
           const payload = await res.json();
           if (isMounted) {
             setTotalPlays(Number(payload.totalPlaysCount || 0));
             setTotalDownloads(Number(payload.totalDownloadsCount || 0));
-          }
-          if (Array.isArray(payload.orderItems)) {
-            items = payload.orderItems;
-          }
-        }
-
-        if (!items && userId) {
-          // Query order items for this producer directly as fallback
-          const { data: fallbackItems } = await supabase
-            .from('order_items')
-            .select(`
-              id,
-              price_cents,
-              producer_amount_cents,
-              license,
-              order:order_id (
-                id,
-                status,
-                created_at,
-                buyer:buyer_id (
-                  display_name,
-                  handle
-                )
-              ),
-              beat:beat_id (
-                title
-              )
-            `)
-            .eq('producer_id', userId)
-            .order('id', { ascending: false });
-          items = fallbackItems;
-        }
-
-        if (items && isMounted) {
-          const paidItems = items.filter((item: any) => !item.order || item.order?.status === 'paid');
-          const mapped: LicenseRecord[] = paidItems.map((item: any) => {
-            const tierStr = (item.license || 'basic').toLowerCase();
-            let coverage = 'Social Media Sync & Streaming';
-            let tierName = 'Starter MP3 Lease';
-
-            if (tierStr === 'premium') {
-              coverage = 'Commercial Video Sync & Streaming (Up to 500,000 streams)';
-              tierName = 'Premium Lease (WAV + Stems)';
-            } else if (tierStr === 'exclusive') {
-              coverage = 'Perpetual Worldwide · Unlimited Distribution · Master Ownership';
-              tierName = '100% Exclusive Rights Buyout';
+            setIsExecutiveAdmin(Boolean(payload.isExecutiveAdmin));
+            if (Array.isArray(payload.licenses)) {
+              setLicenses(payload.licenses);
             }
-
-            const buyerHandle = item.order?.buyer?.handle ? `@${item.order.buyer.handle}` : '@artist';
-            const buyerName = item.order?.buyer?.display_name || 'Verified Artist';
-            const dateStr = item.order?.created_at
-              ? new Date(item.order.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-              : 'Recent';
-
-            return {
-              id: item.id,
-              licenseNumber: `CS-LIC-${item.id.slice(0, 8).toUpperCase()}`,
-              beatTitle: item.beat?.title || 'Studio Instrumental',
-              buyerName,
-              buyerHandle,
-              tier: tierName,
-              priceNgn: Math.round((item.price_cents || 0) / 100),
-              creatorPayoutNgn: Math.round((item.producer_amount_cents || 0) / 100),
-              issuedAt: dateStr,
-              coverage,
-              status: 'Active & Whitelisted'
-            };
-          });
-
-          setLicenses(mapped);
+          }
+        } else {
+          // Fallback to telemetry route if licenses route is warming up
+          const fbRes = await fetch(
+            `/api/creator/telemetry${userId ? `?userId=${encodeURIComponent(userId)}` : ''}`,
+            {
+              headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
+              cache: 'no-store'
+            }
+          );
+          if (fbRes.ok) {
+            const payload = await fbRes.json();
+            if (isMounted) {
+              setTotalPlays(Number(payload.totalPlaysCount || 0));
+              setTotalDownloads(Number(payload.totalDownloadsCount || 0));
+              if (Array.isArray(payload.orderItems)) {
+                const mapped: LicenseRecord[] = payload.orderItems.map((item: any) => {
+                  const rawTier = (item.license || 'premium').toLowerCase();
+                  let tierName = 'Premium Lease (WAV + Stems)';
+                  let coverage = 'Commercial Video Sync & Streaming (Up to 500,000 streams)';
+                  if (rawTier === 'exclusive') {
+                    tierName = '100% Exclusive Rights Buyout';
+                    coverage = 'Perpetual Worldwide · Unlimited Distribution · Master Ownership';
+                  } else if (rawTier === 'basic') {
+                    tierName = 'Starter MP3 Lease';
+                    coverage = 'Social Media Sync & Streaming (Up to 100,000 streams)';
+                  }
+                  return {
+                    id: item.id,
+                    licenseNumber: `CS-LIC-${item.id.slice(0, 8).toUpperCase()}`,
+                    reference: item.order?.paystack_reference || `lic-${item.id.slice(0, 8)}`,
+                    beatId: item.beat_id,
+                    beatTitle: item.beat?.title || 'Studio Instrumental',
+                    buyerName: item.order?.buyer?.display_name || 'Verified Artist',
+                    buyerHandle: item.order?.buyer?.handle ? `@${item.order.buyer.handle}` : '@artist',
+                    tier: tierName,
+                    rawTier,
+                    priceNgn: Math.round((item.price_cents || 0) / 100),
+                    creatorPayoutNgn: Math.round((item.producer_amount_cents || 0) / 100),
+                    issuedAt: item.order?.created_at ? new Date(item.order.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Recent',
+                    coverage,
+                    status: 'Active & Whitelisted',
+                    isOwnBeat: true
+                  };
+                });
+                setLicenses(mapped);
+              }
+            }
+          }
         }
       } catch (err) {
         console.error('Error loading creator licenses:', err);
@@ -156,11 +155,22 @@ export default function CreatorLicensesPage() {
     };
   }, []);
 
-  const filteredLicenses = licenses.filter(
+  const ownCount = licenses.filter((l) => l.isOwnBeat).length;
+  const allCount = licenses.length;
+
+  const scopedLicenses = licenses.filter((l) => {
+    if (activeScope === 'my') return l.isOwnBeat;
+    return true;
+  });
+
+  const filteredLicenses = scopedLicenses.filter(
     (l) =>
       l.beatTitle.toLowerCase().includes(searchQuery.toLowerCase()) ||
       l.buyerName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      l.licenseNumber.toLowerCase().includes(searchQuery.toLowerCase())
+      l.buyerHandle.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      l.licenseNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      l.reference.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (l.producerName && l.producerName.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
   return (
@@ -168,8 +178,11 @@ export default function CreatorLicensesPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-zinc-800">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-white">
-            Commercial Licenses & Clearances
+          <h1 className="text-2xl font-bold tracking-tight text-white flex items-center gap-2">
+            <span>Commercial Licenses & Clearances</span>
+            <span className="px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-[#2dd4bf]/10 text-[#2dd4bf] border border-[#2dd4bf]/20">
+              Live Sync Active
+            </span>
           </h1>
           <p className="text-xs text-zinc-400 mt-0.5">
             Audit trail of legal licenses issued to buyers, copyright terms, and active DSP whitelist status
@@ -184,18 +197,47 @@ export default function CreatorLicensesPage() {
         </div>
       </div>
 
-      {/* Search Filter & Telemetry Summary */}
+      {/* Scope Tabs & Search Filter */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-zinc-900/40 p-3 rounded-lg border border-zinc-800">
-        <div className="relative flex-1 max-w-sm">
-          <Search className="h-3.5 w-3.5 text-zinc-500 absolute left-3 top-1/2 -translate-y-1/2" />
-          <input
-            type="text"
-            placeholder="Search by beat, buyer name, or license number..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full bg-zinc-950 border border-zinc-800 rounded-md py-1.5 pl-9 pr-3 text-xs text-zinc-200 placeholder:text-zinc-500 focus:outline-none focus:border-zinc-700"
-          />
+        <div className="flex items-center gap-2">
+          {/* View Scopes */}
+          <div className="inline-flex rounded-md p-0.5 bg-zinc-950 border border-zinc-800 text-xs">
+            <button
+              type="button"
+              onClick={() => setActiveScope('all')}
+              className={`px-3 py-1 rounded-sm font-medium transition-colors ${
+                activeScope === 'all'
+                  ? 'bg-zinc-800 text-white shadow-xs'
+                  : 'text-zinc-400 hover:text-zinc-200'
+              }`}
+            >
+              All Licenses ({allCount})
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveScope('my')}
+              className={`px-3 py-1 rounded-sm font-medium transition-colors ${
+                activeScope === 'my'
+                  ? 'bg-zinc-800 text-white shadow-xs'
+                  : 'text-zinc-400 hover:text-zinc-200'
+              }`}
+            >
+              My Beat Sales ({ownCount})
+            </button>
+          </div>
+
+          <div className="relative flex-1 sm:w-64">
+            <Search className="h-3.5 w-3.5 text-zinc-500 absolute left-3 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              placeholder="Search beat, buyer, producer, or ref..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full bg-zinc-950 border border-zinc-800 rounded-md py-1.5 pl-9 pr-3 text-xs text-zinc-200 placeholder:text-zinc-500 focus:outline-none focus:border-zinc-700"
+            />
+          </div>
         </div>
+
         <div className="flex flex-wrap items-center gap-4 text-xs font-mono">
           <span className="text-zinc-400">
             Plays: <strong className="text-[#2dd4bf]">{totalPlays.toLocaleString()}</strong>
@@ -222,8 +264,9 @@ export default function CreatorLicensesPage() {
               <table className="w-full text-left text-xs">
                 <thead className="bg-zinc-950/60 border-b border-zinc-800 text-zinc-400 font-mono uppercase text-[10px] tracking-wider">
                   <tr>
-                    <th className="py-3 px-4">License ID</th>
+                    <th className="py-3 px-4">License ID / Ref</th>
                     <th className="py-3 px-4">Beat Title</th>
+                    <th className="py-3 px-4">Producer</th>
                     <th className="py-3 px-4">Licensee (Buyer)</th>
                     <th className="py-3 px-4">Tier</th>
                     <th className="py-3 px-4 text-right">Sale Total</th>
@@ -236,10 +279,15 @@ export default function CreatorLicensesPage() {
                   {filteredLicenses.map((lic) => (
                     <tr key={lic.id} className="hover:bg-zinc-800/30 transition-colors">
                       <td className="py-3 px-4 font-mono font-semibold text-[#2dd4bf]">
-                        {lic.licenseNumber}
+                        <div>{lic.licenseNumber}</div>
+                        <div className="text-[10px] text-zinc-500 font-normal">{lic.reference}</div>
                       </td>
                       <td className="py-3 px-4 font-medium text-white max-w-[200px] truncate">
                         {lic.beatTitle}
+                      </td>
+                      <td className="py-3 px-4">
+                        <div className="font-medium text-zinc-300">{lic.producerName || 'Caution Producer'}</div>
+                        <div className="text-[10px] text-zinc-500 font-mono">{lic.producerHandle}</div>
                       </td>
                       <td className="py-3 px-4">
                         <div className="font-medium text-zinc-200">{lic.buyerName}</div>
@@ -310,12 +358,20 @@ export default function CreatorLicensesPage() {
 
             <div className="p-4 rounded-lg bg-zinc-950 border border-zinc-800 space-y-3 text-xs font-mono">
               <div className="flex justify-between items-center text-zinc-400 pb-2 border-b border-zinc-800/80">
-                <span>LICENSE ID:</span>
+                <span>LICENSE NUMBER:</span>
                 <span className="text-[#2dd4bf] font-bold">{selectedLicense.licenseNumber}</span>
+              </div>
+              <div className="flex justify-between items-center text-zinc-400 pb-2 border-b border-zinc-800/80">
+                <span>TRANSACTION REF:</span>
+                <span className="text-zinc-300 font-mono">{selectedLicense.reference}</span>
               </div>
               <div className="flex justify-between items-center text-zinc-400">
                 <span>LICENSED BEAT:</span>
                 <span className="text-white font-sans font-semibold">{selectedLicense.beatTitle}</span>
+              </div>
+              <div className="flex justify-between items-center text-zinc-400">
+                <span>PRODUCER:</span>
+                <span className="text-zinc-200 font-sans">{selectedLicense.producerName} ({selectedLicense.producerHandle})</span>
               </div>
               <div className="flex justify-between items-center text-zinc-400">
                 <span>LICENSEE (BUYER):</span>
@@ -346,7 +402,18 @@ export default function CreatorLicensesPage() {
               </p>
             </div>
 
-            <div className="pt-2 flex justify-end gap-2">
+            <div className="pt-2 flex justify-between items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  window.print();
+                }}
+                className="px-3 py-1.5 rounded-md bg-[#2dd4bf] hover:bg-[#20b8a4] text-zinc-950 text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5"
+              >
+                <Download className="h-3.5 w-3.5 stroke-[2.5]" />
+                <span>Print Legal Certificate</span>
+              </button>
+
               <button
                 type="button"
                 onClick={() => setSelectedLicense(null)}

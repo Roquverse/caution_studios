@@ -105,6 +105,144 @@ export async function GET(req: NextRequest) {
 
     if (licErr) console.warn('Could not fetch issued licenses:', licErr);
 
+    // 4. Also fetch all paid order items to guarantee 100% sync
+    const { data: allOrderItems } = await supabase
+      .from('order_items')
+      .select(`
+        id,
+        order_id,
+        beat_id,
+        producer_id,
+        license,
+        price_cents,
+        producer_amount_cents,
+        platform_fee_cents,
+        order:orders!order_id (
+          id,
+          buyer_id,
+          status,
+          total_cents,
+          paystack_reference,
+          created_at,
+          buyer:profiles!buyer_id (
+            id,
+            display_name,
+            handle,
+            avatar_url
+          )
+        ),
+        beat:beats!beat_id (
+          id,
+          title,
+          slug,
+          genre,
+          cover_url,
+          bpm,
+          duration_seconds,
+          producer_id,
+          producer:profiles!producer_id (
+            id,
+            display_name,
+            handle,
+            avatar_url
+          )
+        )
+      `)
+      .order('id', { ascending: false });
+
+    // Format issued licenses list
+    const seenOrderItemIds = new Set<string>();
+    const seenLicenseIds = new Set<string>();
+
+    const formattedIssued: any[] = [];
+
+    (issuedLicenses || []).forEach((lic: any) => {
+      seenLicenseIds.add(lic.id);
+      if (lic.order_item_id) seenOrderItemIds.add(lic.order_item_id);
+
+      const beat = lic.beat || {};
+      const producer = beat.producer || {};
+      const buyer = lic.buyer || {};
+      const orderItem = lic.order_item || {};
+      const order = orderItem.order || {};
+
+      formattedIssued.push({
+        id: lic.id,
+        type: lic.type || 'premium',
+        stream_cap: lic.stream_cap || 500000,
+        video_cap: lic.video_cap || 1,
+        agreement_pdf_key: lic.agreement_pdf_key,
+        issued_at: lic.issued_at || order.created_at,
+        price_cents: orderItem.price_cents || order.total_cents || 1500000,
+        reference: order.paystack_reference || `lic-${(lic.order_item_id || lic.id).substring(0, 8)}`,
+        song: {
+          id: beat.id || lic.beat_id,
+          title: beat.title || 'Untitled Master',
+          slug: beat.slug,
+          genre: beat.genre || 'Afrobeats',
+          cover_url: beat.cover_url || '/images/album_neon_dj.jpg'
+        },
+        producer: {
+          id: producer.id || beat.producer_id,
+          display_name: producer.display_name || 'Caution Studio Producer',
+          handle: producer.handle || 'producer',
+          avatar_url: producer.avatar_url || null
+        },
+        buyer: {
+          id: buyer.id || lic.buyer_id,
+          display_name: buyer.display_name || 'Licensed Creator',
+          handle: buyer.handle || 'creator',
+          avatar_url: buyer.avatar_url || null
+        }
+      });
+    });
+
+    // Merge any paid order items not already recorded in licenses
+    (allOrderItems || []).forEach((item: any) => {
+      if (seenOrderItemIds.has(item.id)) return;
+      const order = Array.isArray(item.order) ? item.order[0] : item.order;
+      if (order && order.status && order.status !== 'paid') return;
+
+      const beat = Array.isArray(item.beat) ? item.beat[0] : item.beat;
+      const producer = beat?.producer || null;
+      const buyer = order?.buyer || null;
+
+      seenOrderItemIds.add(item.id);
+
+      formattedIssued.push({
+        id: item.id,
+        type: item.license || 'premium',
+        stream_cap: item.license === 'exclusive' ? 0 : 500000,
+        video_cap: 1,
+        agreement_pdf_key: `licenses/${item.id}/agreement.pdf`,
+        issued_at: order?.created_at || new Date().toISOString(),
+        price_cents: item.price_cents || order?.total_cents || 1500000,
+        reference: order?.paystack_reference || `lic-${item.id.substring(0, 8)}`,
+        song: {
+          id: beat?.id || item.beat_id,
+          title: beat?.title || 'Studio Master Instrumental',
+          slug: beat?.slug,
+          genre: beat?.genre || 'Afrobeats',
+          cover_url: beat?.cover_url || '/images/album_neon_dj.jpg'
+        },
+        producer: {
+          id: producer?.id || item.producer_id,
+          display_name: producer?.display_name || 'Caution Studio Producer',
+          handle: producer?.handle || 'producer',
+          avatar_url: producer?.avatar_url || null
+        },
+        buyer: {
+          id: buyer?.id || order?.buyer_id,
+          display_name: buyer?.display_name || 'Licensed Creator',
+          handle: buyer?.handle || 'creator',
+          avatar_url: buyer?.avatar_url || null
+        }
+      });
+    });
+
+    // Sort by newest first
+    formattedIssued.sort((a, b) => new Date(b.issued_at || 0).getTime() - new Date(a.issued_at || 0).getTime());
+
     // Map configured licenses by beat_id
     const licensesByBeat = new Map<string, any[]>();
     (beatLicenses || []).forEach((bl) => {
@@ -115,9 +253,12 @@ export async function GET(req: NextRequest) {
 
     // Count issued licenses per beat
     const issuedCountByBeat = new Map<string, number>();
-    (issuedLicenses || []).forEach((lic) => {
-      const current = issuedCountByBeat.get(lic.beat_id) || 0;
-      issuedCountByBeat.set(lic.beat_id, current + 1);
+    formattedIssued.forEach((lic) => {
+      const bId = lic.song?.id;
+      if (bId) {
+        const current = issuedCountByBeat.get(bId) || 0;
+        issuedCountByBeat.set(bId, current + 1);
+      }
     });
 
     // Format songs catalog list with uploader & license options
@@ -146,45 +287,6 @@ export async function GET(req: NextRequest) {
         },
         licenseTiers: configured,
         generatedLicenseCount: issuedCountByBeat.get(beat.id) || 0
-      };
-    });
-
-    // Format issued licenses list
-    const formattedIssued = (issuedLicenses || []).map((lic: any) => {
-      const beat = lic.beat || {};
-      const producer = beat.producer || {};
-      const buyer = lic.buyer || {};
-      const orderItem = lic.order_item || {};
-      const order = orderItem.order || {};
-
-      return {
-        id: lic.id,
-        type: lic.type || 'basic',
-        stream_cap: lic.stream_cap || 100000,
-        video_cap: lic.video_cap || 1,
-        agreement_pdf_key: lic.agreement_pdf_key,
-        issued_at: lic.issued_at,
-        price_cents: orderItem.price_cents || order.total_cents || 1500000,
-        reference: order.paystack_reference || `LIC-${lic.id.substring(0, 8).toUpperCase()}`,
-        song: {
-          id: beat.id || lic.beat_id,
-          title: beat.title || 'Untitled Master',
-          slug: beat.slug,
-          genre: beat.genre,
-          cover_url: beat.cover_url || '/images/album_neon_dj.jpg'
-        },
-        producer: {
-          id: producer.id || beat.producer_id,
-          display_name: producer.display_name || 'Studio Producer',
-          handle: producer.handle || 'producer',
-          avatar_url: producer.avatar_url || null
-        },
-        buyer: {
-          id: buyer.id || lic.buyer_id,
-          display_name: buyer.display_name || 'Licensed Creator',
-          handle: buyer.handle || 'creator',
-          avatar_url: buyer.avatar_url || null
-        }
       };
     });
 

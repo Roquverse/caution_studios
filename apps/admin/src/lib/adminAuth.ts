@@ -68,13 +68,26 @@ export async function verifyAdminRequest(req: NextRequest): Promise<AdminAuthRes
     }
 
     const appMeta = user.app_metadata || {};
+    let isDbAdmin = false;
+    try {
+      const { data: prof } = await adminClient
+        .from('profiles')
+        .select('roles, handle')
+        .eq('id', user.id)
+        .maybeSingle();
+      if (prof?.roles?.includes('admin') || prof?.handle?.toLowerCase().includes('admin')) {
+        isDbAdmin = true;
+      }
+    } catch (e) {}
+
     const isAdmin =
       appMeta.is_admin === true ||
       appMeta.role === 'admin' ||
       appMeta.role === 'superadmin' ||
       user.email === 'admin@cautionstudioz.com' ||
       user.email === 'admin@caution.studio' ||
-      user.email === 'damicoledj@gmail.com';
+      user.email === 'damicoledj@gmail.com' ||
+      isDbAdmin;
 
     if (!isAdmin) {
       return {

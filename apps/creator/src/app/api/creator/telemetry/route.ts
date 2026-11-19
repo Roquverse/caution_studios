@@ -40,9 +40,12 @@ export async function GET(req: NextRequest) {
       .eq('id', userId)
       .maybeSingle();
 
-    const isAdminAccount =
+    const isAdminAccount = Boolean(
       profile?.roles?.includes('admin') ||
-      profile?.handle?.toLowerCase().includes('admin');
+      profile?.handle?.toLowerCase().includes('admin') ||
+      (profile?.email && profile.email.toLowerCase().includes('admin')) ||
+      (profile?.email && profile.email.toLowerCase() === 'damicoledj@gmail.com')
+    );
 
     // 2. Fetch Producer Beats with Licenses (order by created_at DESC so newest uploaded beats appear first)
     let { data: dbBeats } = await supabase
@@ -135,13 +138,17 @@ export async function GET(req: NextRequest) {
       `)
       .order('id', { ascending: false });
 
-    if (!isAdminAccount || (dbBeats && dbBeats.some((b) => b.producer_id === userId))) {
+    // If not an admin, restrict sales to this producer's beats
+    if (!isAdminAccount) {
       orderQuery = orderQuery.eq('producer_id', userId);
     }
 
     const { data: orderItems } = await orderQuery;
     let paidOrderItems: any[] = (orderItems || []).filter(
-      (item: any) => !item.order || item.order?.status === 'paid'
+      (item: any) => {
+        const orderObj = Array.isArray(item.order) ? item.order[0] : item.order;
+        return !orderObj || orderObj.status === 'paid';
+      }
     );
 
     // Also check licenses table in case orders were recorded directly as licenses
@@ -152,39 +159,34 @@ export async function GET(req: NextRequest) {
           .from('licenses')
           .select(`
             id,
-            order_id,
             order_item_id,
             beat_id,
             buyer_id,
             type,
-            license_type,
+            stream_cap,
+            video_cap,
             license_number,
             price_cents,
             producer_amount_cents,
             issued_at,
-            buyer:buyer_id (
+            status,
+            buyer:profiles!buyer_id (
               display_name,
               handle
             ),
-            beat:beat_id (
+            beat:beats!beat_id (
               title,
               cover_url
             )
           `)
-          .or(`producer_id.eq.${userId},beat_id.in.(${beatIds})`);
+          .in('beat_id', beats.map((b) => b.id));
 
         if (dbLicenses && dbLicenses.length > 0) {
           const existingOrderItemIds = new Set(paidOrderItems.map((oi: any) => oi.id));
-          const existingBeatOrderPairs = new Set(
-            paidOrderItems.map((oi: any) => {
-              const orderObj = Array.isArray(oi.order) ? oi.order[0] : oi.order;
-              return `${oi.beat_id}_${orderObj?.id || ''}`;
-            })
-          );
+          const existingBeatIds = new Set(paidOrderItems.map((oi: any) => oi.beat_id));
 
           for (const lic of dbLicenses) {
             if (lic.order_item_id && existingOrderItemIds.has(lic.order_item_id)) continue;
-            if (lic.order_id && existingBeatOrderPairs.has(`${lic.beat_id}_${lic.order_id}`)) continue;
 
             const grossCents = lic.price_cents || 1500000;
             const producerCutCents = lic.producer_amount_cents || Math.round(grossCents * 0.8);
@@ -195,9 +197,9 @@ export async function GET(req: NextRequest) {
               producer_id: userId,
               price_cents: grossCents,
               producer_amount_cents: producerCutCents,
-              license: lic.type || lic.license_type || 'premium',
+              license: lic.type || 'premium',
               order: {
-                id: lic.order_id || lic.id,
+                id: lic.order_item_id || lic.id,
                 status: 'paid',
                 created_at: lic.issued_at,
                 buyer: lic.buyer || { display_name: 'Verified Artist', handle: 'artist' }

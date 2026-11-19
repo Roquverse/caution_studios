@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { AdminShell } from '../components/AdminShell';
+import { supabase } from '../lib/supabaseClient';
 import {
   DollarSign,
   Music,
@@ -103,7 +104,32 @@ export default function AdminDashboardPage() {
   const fetchStats = async () => {
     try {
       setLoading(true);
-      const res = await fetch('/api/stats');
+      let { data: { session } } = await supabase.auth.getSession();
+
+      if (!session && typeof document !== 'undefined') {
+        const matchToken = document.cookie.match(/(?:^|;\s*)sb-token=([^;]*)/);
+        const matchRefresh = document.cookie.match(/(?:^|;\s*)sb-refresh=([^;]*)/);
+        if (matchToken && matchRefresh) {
+          try {
+            const { data: restored } = await supabase.auth.setSession({
+              access_token: decodeURIComponent(matchToken[1]),
+              refresh_token: decodeURIComponent(matchRefresh[1])
+            });
+            if (restored?.session) session = restored.session;
+          } catch (e) {}
+        }
+      }
+
+      const headers: Record<string, string> = {};
+      if (session?.access_token) {
+        headers['Authorization'] = `Bearer ${session.access_token}`;
+      }
+
+      const res = await fetch('/api/stats', {
+        headers,
+        credentials: 'include',
+        cache: 'no-store'
+      });
       if (res.ok) {
         const data = await res.json();
         setStats(data);
