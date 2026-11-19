@@ -7,24 +7,56 @@ export async function getStudioBeats(): Promise<{ beats: TrackItem[]; producers:
 
   try {
     const supabase = getServiceRoleClient();
-    const { data: dbBeats } = await supabase
-      .from('beats')
-      .select(`
-        *,
-        producer:producer_id (
-          id,
-          display_name,
-          handle,
-          avatar_url
-        ),
-        licenses:beat_licenses (
-          type,
-          price_cents,
-          enabled
-        )
-      `)
-      .eq('status', 'live')
-      .order('created_at', { ascending: false });
+    const [beatsRes, licRes, oiRes] = await Promise.all([
+      supabase
+        .from('beats')
+        .select(`
+          *,
+          producer:producer_id (
+            id,
+            display_name,
+            handle,
+            avatar_url
+          ),
+          licenses:beat_licenses (
+            type,
+            price_cents,
+            enabled
+          )
+        `)
+        .eq('status', 'live')
+        .order('created_at', { ascending: false }),
+      supabase.from('licenses').select('beat_id'),
+      supabase.from('order_items').select('beat_id, order:orders!order_id(status)')
+    ]);
+
+    const dbBeats = beatsRes.data;
+
+    const licenseCountMap: Record<string, number> = {};
+    const orderItemCountMap: Record<string, number> = {};
+
+    if (licRes.data) {
+      licRes.data.forEach((l: any) => {
+        if (l.beat_id) {
+          licenseCountMap[l.beat_id] = (licenseCountMap[l.beat_id] || 0) + 1;
+        }
+      });
+    }
+
+    if (oiRes.data) {
+      oiRes.data.forEach((oi: any) => {
+        const orderStatus = (oi as any)?.order?.status;
+        if (oi.beat_id && (!orderStatus || orderStatus === 'paid' || orderStatus === 'completed')) {
+          orderItemCountMap[oi.beat_id] = (orderItemCountMap[oi.beat_id] || 0) + 1;
+        }
+      });
+    }
+
+    const purchaseCountMap: Record<string, number> = {};
+    const allBeatIds = new Set([...Object.keys(licenseCountMap), ...Object.keys(orderItemCountMap)]);
+    allBeatIds.forEach((id) => {
+      purchaseCountMap[id] = Math.max(licenseCountMap[id] || 0, orderItemCountMap[id] || 0);
+    });
 
     if (dbBeats && dbBeats.length > 0) {
       const r2Cdn = process.env.NEXT_PUBLIC_R2_PUBLIC_URL?.replace(/\/$/, '') || 'https://media.cautionstudioz.com';
@@ -114,7 +146,9 @@ export async function getStudioBeats(): Promise<{ beats: TrackItem[]; producers:
           exclusivePriceNgn,
           isFree: isFreeTagged,
           tags: beatTags,
-          playCount: b.play_count || 0
+          playCount: b.play_count || 0,
+          downloadCount: Number(b.download_count || b.free_commercial_downloads_count || 0),
+          purchaseCount: purchaseCountMap[b.id] || 0
         };
       });
 

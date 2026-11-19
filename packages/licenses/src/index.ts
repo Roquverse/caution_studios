@@ -69,7 +69,7 @@ export const LICENSE_DEFINITIONS: Record<LicenseType, LicenseTerms> = {
     isExclusive: true,
     radioBroadcasting: true,
     forProfitLivePerformances: true,
-    description: '100% sole exclusive ownership. The beat is permanently retired from Caution Studio.'
+    description: '100% sole exclusive ownership. The beat is permanently retired from Caution Studio. (Important: Previous premium licenses remain valid).'
   }
 };
 
@@ -144,7 +144,7 @@ export function generateLicenseAgreementHtml(params: {
     <div class="clause">2. <strong>Music Videos:</strong> ${terms.videoCap === null ? 'Unlimited music video synchronization rights.' : `Permitted on up to ${terms.videoCap} monetized music video (e.g., YouTube, Vevo).`}</div>
     <div class="clause">3. <strong>Broadcasting:</strong> ${terms.radioBroadcasting ? 'Terrestrial and satellite radio rotation permitted.' : 'No terrestrial broadcast without prior written agreement.'}</div>
     <div class="clause">4. <strong>Trackout Stems:</strong> ${terms.includesStems ? 'Full WAV trackout stems granted for mixing and vocal adaptation.' : 'Stereo master audio only. Stems not included.'}</div>
-    <div class="clause">5. <strong>Exclusivity:</strong> ${terms.isExclusive ? 'Sole exclusive ownership. All future licensing terminated permanently.' : 'Non-exclusive. Grantor reserves rights to license this master to third parties.'}</div>
+    <div class="clause">5. <strong>Exclusivity:</strong> ${terms.isExclusive ? 'Sole exclusive ownership. All future licensing terminated permanently. (Important: You can sell a beat under a Premium License and later sell it exclusively, but the exclusive buyer must understand that previous premium licenses remain valid).' : 'Non-exclusive. Grantor reserves rights to license this master to third parties.'}</div>
   </div>
 
   <div class="footer">

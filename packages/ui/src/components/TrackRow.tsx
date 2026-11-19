@@ -11,7 +11,8 @@ import {
   MoreVertical,
   Volume2,
   Lock,
-  Clock
+  Clock,
+  ShoppingBag
 } from 'lucide-react';
 import { cn } from '../utils/cn';
 
@@ -32,6 +33,8 @@ export interface PlayableTrackItem {
   exclusivePriceNgn?: number;
   isFree?: boolean;
   playCount?: number;
+  downloadCount?: number;
+  purchaseCount?: number;
   date?: string;
   [key: string]: any;
 }
@@ -220,7 +223,17 @@ export const TrackRow = <T extends PlayableTrackItem = PlayableTrackItem>({
               isDark ? 'text-gray-400' : 'text-gray-400'
             )}
           >
-            {subtitleOverride ?? `${track.artist} • ${genreDisplay}`}
+            {subtitleOverride ?? (
+              <>
+                {track.artist} • {genreDisplay}
+                {typeof track.downloadCount === 'number' && track.downloadCount > 0 ? (
+                  <span className="opacity-75"> • {track.downloadCount} dl</span>
+                ) : null}
+                {typeof track.purchaseCount === 'number' && track.purchaseCount > 0 ? (
+                  <span className="text-amber-400/90 font-medium"> • {track.purchaseCount} sold</span>
+                ) : null}
+              </>
+            )}
           </span>
         </div>
       </div>
@@ -307,42 +320,75 @@ export const TrackRow = <T extends PlayableTrackItem = PlayableTrackItem>({
 
         {/* Download or Locked Download */}
         {isDownloadLocked ? (
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              if (onLockedDownloadClick) onLockedDownloadClick(track, e);
-            }}
-            title="Download Locked · License Required"
-            className={cn(
-              'p-1 sm:p-1.5 rounded transition-colors cursor-pointer',
-              isDark
-                ? 'text-gray-500 hover:text-amber-400 hover:bg-amber-400/10'
-                : 'text-gray-400 hover:text-amber-600 hover:bg-amber-50'
-            )}
-          >
-            <Lock className="h-3.5 w-3.5" />
-          </button>
-        ) : (
-          onDownload && (
+          <div className="flex items-center gap-1.5 shrink-0">
+            {/* Download count on Paid beat */}
+            <span
+              className={cn(
+                'inline-flex items-center gap-0.5 text-[10px] sm:text-[11px] font-mono select-none px-1 py-0.5 rounded',
+                isDark ? 'text-gray-400 bg-white/[0.04]' : 'text-gray-500 bg-gray-100'
+              )}
+              title={`${track.downloadCount ?? 0} downloads`}
+            >
+              <Download className="h-3 w-3 opacity-70" />
+              <span className="tabular-nums">{track.downloadCount ?? 0}</span>
+            </span>
+
+            {/* Purchase count on Paid beat */}
+            <span
+              className={cn(
+                'inline-flex items-center gap-0.5 text-[10px] sm:text-[11px] font-mono font-medium select-none px-1.5 py-0.5 rounded',
+                isDark
+                  ? 'text-amber-400 bg-amber-500/10 border border-amber-500/20'
+                  : 'text-amber-700 bg-amber-50 border border-amber-200'
+              )}
+              title={`${track.purchaseCount ?? 0} purchases / licenses issued`}
+            >
+              <ShoppingBag className="h-3 w-3 text-amber-400" />
+              <span className="tabular-nums font-bold">{track.purchaseCount ?? 0}</span>
+            </span>
+
             <button
               type="button"
               onClick={(e) => {
                 e.stopPropagation();
-                onDownload(track, e);
+                if (onLockedDownloadClick) onLockedDownloadClick(track, e);
               }}
-              title="Download Track"
+              title="Download Locked · License Required"
               className={cn(
                 'p-1 sm:p-1.5 rounded transition-colors cursor-pointer',
-                isDownloading
-                  ? 'text-[#2dd4bf] bg-[#2dd4bf]/10 animate-pulse'
-                  : isDark
-                  ? 'hover:text-white hover:bg-white/10'
-                  : 'hover:text-black hover:bg-gray-100'
+                isDark
+                  ? 'text-gray-500 hover:text-amber-400 hover:bg-amber-400/10'
+                  : 'text-gray-400 hover:text-amber-600 hover:bg-amber-50'
               )}
             >
-              <Download className="h-3.5 w-3.5" />
+              <Lock className="h-3.5 w-3.5" />
             </button>
+          </div>
+        ) : (
+          onDownload && (
+            <div className="flex items-center gap-1 shrink-0">
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDownload(track, e);
+                }}
+                title={`Download Track (${track.downloadCount ?? 0} downloads)`}
+                className={cn(
+                  'p-1 sm:p-1.5 rounded transition-colors cursor-pointer flex items-center gap-1',
+                  isDownloading
+                    ? 'text-[#2dd4bf] bg-[#2dd4bf]/10 animate-pulse'
+                    : isDark
+                    ? 'hover:text-white hover:bg-white/10'
+                    : 'hover:text-black hover:bg-gray-100'
+                )}
+              >
+                <Download className="h-3.5 w-3.5" />
+                <span className="text-[10px] sm:text-[11px] font-mono text-gray-400 tabular-nums">
+                  {track.downloadCount ?? 0}
+                </span>
+              </button>
+            </div>
           )
         )}
 

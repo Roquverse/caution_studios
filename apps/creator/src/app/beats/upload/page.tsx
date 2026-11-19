@@ -540,6 +540,10 @@ export default function BeatUploadPage() {
                   <span className="text-[10px] text-zinc-500 mt-1 block">
                     Your cut (80%): ₦{((Number(priceExclusive) || 0) * 0.8).toLocaleString()} · Permanently removed from store
                   </span>
+
+                  <div className="mt-2.5 p-2.5 rounded bg-zinc-900/80 border border-zinc-800 text-[11px] text-zinc-400 leading-relaxed">
+                    <span className="font-semibold text-zinc-200">Important:</span> You can sell a beat under a Premium License and later sell it exclusively, but the exclusive buyer must understand that previous premium licenses remain valid.
+                  </div>
                 </div>
               </div>
             </div>

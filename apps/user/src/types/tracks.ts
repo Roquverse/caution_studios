@@ -24,6 +24,8 @@ export interface TrackItem {
   genre?: string;
   musicalKey?: string;
   playCount?: number;
+  downloadCount?: number;
+  purchaseCount?: number;
 }
 
 export interface ProducerItem {

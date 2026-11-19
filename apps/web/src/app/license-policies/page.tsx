@@ -275,6 +275,10 @@ export default function LicensePoliciesPage() {
           <p className="text-xs sm:text-sm text-gray-400 leading-relaxed pt-2">
             A standard non-exclusive license grants commercial usage rights but does not transfer exclusive ownership of the original beat to the artist. (For 1-of-1 master ownership buyout, artists should select the <strong>Exclusive Buyout</strong> tier).
           </p>
+
+          <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 text-xs sm:text-sm text-amber-200 space-y-1">
+            <strong>Important:</strong> You can sell a beat under a Premium License and later sell it exclusively, but the exclusive buyer must understand that previous premium licenses remain valid.
+          </div>
         </section>
 
         {/* Section 4 */}

@@ -740,6 +740,9 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
     }
 
     setDownloadingId(track.id);
+    setPlaylistRows((prev) =>
+      prev.map((b) => (b.id === track.id ? { ...b, downloadCount: (b.downloadCount || 0) + 1 } : b))
+    );
     const newQuota = recordBeatDownload(track.id, track.title);
     setDownloadToast({
       title: track.title,
@@ -2820,6 +2823,11 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
                   ₦{(paidBeatPurchaseTrack.exclusivePriceNgn || 200000).toLocaleString()}
                 </span>
               </div>
+            </div>
+
+            {/* Exclusive & Prior License Notice */}
+            <div className="mt-4 p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-[11px] text-amber-200/90 leading-relaxed">
+              <span className="font-bold text-amber-400">Important:</span> You can sell a beat under a Premium License and later sell it exclusively, but the exclusive buyer must understand that previous premium licenses remain valid.
             </div>
 
             <div className="mt-6">
