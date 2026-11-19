@@ -21,12 +21,18 @@ import {
   UploadCloud,
   FileCheck2,
   Download,
-  Headphones
+  Headphones,
+  Wallet,
+  Building,
+  CheckCircle2,
+  X,
+  AlertCircle
 } from 'lucide-react';
 
 interface RecentSaleItem {
   id: string;
   beat: string;
+  coverUrl?: string;
   buyer: string;
   tier: string;
   amountNgn: number;
@@ -61,6 +67,7 @@ export default function CreatorDashboardPage() {
 
   // Producer real metrics
   const [totalEarningsNgn, setTotalEarningsNgn] = useState<number>(0);
+  const [availableBalanceNgn, setAvailableBalanceNgn] = useState<number>(0);
   const [downloadRewardNgn, setDownloadRewardNgn] = useState<number>(0);
   const [totalPlaysCount, setTotalPlaysCount] = useState<number>(0);
   const [totalDownloadsCount, setTotalDownloadsCount] = useState<number>(0);
@@ -71,6 +78,17 @@ export default function CreatorDashboardPage() {
   const [recentSales, setRecentSales] = useState<RecentSaleItem[]>([]);
   const [topStreamingBeats, setTopStreamingBeats] = useState<TopBeatItem[]>([]);
   const [monthlyChart, setMonthlyChart] = useState<MonthData[]>([]);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+
+  // Quick Withdrawal Modal State
+  const [isWithdrawModalOpen, setIsWithdrawModalOpen] = useState(false);
+  const [withdrawAmount, setWithdrawAmount] = useState<string>('');
+  const [bankName, setBankName] = useState('');
+  const [accountNumber, setAccountNumber] = useState('');
+  const [accountName, setAccountName] = useState('');
+  const [withdrawing, setWithdrawing] = useState(false);
+  const [withdrawSuccess, setWithdrawSuccess] = useState(false);
+  const [withdrawError, setWithdrawError] = useState('');
 
   const downloadThreshold = 10000;
   const combinedActivityCount = totalPlaysCount + totalDownloadsCount;
@@ -106,6 +124,7 @@ export default function CreatorDashboardPage() {
           if (isMounted) setLoading(false);
           return;
         }
+        setCurrentUserId(userId);
 
         // Primary: Fetch comprehensive producer telemetry via service-role API
         const res = await fetch(`/api/creator/telemetry?userId=${encodeURIComponent(userId)}`, {
@@ -118,6 +137,9 @@ export default function CreatorDashboardPage() {
 
           if (data.profile) {
             setIsVerified(Boolean(data.profile.is_verified));
+            setBankName(data.profile.paystack_bank_name || '');
+            setAccountNumber(data.profile.paystack_account_number || '');
+            setAccountName(data.profile.paystack_account_name || '');
             if (data.profile.trial_ends_at) {
               const ends = new Date(data.profile.trial_ends_at).getTime();
               const diffDays = Math.max(0, Math.ceil((ends - Date.now()) / (1000 * 60 * 60 * 24)));
@@ -126,6 +148,8 @@ export default function CreatorDashboardPage() {
               setTrialDaysRemaining(85);
             }
           }
+
+          setAvailableBalanceNgn(Number(data.availableBalanceNgn) || 0);
 
           const dbBeats = data.beats || [];
           const live = dbBeats.filter((b: any) => b.status === 'live');
@@ -158,16 +182,17 @@ export default function CreatorDashboardPage() {
           const salesNetNgn = Number(data.totalSalesEarningsNgn) || 0;
           setTotalEarningsNgn(salesNetNgn + (Number(data.downloadRewardNgn) || 0));
 
-          const mappedSales: RecentSaleItem[] = paidItems.slice(0, 5).map((item: any) => {
+          const mappedSales: RecentSaleItem[] = paidItems.map((item: any) => {
             const dateStr = item.order?.created_at
-              ? new Date(item.order.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+              ? new Date(item.order.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
               : 'Recent';
 
             return {
               id: item.id,
               beat: item.beat?.title || 'Studio Instrumental',
+              coverUrl: item.beat?.cover_url || '',
               buyer: item.order?.buyer?.handle ? `@${item.order.buyer.handle}` : (item.order?.buyer?.display_name || '@artist'),
-              tier: `${item.license || 'basic'} License`,
+              tier: `${item.license || 'premium'} License`,
               amountNgn: Math.round((item.price_cents || 0) / 100),
               payoutNgn: Math.round((item.producer_amount_cents || 0) / 100),
               date: dateStr,
@@ -224,6 +249,95 @@ export default function CreatorDashboardPage() {
     }
   };
 
+  const handleOpenWithdraw = (customAmount?: number) => {
+    const targetAmount = customAmount !== undefined ? customAmount : availableBalanceNgn;
+    setWithdrawAmount(targetAmount > 0 ? String(targetAmount) : '');
+    setWithdrawError('');
+    setWithdrawSuccess(false);
+    setIsWithdrawModalOpen(true);
+  };
+
+  const handleWithdrawSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const parsedAmount = Number(withdrawAmount);
+
+    if (isNaN(parsedAmount) || parsedAmount < 1000) {
+      setWithdrawError('Minimum withdrawal amount is ₦1,000.');
+      return;
+    }
+
+    if (parsedAmount > availableBalanceNgn) {
+      setWithdrawError(`Amount exceeds your available balance of ₦${availableBalanceNgn.toLocaleString()}.`);
+      return;
+    }
+
+    if (!bankName.trim() || !accountNumber.trim() || !accountName.trim()) {
+      setWithdrawError('Please enter valid Nigerian bank account details.');
+      return;
+    }
+
+    setWithdrawing(true);
+    setWithdrawError('');
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const userId = session?.user?.id || currentUserId;
+      if (!userId) throw new Error('You must be signed in.');
+
+      const fee = 100;
+      const net = parsedAmount - fee;
+
+      // 1. Insert payout row
+      const { error: payoutErr } = await supabase.from('payouts').insert({
+        producer_id: userId,
+        amount_ngn: parsedAmount,
+        fee_ngn: fee,
+        net_ngn: net,
+        bank_name: bankName.trim(),
+        bank_code: '058',
+        account_number: accountNumber.trim(),
+        account_name: accountName.trim(),
+        status: 'pending'
+      });
+
+      if (payoutErr) throw payoutErr;
+
+      // 2. Save bank details to profile
+      await supabase
+        .from('profiles')
+        .update({
+          paystack_bank_name: bankName.trim(),
+          paystack_account_number: accountNumber.trim(),
+          paystack_account_name: accountName.trim()
+        })
+        .eq('id', userId);
+
+      // 3. Notify Admin Support
+      try {
+        const adminId = 'c855e1b8-b34c-4b1d-986b-373e70ec423f';
+        await supabase.from('chats').insert({
+          sender_id: userId,
+          recipient_id: adminId,
+          content: `💳 PAYOUT WITHDRAWAL REQUEST: ₦${parsedAmount.toLocaleString()} to ${bankName.trim()} (${accountNumber.trim()} - ${accountName.trim()}). Net transfer: ₦${net.toLocaleString()}.`,
+          is_encrypted: false,
+          has_contact_info: false
+        });
+      } catch (e) {}
+
+      setAvailableBalanceNgn((prev) => Math.max(0, prev - parsedAmount));
+      setWithdrawSuccess(true);
+      setTimeout(() => {
+        setIsWithdrawModalOpen(false);
+        setWithdrawSuccess(false);
+      }, 2500);
+    } catch (err: any) {
+      console.error('Withdrawal error:', err);
+      setWithdrawError(err.message || 'Failed to submit withdrawal request.');
+    } finally {
+      setWithdrawing(false);
+    }
+  };
+
   return (
     <CreatorShell>
       {/* Top Header & Quick Actions */}
@@ -243,13 +357,21 @@ export default function CreatorDashboardPage() {
           </p>
         </div>
 
-        <div className="flex items-center gap-2.5">
+        <div className="flex flex-wrap items-center gap-2.5">
+          <button
+            type="button"
+            onClick={() => handleOpenWithdraw()}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 text-xs font-semibold transition-colors cursor-pointer shadow-xs"
+          >
+            <Wallet className="h-3.5 w-3.5 text-emerald-400" />
+            <span>Withdraw Funds ({availableBalanceNgn > 0 ? `₦${availableBalanceNgn.toLocaleString()}` : '₦0'})</span>
+          </button>
           <Link
             href="/payouts"
             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-zinc-800 bg-zinc-900/60 hover:bg-zinc-800/80 text-xs font-semibold text-zinc-200 transition-colors"
           >
             <CreditCard className="h-3.5 w-3.5 text-[#2dd4bf]" />
-            <span>Paystack Payouts</span>
+            <span>Paystack Ledger</span>
           </Link>
           <Link
             href="/beats/upload"
@@ -365,24 +487,43 @@ export default function CreatorDashboardPage() {
 
           {/* 5 Metric KPI Cards */}
           <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
-            {/* 1. Total Earnings */}
-            <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-4 shadow-sm">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-medium text-zinc-400">Total Net Earnings</span>
-                <div className="p-1.5 rounded-md bg-[#2dd4bf]/10 text-[#2dd4bf]">
-                  <DollarSign className="h-4 w-4" />
+            {/* 1. Total Earnings & Withdrawal */}
+            <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-4 shadow-sm flex flex-col justify-between">
+              <div>
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-medium text-zinc-400">Total Net Earnings</span>
+                  <div className="p-1.5 rounded-md bg-[#2dd4bf]/10 text-[#2dd4bf]">
+                    <DollarSign className="h-4 w-4" />
+                  </div>
+                </div>
+                <div className="mt-2 flex items-baseline gap-2">
+                  <span className="text-2xl font-bold font-mono text-white">₦{totalEarningsNgn.toLocaleString()}</span>
+                  {totalEarningsNgn > 0 && (
+                    <span className="text-xs font-semibold text-emerald-400 flex items-center gap-0.5">
+                      <TrendingUp className="h-3 w-3" />
+                      <span>80%</span>
+                    </span>
+                  )}
                 </div>
               </div>
-              <div className="mt-2 flex items-baseline gap-2">
-                <span className="text-2xl font-bold font-mono text-white">₦{totalEarningsNgn.toLocaleString()}</span>
-                {totalEarningsNgn > 0 && (
-                  <span className="text-xs font-semibold text-emerald-400 flex items-center gap-0.5">
-                    <TrendingUp className="h-3 w-3" />
-                    <span>80%</span>
-                  </span>
+              <div className="mt-3 pt-2.5 border-t border-zinc-800/80 flex items-center justify-between">
+                <div>
+                  <span className="text-[10px] text-zinc-500 block uppercase font-mono">Available</span>
+                  <span className="text-xs font-bold font-mono text-emerald-400">₦{availableBalanceNgn.toLocaleString()}</span>
+                </div>
+                {availableBalanceNgn >= 1000 ? (
+                  <button
+                    type="button"
+                    onClick={() => handleOpenWithdraw()}
+                    className="px-2.5 py-1 rounded bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 text-[11px] font-semibold flex items-center gap-1 transition-colors cursor-pointer"
+                  >
+                    <Wallet className="h-3 w-3" />
+                    <span>Withdraw</span>
+                  </button>
+                ) : (
+                  <span className="text-[10px] text-zinc-500 font-mono">Min ₦1k</span>
                 )}
               </div>
-              <p className="text-[11px] text-zinc-500 mt-1">80% sales + threshold rewards</p>
             </div>
 
             {/* 2. Total Plays / Streams */}
@@ -503,15 +644,32 @@ export default function CreatorDashboardPage() {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Recent Beat Sales */}
             <div className="lg:col-span-2 rounded-lg border border-zinc-800 bg-zinc-900/50 p-5 shadow-sm">
-              <div className="flex items-center justify-between pb-3 border-b border-zinc-800">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-zinc-800">
                 <div>
-                  <h3 className="text-sm font-semibold text-white">Recent Beat Sales</h3>
-                  <p className="text-xs text-zinc-400">Orders placed by verified artists and content creators</p>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-sm font-semibold text-white">Sold Beats &amp; Commercial Licenses</h3>
+                    <span className="px-2 py-0.5 rounded-full bg-[#2dd4bf]/15 text-[#2dd4bf] text-[10px] font-bold font-mono">
+                      {recentSales.length} Sold
+                    </span>
+                  </div>
+                  <p className="text-xs text-zinc-400 mt-0.5">Purchases by verified artists &amp; content creators (80% net credited)</p>
                 </div>
-                <Link href="/licenses" className="text-xs text-[#2dd4bf] hover:underline flex items-center gap-1">
-                  <span>All Licenses</span>
-                  <ArrowRight className="h-3 w-3" />
-                </Link>
+                <div className="flex items-center gap-2">
+                  {availableBalanceNgn >= 1000 && (
+                    <button
+                      type="button"
+                      onClick={() => handleOpenWithdraw()}
+                      className="px-2.5 py-1 rounded bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 text-xs font-semibold flex items-center gap-1 transition-colors cursor-pointer"
+                    >
+                      <Wallet className="h-3.5 w-3.5" />
+                      <span>Withdraw ₦{availableBalanceNgn.toLocaleString()}</span>
+                    </button>
+                  )}
+                  <Link href="/licenses" className="text-xs text-[#2dd4bf] hover:underline flex items-center gap-1">
+                    <span>All Licenses</span>
+                    <ArrowRight className="h-3 w-3" />
+                  </Link>
+                </div>
               </div>
 
               <div className="mt-3 overflow-x-auto">
@@ -519,10 +677,10 @@ export default function CreatorDashboardPage() {
                   <table className="w-full text-left text-xs">
                     <thead className="border-b border-zinc-800 text-zinc-400 font-mono uppercase text-[10px] tracking-wider">
                       <tr>
-                        <th className="py-2.5 px-3">Beat</th>
+                        <th className="py-2.5 px-3">Beat Title</th>
                         <th className="py-2.5 px-3">Buyer</th>
                         <th className="py-2.5 px-3">License Tier</th>
-                        <th className="py-2.5 px-3 text-right">Sale</th>
+                        <th className="py-2.5 px-3 text-right">Sale Price</th>
                         <th className="py-2.5 px-3 text-right">Your Cut (80%)</th>
                         <th className="py-2.5 px-3 text-right">Date</th>
                       </tr>
@@ -530,8 +688,19 @@ export default function CreatorDashboardPage() {
                     <tbody className="divide-y divide-zinc-800/60">
                       {recentSales.map((sale) => (
                         <tr key={sale.id} className="hover:bg-zinc-800/30 transition-colors">
-                          <td className="py-3 px-3 font-medium text-white max-w-[180px] truncate">
-                            {sale.beat}
+                          <td className="py-3 px-3 font-medium text-white max-w-[220px]">
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <div className="h-8 w-8 rounded overflow-hidden shrink-0 bg-zinc-950 border border-zinc-700/80">
+                                {sale.coverUrl ? (
+                                  <img src={sale.coverUrl} alt="" className="w-full h-full object-cover" />
+                                ) : (
+                                  <div className="w-full h-full flex items-center justify-center bg-zinc-800 text-zinc-500">
+                                    <Music className="h-4 w-4" />
+                                  </div>
+                                )}
+                              </div>
+                              <span className="truncate block font-semibold">{sale.beat}</span>
+                            </div>
                           </td>
                           <td className="py-3 px-3 text-zinc-400 font-mono">{sale.buyer}</td>
                           <td className="py-3 px-3">
@@ -553,7 +722,7 @@ export default function CreatorDashboardPage() {
                 ) : (
                   <div className="py-12 text-center space-y-2">
                     <FileCheck2 className="h-8 w-8 text-zinc-600 mx-auto" />
-                    <p className="text-xs text-zinc-400 font-medium">No sales recorded yet</p>
+                    <p className="text-xs text-zinc-400 font-medium">No beat sales recorded yet</p>
                     <p className="text-[11px] text-zinc-500 max-w-sm mx-auto">
                       When artists purchase Starter, Premium, or Exclusive licenses for your beats, sales and instant 80% splits will appear here.
                     </p>
@@ -639,6 +808,178 @@ export default function CreatorDashboardPage() {
               </div>
             </div>
           </div>
+          {/* Quick Paystack Withdrawal Modal */}
+          {isWithdrawModalOpen && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+              <div className="relative w-full max-w-md rounded-2xl bg-zinc-900 border border-zinc-800 p-6 shadow-2xl space-y-4">
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <div className="p-2 rounded-lg bg-emerald-500/20 text-emerald-400">
+                      <Wallet className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <h3 className="text-base font-bold text-white">Withdraw Earnings</h3>
+                      <p className="text-xs text-zinc-400">Direct Paystack transfer to Nigerian bank</p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsWithdrawModalOpen(false)}
+                    className="p-1 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors"
+                  >
+                    <X className="h-5 w-5" />
+                  </button>
+                </div>
+
+                {withdrawSuccess ? (
+                  <div className="py-8 text-center space-y-3">
+                    <CheckCircle2 className="h-12 w-12 text-emerald-400 mx-auto animate-bounce" />
+                    <h4 className="text-base font-bold text-white">Withdrawal Submitted!</h4>
+                    <p className="text-xs text-zinc-300 max-w-xs mx-auto leading-relaxed">
+                      Your payout request for <strong className="text-emerald-400">₦{Number(withdrawAmount).toLocaleString()}</strong> has been submitted. Funds will be deposited to your bank account shortly.
+                    </p>
+                  </div>
+                ) : (
+                  <form onSubmit={handleWithdrawSubmit} className="space-y-4">
+                    {/* Available Balance Pill */}
+                    <div className="p-3 rounded-xl bg-zinc-950/70 border border-zinc-800/80 flex items-center justify-between">
+                      <span className="text-xs text-zinc-400 font-mono">Available Balance:</span>
+                      <span className="text-sm font-bold font-mono text-emerald-400">
+                        ₦{availableBalanceNgn.toLocaleString()}
+                      </span>
+                    </div>
+
+                    {/* Amount to Withdraw */}
+                    <div className="space-y-1.5">
+                      <div className="flex justify-between items-center text-xs">
+                        <label className="text-zinc-300 font-medium">Withdrawal Amount (₦)</label>
+                        <button
+                          type="button"
+                          onClick={() => setWithdrawAmount(String(availableBalanceNgn))}
+                          className="text-[#2dd4bf] hover:underline text-[11px] font-mono cursor-pointer"
+                        >
+                          Max All
+                        </button>
+                      </div>
+                      <input
+                        type="number"
+                        min="1000"
+                        max={availableBalanceNgn}
+                        value={withdrawAmount}
+                        onChange={(e) => setWithdrawAmount(e.target.value)}
+                        placeholder="e.g. 36000"
+                        className="w-full h-10 px-3 rounded-lg bg-zinc-950 border border-zinc-700/80 text-white font-mono text-sm placeholder-zinc-500 focus:outline-none focus:border-[#2dd4bf]"
+                        required
+                      />
+                    </div>
+
+                    {/* Bank Selection */}
+                    <div className="space-y-1.5">
+                      <label className="text-xs text-zinc-300 font-medium">Bank Name</label>
+                      <select
+                        value={bankName}
+                        onChange={(e) => setBankName(e.target.value)}
+                        className="w-full h-10 px-3 rounded-lg bg-zinc-950 border border-zinc-700/80 text-white text-xs focus:outline-none focus:border-[#2dd4bf]"
+                        required
+                      >
+                        <option value="">Select Nigerian Bank...</option>
+                        <option value="Access Bank">Access Bank</option>
+                        <option value="GTBank (Guaranty Trust Bank)">GTBank (Guaranty Trust Bank)</option>
+                        <option value="Zenith Bank">Zenith Bank</option>
+                        <option value="First Bank of Nigeria">First Bank of Nigeria</option>
+                        <option value="United Bank for Africa (UBA)">United Bank for Africa (UBA)</option>
+                        <option value="Kuda Bank">Kuda Bank</option>
+                        <option value="OPay">OPay</option>
+                        <option value="PalmPay">PalmPay</option>
+                        <option value="Moniepoint Microfinance Bank">Moniepoint MFB</option>
+                        <option value="Stanbic IBTC Bank">Stanbic IBTC Bank</option>
+                        <option value="FCMB (First City Monument Bank)">FCMB</option>
+                        <option value="Sterling Bank">Sterling Bank</option>
+                        <option value="Fidelity Bank">Fidelity Bank</option>
+                        <option value="Union Bank of Nigeria">Union Bank</option>
+                        <option value="Wema Bank (ALAT)">Wema Bank (ALAT)</option>
+                      </select>
+                    </div>
+
+                    {/* Account Number */}
+                    <div className="space-y-1.5">
+                      <label className="text-xs text-zinc-300 font-medium">NUBAN Account Number</label>
+                      <input
+                        type="text"
+                        maxLength={10}
+                        value={accountNumber}
+                        onChange={(e) => setAccountNumber(e.target.value.replace(/\D/g, ''))}
+                        placeholder="10-digit account number"
+                        className="w-full h-10 px-3 rounded-lg bg-zinc-950 border border-zinc-700/80 text-white font-mono text-sm placeholder-zinc-500 focus:outline-none focus:border-[#2dd4bf]"
+                        required
+                      />
+                    </div>
+
+                    {/* Account Name */}
+                    <div className="space-y-1.5">
+                      <label className="text-xs text-zinc-300 font-medium">Account Name (Full Legal Name)</label>
+                      <input
+                        type="text"
+                        value={accountName}
+                        onChange={(e) => setAccountName(e.target.value)}
+                        placeholder="As registered on bank account"
+                        className="w-full h-10 px-3 rounded-lg bg-zinc-950 border border-zinc-700/80 text-white text-xs placeholder-zinc-500 focus:outline-none focus:border-[#2dd4bf]"
+                        required
+                      />
+                    </div>
+
+                    {/* Transfer Fee Preview */}
+                    <div className="p-3 rounded-lg bg-zinc-950/40 border border-zinc-800 text-[11px] space-y-1 font-mono">
+                      <div className="flex justify-between text-zinc-400">
+                        <span>Platform fee:</span>
+                        <span>₦100</span>
+                      </div>
+                      <div className="flex justify-between text-white font-bold pt-1 border-t border-zinc-800/80">
+                        <span>Net Payout to Bank:</span>
+                        <span className="text-emerald-400">
+                          ₦{Math.max(0, Number(withdrawAmount || 0) - 100).toLocaleString()}
+                        </span>
+                      </div>
+                    </div>
+
+                    {withdrawError && (
+                      <div className="p-2.5 rounded-lg bg-red-500/10 border border-red-500/30 text-xs text-red-400 flex items-center gap-2">
+                        <AlertCircle className="h-4 w-4 shrink-0" />
+                        <span>{withdrawError}</span>
+                      </div>
+                    )}
+
+                    <div className="flex items-center justify-end gap-2 pt-2">
+                      <button
+                        type="button"
+                        onClick={() => setIsWithdrawModalOpen(false)}
+                        className="px-4 py-2 rounded-lg border border-zinc-700 bg-zinc-800 text-xs font-semibold text-zinc-300 hover:text-white transition-colors"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={withdrawing || availableBalanceNgn < 1000}
+                        className="px-5 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-zinc-950 text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer shadow-md shadow-emerald-500/20"
+                      >
+                        {withdrawing ? (
+                          <>
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            <span>Processing...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Wallet className="h-3.5 w-3.5" />
+                            <span>Confirm &amp; Withdraw</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </form>
+                )}
+              </div>
+            </div>
+          )}
         </>
       )}
     </CreatorShell>

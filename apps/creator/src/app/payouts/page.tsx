@@ -83,7 +83,11 @@ export default function PayoutsPage() {
               setBankName(profile.paystack_bank_name || '');
               setAccountNumber(profile.paystack_account_number || '');
               setAccountName(profile.paystack_account_name || '');
-              setAvailableBalanceNgn(Number(profile.available_balance_ngn) || Number(payload.availableBalanceNgn) || 0);
+              setAvailableBalanceNgn(
+                payload.availableBalanceNgn !== undefined
+                  ? Number(payload.availableBalanceNgn)
+                  : Number(profile.available_balance_ngn) || 0
+              );
               setPendingClearanceNgn(Number(profile.pending_balance_ngn) || 0);
             } else {
               setAvailableBalanceNgn(Number(payload.availableBalanceNgn) || 0);
@@ -212,8 +216,8 @@ export default function PayoutsPage() {
       return;
     }
 
-    if (availableBalanceNgn < 2000) {
-      alert('Minimum payout withdrawal is ₦2,000.');
+    if (availableBalanceNgn < 1000) {
+      alert('Minimum payout withdrawal is ₦1,000.');
       return;
     }
 

@@ -17,7 +17,9 @@ import {
   Search,
   Menu,
   X,
-  CreditCard
+  CreditCard,
+  Music2,
+  ShieldCheck
 } from 'lucide-react';
 import { UserDropdown } from './UserDropdown';
 
@@ -61,6 +63,14 @@ export function UserShell({ children, activePath }: UserShellProps) {
       isActive: pathname.includes('tab=marketplace')
     },
     {
+      label: 'Purchased Beats',
+      href: '/library',
+      icon: ShieldCheck,
+      badge: 'Library',
+      badgeColor: 'bg-[#2dd4bf]/20 text-[#2dd4bf]',
+      isActive: pathname.startsWith('/library')
+    },
+    {
       label: 'Studio',
       href: '/studio',
       icon: Mic,
@@ -80,6 +90,13 @@ export function UserShell({ children, activePath }: UserShellProps) {
   ];
 
   const libraryItems = [
+    {
+      label: 'Purchased Beats',
+      href: '/library',
+      icon: ShieldCheck,
+      iconColor: 'text-[#2dd4bf]',
+      isActive: pathname.startsWith('/library')
+    },
     {
       label: 'Favourites',
       href: '/?tab=fav',

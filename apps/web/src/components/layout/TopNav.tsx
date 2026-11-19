@@ -35,6 +35,7 @@ export const TopNav: React.FC<TopNavProps> = ({
     { label: 'Home', href: '/' },
     { label: 'About Us', href: '/about' },
     { label: 'Beat Store', href: `${APP_URL}?tab=marketplace` },
+    { label: 'Library', href: '/library' },
     { label: 'Pricing', href: '/pricing' },
     { label: 'FAQ', href: '/faq' },
     { label: 'Credit', href: '/#credits' },

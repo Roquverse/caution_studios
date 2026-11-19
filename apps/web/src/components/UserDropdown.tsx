@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { User, Settings, CreditCard, LogOut, ChevronRight, Sparkles } from 'lucide-react';
+import { User, Settings, CreditCard, LogOut, ChevronRight, Sparkles, Music2 } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
 import { setCachedUserPlan, resolveEffectivePlan } from '../lib/subscription';
 
@@ -248,6 +248,18 @@ export function UserDropdown({ initialProfile }: { initialProfile?: UserProfileD
               </div>
               <ChevronRight className="h-3.5 w-3.5 text-gray-600 group-hover:text-gray-400 transition-colors" />
             </a>
+
+            <Link
+              href="/library"
+              onClick={() => setIsOpen(false)}
+              className="flex items-center justify-between p-2.5 rounded-lg text-xs font-medium text-gray-300 hover:text-white hover:bg-white/[0.06] transition-colors group"
+            >
+              <div className="flex items-center gap-2.5">
+                <Music2 className="h-4 w-4 text-[#2dd4bf] group-hover:text-[#2dd4bf] transition-colors" />
+                <span>My Library & Downloads</span>
+              </div>
+              <ChevronRight className="h-3.5 w-3.5 text-gray-600 group-hover:text-gray-400 transition-colors" />
+            </Link>
 
             <Link
               href="/profile"

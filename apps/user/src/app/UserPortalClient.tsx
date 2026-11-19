@@ -31,7 +31,8 @@ import {
   Mic,
   Lock,
   Megaphone,
-  Sliders
+  Sliders,
+  ShieldCheck
 } from 'lucide-react';
 import { audioSynth, TrackRow } from '@caution/ui';
 import { UserDropdown } from '../components/UserDropdown';
@@ -1189,6 +1190,19 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
                 Library
               </p>
               <div className="space-y-1">
+                <Link
+                  href="/library"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold text-white bg-white/[0.04] hover:bg-white/[0.08] transition-colors"
+                >
+                  <div className="flex items-center gap-3">
+                    <ShieldCheck className="h-4 w-4 text-[#2dd4bf]" />
+                    <span>Purchased Beats</span>
+                  </div>
+                  <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-[#2dd4bf]/20 text-[#2dd4bf]">
+                    OWNED
+                  </span>
+                </Link>
                 {[
                   { id: 'fav', label: 'Favourites', icon: Heart, count: favoritesList.length, activeColor: 'text-red-500' },
                   { id: 'later', label: 'Listen Later', icon: Clock, count: listenLaterList.length, activeColor: 'text-[#2dd4bf]' },
@@ -1334,6 +1348,19 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
                 Library
               </p>
               <div className="space-y-0.5">
+                <Link
+                  href="/library"
+                  className="w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium text-gray-300 hover:text-white hover:bg-white/[0.04] transition-colors group mb-0.5"
+                  title="View your purchased beats, WAVs and stems"
+                >
+                  <div className="flex items-center gap-3">
+                    <ShieldCheck className="h-4 w-4 text-[#2dd4bf]" />
+                    <span className="font-semibold text-white">Purchased Beats</span>
+                  </div>
+                  <span className="text-[9px] font-mono font-bold px-1.5 py-0.2 rounded bg-[#2dd4bf]/20 text-[#2dd4bf]">
+                    OWNED
+                  </span>
+                </Link>
                 {[
                   { id: 'fav', label: 'Favourites', icon: Heart, count: favoritesList.length, activeColor: 'text-red-500' },
                   { id: 'later', label: 'Listen Later', icon: Clock, count: listenLaterList.length, activeColor: 'text-[#2dd4bf]' },

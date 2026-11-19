@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { User, Settings, CreditCard, LogOut, ChevronRight, Sparkles, Megaphone } from 'lucide-react';
+import { User, Settings, CreditCard, LogOut, ChevronRight, Sparkles, Megaphone, Music2 } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
 import { setCachedUserPlan, resolveEffectivePlan } from '../lib/subscription';
 
@@ -294,6 +294,18 @@ export function UserDropdown() {
 
           {/* Navigation Links */}
           <div className="space-y-0.5">
+            <Link
+              href="/library"
+              onClick={() => setIsOpen(false)}
+              className="flex items-center justify-between p-2.5 rounded-lg text-xs font-semibold text-white bg-white/[0.04] hover:bg-white/[0.08] transition-colors group"
+            >
+              <div className="flex items-center gap-2.5">
+                <Music2 className="h-4 w-4 text-[#2dd4bf]" />
+                <span className="text-white">Purchased Beats (Library)</span>
+              </div>
+              <ChevronRight className="h-3.5 w-3.5 text-gray-500 group-hover:text-white transition-colors" />
+            </Link>
+
             <Link
               href="/profile"
               onClick={() => setIsOpen(false)}

@@ -134,9 +134,76 @@ export async function GET(req: NextRequest) {
     }
 
     const { data: orderItems } = await orderQuery;
-    const paidOrderItems = (orderItems || []).filter(
+    let paidOrderItems: any[] = (orderItems || []).filter(
       (item: any) => !item.order || item.order?.status === 'paid'
     );
+
+    // Also check licenses table in case orders were recorded directly as licenses
+    if (beats.length > 0) {
+      try {
+        const beatIds = beats.map((b) => `'${b.id}'`).join(',');
+        const { data: dbLicenses } = await supabase
+          .from('licenses')
+          .select(`
+            id,
+            order_id,
+            order_item_id,
+            beat_id,
+            buyer_id,
+            type,
+            license_type,
+            license_number,
+            price_cents,
+            producer_amount_cents,
+            issued_at,
+            buyer:buyer_id (
+              display_name,
+              handle
+            ),
+            beat:beat_id (
+              title,
+              cover_url
+            )
+          `)
+          .or(`producer_id.eq.${userId},beat_id.in.(${beatIds})`);
+
+        if (dbLicenses && dbLicenses.length > 0) {
+          const existingOrderItemIds = new Set(paidOrderItems.map((oi: any) => oi.id));
+          const existingBeatOrderPairs = new Set(
+            paidOrderItems.map((oi: any) => {
+              const orderObj = Array.isArray(oi.order) ? oi.order[0] : oi.order;
+              return `${oi.beat_id}_${orderObj?.id || ''}`;
+            })
+          );
+
+          for (const lic of dbLicenses) {
+            if (lic.order_item_id && existingOrderItemIds.has(lic.order_item_id)) continue;
+            if (lic.order_id && existingBeatOrderPairs.has(`${lic.beat_id}_${lic.order_id}`)) continue;
+
+            const grossCents = lic.price_cents || 1500000;
+            const producerCutCents = lic.producer_amount_cents || Math.round(grossCents * 0.8);
+
+            paidOrderItems.push({
+              id: lic.id,
+              beat_id: lic.beat_id,
+              producer_id: userId,
+              price_cents: grossCents,
+              producer_amount_cents: producerCutCents,
+              license: lic.type || lic.license_type || 'premium',
+              order: {
+                id: lic.order_id || lic.id,
+                status: 'paid',
+                created_at: lic.issued_at,
+                buyer: lic.buyer || { display_name: 'Verified Artist', handle: 'artist' }
+              },
+              beat: lic.beat || { title: 'Studio Instrumental', cover_url: '' }
+            });
+          }
+        }
+      } catch (e) {
+        console.warn('Error fetching licenses for telemetry:', e);
+      }
+    }
 
     const totalSalesEarningsNgn = Math.round(
       paidOrderItems.reduce((acc: number, item: any) => acc + (Number(item.producer_amount_cents) || 0), 0) / 100
@@ -157,12 +224,22 @@ export async function GET(req: NextRequest) {
       sales_count: salesCountByBeat[b.id] || (b.status === 'sold' ? 1 : 0)
     }));
 
-    // 5. Fetch Payouts History
+    // 5. Fetch Payouts History & Calculate Available Balance for Withdrawal
     const { data: payouts } = await supabase
       .from('payouts')
       .select('*')
       .eq('producer_id', userId)
       .order('created_at', { ascending: false });
+
+    const totalWithdrawnOrPendingNgn = (payouts || [])
+      .filter((p: any) => p.status === 'completed' || p.status === 'pending')
+      .reduce((acc: number, p: any) => acc + (Number(p.amount_ngn) || 0), 0);
+
+    const totalEarningsNgn = totalSalesEarningsNgn + downloadRewardNgn;
+    const computedAvailableBalanceNgn = Math.max(0, totalEarningsNgn - totalWithdrawnOrPendingNgn);
+    const availableBalanceNgn = profile?.available_balance_ngn
+      ? Math.max(Number(profile.available_balance_ngn), computedAvailableBalanceNgn)
+      : computedAvailableBalanceNgn;
 
     return NextResponse.json({
       profile: profile || null,
@@ -176,6 +253,9 @@ export async function GET(req: NextRequest) {
       combinedThresholdPct,
       downloadRewardNgn,
       totalSalesEarningsNgn,
+      totalEarningsNgn,
+      totalWithdrawnNgn: totalWithdrawnOrPendingNgn,
+      availableBalanceNgn,
       licensesSoldCount: paidOrderItems.length,
       orderItems: paidOrderItems,
       payouts: payouts || []
