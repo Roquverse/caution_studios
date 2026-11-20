@@ -38,12 +38,16 @@ export async function POST(req: NextRequest) {
       if (!finalContentType) finalContentType = 'application/octet-stream';
     }
 
-    const uploadUrl = await getPresignedUploadUrl(key, finalContentType);
+    // Omit contentType constraint from presigned signature so browser can upload with any native mime type without header mismatch
+    const uploadUrl = await getPresignedUploadUrl(key);
+
+    const publicDomain = process.env.NEXT_PUBLIC_R2_PUBLIC_URL || process.env.R2_PUBLIC_URL || 'https://media.cautionstudioz.com';
+    const cleanDomain = publicDomain.replace(/\/$/, '');
 
     return NextResponse.json({
       uploadUrl,
       key,
-      publicUrl: `https://media.cautionstudioz.com/${key}`
+      publicUrl: `${cleanDomain}/${key}`
     });
   } catch (err: any) {
     console.error('Error generating ad presigned upload URL:', err);
