@@ -207,7 +207,7 @@ export default function StreamingRoyaltiesPage() {
 
       {loading ? (
         <div className="py-20 flex flex-col items-center justify-center space-y-3">
-          <Loader2 className="h-7 w-7 text-[#2dd4bf] animate-spin" />
+          <Loader2 className="h-7 w-7 text-[#e53935] animate-spin" />
           <span className="text-xs font-mono text-zinc-400">Loading plays, downloads &amp; pay threshold milestones...</span>
         </div>
       ) : (
@@ -221,7 +221,7 @@ export default function StreamingRoyaltiesPage() {
                     Partner Pay Threshold
                   </span>
                   {isVerified ? (
-                    <span className="px-2.5 py-0.5 rounded-full bg-[#2dd4bf]/20 border border-[#2dd4bf]/40 text-xs font-bold text-[#2dd4bf] flex items-center gap-1">
+                    <span className="px-2.5 py-0.5 rounded-full bg-[#e53935]/20 border border-[#e53935]/40 text-xs font-bold text-[#e53935] flex items-center gap-1">
                       <ShieldCheck className="h-3.5 w-3.5" />
                       <span>Verified Producer Checkmark Active</span>
                     </span>
@@ -243,7 +243,7 @@ export default function StreamingRoyaltiesPage() {
               <div className="flex items-center gap-6 text-left md:text-right shrink-0">
                 <div>
                   <span className="text-xs font-mono text-zinc-400 block">Total Plays</span>
-                  <span className="text-2xl font-bold font-mono text-[#2dd4bf] block mt-0.5">
+                  <span className="text-2xl font-bold font-mono text-[#e53935] block mt-0.5">
                     {totalPlaysCount.toLocaleString()}
                   </span>
                   <span className="text-[11px] text-zinc-500 block">Live Streams</span>
@@ -273,14 +273,14 @@ export default function StreamingRoyaltiesPage() {
 
               <div className="w-full h-3 rounded-full bg-zinc-800 overflow-hidden">
                 <div
-                  className="h-full bg-gradient-to-r from-[#2dd4bf] to-emerald-400 transition-all duration-700 rounded-full"
+                  className="h-full bg-gradient-to-r from-[#e53935] to-emerald-400 transition-all duration-700 rounded-full"
                   style={{ width: `${downloadProgressPct}%` }}
                 />
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-3">
                 <div className="flex items-center gap-2 p-2.5 rounded-md bg-zinc-950/60 border border-zinc-800/80">
-                  <CheckCircle2 className="h-4 w-4 text-[#2dd4bf] shrink-0" />
+                  <CheckCircle2 className="h-4 w-4 text-[#e53935] shrink-0" />
                   <div className="text-xs">
                     <span className="font-semibold text-zinc-200 block">₦30,000 Cash Reward</span>
                     <span className="text-zinc-500 text-[10px]">Paid on every 10k threshold</span>
@@ -288,7 +288,7 @@ export default function StreamingRoyaltiesPage() {
                 </div>
 
                 <div className="flex items-center gap-2 p-2.5 rounded-md bg-zinc-950/60 border border-zinc-800/80">
-                  <CheckCircle2 className="h-4 w-4 text-[#2dd4bf] shrink-0" />
+                  <CheckCircle2 className="h-4 w-4 text-[#e53935] shrink-0" />
                   <div className="text-xs">
                     <span className="font-semibold text-zinc-200 block">Verified Badge</span>
                     <span className="text-zinc-500 text-[10px]">Official checkmark on profile</span>
@@ -296,7 +296,7 @@ export default function StreamingRoyaltiesPage() {
                 </div>
 
                 <div className="flex items-center gap-2 p-2.5 rounded-md bg-zinc-950/60 border border-zinc-800/80">
-                  <CheckCircle2 className="h-4 w-4 text-[#2dd4bf] shrink-0" />
+                  <CheckCircle2 className="h-4 w-4 text-[#e53935] shrink-0" />
                   <div className="text-xs">
                     <span className="font-semibold text-zinc-200 block">Direct Artist Chat</span>
                     <span className="text-zinc-500 text-[10px]">Custom production bookings</span>
@@ -311,12 +311,12 @@ export default function StreamingRoyaltiesPage() {
             <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-4 shadow-sm">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-medium text-zinc-400">Total Beat Plays</span>
-                <Play className="h-4 w-4 text-[#2dd4bf]" />
+                <Play className="h-4 w-4 text-[#e53935]" />
               </div>
               <div className="mt-2">
                 <span className="text-2xl font-bold font-mono text-white">{totalPlaysCount.toLocaleString()}</span>
               </div>
-              <p className="text-[11px] text-[#2dd4bf] mt-1">Across all web &amp; mobile streams</p>
+              <p className="text-[11px] text-[#e53935] mt-1">Across all web &amp; mobile streams</p>
             </div>
 
             <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-4 shadow-sm">
@@ -389,7 +389,7 @@ export default function StreamingRoyaltiesPage() {
                       <tr key={row.id} className="hover:bg-zinc-800/30 transition-colors">
                         <td className="py-3 px-3 font-sans font-medium text-white">{row.title}</td>
                         <td className="py-3 px-3 font-sans text-zinc-400">{row.genre}</td>
-                        <td className="py-3 px-3 text-center text-[#2dd4bf] font-semibold">
+                        <td className="py-3 px-3 text-center text-[#e53935] font-semibold">
                           {row.plays.toLocaleString()}
                         </td>
                         <td className="py-3 px-3 text-center text-emerald-400 font-semibold">

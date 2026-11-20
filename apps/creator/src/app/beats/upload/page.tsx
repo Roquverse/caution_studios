@@ -242,7 +242,7 @@ export default function BeatUploadPage() {
           </div>
         </div>
 
-        <span className="text-xs font-mono text-[#2dd4bf] bg-[#2dd4bf]/10 border border-[#2dd4bf]/20 px-2.5 py-1 rounded-full">
+        <span className="text-xs font-mono text-[#e53935] bg-[#e53935]/10 border border-[#e53935]/20 px-2.5 py-1 rounded-full">
           80% Creator Revenue Split
         </span>
       </div>
@@ -281,14 +281,14 @@ export default function BeatUploadPage() {
               {/* Entire zone is tappable — critical for mobile iOS where only label clicks work */}
               <label
                 htmlFor="master-audio-input"
-                className="flex flex-col items-center border border-dashed border-zinc-700 hover:border-[#2dd4bf] active:border-[#2dd4bf] rounded-lg p-6 text-center cursor-pointer transition-colors bg-zinc-950/60 select-none"
+                className="flex flex-col items-center border border-dashed border-zinc-700 hover:border-[#e53935] active:border-[#e53935] rounded-lg p-6 text-center cursor-pointer transition-colors bg-zinc-950/60 select-none"
               >
                 <Upload className="h-6 w-6 text-zinc-500 mb-2" />
                 <span className="text-xs font-medium text-zinc-200 block">
                   {audioFileObj ? audioFileObj.name : 'Tap or click to select master audio'}
                 </span>
                 {audioFileObj && (
-                  <span className="text-[10px] text-[#2dd4bf] block mt-1 font-mono">
+                  <span className="text-[10px] text-[#e53935] block mt-1 font-mono">
                     {(audioFileObj.size / (1024 * 1024)).toFixed(1)} MB selected ✓
                   </span>
                 )}
@@ -315,14 +315,14 @@ export default function BeatUploadPage() {
               </label>
               <label
                 htmlFor="stems-zip-input"
-                className="flex flex-col items-center border border-dashed border-zinc-700 hover:border-[#2dd4bf] active:border-[#2dd4bf] rounded-lg p-5 text-center cursor-pointer transition-colors bg-zinc-950/60 select-none"
+                className="flex flex-col items-center border border-dashed border-zinc-700 hover:border-[#e53935] active:border-[#e53935] rounded-lg p-5 text-center cursor-pointer transition-colors bg-zinc-950/60 select-none"
               >
                 <FileArchive className="h-6 w-6 text-zinc-500 mb-2" />
                 <span className="text-xs font-medium text-zinc-200 block">
                   {stemsFileObj ? stemsFileObj.name : 'Tap or click to upload stems archive'}
                 </span>
                 {stemsFileObj && (
-                  <span className="text-[10px] text-[#2dd4bf] block mt-1 font-mono">
+                  <span className="text-[10px] text-[#e53935] block mt-1 font-mono">
                     {(stemsFileObj.size / (1024 * 1024)).toFixed(1)} MB selected ✓
                   </span>
                 )}
@@ -448,7 +448,7 @@ export default function BeatUploadPage() {
               <span className={`text-[10px] font-mono font-bold px-2.5 py-1 rounded-full ${
                 isFreeBeat
                   ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
-                  : 'bg-[#2dd4bf]/20 text-[#2dd4bf] border border-[#2dd4bf]/30'
+                  : 'bg-[#e53935]/20 text-[#e53935] border border-[#e53935]/30'
               }`}>
                 {isFreeBeat ? 'FREE BEAT' : 'PAID BEAT'}
               </span>
@@ -461,7 +461,7 @@ export default function BeatUploadPage() {
                 onClick={() => setIsFreeBeat(false)}
                 className={`py-2 px-3 rounded-md text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
                   !isFreeBeat
-                    ? 'bg-[#2dd4bf] text-zinc-950 shadow-sm'
+                    ? 'bg-[#e53935] text-white shadow-sm'
                     : 'text-zinc-400 hover:text-white'
                 }`}
               >
@@ -521,12 +521,12 @@ export default function BeatUploadPage() {
                 </div>
 
                 {/* Premium */}
-                <div className="p-3 rounded-md bg-zinc-950 border border-[#2dd4bf]/30">
+                <div className="p-3 rounded-md bg-zinc-950 border border-[#e53935]/30">
                   <div className="flex justify-between items-center mb-1">
-                    <label className="text-xs font-bold text-[#2dd4bf]">
+                    <label className="text-xs font-bold text-[#e53935]">
                       Premium Beat Plan (WAV Master + Stems)
                     </label>
-                    <span className="text-[10px] text-[#2dd4bf] font-mono">500k streams</span>
+                    <span className="text-[10px] text-[#e53935] font-mono">500k streams</span>
                   </div>
                   <div className="relative flex items-center">
                     <span className="absolute left-3 text-xs text-zinc-400 font-mono pointer-events-none">₦</span>
@@ -545,7 +545,7 @@ export default function BeatUploadPage() {
                       }}
                       className="w-full bg-zinc-900 border border-zinc-800 rounded-md py-1.5 pl-7 pr-8 text-xs text-zinc-100 font-mono focus:outline-none focus:border-zinc-700"
                     />
-                    <span className="absolute right-3 text-sm font-bold text-[#2dd4bf] pointer-events-none">+</span>
+                    <span className="absolute right-3 text-sm font-bold text-[#e53935] pointer-events-none">+</span>
                   </div>
                   <span className="text-[10px] text-zinc-500 mt-1 block">
                     Your cut (80%): ₦{((Number(pricePremium) || 0) * 0.8).toLocaleString()} · min price, artist pays ₦{Number(pricePremium).toLocaleString()}+
@@ -623,17 +623,17 @@ export default function BeatUploadPage() {
               <div className="p-3 rounded-lg bg-zinc-950 border border-zinc-800 space-y-2">
                 <div className="flex items-center justify-between text-xs">
                   <span className="text-zinc-300 font-medium flex items-center gap-2">
-                    <Loader2 className="h-3.5 w-3.5 text-[#2dd4bf] animate-spin" />
+                    <Loader2 className="h-3.5 w-3.5 text-[#e53935] animate-spin" />
                     <span>{uploadStep || 'Uploading beat files...'}</span>
                   </span>
                   {uploadProgress > 0 && uploadProgress < 100 && (
-                    <span className="font-mono text-[#2dd4bf] font-bold text-[11px]">{uploadProgress}%</span>
+                    <span className="font-mono text-[#e53935] font-bold text-[11px]">{uploadProgress}%</span>
                   )}
                 </div>
                 {uploadProgress > 0 && uploadProgress < 100 && (
                   <div className="w-full bg-zinc-800 rounded-full h-1.5 overflow-hidden">
                     <div
-                      className="bg-[#2dd4bf] h-1.5 rounded-full transition-all duration-150"
+                      className="bg-[#e53935] h-1.5 rounded-full transition-all duration-150"
                       style={{ width: `${uploadProgress}%` }}
                     />
                   </div>
@@ -644,7 +644,7 @@ export default function BeatUploadPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-2.5 px-4 rounded-md bg-[#2dd4bf] hover:bg-[#20b8a4] text-zinc-950 font-bold text-xs flex items-center justify-center gap-2 transition-colors disabled:opacity-50 cursor-pointer shadow-sm"
+              className="w-full py-2.5 px-4 rounded-xl bg-[#e53935] hover:bg-[#d32f2f] text-white font-bold text-xs flex items-center justify-center gap-2 transition-colors disabled:opacity-50 cursor-pointer shadow-sm"
             >
               {loading ? (
                 <>

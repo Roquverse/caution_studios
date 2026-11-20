@@ -180,7 +180,7 @@ export default function CreatorLicensesPage() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-white flex items-center gap-2">
             <span>Commercial Licenses & Clearances</span>
-            <span className="px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-[#2dd4bf]/10 text-[#2dd4bf] border border-[#2dd4bf]/20">
+            <span className="px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-[#e53935]/10 text-[#e53935] border border-[#e53935]/20">
               Live Sync Active
             </span>
           </h1>
@@ -240,7 +240,7 @@ export default function CreatorLicensesPage() {
 
         <div className="flex flex-wrap items-center gap-4 text-xs font-mono">
           <span className="text-zinc-400">
-            Plays: <strong className="text-[#2dd4bf]">{totalPlays.toLocaleString()}</strong>
+            Plays: <strong className="text-[#e53935]">{totalPlays.toLocaleString()}</strong>
           </span>
           <span className="text-zinc-400">
             Downloads: <strong className="text-emerald-400">{totalDownloads.toLocaleString()}</strong>
@@ -253,7 +253,7 @@ export default function CreatorLicensesPage() {
 
       {loading ? (
         <div className="py-20 flex flex-col items-center justify-center space-y-3">
-          <Loader2 className="h-7 w-7 text-[#2dd4bf] animate-spin" />
+          <Loader2 className="h-7 w-7 text-[#e53935] animate-spin" />
           <span className="text-xs font-mono text-zinc-400">Loading commercial licenses & agreements...</span>
         </div>
       ) : (
@@ -278,7 +278,7 @@ export default function CreatorLicensesPage() {
                 <tbody className="divide-y divide-zinc-800/60">
                   {filteredLicenses.map((lic) => (
                     <tr key={lic.id} className="hover:bg-zinc-800/30 transition-colors">
-                      <td className="py-3 px-4 font-mono font-semibold text-[#2dd4bf]">
+                      <td className="py-3 px-4 font-mono font-semibold text-[#e53935]">
                         <div>{lic.licenseNumber}</div>
                         <div className="text-[10px] text-zinc-500 font-normal">{lic.reference}</div>
                       </td>
@@ -342,7 +342,7 @@ export default function CreatorLicensesPage() {
           <div className="relative w-full max-w-2xl bg-[#0e1014] border border-zinc-800 rounded-xl p-6 shadow-2xl text-white space-y-4 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between pb-3 border-b border-zinc-800">
               <div className="flex items-center gap-2">
-                <FileText className="h-4 w-4 text-[#2dd4bf]" />
+                <FileText className="h-4 w-4 text-[#e53935]" />
                 <h3 className="text-sm font-bold uppercase tracking-wider">
                   Caution Studio Copyright Clearance Certificate
                 </h3>
@@ -359,7 +359,7 @@ export default function CreatorLicensesPage() {
             <div className="p-4 rounded-lg bg-zinc-950 border border-zinc-800 space-y-3 text-xs font-mono">
               <div className="flex justify-between items-center text-zinc-400 pb-2 border-b border-zinc-800/80">
                 <span>LICENSE NUMBER:</span>
-                <span className="text-[#2dd4bf] font-bold">{selectedLicense.licenseNumber}</span>
+                <span className="text-[#e53935] font-bold">{selectedLicense.licenseNumber}</span>
               </div>
               <div className="flex justify-between items-center text-zinc-400 pb-2 border-b border-zinc-800/80">
                 <span>TRANSACTION REF:</span>
@@ -393,8 +393,8 @@ export default function CreatorLicensesPage() {
               </div>
             </div>
 
-            <div className="p-3 rounded-lg bg-[#2dd4bf]/5 border border-[#2dd4bf]/20 space-y-1">
-              <span className="text-[11px] font-bold text-[#2dd4bf] block">
+            <div className="p-3 rounded-lg bg-[#e53935]/5 border border-[#e53935]/20 space-y-1">
+              <span className="text-[11px] font-bold text-[#e53935] block">
                 Whitelisted Rights & Permitted Usages
               </span>
               <p className="text-xs text-zinc-300 leading-relaxed">
@@ -408,7 +408,7 @@ export default function CreatorLicensesPage() {
                 onClick={() => {
                   window.print();
                 }}
-                className="px-3 py-1.5 rounded-md bg-[#2dd4bf] hover:bg-[#20b8a4] text-zinc-950 text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5"
+                className="px-3 py-1.5 rounded-xl bg-[#e53935] hover:bg-[#d32f2f] text-white text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5"
               >
                 <Download className="h-3.5 w-3.5 stroke-[2.5]" />
                 <span>Print Legal Certificate</span>

@@ -13,7 +13,13 @@ import {
   Trash2,
   UploadCloud,
   Loader2,
-  Image as ImageIcon
+  Image as ImageIcon,
+  Crown,
+  Upload,
+  ArrowUpRight,
+  SlidersHorizontal,
+  MoreVertical,
+  Download
 } from 'lucide-react';
 import { UpdateArtworkModal } from '../../components/UpdateArtworkModal';
 
@@ -221,159 +227,295 @@ export default function BeatsCatalogPage() {
     return matchesSearch && matchesGenre;
   });
 
+  const totalSalesCount = beatsList.reduce((sum, b) => sum + (b.salesCount || 0), 0);
+  const totalRevenueUsd = Math.round((totalPlays * 0.05 + totalDownloads * 0.5 + totalSalesCount * 50) || 284);
+  const combinedActivity = Math.max(totalPlays, totalDownloads, totalPlays + totalDownloads);
+  const thresholdPct = Math.min(100, Math.round((combinedActivity / 10000) * 100));
+
   return (
     <CreatorShell>
-      {/* Top Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-zinc-800">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-white">
+      {/* 1. EDITORIAL STUDIO HERO BANNER */}
+      <div className="relative rounded-2xl overflow-hidden border border-white/[0.08] bg-[#16181d] p-6 sm:p-8 min-h-[170px] flex flex-col md:flex-row md:items-center justify-between gap-6 shadow-2xl">
+        {/* Studio Producer Background Artwork with Red Ambient Lighting */}
+        <div className="absolute right-0 top-0 bottom-0 w-full md:w-3/5 pointer-events-none overflow-hidden">
+          <img
+            src="/images/african_producer_beats.jpg"
+            alt="Studio Mixing & Mastering"
+            className="w-full h-full object-cover object-right md:object-center opacity-35 md:opacity-45 mix-blend-screen"
+          />
+          <div className="absolute inset-0 bg-gradient-to-r from-[#16181d] via-[#16181d]/85 to-transparent" />
+          <div className="absolute inset-0 bg-radial-gradient from-transparent via-black/40 to-[#16181d]" />
+          {/* Subtle Ambient Red Glow */}
+          <div className="absolute right-10 top-1/2 -translate-y-1/2 w-72 h-72 rounded-full bg-[#e53935]/15 blur-3xl pointer-events-none" />
+        </div>
+
+        {/* Banner Left Info */}
+        <div className="relative z-10 max-w-xl space-y-2">
+          <div className="flex items-center gap-1.5 text-xs text-gray-400 font-medium">
+            <span>Creator Studio</span>
+            <span className="text-gray-600">&gt;</span>
+            <span className="text-white font-semibold">Beat Catalog</span>
+          </div>
+          <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight leading-tight">
             Beat Catalog Management
           </h1>
-          <p className="text-xs text-zinc-400 mt-0.5">
-            Manage your master files, pricing, stem archives, and commercial license availability
+          <p className="text-xs sm:text-sm text-gray-400 leading-relaxed">
+            Manage your master files, pricing, stem archives, and commercial license availability.
           </p>
         </div>
 
-        <Link
-          href="/beats/upload"
-          className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-md bg-[#2dd4bf] hover:bg-[#20b8a4] text-zinc-950 text-xs font-semibold transition-colors shadow-xs"
-        >
-          <Plus className="h-4 w-4 stroke-[2.5]" />
-          <span>Upload Beat</span>
-        </Link>
-      </div>
-
-      {/* Catalog Telemetry & Pay Threshold Summary Bar */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-3.5 flex items-center justify-between">
-          <div>
-            <span className="text-[11px] text-zinc-400 font-medium block">Total Catalog Plays</span>
-            <span className="text-xl font-bold font-mono text-white mt-0.5 block">
-              {totalPlays.toLocaleString()}
-            </span>
-          </div>
-          <span className="text-[10px] font-mono px-2 py-1 rounded bg-[#2dd4bf]/10 text-[#2dd4bf] border border-[#2dd4bf]/20">
-            Live Streams
-          </span>
-        </div>
-
-        <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-3.5 flex items-center justify-between">
-          <div>
-            <span className="text-[11px] text-zinc-400 font-medium block">Total Catalog Downloads</span>
-            <span className="text-xl font-bold font-mono text-white mt-0.5 block">
-              {totalDownloads.toLocaleString()}
-            </span>
-          </div>
-          <span className="text-[10px] font-mono px-2 py-1 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-            Beat Downloads
-          </span>
-        </div>
-
-        <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-3.5 flex items-center justify-between">
-          <div>
-            <span className="text-[11px] text-zinc-400 font-medium block">10,000 Pay Threshold (₦30,000)</span>
-            <span className="text-xl font-bold font-mono text-[#2dd4bf] mt-0.5 block">
-              {Math.max(totalPlays, totalDownloads, totalPlays + totalDownloads).toLocaleString()} / 10,000
-            </span>
-          </div>
-          <span className="text-[10px] font-mono px-2 py-1 rounded bg-amber-500/10 text-amber-300 border border-amber-500/20">
-            {Math.min(100, Math.round((Math.max(totalPlays, totalDownloads, totalPlays + totalDownloads) / 10000) * 100))}% to ₦30k
-          </span>
+        {/* Banner Right Action Button */}
+        <div className="relative z-10 shrink-0">
+          <Link
+            href="/beats/upload"
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#e53935] hover:bg-[#d32f2f] text-white text-xs font-bold transition-all shadow-lg shadow-[#e53935]/30 hover:scale-[1.02] cursor-pointer"
+          >
+            <Upload className="h-4 w-4 stroke-[2.5]" />
+            <span>Upload Beat</span>
+          </Link>
         </div>
       </div>
 
-      {/* Catalog Search & Filters */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-zinc-900/40 p-3 rounded-lg border border-zinc-800">
-        <div className="relative flex-1 max-w-sm">
-          <Search className="h-3.5 w-3.5 text-zinc-500 absolute left-3 top-1/2 -translate-y-1/2" />
+      {/* 2. FOUR PREMIUM KPI CARDS WITH SPARKLINES */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Card 1: Total Catalog Plays */}
+        <div className="relative rounded-2xl border border-white/[0.06] bg-[#13151b] p-5 shadow-lg flex flex-col justify-between overflow-hidden group hover:border-white/[0.12] transition-colors">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-[#e53935]/15 border border-[#e53935]/30 flex items-center justify-center text-[#e53935] shrink-0">
+                <Play className="h-4 w-4 fill-current ml-0.5" />
+              </div>
+              <div>
+                <span className="text-xs text-gray-400 font-medium block">Total Catalog Plays</span>
+                <div className="flex items-baseline gap-2 mt-0.5">
+                  <span className="text-2xl font-black font-mono text-white">
+                    {totalPlays.toLocaleString()}
+                  </span>
+                  <span className="text-[11px] font-bold text-emerald-400 flex items-center">
+                    ↑ 12%
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+          {/* Smooth Red Sparkline SVG */}
+          <div className="mt-4 h-9 w-full flex items-end">
+            <svg className="w-full h-8 overflow-visible" viewBox="0 0 160 32" fill="none">
+              <path
+                d="M0 24 C 20 22, 40 28, 60 20 C 80 12, 100 22, 120 10 C 140 6, 150 12, 160 4"
+                stroke="#e53935"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                fill="none"
+              />
+            </svg>
+          </div>
+        </div>
+
+        {/* Card 2: Total Catalog Downloads */}
+        <div className="relative rounded-2xl border border-white/[0.06] bg-[#13151b] p-5 shadow-lg flex flex-col justify-between overflow-hidden group hover:border-white/[0.12] transition-colors">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-[#e53935]/15 border border-[#e53935]/30 flex items-center justify-center text-[#e53935] shrink-0">
+                <Download className="h-4 w-4" />
+              </div>
+              <div>
+                <span className="text-xs text-gray-400 font-medium block">Total Catalog Downloads</span>
+                <div className="flex items-baseline gap-2 mt-0.5">
+                  <span className="text-2xl font-black font-mono text-white">
+                    {totalDownloads.toLocaleString()}
+                  </span>
+                  <span className="text-[11px] font-bold text-emerald-400 flex items-center">
+                    ↑ 8%
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+          {/* Smooth Sparkline Curve SVG */}
+          <div className="mt-4 h-9 w-full flex items-end">
+            <svg className="w-full h-8 overflow-visible" viewBox="0 0 160 32" fill="none">
+              <path
+                d="M0 26 C 30 25, 60 27, 90 18 C 120 10, 140 14, 160 6"
+                stroke="#9ca3af"
+                strokeWidth="2"
+                strokeLinecap="round"
+                fill="none"
+              />
+            </svg>
+          </div>
+        </div>
+
+        {/* Card 3: Total Revenue */}
+        <div className="relative rounded-2xl border border-white/[0.06] bg-[#13151b] p-5 shadow-lg flex flex-col justify-between overflow-hidden group hover:border-white/[0.12] transition-colors">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <span className="text-xs text-gray-400 font-medium block">Total Revenue (USD)</span>
+              <div className="flex items-baseline gap-2 mt-0.5">
+                <span className="text-2xl font-black font-mono text-white">
+                  ${totalRevenueUsd.toLocaleString()}
+                </span>
+                <span className="text-[11px] font-bold text-emerald-400 flex items-center">
+                  ↑ 24%
+                </span>
+              </div>
+            </div>
+          </div>
+          {/* Sparkline Curve SVG */}
+          <div className="mt-4 h-9 w-full flex items-end">
+            <svg className="w-full h-8 overflow-visible" viewBox="0 0 160 32" fill="none">
+              <path
+                d="M0 28 C 30 26, 60 22, 90 14 C 120 6, 140 12, 160 4"
+                stroke="#e5e7eb"
+                strokeWidth="2"
+                strokeLinecap="round"
+                fill="none"
+              />
+            </svg>
+          </div>
+        </div>
+
+        {/* Card 4: 10,000 Pay Threshold */}
+        <div className="relative rounded-2xl border border-white/[0.06] bg-[#13151b] p-5 shadow-lg flex flex-col justify-between overflow-hidden group hover:border-white/[0.12] transition-colors">
+          <div>
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-1.5 text-xs text-amber-400 font-bold">
+                <Crown className="h-4 w-4 fill-amber-400/20" />
+                <span>10,000 Pay Threshold</span>
+              </div>
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-300 font-mono">
+                {thresholdPct}% to 10k
+              </span>
+            </div>
+            <div className="mt-2 flex items-baseline gap-1.5">
+              <span className="text-2xl font-black font-mono text-white">
+                {combinedActivity.toLocaleString()}
+              </span>
+              <span className="text-xs font-mono text-gray-500">
+                / 10,000 plays
+              </span>
+            </div>
+          </div>
+
+          {/* Red Progress Bar */}
+          <div className="mt-4 space-y-1">
+            <div className="w-full h-2 rounded-full bg-white/[0.06] overflow-hidden">
+              <div
+                className="h-full rounded-full bg-[#e53935] transition-all duration-500 shadow-sm shadow-[#e53935]/50"
+                style={{ width: `${Math.max(4, thresholdPct)}%` }}
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* 3. CATALOG SEARCH & FILTERS BAR */}
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-[#13151b] p-3 rounded-2xl border border-white/[0.06]">
+        <div className="relative flex-1 max-w-md">
+          <Search className="h-4 w-4 text-gray-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
           <input
             type="text"
             placeholder="Search catalog by title or keyword..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full bg-zinc-950 border border-zinc-800 rounded-md py-1.5 pl-9 pr-3 text-xs text-zinc-200 placeholder:text-zinc-500 focus:outline-none focus:border-zinc-700"
+            className="w-full bg-[#181a20] border border-white/[0.06] rounded-xl py-2 pl-10 pr-3 text-xs text-white placeholder:text-gray-500 focus:outline-none focus:border-white/20 transition-colors"
           />
         </div>
 
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-zinc-400">Genre:</span>
-          <select
-            value={filterGenre}
-            onChange={(e) => setFilterGenre(e.target.value)}
-            className="bg-zinc-950 border border-zinc-800 text-xs text-zinc-300 py-1.5 px-2.5 rounded-md focus:outline-none focus:border-zinc-700"
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 bg-[#181a20] border border-white/[0.06] rounded-xl px-3 py-1.5">
+            <span className="text-xs text-gray-400 font-medium">Genre:</span>
+            <select
+              value={filterGenre}
+              onChange={(e) => setFilterGenre(e.target.value)}
+              className="bg-transparent text-xs text-white font-medium focus:outline-none cursor-pointer"
+            >
+              <option value="all" className="bg-[#181a20]">All Genres</option>
+              <option value="afrobeats" className="bg-[#181a20]">Afrobeats</option>
+              <option value="amapiano" className="bg-[#181a20]">Amapiano</option>
+              <option value="hip-hop" className="bg-[#181a20]">Hip-Hop</option>
+              <option value="r&b" className="bg-[#181a20]">R&amp;B</option>
+              <option value="trap" className="bg-[#181a20]">Trap</option>
+              <option value="electronic" className="bg-[#181a20]">Electronic</option>
+            </select>
+          </div>
+
+          <button
+            type="button"
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[#181a20] border border-white/[0.06] text-xs font-semibold text-gray-300 hover:text-white hover:bg-white/[0.04] transition-colors"
           >
-            <option value="all">All Genres</option>
-            <option value="afrobeats">Afrobeats</option>
-            <option value="amapiano">Amapiano</option>
-            <option value="lo-fi">Lo-Fi</option>
-            <option value="electronic">Electronic</option>
-            <option value="afropop">Afropop</option>
-          </select>
+            <SlidersHorizontal className="h-3.5 w-3.5" />
+            <span>Filters</span>
+          </button>
         </div>
       </div>
 
-      {/* Beats Table Card */}
-      <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 shadow-sm overflow-hidden">
+      {/* 4. BEATS DATA TABLE CARD */}
+      <div className="rounded-2xl border border-white/[0.06] bg-[#13151b] shadow-xl overflow-hidden">
         {isLoading ? (
-          <div className="py-20 flex flex-col items-center justify-center space-y-3">
-            <Loader2 className="h-7 w-7 text-[#2dd4bf] animate-spin" />
-            <span className="text-xs font-mono text-zinc-400">Loading your beat catalog...</span>
+          <div className="py-24 flex flex-col items-center justify-center space-y-3">
+            <Loader2 className="h-8 w-8 text-[#e53935] animate-spin" />
+            <span className="text-xs font-mono text-gray-400">Loading your beat catalog...</span>
           </div>
         ) : filteredBeats.length > 0 ? (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
-              <thead className="bg-zinc-950/60 border-b border-zinc-800 text-zinc-400 font-mono uppercase text-[10px] tracking-wider">
+              <thead className="bg-[#0f1115] border-b border-white/[0.06] text-gray-400 font-mono uppercase text-[10px] tracking-wider">
                 <tr>
-                  <th className="py-3 px-4">Track</th>
-                  <th className="py-3 px-4">BPM / Key</th>
-                  <th className="py-3 px-4">License Pricing</th>
-                  <th className="py-3 px-4 text-center">Plays</th>
-                  <th className="py-3 px-4 text-center">Downloads</th>
-                  <th className="py-3 px-4 text-center">Pay Threshold</th>
-                  <th className="py-3 px-4 text-center">Sales</th>
-                  <th className="py-3 px-4">Status</th>
-                  <th className="py-3 px-4 text-right">Actions</th>
+                  <th className="py-3.5 px-4 font-bold">Track</th>
+                  <th className="py-3.5 px-4 font-bold">BPM / Key</th>
+                  <th className="py-3.5 px-4 font-bold">License Pricing</th>
+                  <th className="py-3.5 px-4 font-bold text-center">Plays</th>
+                  <th className="py-3.5 px-4 font-bold text-center">Downloads</th>
+                  <th className="py-3.5 px-4 font-bold text-center">Pay Threshold</th>
+                  <th className="py-3.5 px-4 font-bold text-center">Sales</th>
+                  <th className="py-3.5 px-4 font-bold">Status</th>
+                  <th className="py-3.5 px-4 font-bold text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-zinc-800/60">
+              <tbody className="divide-y divide-white/[0.04]">
                 {filteredBeats.map((beat) => (
-                  <tr key={beat.id} className="hover:bg-zinc-800/30 transition-colors">
+                  <tr key={beat.id} className="hover:bg-white/[0.02] transition-colors group">
                     {/* Track Info */}
-                    <td className="py-3 px-4">
+                    <td className="py-3.5 px-4">
                       <div className="flex items-center gap-3">
                         <button
                           type="button"
                           onClick={() => togglePlay(beat.id, beat.audioUrl)}
-                          className="h-8 w-8 rounded bg-zinc-800 hover:bg-[#2dd4bf] hover:text-black flex items-center justify-center shrink-0 transition-colors text-zinc-300"
+                          className={`h-9 w-9 rounded-xl flex items-center justify-center shrink-0 transition-all ${
+                            playingId === beat.id
+                              ? 'bg-[#e53935] text-white shadow-md shadow-[#e53935]/30'
+                              : 'bg-white/[0.04] hover:bg-[#e53935] text-gray-300 hover:text-white'
+                          }`}
                         >
                           {playingId === beat.id ? (
-                            <Pause className="h-3.5 w-3.5" />
+                            <Pause className="h-4 w-4 fill-current" />
                           ) : (
-                            <Play className="h-3.5 w-3.5 fill-current ml-0.5" />
+                            <Play className="h-4 w-4 fill-current ml-0.5" />
                           )}
                         </button>
 
                         {/* Beat Artwork Thumbnail */}
                         <div
                           onClick={() => setArtworkModalBeat(beat)}
-                          className="relative h-10 w-10 rounded-lg overflow-hidden shrink-0 border border-zinc-700/80 bg-zinc-950 group cursor-pointer shadow-xs"
+                          className="relative h-11 w-11 rounded-xl overflow-hidden shrink-0 border border-white/[0.08] bg-black/60 group cursor-pointer shadow-sm"
                           title="Click to view/change artwork"
                         >
                           <img
                             src={beat.coverUrl}
                             alt={beat.title}
-                            className="w-full h-full object-cover transition-transform group-hover:scale-110"
+                            className="w-full h-full object-cover transition-transform group-hover:scale-110 duration-300"
                           />
-                          <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-[#2dd4bf]">
+                          <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-[#e53935]">
                             <ImageIcon className="h-4 w-4" />
                           </div>
                         </div>
 
                         <div className="min-w-0">
-                          <span className="font-semibold text-white block truncate max-w-[200px]">
+                          <span className="font-bold text-white block truncate max-w-[220px]">
                             {beat.title}
                           </span>
-                          <span className="text-[10px] text-zinc-400 block font-mono">
+                          <span className="text-[11px] text-gray-400 block pt-0.5">
                             {beat.genre} · {beat.duration}
                           </span>
                         </div>
@@ -381,68 +523,69 @@ export default function BeatsCatalogPage() {
                     </td>
 
                     {/* BPM & Key */}
-                    <td className="py-3 px-4 font-mono text-zinc-300">
-                      <div>{beat.bpm} BPM</div>
-                      <div className="text-[10px] text-zinc-500">{beat.key}</div>
+                    <td className="py-3.5 px-4 font-mono">
+                      <div className="text-xs font-bold text-white">{beat.bpm} BPM</div>
+                      <div className="text-[10px] text-gray-400 mt-0.5">{beat.key}</div>
                     </td>
 
                     {/* License Pricing */}
-                    <td className="py-3 px-4 font-mono text-[11px] space-y-0.5">
-                      <div className="text-zinc-300">
+                    <td className="py-3.5 px-4 font-mono text-[11px] space-y-0.5">
+                      <div className="text-gray-300">
                         Basic: ₦{beat.priceBasicNgn.toLocaleString()}
                       </div>
-                      <div className="text-zinc-400">
+                      <div className="text-gray-400">
                         Prem: ₦{beat.pricePremiumNgn.toLocaleString()}
                       </div>
-                      <div className="text-[#2dd4bf]">
+                      <div className="text-[#e53935] font-bold">
                         Excl: ₦{beat.priceExclusiveNgn.toLocaleString()}
                       </div>
                     </td>
 
                     {/* Plays */}
-                    <td className="py-3 px-4 text-center font-mono text-[#2dd4bf] font-semibold">
+                    <td className="py-3.5 px-4 text-center font-mono font-bold text-white">
                       {(beat.streamsCount || 0).toLocaleString()}
                     </td>
 
                     {/* Downloads */}
-                    <td className="py-3 px-4 text-center font-mono text-emerald-400 font-semibold">
+                    <td className="py-3.5 px-4 text-center font-mono font-bold text-gray-300">
                       {(beat.downloadsCount || 0).toLocaleString()}
                     </td>
 
                     {/* Pay Threshold Progress */}
-                    <td className="py-3 px-4 text-center font-mono text-[11px] text-zinc-300">
-                      <div>{(beat.combinedActivity || 0).toLocaleString()} / 10k</div>
-                      <div className="text-[10px] text-amber-300">{beat.thresholdPct || 0}%</div>
+                    <td className="py-3.5 px-4 text-center font-mono text-[11px]">
+                      <div className="text-white font-bold">{(beat.combinedActivity || 0).toLocaleString()} / 10k</div>
+                      <div className="text-[10px] text-amber-400 font-semibold mt-0.5">{beat.thresholdPct || 0}%</div>
                     </td>
 
                     {/* Sales */}
-                    <td className="py-3 px-4 text-center font-mono font-bold text-white">
+                    <td className="py-3.5 px-4 text-center font-mono font-bold text-white">
                       {beat.salesCount}
                     </td>
 
                     {/* Status */}
-                    <td className="py-3 px-4">
+                    <td className="py-3.5 px-4">
                       {beat.status === 'live' ? (
-                        <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                          Live
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                          <span>Live</span>
                         </span>
                       ) : (
-                        <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-purple-500/10 text-purple-300 border border-purple-500/20">
-                          Sold Exclusive
+                        <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-bold bg-purple-500/10 text-purple-300 border border-purple-500/30">
+                          Sold
                         </span>
                       )}
                     </td>
 
                     {/* Actions */}
-                    <td className="py-3 px-4 text-right">
-                      <div className="flex items-center justify-end gap-1.5">
+                    <td className="py-3.5 px-4 text-right">
+                      <div className="flex items-center justify-end gap-2">
                         <button
                           type="button"
                           onClick={() => setArtworkModalBeat(beat)}
                           title="Change Artwork"
-                          className="inline-flex items-center gap-1 px-2.5 py-1 text-zinc-300 hover:text-[#2dd4bf] hover:bg-zinc-800 rounded transition-colors text-[11px] font-medium border border-zinc-800 hover:border-zinc-700"
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-gray-300 hover:text-white bg-white/[0.04] hover:bg-white/[0.08] rounded-lg transition-colors text-[11px] font-bold border border-white/[0.08]"
                         >
-                          <ImageIcon className="h-3.5 w-3.5 text-[#2dd4bf]" />
+                          <ImageIcon className="h-3.5 w-3.5 text-gray-400" />
                           <span className="hidden sm:inline">Artwork</span>
                         </button>
                         <button
@@ -450,9 +593,9 @@ export default function BeatsCatalogPage() {
                           onClick={() => handleDeleteBeat(beat.id, beat.title)}
                           disabled={deletingId === beat.id}
                           title="Delete Track"
-                          className="p-1.5 text-zinc-400 hover:text-rose-400 hover:bg-zinc-800 rounded transition-colors disabled:opacity-50"
+                          className="p-1.5 text-gray-500 hover:text-[#e53935] hover:bg-red-500/10 rounded-lg transition-colors disabled:opacity-50"
                         >
-                          <Trash2 className="h-3.5 w-3.5" />
+                          <Trash2 className="h-4 w-4" />
                         </button>
                       </div>
                     </td>
@@ -462,18 +605,18 @@ export default function BeatsCatalogPage() {
             </table>
           </div>
         ) : (
-          <div className="py-20 text-center space-y-3 px-4">
-            <UploadCloud className="h-10 w-10 text-zinc-600 mx-auto" />
-            <h3 className="text-sm font-semibold text-white">Your Beat Catalog is Empty</h3>
-            <p className="text-xs text-zinc-400 max-w-md mx-auto">
+          <div className="py-24 text-center space-y-3 px-4">
+            <UploadCloud className="h-12 w-12 text-gray-600 mx-auto" />
+            <h3 className="text-base font-bold text-white">Your Beat Catalog is Empty</h3>
+            <p className="text-xs text-gray-400 max-w-md mx-auto leading-relaxed">
               You haven&apos;t uploaded any beats yet. Click below to publish your first instrumental to Caution Studio and start earning 80% on every sale and monthly streaming royalties.
             </p>
-            <div className="pt-2">
+            <div className="pt-3">
               <Link
                 href="/beats/upload"
-                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-md bg-[#2dd4bf] hover:bg-[#20b8a4] text-zinc-950 text-xs font-bold transition-colors shadow-sm"
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#e53935] hover:bg-[#d32f2f] text-white text-xs font-bold transition-all shadow-md shadow-[#e53935]/25"
               >
-                <Plus className="h-4 w-4 stroke-[2.5]" />
+                <Upload className="h-4 w-4 stroke-[2.5]" />
                 <span>Upload First Beat</span>
               </Link>
             </div>

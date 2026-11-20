@@ -29,7 +29,9 @@ import {
   AlertCircle,
   Search,
   ShoppingBag,
-  Tag
+  Tag,
+  Crown,
+  Upload
 } from 'lucide-react';
 
 interface RecentSaleItem {
@@ -395,44 +397,57 @@ export default function CreatorDashboardPage() {
 
   return (
     <CreatorShell>
-      {/* Top Header & Quick Actions */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-zinc-800">
-        <div>
+      {/* 1. EDITORIAL STUDIO HERO BANNER */}
+      <div className="relative rounded-2xl overflow-hidden border border-white/[0.08] bg-[#16181d] p-6 sm:p-8 min-h-[170px] flex flex-col md:flex-row md:items-center justify-between gap-6 shadow-2xl">
+        {/* Studio Producer Background Artwork with Red Ambient Lighting */}
+        <div className="absolute right-0 top-0 bottom-0 w-full md:w-3/5 pointer-events-none overflow-hidden">
+          <img
+            src="/images/african_mixing_engineer.jpg"
+            alt="Studio Dashboard"
+            className="w-full h-full object-cover object-right md:object-center opacity-30 md:opacity-40 mix-blend-screen"
+          />
+          <div className="absolute inset-0 bg-gradient-to-r from-[#16181d] via-[#16181d]/85 to-transparent" />
+          <div className="absolute right-10 top-1/2 -translate-y-1/2 w-72 h-72 rounded-full bg-[#e53935]/15 blur-3xl pointer-events-none" />
+        </div>
+
+        {/* Banner Left Info */}
+        <div className="relative z-10 max-w-xl space-y-2">
           <div className="flex items-center gap-2">
-            <span className="h-2 w-2 rounded-full bg-[#2dd4bf] animate-pulse" />
-            <span className="text-xs font-mono uppercase tracking-wider text-zinc-400">
+            <span className="h-2 w-2 rounded-full bg-[#e53935] animate-pulse" />
+            <span className="text-xs font-mono uppercase tracking-wider text-gray-400">
               Producer Portal // Caution Studio
             </span>
           </div>
-          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white mt-1">
+          <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight leading-tight">
             Studio Dashboard
           </h1>
-          <p className="text-xs text-zinc-400 mt-0.5">
-            Real-time catalog performance, plays &amp; downloads pay threshold, and Paystack payout ledger
+          <p className="text-xs sm:text-sm text-gray-400 leading-relaxed">
+            Real-time catalog performance, plays &amp; downloads pay threshold, and Paystack direct payouts.
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2.5">
+        {/* Banner Right Action Buttons */}
+        <div className="relative z-10 flex flex-wrap items-center gap-2.5 shrink-0">
           <button
             type="button"
             onClick={() => handleOpenWithdraw()}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 text-xs font-semibold transition-colors cursor-pointer shadow-xs"
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 text-xs font-bold transition-all cursor-pointer shadow-sm"
           >
-            <Wallet className="h-3.5 w-3.5 text-emerald-400" />
-            <span>Withdraw Funds ({availableBalanceNgn > 0 ? `₦${availableBalanceNgn.toLocaleString()}` : '₦0'})</span>
+            <Wallet className="h-4 w-4 text-emerald-400" />
+            <span>Withdraw ({availableBalanceNgn > 0 ? `₦${availableBalanceNgn.toLocaleString()}` : '₦0'})</span>
           </button>
           <Link
             href="/payouts"
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-zinc-800 bg-zinc-900/60 hover:bg-zinc-800/80 text-xs font-semibold text-zinc-200 transition-colors"
+            className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-white/[0.08] bg-[#181a20] hover:bg-white/[0.06] text-xs font-bold text-gray-200 transition-colors"
           >
-            <CreditCard className="h-3.5 w-3.5 text-[#2dd4bf]" />
+            <CreditCard className="h-4 w-4 text-gray-400" />
             <span>Paystack Ledger</span>
           </Link>
           <Link
             href="/beats/upload"
-            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-md bg-[#2dd4bf] hover:bg-[#20b8a4] text-zinc-950 text-xs font-semibold transition-colors shadow-xs"
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#e53935] hover:bg-[#d32f2f] text-white text-xs font-bold transition-all shadow-md shadow-[#e53935]/25 hover:scale-[1.02]"
           >
-            <Plus className="h-3.5 w-3.5 stroke-[2.5]" />
+            <Upload className="h-4 w-4 stroke-[2.5]" />
             <span>Upload New Beat</span>
           </Link>
         </div>
@@ -440,7 +455,7 @@ export default function CreatorDashboardPage() {
 
       {loading ? (
         <div className="flex flex-col items-center justify-center p-16 space-y-3">
-          <Loader2 className="h-7 w-7 text-[#2dd4bf] animate-spin" />
+          <Loader2 className="h-8 w-8 text-[#e53935] animate-spin" />
           <span className="text-xs font-mono text-zinc-400">Loading catalog telemetry, plays &amp; downloads...</span>
         </div>
       ) : (
@@ -485,7 +500,7 @@ export default function CreatorDashboardPage() {
                       Pay Threshold &amp; Partner Verification
                     </span>
                     {isVerified ? (
-                      <span className="px-2 py-0.5 rounded-full bg-[#2dd4bf]/20 border border-[#2dd4bf]/40 text-[10px] font-bold text-[#2dd4bf] flex items-center gap-1">
+                      <span className="px-2 py-0.5 rounded-full bg-[#e53935]/20 border border-[#e53935]/40 text-[10px] font-bold text-[#e53935] flex items-center gap-1">
                         <ShieldCheck className="h-3 w-3" />
                         <span>Verified Producer</span>
                       </span>
@@ -498,7 +513,7 @@ export default function CreatorDashboardPage() {
                   </div>
                   <div className="flex flex-wrap items-center gap-3 text-xs font-mono">
                     <span className="text-zinc-300">
-                      Plays: <strong className="text-[#2dd4bf]">{totalPlaysCount.toLocaleString()}</strong>
+                      Plays: <strong className="text-[#e53935]">{totalPlaysCount.toLocaleString()}</strong>
                     </span>
                     <span className="text-zinc-600">•</span>
                     <span className="text-zinc-300">
@@ -525,13 +540,13 @@ export default function CreatorDashboardPage() {
                 </div>
                 <div className="w-full h-2.5 rounded-full bg-zinc-800 overflow-hidden">
                   <div
-                    className="h-full bg-gradient-to-r from-[#2dd4bf] to-emerald-400 transition-all duration-500 rounded-full"
+                    className="h-full bg-gradient-to-r from-[#e53935] to-emerald-400 transition-all duration-500 rounded-full"
                     style={{ width: `${Math.max(downloadProgressPct, combinedActivityCount > 0 ? 2 : 0)}%` }}
                   />
                 </div>
                 <div className="flex items-center justify-between text-[11px] text-zinc-500 pt-1">
                   <span>Goal: 10,000 plays &amp; downloads threshold (₦30,000 payout)</span>
-                  <Link href="/streaming" className="text-[#2dd4bf] hover:underline flex items-center gap-1">
+                  <Link href="/streaming" className="text-[#e53935] hover:underline flex items-center gap-1">
                     <span>View Full Plays &amp; Downloads Telemetry</span>
                     <ArrowRight className="h-3 w-3" />
                   </Link>
@@ -547,7 +562,7 @@ export default function CreatorDashboardPage() {
               <div>
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-medium text-zinc-400">Total Net Earnings</span>
-                  <div className="p-1.5 rounded-md bg-[#2dd4bf]/10 text-[#2dd4bf]">
+                  <div className="p-1.5 rounded-xl bg-[#e53935]/10 text-[#e53935]">
                     <DollarSign className="h-4 w-4" />
                   </div>
                 </div>
@@ -585,12 +600,12 @@ export default function CreatorDashboardPage() {
             <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-4 shadow-sm">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-medium text-zinc-400">Total Beat Plays</span>
-                <div className="p-1.5 rounded-md bg-[#2dd4bf]/10 text-[#2dd4bf]">
+                <div className="p-1.5 rounded-xl bg-[#e53935]/10 text-[#e53935]">
                   <Headphones className="h-4 w-4" />
                 </div>
               </div>
               <div className="mt-2 flex items-baseline gap-2">
-                <span className="text-2xl font-bold font-mono text-[#2dd4bf]">{totalPlaysCount.toLocaleString()}</span>
+                <span className="text-2xl font-bold font-mono text-[#e53935]">{totalPlaysCount.toLocaleString()}</span>
                 <span className="text-xs font-mono text-zinc-500">plays</span>
               </div>
               <p className="text-[11px] text-zinc-500 mt-1">
@@ -657,7 +672,7 @@ export default function CreatorDashboardPage() {
               </div>
               <div className="flex items-center gap-2">
                 <span className="inline-flex items-center gap-1.5 text-xs text-zinc-400">
-                  <span className="h-2 w-2 rounded-full bg-[#2dd4bf]" />
+                  <span className="h-2 w-2 rounded-full bg-[#e53935]" />
                   <span>Net Payout (₦)</span>
                 </span>
               </div>
@@ -675,13 +690,13 @@ export default function CreatorDashboardPage() {
                         <div
                           className={`w-full rounded-t-xs transition-all duration-300 ${
                             d.isCurrent
-                              ? 'bg-[#2dd4bf] group-hover:bg-[#20b8a4]'
+                              ? 'bg-[#e53935] group-hover:bg-[#d32f2f]'
                               : 'bg-zinc-700/80 group-hover:bg-zinc-600'
                           }`}
                           style={{ height: d.height }}
                         />
                       </div>
-                      <span className={`text-xs font-mono ${d.isCurrent ? 'text-[#2dd4bf] font-bold' : 'text-zinc-500'}`}>
+                      <span className={`text-xs font-mono ${d.isCurrent ? 'text-[#e53935] font-bold' : 'text-zinc-500'}`}>
                         {d.month}
                       </span>
                     </div>
@@ -703,7 +718,7 @@ export default function CreatorDashboardPage() {
                 <div>
                   <div className="flex items-center gap-2">
                     <h3 className="text-sm font-semibold text-white">Sold Beats &amp; Commercial Licenses</h3>
-                    <span className="px-2 py-0.5 rounded-full bg-[#2dd4bf]/15 text-[#2dd4bf] text-[10px] font-bold font-mono">
+                    <span className="px-2 py-0.5 rounded-full bg-[#e53935]/15 text-[#e53935] text-[10px] font-bold font-mono">
                       {recentSales.length} Sold
                     </span>
                   </div>
@@ -720,7 +735,7 @@ export default function CreatorDashboardPage() {
                       <span>Withdraw ₦{availableBalanceNgn.toLocaleString()}</span>
                     </button>
                   )}
-                  <Link href="/licenses" className="text-xs text-[#2dd4bf] hover:underline flex items-center gap-1">
+                  <Link href="/licenses" className="text-xs text-[#e53935] hover:underline flex items-center gap-1">
                     <span>All Licenses</span>
                     <ArrowRight className="h-3 w-3" />
                   </Link>
@@ -759,7 +774,7 @@ export default function CreatorDashboardPage() {
                           </td>
                           <td className="py-3 px-3 text-zinc-400 font-mono">{sale.buyer}</td>
                           <td className="py-3 px-3">
-                            <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-zinc-800 text-[#2dd4bf] border border-zinc-700 capitalize">
+                            <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-zinc-800 text-[#e53935] border border-zinc-700 capitalize">
                               {sale.tier}
                             </span>
                           </td>
@@ -793,7 +808,7 @@ export default function CreatorDashboardPage() {
                   <h3 className="text-sm font-semibold text-white">Top Played &amp; Downloaded Beats</h3>
                   <p className="text-xs text-zinc-400">Plays &amp; downloads towards ₦30,000 / 10k threshold</p>
                 </div>
-                <Link href="/streaming" className="text-xs text-[#2dd4bf] hover:underline">
+                <Link href="/streaming" className="text-xs text-[#e53935] hover:underline">
                   Details
                 </Link>
               </div>
@@ -806,7 +821,7 @@ export default function CreatorDashboardPage() {
                         <button
                           type="button"
                           onClick={() => togglePlay(beat.id, beat.audioUrl)}
-                          className="h-8 w-8 rounded bg-zinc-800 hover:bg-[#2dd4bf] hover:text-black flex items-center justify-center shrink-0 transition-colors text-zinc-300"
+                          className="h-8 w-8 rounded bg-zinc-800 hover:bg-[#e53935] hover:text-black flex items-center justify-center shrink-0 transition-colors text-zinc-300"
                         >
                           {playingId === beat.id ? (
                             <Pause className="h-3.5 w-3.5" />
@@ -826,7 +841,7 @@ export default function CreatorDashboardPage() {
                             {beat.title}
                           </span>
                           <span className="text-[10px] text-zinc-400 block font-mono">
-                            <span className="text-[#2dd4bf]">{beat.plays.toLocaleString()} plays</span>
+                            <span className="text-[#e53935]">{beat.plays.toLocaleString()} plays</span>
                             {' · '}
                             <span className="text-amber-300">{beat.downloads.toLocaleString()} dl</span>
                           </span>
@@ -834,7 +849,7 @@ export default function CreatorDashboardPage() {
                       </div>
 
                       <div className="text-right shrink-0 font-mono">
-                        <span className="text-xs font-bold text-[#2dd4bf] block">
+                        <span className="text-xs font-bold text-[#e53935] block">
                           {(beat.plays + beat.downloads).toLocaleString()}
                         </span>
                         <span className="text-[10px] text-zinc-500 block">/ 10,000</span>
@@ -870,7 +885,7 @@ export default function CreatorDashboardPage() {
               <div>
                 <div className="flex items-center gap-2.5">
                   <h3 className="text-sm font-semibold text-white">All Uploaded &amp; Created Beats</h3>
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-[#2dd4bf]/15 text-[#2dd4bf] border border-[#2dd4bf]/30">
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-[#e53935]/15 text-[#e53935] border border-[#e53935]/30">
                     {allUploadedBeats.length} {allUploadedBeats.length === 1 ? 'Beat' : 'Beats'}
                   </span>
                 </div>
@@ -882,7 +897,7 @@ export default function CreatorDashboardPage() {
               <div className="flex items-center gap-2">
                 <Link
                   href="/beats/upload"
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-[#2dd4bf] hover:bg-[#20b8a4] text-zinc-950 text-xs font-semibold transition-colors shadow-xs"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#e53935] hover:bg-[#d32f2f] text-white text-xs font-semibold transition-colors shadow-xs"
                 >
                   <Plus className="h-3.5 w-3.5 stroke-[2.5]" />
                   <span>Upload Beat</span>
@@ -981,7 +996,7 @@ export default function CreatorDashboardPage() {
                             <button
                               type="button"
                               onClick={() => togglePlay(beat.id, beat.audioUrl)}
-                              className="h-7 w-7 rounded bg-zinc-800 hover:bg-[#2dd4bf] hover:text-black flex items-center justify-center shrink-0 transition-colors text-zinc-300 cursor-pointer"
+                              className="h-7 w-7 rounded bg-zinc-800 hover:bg-[#e53935] hover:text-black flex items-center justify-center shrink-0 transition-colors text-zinc-300 cursor-pointer"
                               title="Preview Beat"
                             >
                               {playingId === beat.id ? (
@@ -1024,7 +1039,7 @@ export default function CreatorDashboardPage() {
                         </td>
 
                         <td className="py-2.5 px-3 font-mono text-[11px]">
-                          <span className="text-[#2dd4bf] font-bold">{beat.plays.toLocaleString()} plays</span>
+                          <span className="text-[#e53935] font-bold">{beat.plays.toLocaleString()} plays</span>
                           <span className="text-zinc-500"> · </span>
                           <span className="text-amber-300">{beat.downloads.toLocaleString()} dl</span>
                         </td>
@@ -1055,7 +1070,7 @@ export default function CreatorDashboardPage() {
                 <div className="pt-1">
                   <Link
                     href="/beats/upload"
-                    className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-md bg-[#2dd4bf] text-zinc-950 text-xs font-semibold"
+                    className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-[#e53935] text-white text-xs font-semibold"
                   >
                     <Plus className="h-3.5 w-3.5" />
                     <span>Upload Beat</span>
@@ -1112,7 +1127,7 @@ export default function CreatorDashboardPage() {
                         <button
                           type="button"
                           onClick={() => setWithdrawAmount(String(availableBalanceNgn))}
-                          className="text-[#2dd4bf] hover:underline text-[11px] font-mono cursor-pointer"
+                          className="text-[#e53935] hover:underline text-[11px] font-mono cursor-pointer"
                         >
                           Max All
                         </button>
@@ -1124,7 +1139,7 @@ export default function CreatorDashboardPage() {
                         value={withdrawAmount}
                         onChange={(e) => setWithdrawAmount(e.target.value)}
                         placeholder="e.g. 36000"
-                        className="w-full h-10 px-3 rounded-lg bg-zinc-950 border border-zinc-700/80 text-white font-mono text-sm placeholder-zinc-500 focus:outline-none focus:border-[#2dd4bf]"
+                        className="w-full h-10 px-3 rounded-lg bg-zinc-950 border border-zinc-700/80 text-white font-mono text-sm placeholder-zinc-500 focus:outline-none focus:border-[#e53935]"
                         required
                       />
                     </div>
@@ -1135,7 +1150,7 @@ export default function CreatorDashboardPage() {
                       <select
                         value={bankName}
                         onChange={(e) => setBankName(e.target.value)}
-                        className="w-full h-10 px-3 rounded-lg bg-zinc-950 border border-zinc-700/80 text-white text-xs focus:outline-none focus:border-[#2dd4bf]"
+                        className="w-full h-10 px-3 rounded-lg bg-zinc-950 border border-zinc-700/80 text-white text-xs focus:outline-none focus:border-[#e53935]"
                         required
                       >
                         <option value="">Select Nigerian Bank...</option>
@@ -1166,7 +1181,7 @@ export default function CreatorDashboardPage() {
                         value={accountNumber}
                         onChange={(e) => setAccountNumber(e.target.value.replace(/\D/g, ''))}
                         placeholder="10-digit account number"
-                        className="w-full h-10 px-3 rounded-lg bg-zinc-950 border border-zinc-700/80 text-white font-mono text-sm placeholder-zinc-500 focus:outline-none focus:border-[#2dd4bf]"
+                        className="w-full h-10 px-3 rounded-lg bg-zinc-950 border border-zinc-700/80 text-white font-mono text-sm placeholder-zinc-500 focus:outline-none focus:border-[#e53935]"
                         required
                       />
                     </div>
@@ -1179,7 +1194,7 @@ export default function CreatorDashboardPage() {
                         value={accountName}
                         onChange={(e) => setAccountName(e.target.value)}
                         placeholder="As registered on bank account"
-                        className="w-full h-10 px-3 rounded-lg bg-zinc-950 border border-zinc-700/80 text-white text-xs placeholder-zinc-500 focus:outline-none focus:border-[#2dd4bf]"
+                        className="w-full h-10 px-3 rounded-lg bg-zinc-950 border border-zinc-700/80 text-white text-xs placeholder-zinc-500 focus:outline-none focus:border-[#e53935]"
                         required
                       />
                     </div>

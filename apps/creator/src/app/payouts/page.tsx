@@ -326,7 +326,7 @@ export default function PayoutsPage() {
           type="button"
           onClick={handleWithdraw}
           disabled={withdrawing || availableBalanceNgn < 2000}
-          className="inline-flex items-center gap-1.5 px-4 py-2 rounded-md bg-[#2dd4bf] hover:bg-[#20b8a4] text-zinc-950 text-xs font-bold transition-colors shadow-xs disabled:opacity-50 cursor-pointer"
+          className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#e53935] hover:bg-[#d32f2f] text-white text-xs font-bold transition-colors shadow-xs disabled:opacity-50 cursor-pointer"
         >
           {withdrawing ? (
             <>
@@ -344,7 +344,7 @@ export default function PayoutsPage() {
 
       {loading ? (
         <div className="py-20 flex flex-col items-center justify-center space-y-3">
-          <Loader2 className="h-7 w-7 text-[#2dd4bf] animate-spin" />
+          <Loader2 className="h-7 w-7 text-[#e53935] animate-spin" />
           <span className="text-xs font-mono text-zinc-400">Loading wallet & payout ledger...</span>
         </div>
       ) : (
@@ -375,7 +375,7 @@ export default function PayoutsPage() {
                   ₦{availableBalanceNgn.toLocaleString()}
                 </span>
               </div>
-              <p className="text-[11px] text-[#2dd4bf] mt-1 font-medium">
+              <p className="text-[11px] text-[#e53935] mt-1 font-medium">
                 Min. withdrawal threshold: ₦2,000
               </p>
             </div>
@@ -383,7 +383,7 @@ export default function PayoutsPage() {
             <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-5 shadow-sm">
               <span className="text-xs font-medium text-zinc-400 block">Plays &amp; Downloads Threshold</span>
               <div className="mt-2">
-                <span className="text-2xl font-bold font-mono text-[#2dd4bf]">
+                <span className="text-2xl font-bold font-mono text-[#e53935]">
                   {Math.max(totalPlaysCount, totalDownloadsCount, totalPlaysCount + totalDownloadsCount).toLocaleString()} / 10k
                 </span>
               </div>
@@ -421,7 +421,7 @@ export default function PayoutsPage() {
             {/* Left: Bank Settings Form */}
             <div className="lg:col-span-1 rounded-lg border border-zinc-800 bg-zinc-900/50 p-5 shadow-sm space-y-4">
               <div className="flex items-center gap-2 pb-3 border-b border-zinc-800">
-                <Building className="h-4 w-4 text-[#2dd4bf]" />
+                <Building className="h-4 w-4 text-[#e53935]" />
                 <h3 className="text-sm font-semibold text-white">Bank Account Configuration</h3>
               </div>
 

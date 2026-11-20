@@ -148,7 +148,7 @@ export default function CreatorSettingsPage() {
           type="button"
           onClick={handleSave}
           disabled={saving || loading}
-          className="inline-flex items-center gap-1.5 px-4 py-2 rounded-md bg-[#2dd4bf] hover:bg-[#20b8a4] text-zinc-950 text-xs font-bold transition-colors cursor-pointer disabled:opacity-50"
+          className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#e53935] hover:bg-[#d32f2f] text-white text-xs font-bold transition-colors cursor-pointer disabled:opacity-50"
         >
           {saving ? (
             <Loader2 className="h-4 w-4 animate-spin" />
@@ -285,7 +285,7 @@ export default function CreatorSettingsPage() {
                 </div>
                 <div className="flex items-center justify-between text-xs">
                   <span className="text-zinc-400">Revenue Split:</span>
-                  <span className="text-[#2dd4bf] font-bold font-mono">80% Creator</span>
+                  <span className="text-[#e53935] font-bold font-mono">80% Creator</span>
                 </div>
                 <div className="flex items-center justify-between text-xs">
                   <span className="text-zinc-400">Verification:</span>
@@ -305,7 +305,7 @@ export default function CreatorSettingsPage() {
                     type="checkbox"
                     checked={notifySales}
                     onChange={(e) => setNotifySales(e.target.checked)}
-                    className="rounded border-zinc-700 bg-zinc-950 text-[#2dd4bf] focus:ring-[#2dd4bf]"
+                    className="rounded border-zinc-700 bg-zinc-950 text-[#e53935] focus:ring-[#e53935]"
                   />
                   <span className="text-zinc-300">Email on each beat license sale</span>
                 </label>
@@ -315,7 +315,7 @@ export default function CreatorSettingsPage() {
                     type="checkbox"
                     checked={notifyChats}
                     onChange={(e) => setNotifyChats(e.target.checked)}
-                    className="rounded border-zinc-700 bg-zinc-950 text-[#2dd4bf] focus:ring-[#2dd4bf]"
+                    className="rounded border-zinc-700 bg-zinc-950 text-[#e53935] focus:ring-[#e53935]"
                   />
                   <span className="text-zinc-300">Email on new artist studio chat message</span>
                 </label>
@@ -325,7 +325,7 @@ export default function CreatorSettingsPage() {
                     type="checkbox"
                     checked={notifyPayouts}
                     onChange={(e) => setNotifyPayouts(e.target.checked)}
-                    className="rounded border-zinc-700 bg-zinc-950 text-[#2dd4bf] focus:ring-[#2dd4bf]"
+                    className="rounded border-zinc-700 bg-zinc-950 text-[#e53935] focus:ring-[#e53935]"
                   />
                   <span className="text-zinc-300">Weekly Paystack royalty disbursement digest</span>
                 </label>

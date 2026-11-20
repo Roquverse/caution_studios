@@ -26,7 +26,7 @@ export default function RootLayout({
           rel="stylesheet"
         />
       </head>
-      <body className="min-h-screen bg-[#09090b] text-zinc-100 selection:bg-[#2dd4bf] selection:text-black antialiased">
+      <body className="min-h-screen bg-[#09090b] text-zinc-100 selection:bg-[#e53935] selection:text-white antialiased">
         {children}
       </body>
     </html>

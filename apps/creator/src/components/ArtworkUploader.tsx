@@ -179,7 +179,7 @@ export function ArtworkUploader({
             <p className="text-[11px] text-zinc-400 mt-0.5">{description}</p>
           )}
         </div>
-        <span className="text-[10px] font-mono text-[#2dd4bf] bg-[#2dd4bf]/10 px-2 py-0.5 rounded border border-[#2dd4bf]/20">
+        <span className="text-[10px] font-mono text-[#e53935] bg-[#e53935]/10 px-2 py-0.5 rounded border border-[#e53935]/20">
           1:1 Square Artwork
         </span>
       </div>
@@ -216,7 +216,7 @@ export function ArtworkUploader({
                 <button
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
-                  className="px-3 py-1.5 rounded-md bg-[#2dd4bf] hover:bg-[#20b8a4] text-zinc-950 text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer shadow-sm"
+                  className="px-3 py-1.5 rounded-xl bg-[#e53935] hover:bg-[#d32f2f] text-white text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer shadow-sm"
                 >
                   <RefreshCw className="h-3.5 w-3.5" />
                   <span>Replace Image</span>
@@ -238,7 +238,7 @@ export function ArtworkUploader({
                     Custom Upload
                   </span>
                 ) : selectedPresetId ? (
-                  <span className="bg-[#2dd4bf]/90 backdrop-blur-xs text-zinc-950 text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full shadow-sm">
+                  <span className="bg-[#e53935]/90 backdrop-blur-xs text-zinc-950 text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full shadow-sm">
                     Preset Theme
                   </span>
                 ) : (
@@ -262,11 +262,11 @@ export function ArtworkUploader({
               onClick={() => fileInputRef.current?.click()}
               className={`border-2 border-dashed rounded-xl aspect-square flex flex-col items-center justify-center p-6 text-center cursor-pointer transition-all duration-200 ${
                 isDragging
-                  ? 'border-[#2dd4bf] bg-[#2dd4bf]/10 scale-[1.01]'
-                  : 'border-zinc-700 hover:border-[#2dd4bf]/70 bg-zinc-950/70 hover:bg-zinc-900/60'
+                  ? 'border-[#e53935] bg-[#e53935]/10 scale-[1.01]'
+                  : 'border-zinc-700 hover:border-[#e53935]/70 bg-zinc-950/70 hover:bg-zinc-900/60'
               }`}
             >
-              <div className="w-12 h-12 rounded-full bg-zinc-800/80 border border-zinc-700 flex items-center justify-center mb-3 text-[#2dd4bf] group-hover:scale-110 transition-transform">
+              <div className="w-12 h-12 rounded-full bg-zinc-800/80 border border-zinc-700 flex items-center justify-center mb-3 text-[#e53935] group-hover:scale-110 transition-transform">
                 <Upload className="h-6 w-6" />
               </div>
               <span className="text-xs font-semibold text-white block">
@@ -274,7 +274,7 @@ export function ArtworkUploader({
               </span>
               <span className="text-[11px] text-zinc-400 mt-1 block">
                 Drag and drop image here, or{' '}
-                <span className="text-[#2dd4bf] underline">browse</span>
+                <span className="text-[#e53935] underline">browse</span>
               </span>
               <span className="text-[10px] text-zinc-500 mt-2 block font-mono">
                 PNG, JPG, WebP up to 10MB
@@ -288,13 +288,13 @@ export function ArtworkUploader({
           <div className="bg-zinc-950/60 rounded-lg p-3.5 border border-zinc-800/80 space-y-2">
             <div className="flex items-center justify-between">
               <span className="text-xs font-semibold text-zinc-200 flex items-center gap-1.5">
-                <Sparkles className="h-3.5 w-3.5 text-[#2dd4bf]" />
+                <Sparkles className="h-3.5 w-3.5 text-[#e53935]" />
                 <span>Need quick artwork? Choose a studio preset</span>
               </span>
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                className="text-[11px] text-[#2dd4bf] hover:underline font-medium"
+                className="text-[11px] text-[#e53935] hover:underline font-medium"
               >
                 Upload your own
               </button>
@@ -314,7 +314,7 @@ export function ArtworkUploader({
                     onClick={() => handleSelectPreset(preset)}
                     className={`relative rounded-lg overflow-hidden border text-left transition-all group cursor-pointer ${
                       isSelected
-                        ? 'border-[#2dd4bf] ring-2 ring-[#2dd4bf]/40'
+                        ? 'border-[#e53935] ring-2 ring-[#e53935]/40'
                         : 'border-zinc-800 hover:border-zinc-600 bg-zinc-900'
                     }`}
                   >
@@ -325,8 +325,8 @@ export function ArtworkUploader({
                         className="w-full h-full object-cover transition-transform group-hover:scale-105"
                       />
                       {isSelected && (
-                        <div className="absolute inset-0 bg-[#2dd4bf]/20 flex items-center justify-center">
-                          <div className="w-5 h-5 rounded-full bg-[#2dd4bf] text-black flex items-center justify-center shadow-md">
+                        <div className="absolute inset-0 bg-[#e53935]/20 flex items-center justify-center">
+                          <div className="w-5 h-5 rounded-full bg-[#e53935] text-black flex items-center justify-center shadow-md">
                             <Check className="h-3 w-3 stroke-[3]" />
                           </div>
                         </div>

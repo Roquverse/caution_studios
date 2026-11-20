@@ -24,7 +24,9 @@ import {
   CheckCircle2,
   Upload,
   Download,
-  Megaphone
+  Megaphone,
+  Bell,
+  ArrowRight
 } from 'lucide-react';
 
 interface CreatorShellProps {
@@ -273,10 +275,10 @@ export function CreatorShell({ children, activePath }: CreatorShellProps) {
 
   if (checkingAuth) {
     return (
-      <div className="min-h-screen bg-[#09090b] flex items-center justify-center">
+      <div className="min-h-screen bg-[#0d0e12] flex items-center justify-center">
         <div className="flex flex-col items-center gap-3">
-          <div className="h-6 w-6 border-2 border-[#2dd4bf] border-t-transparent rounded-full animate-spin" />
-          <span className="text-xs text-zinc-500 font-mono">Verifying producer credentials...</span>
+          <div className="h-6 w-6 border-2 border-[#e53935] border-t-transparent rounded-full animate-spin" />
+          <span className="text-xs text-gray-500 font-mono">Verifying producer credentials...</span>
         </div>
       </div>
     );
@@ -287,7 +289,7 @@ export function CreatorShell({ children, activePath }: CreatorShellProps) {
   }
 
   return (
-    <div className="min-h-screen bg-[#09090b] text-zinc-100 flex">
+    <div className="min-h-screen bg-[#0d0e12] text-gray-100 flex">
       {/* Mobile Overlay */}
       {mobileOpen && (
         <div
@@ -298,115 +300,137 @@ export function CreatorShell({ children, activePath }: CreatorShellProps) {
 
       {/* Sidebar */}
       <aside
-        className={`fixed top-0 bottom-0 left-0 z-50 w-64 border-r border-zinc-800 bg-[#0c0d10] flex flex-col transition-transform duration-200 lg:translate-x-0 ${
+        className={`fixed top-0 bottom-0 left-0 z-50 w-64 border-r border-white/[0.06] bg-[#121316] flex flex-col justify-between transition-transform duration-200 lg:translate-x-0 ${
           mobileOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
-        {/* Workspace Brand Header */}
-        <div className="h-14 border-b border-zinc-800 px-4 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-2.5 group">
-            <img
-              src="/logo.png"
-              alt="Caution Studio"
-              className="h-7 w-auto max-w-[120px] object-contain brightness-0 invert group-hover:opacity-90 transition-opacity"
-            />
-            <span className="bg-[#2dd4bf]/15 text-[#2dd4bf] border border-[#2dd4bf]/30 text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider">
-              Creator
-            </span>
-          </Link>
-          <button
-            type="button"
-            className="lg:hidden p-1.5 text-zinc-400 hover:text-white"
-            onClick={() => setMobileOpen(false)}
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
+        <div className="flex flex-col flex-1 min-h-0">
+          {/* Workspace Brand Header */}
+          <div className="h-16 border-b border-white/[0.06] px-5 flex items-center justify-between">
+            <Link href="/" className="flex items-center gap-2 group">
+              <img
+                src="/logo.png"
+                alt="Caution Studio"
+                className="h-7 w-auto max-w-[125px] object-contain brightness-0 invert group-hover:opacity-90 transition-opacity"
+              />
+            </Link>
+            <button
+              type="button"
+              className="lg:hidden p-1.5 text-gray-400 hover:text-white"
+              onClick={() => setMobileOpen(false)}
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
 
-        {/* Promo Telemetry Tag */}
-        <div className="p-3">
-          <div className="p-2.5 rounded-md bg-amber-500/10 border border-amber-500/20 flex items-center gap-2.5">
-            <div className="p-1 rounded bg-amber-500/20 text-amber-300 shrink-0">
-              <Gift className="h-3.5 w-3.5" />
-            </div>
-            <div className="min-w-0">
-              <span className="text-[11px] font-bold text-amber-200 block truncate">
-                3 Months Free Promo
-              </span>
-              <span className="text-[10px] text-amber-400/80 block">
-                78 days left · 80% keep rate
-              </span>
+          {/* Prominent Upload Beat Button */}
+          <div className="p-3.5 pb-2">
+            <Link
+              href="/beats/upload"
+              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-[#e53935] hover:bg-[#d32f2f] text-white text-xs font-bold transition-all shadow-md shadow-[#e53935]/25"
+            >
+              <Upload className="h-4 w-4 stroke-[2.5]" />
+              <span>Upload Beat</span>
+            </Link>
+          </div>
+
+          {/* Navigation Section */}
+          <div className="flex-1 px-3 py-1 space-y-4 overflow-y-auto">
+            <div>
+              <div className="px-3 pt-2 pb-1.5 text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+                Studio Portal
+              </div>
+              <nav className="space-y-1">
+                {navItems.map((item) => {
+                  const Icon = item.icon;
+                  const isActive = pathname === item.href;
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      className={`flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold transition-all ${
+                        isActive
+                          ? 'bg-[#1c1e24] text-white shadow-sm border border-white/[0.08]'
+                          : 'text-gray-400 hover:text-white hover:bg-white/[0.04]'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <Icon
+                          className={`h-4 w-4 shrink-0 ${
+                            isActive ? 'text-[#e53935]' : 'text-gray-400'
+                          }`}
+                        />
+                        <span className="truncate">{item.label}</span>
+                      </div>
+                      {item.badge && (
+                        <span
+                          className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ${
+                            item.badge === 'Live'
+                              ? 'bg-[#e53935]/20 text-[#ff6b67] border border-[#e53935]/30'
+                              : item.badge === '3' || item.badge === 'Direct'
+                              ? 'bg-[#e53935] text-white min-w-[18px] text-center'
+                              : 'bg-white/[0.06] text-gray-400'
+                          }`}
+                        >
+                          {item.badge}
+                        </span>
+                      )}
+                    </Link>
+                  );
+                })}
+              </nav>
             </div>
           </div>
-        </div>
 
-        {/* Navigation Section */}
-        <div className="flex-1 px-3 py-1 space-y-6 overflow-y-auto">
-          <div>
-            <div className="px-2 text-[10px] font-semibold text-zinc-500 uppercase tracking-wider mb-2">
-              Studio Portal
-            </div>
-            <nav className="space-y-1">
-              {navItems.map((item) => {
-                const Icon = item.icon;
-                const isActive = pathname === item.href;
-                return (
+          {/* Producer Promotion Card */}
+          <div className="p-3">
+            <div className="relative rounded-2xl overflow-hidden p-4 border border-white/[0.06] bg-[#16181d] space-y-2 group">
+              <img
+                src="/images/african_producer_beats.jpg"
+                alt="Studio Producer"
+                className="absolute inset-0 w-full h-full object-cover opacity-25 group-hover:scale-105 transition-transform duration-500"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-[#0d0e12] via-[#0d0e12]/80 to-transparent" />
+              <div className="relative z-10 space-y-1.5">
+                <h3 className="text-xs font-black text-white leading-tight">Grow your sales</h3>
+                <p className="text-[11px] text-gray-400 leading-snug">
+                  Promote your beats to millions of artists.
+                </p>
+                <div className="pt-1">
                   <Link
-                    key={item.href}
-                    href={item.href}
-                    className={`flex items-center justify-between px-2.5 py-2 rounded-md text-xs font-medium transition-all ${
-                      isActive
-                        ? 'bg-zinc-800/90 text-white font-semibold shadow-xs border border-zinc-700/60'
-                        : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/40'
-                    }`}
+                    href="/promote"
+                    className="inline-flex items-center gap-1 text-[11px] font-bold text-white hover:text-[#e53935] transition-colors"
                   >
-                    <div className="flex items-center gap-2.5">
-                      <Icon
-                        className={`h-4 w-4 ${
-                          isActive ? 'text-[#2dd4bf]' : 'text-zinc-400'
-                        }`}
-                      />
-                      <span>{item.label}</span>
-                    </div>
-                    {item.badge && (
-                      <span
-                        className={`text-[10px] font-bold px-1.5 py-0.2 rounded ${
-                          isActive
-                            ? 'bg-[#2dd4bf]/20 text-[#2dd4bf]'
-                            : 'bg-zinc-800 text-zinc-400'
-                        }`}
-                      >
-                        {item.badge}
-                      </span>
-                    )}
+                    <span>Go to Promotion</span>
+                    <ArrowRight className="h-3 w-3" />
                   </Link>
-                );
-              })}
-            </nav>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 
         {/* Sidebar Footer / User Profile */}
-        <div className="p-3 border-t border-zinc-800 bg-[#0c0d10]">
-          <div className="flex items-center justify-between p-2 rounded-lg bg-zinc-900/60 border border-zinc-800/80">
+        <div className="p-3 border-t border-white/[0.06] bg-[#121316]">
+          <div className="flex items-center justify-between p-2 rounded-xl bg-white/[0.02] border border-white/[0.05] hover:bg-white/[0.04] transition-colors">
             <div className="flex items-center gap-2.5 min-w-0">
-              <div className="h-8 w-8 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center text-xs font-bold text-[#2dd4bf] shrink-0 overflow-hidden">
+              <div className="h-8 w-8 rounded-full bg-zinc-800 border border-white/10 flex items-center justify-center text-xs font-bold text-white shrink-0 overflow-hidden">
                 {avatarUrl ? (
                   <img src={avatarUrl} alt={displayName} className="h-full w-full object-cover" />
                 ) : (
-                  initials
+                  <span className="text-[#e53935] font-black">{initials}</span>
                 )}
               </div>
               <div className="min-w-0">
                 <div className="flex items-center gap-1">
-                  <span className="text-xs font-semibold text-white block truncate leading-tight">
+                  <span className="text-xs font-bold text-white block truncate leading-tight">
                     {displayName}
                   </span>
                   {isVerifiedProducer && (
-                    <ShieldCheck className="h-3 w-3 text-[#2dd4bf] shrink-0" />
+                    <CheckCircle2 className="h-3 w-3 text-emerald-400 shrink-0" />
                   )}
                 </div>
-                <span className="text-[10px] text-zinc-400 block truncate">
+                <span className="text-[10px] text-gray-400 font-mono block truncate">
                   @{displayHandle}
                 </span>
               </div>
@@ -415,7 +439,7 @@ export function CreatorShell({ children, activePath }: CreatorShellProps) {
               type="button"
               onClick={handleSignOut}
               title="Sign Out of Creator Studio"
-              className="p-1.5 text-zinc-400 hover:text-rose-400 hover:bg-zinc-800/80 rounded transition-colors"
+              className="p-1.5 text-gray-400 hover:text-[#e53935] hover:bg-white/[0.04] rounded-lg transition-colors cursor-pointer"
             >
               <LogOut className="h-3.5 w-3.5" />
             </button>
@@ -426,31 +450,43 @@ export function CreatorShell({ children, activePath }: CreatorShellProps) {
       {/* Main Container */}
       <div className="flex-1 lg:pl-64 flex flex-col min-w-0">
         {/* Top Navbar */}
-        <header className="sticky top-0 z-30 h-14 border-b border-zinc-800 bg-[#09090b]/80 backdrop-blur-md px-4 sm:px-6 flex items-center justify-between">
+        <header className="sticky top-0 z-30 h-16 border-b border-white/[0.06] bg-[#121316]/90 backdrop-blur-md px-4 sm:px-6 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <button
               type="button"
-              className="lg:hidden p-1.5 -ml-1 text-zinc-400 hover:text-white"
+              className="lg:hidden p-1.5 -ml-1 text-gray-400 hover:text-white"
               onClick={() => setMobileOpen(true)}
             >
               <Menu className="h-5 w-5" />
             </button>
 
             {/* Breadcrumb */}
-            <div className="flex items-center gap-1.5 text-xs text-zinc-400 font-medium">
+            <div className="flex items-center gap-1.5 text-xs text-gray-400 font-medium">
               <span>Creator Studio</span>
-              <ChevronRight className="h-3.5 w-3.5 text-zinc-600" />
+              <ChevronRight className="h-3.5 w-3.5 text-gray-600" />
               <span className="text-white font-semibold">{getBreadcrumbTitle()}</span>
             </div>
           </div>
 
+          {/* Global Search in Header */}
+          <div className="flex-1 max-w-xl mx-4 hidden md:block">
+            <div className="relative">
+              <Search className="h-3.5 w-3.5 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                placeholder="Search beats, producers, genres..."
+                className="w-full bg-[#181a20] border border-white/[0.06] rounded-xl py-2 pl-9 pr-3 text-xs text-gray-200 placeholder:text-gray-500 focus:outline-none focus:border-white/20 transition-colors"
+              />
+            </div>
+          </div>
+
           {/* Right Header Actions */}
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-3">
             <a
               href={process.env.NEXT_PUBLIC_WEB_URL || 'https://cautionstudioz.com'}
               target="_blank"
               rel="noreferrer"
-              className="hidden sm:inline-flex items-center gap-1 text-xs text-zinc-400 hover:text-white px-2 py-1 rounded transition-colors"
+              className="hidden sm:inline-flex items-center gap-1 text-xs text-gray-400 hover:text-white px-2 py-1 rounded transition-colors"
             >
               <span>Main Site</span>
               <ExternalLink className="h-3 w-3" />
@@ -460,20 +496,40 @@ export function CreatorShell({ children, activePath }: CreatorShellProps) {
               href={process.env.NEXT_PUBLIC_USER_URL || 'https://app.cautionstudioz.com'}
               target="_blank"
               rel="noreferrer"
-              className="hidden sm:inline-flex items-center gap-1 text-xs text-zinc-400 hover:text-white px-2 py-1 rounded transition-colors"
+              className="hidden sm:inline-flex items-center gap-1 text-xs text-gray-400 hover:text-white px-2 py-1 rounded transition-colors"
             >
               <span>Listener App</span>
               <ExternalLink className="h-3 w-3" />
             </a>
 
-            <div className="h-4 w-px bg-zinc-800 hidden sm:block" />
+            {/* Notifications Bell */}
+            <button
+              type="button"
+              title="Notifications"
+              className="relative p-2 rounded-xl text-gray-400 hover:text-white hover:bg-white/[0.04] transition-colors"
+            >
+              <Bell className="h-4 w-4" />
+              <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-[#e53935]" />
+            </button>
+
+            {/* Profile Avatar with Live Status Indicator */}
+            <div className="relative">
+              <div className="w-8 h-8 rounded-full overflow-hidden bg-zinc-800 border border-white/10 flex items-center justify-center text-xs font-bold text-white">
+                {avatarUrl ? (
+                  <img src={avatarUrl} alt={displayName} className="w-full h-full object-cover" />
+                ) : (
+                  <span className="text-[#e53935] font-black">{initials}</span>
+                )}
+              </div>
+              <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-[#121316]" />
+            </div>
 
             <Link
               href="/beats/upload"
-              className="inline-flex items-center gap-1.5 bg-[#2dd4bf] hover:bg-[#20b8a4] text-zinc-950 font-semibold text-xs px-3 py-1.5 rounded-md transition-colors shadow-xs"
+              className="inline-flex sm:hidden items-center gap-1.5 bg-[#e53935] hover:bg-[#d32f2f] text-white font-bold text-xs px-3 py-1.5 rounded-xl transition-colors shadow-sm"
             >
               <Plus className="h-3.5 w-3.5 stroke-[2.5]" />
-              <span>Upload Beat</span>
+              <span>Upload</span>
             </Link>
           </div>
         </header>

@@ -244,13 +244,13 @@ export default function ProducerPromotePage() {
         {/* Header */}
         <div className="pb-4 border-b border-zinc-800">
           <div className="flex items-center gap-2">
-            <span className="h-2 w-2 rounded-full bg-[#2dd4bf] animate-pulse" />
+            <span className="h-2 w-2 rounded-full bg-[#e53935] animate-pulse" />
             <span className="text-xs font-mono uppercase tracking-wider text-zinc-400">
               Commercial Engine // Beat Promotion
             </span>
           </div>
           <h1 className="text-2xl font-bold tracking-tight text-white mt-1 flex items-center gap-2">
-            <Megaphone className="h-6 w-6 text-[#2dd4bf]" />
+            <Megaphone className="h-6 w-6 text-[#e53935]" />
             <span>Promote Your Beats with Audio Ads</span>
           </h1>
           <p className="text-xs text-zinc-400 mt-1 max-w-3xl">
@@ -261,7 +261,7 @@ export default function ProducerPromotePage() {
         {/* Feature Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="p-4 rounded-xl bg-zinc-900/60 border border-zinc-800 space-y-1.5">
-            <div className="flex items-center gap-2 text-[#2dd4bf]">
+            <div className="flex items-center gap-2 text-[#e53935]">
               <Radio className="h-4 w-4" />
               <span className="text-xs font-bold uppercase tracking-wider">Targeted Artists</span>
             </div>
@@ -297,7 +297,7 @@ export default function ProducerPromotePage() {
             <h2 className="text-xs font-mono font-bold uppercase tracking-wider text-zinc-400">
               1. Select Your Ad Placement
             </h2>
-            <span className="text-xs text-[#2dd4bf] font-medium font-mono">
+            <span className="text-xs text-[#e53935] font-medium font-mono">
               Live Platform Rates
             </span>
           </div>
@@ -308,13 +308,13 @@ export default function ProducerPromotePage() {
               onClick={() => setAdType('listening')}
               className={`p-5 rounded-xl border transition-all cursor-pointer relative flex flex-col justify-between ${
                 adType === 'listening'
-                  ? 'bg-[#2dd4bf]/10 border-[#2dd4bf] shadow-md shadow-[#2dd4bf]/10 ring-1 ring-[#2dd4bf]'
+                  ? 'bg-[#e53935]/10 border-[#e53935] shadow-md shadow-[#e53935]/10 ring-1 ring-[#e53935]'
                   : 'bg-zinc-900/50 border-zinc-800 hover:border-zinc-700 hover:bg-zinc-900'
               }`}
             >
               <div>
                 <div className="flex items-center gap-2 mb-1">
-                  <Radio className="h-4 w-4 text-[#2dd4bf]" />
+                  <Radio className="h-4 w-4 text-[#e53935]" />
                   <h3 className="text-sm font-bold text-white">Stream Audio Ad</h3>
                 </div>
                 <div className="mt-2">
@@ -328,7 +328,7 @@ export default function ProducerPromotePage() {
               </div>
 
               <div className="mt-4 pt-3 border-t border-zinc-800 flex items-center justify-between text-xs font-mono">
-                <span className="text-[#2dd4bf] font-bold">
+                <span className="text-[#e53935] font-bold">
                   ~{pricing.stream_ad_plays.toLocaleString()} plays
                 </span>
                 <span className="text-zinc-500 text-[10px]">Guaranteed</span>
@@ -340,7 +340,7 @@ export default function ProducerPromotePage() {
               onClick={() => setAdType('download')}
               className={`p-5 rounded-xl border transition-all cursor-pointer relative flex flex-col justify-between ${
                 adType === 'download'
-                  ? 'bg-[#2dd4bf]/10 border-[#2dd4bf] shadow-md shadow-[#2dd4bf]/10 ring-1 ring-[#2dd4bf]'
+                  ? 'bg-[#e53935]/10 border-[#e53935] shadow-md shadow-[#e53935]/10 ring-1 ring-[#e53935]'
                   : 'bg-zinc-900/50 border-zinc-800 hover:border-zinc-700 hover:bg-zinc-900'
               }`}
             >
@@ -360,7 +360,7 @@ export default function ProducerPromotePage() {
               </div>
 
               <div className="mt-4 pt-3 border-t border-zinc-800 flex items-center justify-between text-xs font-mono">
-                <span className="text-[#2dd4bf] font-bold">
+                <span className="text-[#e53935] font-bold">
                   ~{pricing.download_ad_plays.toLocaleString()} plays
                 </span>
                 <span className="text-zinc-500 text-[10px]">Guaranteed</span>
@@ -372,20 +372,20 @@ export default function ProducerPromotePage() {
               onClick={() => setAdType('all')}
               className={`p-5 rounded-xl border transition-all cursor-pointer relative flex flex-col justify-between ${
                 adType === 'all'
-                  ? 'bg-[#2dd4bf]/10 border-[#2dd4bf] shadow-md shadow-[#2dd4bf]/10 ring-1 ring-[#2dd4bf]'
+                  ? 'bg-[#e53935]/10 border-[#e53935] shadow-md shadow-[#e53935]/10 ring-1 ring-[#e53935]'
                   : 'bg-zinc-900/50 border-zinc-800 hover:border-zinc-700 hover:bg-zinc-900'
               }`}
             >
-              <span className="absolute -top-2.5 right-4 px-2 py-0.5 rounded-full text-[9px] font-mono font-bold bg-[#2dd4bf] text-black uppercase">
+              <span className="absolute -top-2.5 right-4 px-2 py-0.5 rounded-full text-[9px] font-mono font-bold bg-[#e53935] text-black uppercase">
                 BUNDLE DEAL
               </span>
               <div>
                 <div className="flex items-center gap-2 mb-1">
-                  <Megaphone className="h-4 w-4 text-[#2dd4bf]" />
+                  <Megaphone className="h-4 w-4 text-[#e53935]" />
                   <h3 className="text-sm font-bold text-white">Both Placements</h3>
                 </div>
                 <div className="mt-2">
-                  <span className="text-2xl font-black font-mono text-[#2dd4bf]">
+                  <span className="text-2xl font-black font-mono text-[#e53935]">
                     ₦{pricing.both_placements_price_ngn.toLocaleString()}
                   </span>
                 </div>
@@ -395,7 +395,7 @@ export default function ProducerPromotePage() {
               </div>
 
               <div className="mt-4 pt-3 border-t border-zinc-800 flex items-center justify-between text-xs font-mono">
-                <span className="text-[#2dd4bf] font-bold">
+                <span className="text-[#e53935] font-bold">
                   ~{pricing.both_placements_plays.toLocaleString()} plays
                 </span>
                 <span className="text-emerald-400 text-[10px] font-bold">Save ₦5,000</span>
@@ -421,7 +421,7 @@ export default function ProducerPromotePage() {
                 <select
                   value={selectedBeatId}
                   onChange={(e) => handleSelectCatalogBeat(e.target.value)}
-                  className="w-full bg-zinc-950 border border-zinc-800 rounded-lg py-2 px-3 text-xs text-[#2dd4bf] font-medium focus:outline-none"
+                  className="w-full bg-zinc-950 border border-zinc-800 rounded-lg py-2 px-3 text-xs text-[#e53935] font-medium focus:outline-none"
                 >
                   <option value="">⚡ Pick Beat from Catalog...</option>
                   {producerBeats.map((b) => (
@@ -458,7 +458,7 @@ export default function ProducerPromotePage() {
                   value={songTitle}
                   onChange={(e) => setSongTitle(e.target.value)}
                   placeholder="e.g. Afrobeats Sunset (Prod. by Caution)"
-                  className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-[#2dd4bf]"
+                  className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-[#e53935]"
                 />
               </div>
 
@@ -470,7 +470,7 @@ export default function ProducerPromotePage() {
                   value={producerName}
                   onChange={(e) => setProducerName(e.target.value)}
                   placeholder="e.g. Zino Waves"
-                  className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-[#2dd4bf]"
+                  className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-[#e53935]"
                 />
               </div>
             </div>
@@ -482,7 +482,7 @@ export default function ProducerPromotePage() {
                 value={tagline}
                 onChange={(e) => setTagline(e.target.value)}
                 placeholder="e.g. License this hit beat today on Caution Studio Beat Store!"
-                className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-[#2dd4bf]"
+                className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-[#e53935]"
               />
             </div>
 
@@ -490,7 +490,7 @@ export default function ProducerPromotePage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-1">
                 <label className="text-xs font-medium text-zinc-300">
-                  Audio Snippet (15-30s WAV / MP3) {audioUrl && <span className="text-[#2dd4bf]">(Loaded from Catalog)</span>}
+                  Audio Snippet (15-30s WAV / MP3) {audioUrl && <span className="text-[#e53935]">(Loaded from Catalog)</span>}
                 </label>
                 <div className="border border-dashed border-zinc-800 rounded-lg p-3 bg-zinc-950">
                   <input
@@ -503,12 +503,12 @@ export default function ProducerPromotePage() {
                     className="w-full text-xs text-zinc-400 file:mr-3 file:py-1 file:px-2.5 file:rounded file:border-0 file:text-xs file:font-semibold file:bg-zinc-800 file:text-zinc-300 hover:file:bg-zinc-700 cursor-pointer"
                   />
                   {audioFile && (
-                    <p className="text-[10px] text-[#2dd4bf] font-mono mt-1 truncate">
+                    <p className="text-[10px] text-[#e53935] font-mono mt-1 truncate">
                       ✓ Selected: {audioFile.name} ({(audioFile.size / (1024 * 1024)).toFixed(2)} MB)
                     </p>
                   )}
                   {audioUrl && !audioFile && (
-                    <p className="text-[10px] text-[#2dd4bf] font-mono mt-1 truncate">
+                    <p className="text-[10px] text-[#e53935] font-mono mt-1 truncate">
                       Catalog Audio: {audioUrl}
                     </p>
                   )}
@@ -517,7 +517,7 @@ export default function ProducerPromotePage() {
 
               <div className="space-y-1">
                 <label className="text-xs font-medium text-zinc-300">
-                  Cover Artwork {coverUrl && <span className="text-[#2dd4bf]">(Loaded from Catalog)</span>}
+                  Cover Artwork {coverUrl && <span className="text-[#e53935]">(Loaded from Catalog)</span>}
                 </label>
                 <div className="border border-dashed border-zinc-800 rounded-lg p-3 bg-zinc-950">
                   <input
@@ -530,12 +530,12 @@ export default function ProducerPromotePage() {
                     className="w-full text-xs text-zinc-400 file:mr-3 file:py-1 file:px-2.5 file:rounded file:border-0 file:text-xs file:font-semibold file:bg-zinc-800 file:text-zinc-300 hover:file:bg-zinc-700 cursor-pointer"
                   />
                   {coverFile && (
-                    <p className="text-[10px] text-[#2dd4bf] font-mono mt-1 truncate">
+                    <p className="text-[10px] text-[#e53935] font-mono mt-1 truncate">
                       ✓ Selected: {coverFile.name}
                     </p>
                   )}
                   {coverUrl && !coverFile && (
-                    <p className="text-[10px] text-[#2dd4bf] font-mono mt-1 truncate">
+                    <p className="text-[10px] text-[#e53935] font-mono mt-1 truncate">
                       Catalog Artwork: {coverUrl}
                     </p>
                   )}
@@ -596,7 +596,7 @@ export default function ProducerPromotePage() {
             <div className="pt-4 border-t border-zinc-800 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
                 <span className="text-xs text-zinc-400 block">Total Due:</span>
-                <span className="text-2xl font-black font-mono text-[#2dd4bf]">
+                <span className="text-2xl font-black font-mono text-[#e53935]">
                   ₦{currentPriceNgn.toLocaleString()}
                 </span>
                 <span className="text-[11px] text-zinc-500 block mt-0.5">
@@ -607,7 +607,7 @@ export default function ProducerPromotePage() {
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="px-8 py-3 rounded-lg bg-[#2dd4bf] hover:bg-[#20b8a4] text-black font-black text-xs uppercase tracking-wider transition-all disabled:opacity-50 cursor-pointer flex items-center justify-center gap-2"
+                className="px-8 py-3 rounded-lg bg-[#e53935] hover:bg-[#d32f2f] text-black font-black text-xs uppercase tracking-wider transition-all disabled:opacity-50 cursor-pointer flex items-center justify-center gap-2"
               >
                 {isSubmitting ? (
                   <span>Injecting Campaign...</span>
@@ -634,7 +634,7 @@ export default function ProducerPromotePage() {
                 return (
                   <div key={camp.id} className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <div className="flex items-center gap-3">
-                      <div className="h-10 w-10 rounded bg-zinc-800 flex items-center justify-center text-[#2dd4bf] shrink-0 overflow-hidden">
+                      <div className="h-10 w-10 rounded bg-zinc-800 flex items-center justify-center text-[#e53935] shrink-0 overflow-hidden">
                         {camp.cover_url ? (
                           <img src={camp.cover_url} alt="" className="h-full w-full object-cover" />
                         ) : (
@@ -655,13 +655,13 @@ export default function ProducerPromotePage() {
                           {(camp.delivered_plays || 0).toLocaleString()} / {(camp.target_plays || 0).toLocaleString()} plays
                         </div>
                         <div className="w-32 h-1.5 rounded-full bg-zinc-800 overflow-hidden">
-                          <div className="h-full bg-[#2dd4bf]" style={{ width: `${progress}%` }} />
+                          <div className="h-full bg-[#e53935]" style={{ width: `${progress}%` }} />
                         </div>
                       </div>
 
                       <div className="text-right">
                         <span className="text-[10px] font-mono text-zinc-500 block">Clicks</span>
-                        <span className="text-xs font-mono font-bold text-[#2dd4bf]">
+                        <span className="text-xs font-mono font-bold text-[#e53935]">
                           {camp.clicks_count || 0}
                         </span>
                       </div>

@@ -102,7 +102,7 @@ export function UpdateArtworkModal({
         {/* Header */}
         <div className="flex items-center justify-between pb-4 border-b border-zinc-800">
           <div className="flex items-center gap-2.5">
-            <div className="p-2 rounded-lg bg-[#2dd4bf]/10 text-[#2dd4bf] border border-[#2dd4bf]/20">
+            <div className="p-2 rounded-lg bg-[#e53935]/10 text-[#e53935] border border-[#e53935]/20">
               <ImageIcon className="h-5 w-5" />
             </div>
             <div>
@@ -164,7 +164,7 @@ export function UpdateArtworkModal({
             type="button"
             onClick={handleSave}
             disabled={loading || (!selectedFile && !selectedPresetUrl)}
-            className="px-5 py-2 rounded-lg bg-[#2dd4bf] hover:bg-[#20b8a4] text-zinc-950 text-xs font-bold transition-colors flex items-center gap-2 disabled:opacity-50 cursor-pointer shadow-sm"
+            className="px-5 py-2 rounded-lg bg-[#e53935] hover:bg-[#d32f2f] text-white text-xs font-bold transition-colors flex items-center gap-2 disabled:opacity-50 cursor-pointer shadow-sm"
           >
             {loading ? (
               <>

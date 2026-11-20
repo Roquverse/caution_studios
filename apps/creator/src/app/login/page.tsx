@@ -204,7 +204,7 @@ function CreatorLoginForm() {
             style={{ width: 150 }}
           />
         </Link>
-        <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#2dd4bf]/10 border border-[#2dd4bf]/20 text-[#2dd4bf] text-xs font-semibold mb-1">
+        <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#e53935]/10 border border-[#e53935]/20 text-[#e53935] text-xs font-semibold mb-1">
           <Sparkles className="h-3 w-3" />
           <span>Creator Portal</span>
         </div>
@@ -227,7 +227,7 @@ function CreatorLoginForm() {
               <div className="mt-2.5 pt-2 border-t border-red-500/20 flex justify-end">
                 <a
                   href={process.env.NEXT_PUBLIC_USER_URL || 'https://cautionstudioz.com'}
-                  className="inline-flex items-center gap-1 text-xs font-semibold text-[#2dd4bf] hover:underline"
+                  className="inline-flex items-center gap-1 text-xs font-semibold text-[#e53935] hover:underline"
                 >
                   <span>Go to Artist Portal</span>
                   <ArrowRight className="h-3 w-3" />
@@ -278,7 +278,7 @@ function CreatorLoginForm() {
               </label>
               <a
                 href={process.env.NEXT_PUBLIC_AUTH_URL ? `${process.env.NEXT_PUBLIC_AUTH_URL}/forgot-password` : 'https://auth.cautionstudioz.com/forgot-password'}
-                className="text-xs text-zinc-400 hover:text-[#2dd4bf] transition-colors"
+                className="text-xs text-zinc-400 hover:text-[#e53935] transition-colors"
               >
                 Forgot password?
               </a>
@@ -334,7 +334,7 @@ function CreatorLoginForm() {
           Don&apos;t have a creator account?{' '}
           <a
             href={process.env.NEXT_PUBLIC_AUTH_URL ? `${process.env.NEXT_PUBLIC_AUTH_URL}/register?role=producer` : 'https://auth.cautionstudioz.com/register?role=producer'}
-            className="text-[#2dd4bf] hover:underline font-semibold"
+            className="text-[#e53935] hover:underline font-semibold"
           >
             Join as a Producer (3-Month Free)
           </a>

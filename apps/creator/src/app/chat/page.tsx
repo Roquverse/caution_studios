@@ -571,7 +571,7 @@ export default function StudioChatPage() {
         </div>
 
         <div className="flex items-center gap-2">
-          <span className="px-2.5 py-1 rounded-full bg-[#2dd4bf]/10 border border-[#2dd4bf]/20 text-[#2dd4bf] text-xs font-semibold flex items-center gap-1.5">
+          <span className="px-2.5 py-1 rounded-full bg-[#e53935]/10 border border-[#e53935]/20 text-[#e53935] text-xs font-semibold flex items-center gap-1.5">
             <Lock className="h-3 w-3" />
             <span>R2 Media & Cloud Audio Active</span>
           </span>
@@ -580,7 +580,7 @@ export default function StudioChatPage() {
 
       {/* Contact Protection Banner */}
       <div className="p-3 rounded-lg border border-zinc-800 bg-zinc-900/60 flex items-center gap-3">
-        <ShieldCheck className="h-4 w-4 text-[#2dd4bf] shrink-0" />
+        <ShieldCheck className="h-4 w-4 text-[#e53935] shrink-0" />
         <span className="text-xs text-zinc-400 leading-snug">
           Need help with stems verification, exclusive buyouts, or catalog inquiries? Message the <strong>Caution Studio Executive Admin</strong> directly anytime.
         </span>
@@ -589,7 +589,7 @@ export default function StudioChatPage() {
       {/* Chat Container */}
       {loading ? (
         <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 h-[560px] flex items-center justify-center">
-          <Loader2 className="h-6 w-6 text-[#2dd4bf] animate-spin" />
+          <Loader2 className="h-6 w-6 text-[#e53935] animate-spin" />
         </div>
       ) : (
         <div className="rounded-xl border border-zinc-800 bg-[#0A0D14] h-[600px] flex overflow-hidden shadow-2xl">
@@ -611,14 +611,14 @@ export default function StudioChatPage() {
                     onClick={() => setActiveCounterpartId(t.counterpartId)}
                     className={`w-full p-3.5 text-left transition-colors flex items-start gap-3 cursor-pointer ${
                       isActive
-                        ? 'bg-[#151D2A] border-l-2 border-[#2dd4bf]'
+                        ? 'bg-[#151D2A] border-l-2 border-[#e53935]'
                         : 'hover:bg-zinc-900/60'
                     }`}
                   >
                     {/* Avatar */}
                     <div className="relative flex-shrink-0">
                       {t.isAdmin ? (
-                        <div className="h-10 w-10 rounded-full bg-gradient-to-br from-[#2dd4bf] to-[#0d9488] flex items-center justify-center text-zinc-950 font-black text-sm shadow-md">
+                        <div className="h-10 w-10 rounded-full bg-gradient-to-br from-[#e53935] to-[#b71c1c] flex items-center justify-center text-zinc-950 font-black text-sm shadow-md">
                           CS
                         </div>
                       ) : t.avatar ? (
@@ -628,7 +628,7 @@ export default function StudioChatPage() {
                           className="h-10 w-10 rounded-full object-cover border border-zinc-700"
                         />
                       ) : (
-                        <div className="h-10 w-10 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center text-xs font-bold text-[#2dd4bf]">
+                        <div className="h-10 w-10 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center text-xs font-bold text-[#e53935]">
                           {t.artistName.substring(0, 2).toUpperCase()}
                         </div>
                       )}
@@ -642,7 +642,7 @@ export default function StudioChatPage() {
                         </span>
                         <span className="text-[10px] text-zinc-500 font-mono flex-shrink-0">{t.time}</span>
                       </div>
-                      <span className="text-[10px] text-[#2dd4bf] font-mono block truncate">
+                      <span className="text-[10px] text-[#e53935] font-mono block truncate">
                         {t.project}
                       </span>
                       <p className="text-xs text-zinc-400 truncate mt-1">
@@ -662,7 +662,7 @@ export default function StudioChatPage() {
               <div className="h-14 border-b border-zinc-800 px-5 flex items-center justify-between bg-[#0B0E17]">
                 <div className="flex items-center gap-3 min-w-0">
                   {activeThread.isAdmin ? (
-                    <div className="h-9 w-9 rounded-full bg-gradient-to-br from-[#2dd4bf] to-[#0d9488] flex items-center justify-center text-zinc-950 font-black text-xs shadow-md">
+                    <div className="h-9 w-9 rounded-full bg-gradient-to-br from-[#e53935] to-[#b71c1c] flex items-center justify-center text-zinc-950 font-black text-xs shadow-md">
                       CS
                     </div>
                   ) : activeThread.avatar ? (
@@ -672,7 +672,7 @@ export default function StudioChatPage() {
                       className="h-9 w-9 rounded-full object-cover border border-zinc-700"
                     />
                   ) : (
-                    <div className="h-9 w-9 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center text-xs font-bold text-[#2dd4bf]">
+                    <div className="h-9 w-9 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center text-xs font-bold text-[#e53935]">
                       {activeThread.artistName.substring(0, 2).toUpperCase()}
                     </div>
                   )}
@@ -681,22 +681,22 @@ export default function StudioChatPage() {
                     <span className="text-xs font-bold text-white flex items-center gap-2 truncate">
                       {activeThread.artistName}
                       {activeThread.isAdmin && (
-                        <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-[#2dd4bf] text-zinc-950 uppercase">
+                        <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-[#e53935] text-white uppercase">
                           Official
                         </span>
                       )}
                     </span>
                     {isPeerTyping ? (
-                      <span className="text-[11px] text-[#2dd4bf] font-medium animate-pulse flex items-center gap-1">
+                      <span className="text-[11px] text-[#e53935] font-medium animate-pulse flex items-center gap-1">
                         <span>Typing</span>
                         <span className="flex gap-0.5">
-                          <span className="h-1 w-1 bg-[#2dd4bf] rounded-full animate-bounce [animation-delay:-0.3s]" />
-                          <span className="h-1 w-1 bg-[#2dd4bf] rounded-full animate-bounce [animation-delay:-0.15s]" />
-                          <span className="h-1 w-1 bg-[#2dd4bf] rounded-full animate-bounce" />
+                          <span className="h-1 w-1 bg-[#e53935] rounded-full animate-bounce [animation-delay:-0.3s]" />
+                          <span className="h-1 w-1 bg-[#e53935] rounded-full animate-bounce [animation-delay:-0.15s]" />
+                          <span className="h-1 w-1 bg-[#e53935] rounded-full animate-bounce" />
                         </span>
                       </span>
                     ) : (
-                      <span className="text-[10px] text-[#2dd4bf] block font-mono truncate">
+                      <span className="text-[10px] text-[#e53935] block font-mono truncate">
                         {activeThread.artistHandle} &bull; {activeThread.project}
                       </span>
                     )}
@@ -721,7 +721,7 @@ export default function StudioChatPage() {
               <div className="flex-1 p-5 overflow-y-auto space-y-4">
                 {activeThread.messages.length === 0 ? (
                   <div className="h-full flex flex-col items-center justify-center text-zinc-500 text-xs">
-                    <Sparkles className="h-8 w-8 text-[#2dd4bf]/40 mb-2" />
+                    <Sparkles className="h-8 w-8 text-[#e53935]/40 mb-2" />
                     <p className="text-sm text-zinc-300 font-medium">Start conversation with {activeThread.artistName}</p>
                     <p className="text-zinc-500 text-xs mt-1 text-center max-w-sm">
                       Send questions regarding beat stems, custom licensing, contract terms, or share audio samples directly.
@@ -743,7 +743,7 @@ export default function StudioChatPage() {
                         <div
                           className={`max-w-[75%] rounded-2xl p-4 shadow-md ${
                             isProducer
-                              ? 'bg-gradient-to-br from-[#124b42] to-[#0c352f] text-white rounded-br-none border border-[#2dd4bf]/30'
+                              ? 'bg-gradient-to-br from-[#124b42] to-[#0c352f] text-white rounded-br-none border border-[#e53935]/30'
                               : 'bg-[#121620] text-zinc-200 rounded-bl-none border border-zinc-800'
                           }`}
                         >
@@ -778,7 +778,7 @@ export default function StudioChatPage() {
                                   download={m.media_name || 'image.jpg'}
                                   target="_blank"
                                   rel="noreferrer"
-                                  className="text-[#2dd4bf] hover:underline flex items-center gap-1 font-semibold"
+                                  className="text-[#e53935] hover:underline flex items-center gap-1 font-semibold"
                                 >
                                   <Download className="h-3 w-3" /> Save
                                 </a>
@@ -792,7 +792,7 @@ export default function StudioChatPage() {
                               <button
                                 type="button"
                                 onClick={() => handleToggleAudio(m.media_url!)}
-                                className="h-10 w-10 rounded-full bg-[#2dd4bf] text-[#042f2e] flex items-center justify-center hover:scale-105 transition-transform flex-shrink-0 shadow-md"
+                                className="h-10 w-10 rounded-full bg-[#e53935] text-[#042f2e] flex items-center justify-center hover:scale-105 transition-transform flex-shrink-0 shadow-md"
                               >
                                 {playingAudioUrl === m.media_url ? (
                                   <Pause className="h-4 w-4" />
@@ -806,7 +806,7 @@ export default function StudioChatPage() {
                                   <span className="font-semibold text-white truncate max-w-[160px]">
                                     {m.media_name || 'Audio Track / Voice Message'}
                                   </span>
-                                  <span className="text-[10px] font-mono text-[#2dd4bf]">
+                                  <span className="text-[10px] font-mono text-[#e53935]">
                                     {playingAudioUrl === m.media_url
                                       ? `${Math.floor(audioCurrentTime)}s / ${Math.floor(audioDuration)}s`
                                       : m.media_size ? `${Math.round(m.media_size / 1024 / 1024 * 10) / 10} MB` : 'Audio'}
@@ -815,7 +815,7 @@ export default function StudioChatPage() {
 
                                 <div className="h-1.5 bg-zinc-800 rounded-full overflow-hidden">
                                   <div
-                                    className="h-full bg-[#2dd4bf] transition-all"
+                                    className="h-full bg-[#e53935] transition-all"
                                     style={{
                                       width:
                                         playingAudioUrl === m.media_url && audioDuration > 0
@@ -855,7 +855,7 @@ export default function StudioChatPage() {
                         className="h-12 w-12 rounded object-cover border border-zinc-700"
                       />
                     ) : (
-                      <div className="h-12 w-12 rounded bg-zinc-800 border border-zinc-700 flex items-center justify-center text-[#2dd4bf]">
+                      <div className="h-12 w-12 rounded bg-zinc-800 border border-zinc-700 flex items-center justify-center text-[#e53935]">
                         <Music className="h-6 w-6" />
                       </div>
                     )}
@@ -907,13 +907,13 @@ export default function StudioChatPage() {
                   onChange={handleInputChange}
                   placeholder={`Message ${activeThread.artistName}...`}
                   disabled={sending}
-                  className="flex-1 bg-[#121620] border border-zinc-800 rounded-xl py-2.5 px-4 text-xs sm:text-sm text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:border-[#2dd4bf]"
+                  className="flex-1 bg-[#121620] border border-zinc-800 rounded-xl py-2.5 px-4 text-xs sm:text-sm text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:border-[#e53935]"
                 />
 
                 <button
                   type="submit"
                   disabled={(!newMessage.trim() && !stagedFile) || sending}
-                  className="px-4 py-2.5 rounded-xl bg-[#2dd4bf] hover:bg-[#20b8a4] text-zinc-950 font-bold text-xs sm:text-sm transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2 shadow-md"
+                  className="px-4 py-2.5 rounded-xl bg-[#e53935] hover:bg-[#d32f2f] text-white font-bold text-xs sm:text-sm transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2 shadow-md"
                 >
                   {sending ? (
                     <>
