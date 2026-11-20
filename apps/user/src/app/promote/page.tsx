@@ -69,15 +69,15 @@ export default function PromoteMusicPage() {
     adType === 'listening'
       ? pricing.stream_ad_price_ngn
       : adType === 'download'
-      ? pricing.download_ad_price_ngn
-      : pricing.both_placements_price_ngn;
+        ? pricing.download_ad_price_ngn
+        : pricing.both_placements_price_ngn;
 
   const currentPlays =
     adType === 'listening'
       ? pricing.stream_ad_plays
       : adType === 'download'
-      ? pricing.download_ad_plays
-      : pricing.both_placements_plays;
+        ? pricing.download_ad_plays
+        : pricing.both_placements_plays;
 
   useEffect(() => {
     async function loadUser() {
@@ -176,67 +176,27 @@ export default function PromoteMusicPage() {
     titleStr: string,
     authToken?: string
   ): Promise<string> => {
-    let targetContentType = file.type;
-    if (!targetContentType || targetContentType === 'application/octet-stream') {
-      if (type === 'audio') {
-        const ext = file.name.split('.').pop()?.toLowerCase();
-        targetContentType = ext === 'wav' ? 'audio/wav' : 'audio/mpeg';
-      } else if (type === 'cover') {
-        targetContentType = 'image/jpeg';
-      }
-    }
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('type', type);
+    formData.append('title', titleStr);
 
-    const presignRes = await fetch('/api/ads/presigned-url', {
+    const res = await fetch('/api/ads/upload', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(authToken ? { Authorization: `Bearer ${authToken}` } : {})
-      },
-      body: JSON.stringify({
-        filename: file.name,
-        contentType: targetContentType,
-        type,
-        title: titleStr
-      })
+      headers: authToken ? { Authorization: `Bearer ${authToken}` } : undefined,
+      body: formData
     });
 
-    const presignText = await presignRes.text();
-    let presignJson: any = {};
-    try {
-      presignJson = JSON.parse(presignText);
-    } catch {
-      throw new Error(`Storage error (${presignRes.status}): ${presignText.slice(0, 120)}`);
+    if (!res.ok) {
+      const errText = await res.text();
+      let errJson: any = {};
+      try { errJson = JSON.parse(errText); } catch {}
+      throw new Error(errJson.error || `Upload failed: ${res.statusText}`);
     }
 
-    if (!presignRes.ok || !presignJson.uploadUrl || !presignJson.publicUrl) {
-      throw new Error(presignJson.error || `Failed to initiate storage upload for ${file.name}`);
-    }
-
-    await new Promise<void>((resolve, reject) => {
-      const xhr = new XMLHttpRequest();
-      xhr.open('PUT', presignJson.uploadUrl, true);
-      xhr.setRequestHeader('Content-Type', targetContentType);
-
-      xhr.upload.onprogress = (evt) => {
-        if (evt.lengthComputable) {
-          const pct = Math.round((evt.loaded / evt.total) * 100);
-          setUploadProgress(pct);
-        }
-      };
-
-      xhr.onload = () => {
-        if (xhr.status >= 200 && xhr.status < 300) {
-          resolve();
-        } else {
-          reject(new Error(`Storage upload failed with HTTP ${xhr.status}`));
-        }
-      };
-
-      xhr.onerror = () => reject(new Error('Network error during file storage upload.'));
-      xhr.send(file);
-    });
-
-    return presignJson.publicUrl;
+    const data = await res.json();
+    setUploadProgress(100);
+    return data.url;
   };
 
   const handlePaystackCheckout = async (e: React.FormEvent) => {
@@ -319,6 +279,55 @@ export default function PromoteMusicPage() {
           });
         }
 
+        const handlePaystackSuccess = async (reference: string) => {
+          setUploadStep('Verifying Paystack transaction...');
+          try {
+            // Create Campaign in backend
+            const createRes = await fetch('/api/ads/create', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                ...(authToken ? { Authorization: `Bearer ${authToken}` } : {})
+              },
+              body: JSON.stringify({
+                ...campaignPayload,
+                paystackReference: reference
+              })
+            });
+            const createData = await createRes.json();
+
+            // Verify transaction in orders ledger
+            await fetch('/api/paystack/verify', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                reference,
+                order_id: orderId,
+                userId: advertiserId
+              })
+            });
+
+            setSuccessMessage(
+              `Payment confirmed (Ref: ${reference})! Your song "${songTitle}" is now active in the unskippable audio rotation.`
+            );
+            if (createData.campaign) {
+              setMyCampaigns((prev) => [createData.campaign, ...prev]);
+            }
+
+            // Reset form
+            setSongTitle('');
+            setTagline('');
+            setAudioFile(null);
+            setCoverFile(null);
+          } catch (e: any) {
+            console.error('Error confirming Paystack campaign:', e);
+            setErrorMessage('Payment received, but error activating campaign. Our admin has been notified.');
+          } finally {
+            setIsSubmitting(false);
+            setUploadStep('');
+          }
+        };
+
         if ((window as any).PaystackPop) {
           const handler = (window as any).PaystackPop.setup({
             key: publicKey,
@@ -331,53 +340,8 @@ export default function PromoteMusicPage() {
               order_id: orderId,
               ...campaignPayload
             },
-            callback: async function (response: { reference: string }) {
-              setUploadStep('Verifying Paystack transaction...');
-              try {
-                // Create Campaign in backend
-                const createRes = await fetch('/api/ads/create', {
-                  method: 'POST',
-                  headers: {
-                    'Content-Type': 'application/json',
-                    ...(authToken ? { Authorization: `Bearer ${authToken}` } : {})
-                  },
-                  body: JSON.stringify({
-                    ...campaignPayload,
-                    paystackReference: response.reference
-                  })
-                });
-                const createData = await createRes.json();
-
-                // Verify transaction in orders ledger
-                await fetch('/api/paystack/verify', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                    reference: response.reference,
-                    order_id: orderId,
-                    userId: advertiserId
-                  })
-                });
-
-                setSuccessMessage(
-                  `Payment confirmed (Ref: ${response.reference})! Your song "${songTitle}" is now active in the unskippable audio rotation.`
-                );
-                if (createData.campaign) {
-                  setMyCampaigns((prev) => [createData.campaign, ...prev]);
-                }
-
-                // Reset form
-                setSongTitle('');
-                setTagline('');
-                setAudioFile(null);
-                setCoverFile(null);
-              } catch (e: any) {
-                console.error('Error confirming Paystack campaign:', e);
-                setErrorMessage('Payment received, but error activating campaign. Our admin has been notified.');
-              } finally {
-                setIsSubmitting(false);
-                setUploadStep('');
-              }
+            callback: function (response: { reference: string }) {
+              handlePaystackSuccess(response.reference);
             },
             onClose: function () {
               setIsSubmitting(false);
@@ -564,11 +528,10 @@ export default function PromoteMusicPage() {
                 <button
                   type="button"
                   onClick={() => setAdType('listening')}
-                  className={`p-5 rounded-2xl border text-left transition-all cursor-pointer relative flex flex-col justify-between ${
-                    adType === 'listening'
-                      ? 'border-[#e53935] bg-[#e53935]/10 shadow-lg shadow-[#e53935]/20 ring-1 ring-[#e53935]'
-                      : 'border-white/[0.06] bg-[#181a20] hover:border-white/[0.15]'
-                  }`}
+                  className={`p-5 rounded-2xl border text-left transition-all cursor-pointer relative flex flex-col justify-between ${adType === 'listening'
+                    ? 'border-[#e53935] bg-[#e53935]/10 shadow-lg shadow-[#e53935]/20 ring-1 ring-[#e53935]'
+                    : 'border-white/[0.06] bg-[#181a20] hover:border-white/[0.15]'
+                    }`}
                 >
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
@@ -600,11 +563,10 @@ export default function PromoteMusicPage() {
                 <button
                   type="button"
                   onClick={() => setAdType('download')}
-                  className={`p-5 rounded-2xl border text-left transition-all cursor-pointer relative flex flex-col justify-between ${
-                    adType === 'download'
-                      ? 'border-[#e53935] bg-[#e53935]/10 shadow-lg shadow-[#e53935]/20 ring-1 ring-[#e53935]'
-                      : 'border-white/[0.06] bg-[#181a20] hover:border-white/[0.15]'
-                  }`}
+                  className={`p-5 rounded-2xl border text-left transition-all cursor-pointer relative flex flex-col justify-between ${adType === 'download'
+                    ? 'border-[#e53935] bg-[#e53935]/10 shadow-lg shadow-[#e53935]/20 ring-1 ring-[#e53935]'
+                    : 'border-white/[0.06] bg-[#181a20] hover:border-white/[0.15]'
+                    }`}
                 >
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
@@ -636,11 +598,10 @@ export default function PromoteMusicPage() {
                 <button
                   type="button"
                   onClick={() => setAdType('all')}
-                  className={`p-5 rounded-2xl border text-left transition-all cursor-pointer relative flex flex-col justify-between ${
-                    adType === 'all'
-                      ? 'border-[#e53935] bg-[#e53935]/10 shadow-lg shadow-[#e53935]/20 ring-1 ring-[#e53935]'
-                      : 'border-white/[0.06] bg-[#181a20] hover:border-white/[0.15]'
-                  }`}
+                  className={`p-5 rounded-2xl border text-left transition-all cursor-pointer relative flex flex-col justify-between ${adType === 'all'
+                    ? 'border-[#e53935] bg-[#e53935]/10 shadow-lg shadow-[#e53935]/20 ring-1 ring-[#e53935]'
+                    : 'border-white/[0.06] bg-[#181a20] hover:border-white/[0.15]'
+                    }`}
                 >
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
@@ -914,11 +875,10 @@ export default function PromoteMusicPage() {
 
                       <div>
                         <span
-                          className={`px-2.5 py-1 rounded-full text-[10px] font-mono font-bold uppercase border ${
-                            camp.status === 'active'
-                              ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
-                              : 'bg-zinc-800 text-zinc-400 border-zinc-700'
-                          }`}
+                          className={`px-2.5 py-1 rounded-full text-[10px] font-mono font-bold uppercase border ${camp.status === 'active'
+                            ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
+                            : 'bg-zinc-800 text-zinc-400 border-zinc-700'
+                            }`}
                         >
                           {camp.status || 'Active'}
                         </span>
