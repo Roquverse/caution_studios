@@ -123,14 +123,14 @@ export async function POST(req: NextRequest) {
     const moods = Array.isArray(bodyData.moods)
       ? bodyData.moods
       : typeof bodyData.moods === 'string' && bodyData.moods.trim()
-      ? bodyData.moods.split(',').map((m: string) => m.trim()).filter(Boolean)
-      : ['Epic'];
+        ? bodyData.moods.split(',').map((m: string) => m.trim()).filter(Boolean)
+        : ['Epic'];
 
     const tags = Array.isArray(bodyData.tags)
       ? bodyData.tags
       : typeof bodyData.tags === 'string' && bodyData.tags.trim()
-      ? bodyData.tags.split(',').map((t: string) => t.trim()).filter(Boolean)
-      : ['Instrumental'];
+        ? bodyData.tags.split(',').map((t: string) => t.trim()).filter(Boolean)
+        : ['Instrumental'];
 
     if (!title.trim()) {
       return NextResponse.json({ error: 'Title is required' }, { status: 400 });

@@ -442,8 +442,8 @@ export default function AdminTracksPage() {
       const audioUrl = track.master_wav_key
         ? `/api/media/${track.master_wav_key}`
         : track.preview_clean_key
-        ? `/api/media/${track.preview_clean_key}`
-        : '';
+          ? `/api/media/${track.preview_clean_key}`
+          : '';
 
       if (!audioUrl) {
         alert('No audio stream found for track.');
@@ -538,13 +538,13 @@ export default function AdminTracksPage() {
         prev.map((t) =>
           t.id === editingTrack.id
             ? {
-                ...t,
-                ...editingTrack,
-                licenses: updatedBeat?.licenses || [
-                  { id: 'premium', beat_id: editingTrack.id, type: 'premium', price_cents: premiumPriceCents, enabled: true },
-                  { id: 'exclusive', beat_id: editingTrack.id, type: 'exclusive', price_cents: exclusivePriceCents, enabled: true }
-                ]
-              }
+              ...t,
+              ...editingTrack,
+              licenses: updatedBeat?.licenses || [
+                { id: 'premium', beat_id: editingTrack.id, type: 'premium', price_cents: premiumPriceCents, enabled: true },
+                { id: 'exclusive', beat_id: editingTrack.id, type: 'exclusive', price_cents: exclusivePriceCents, enabled: true }
+              ]
+            }
             : t
         )
       );
@@ -745,9 +745,8 @@ export default function AdminTracksPage() {
                     return (
                       <tr
                         key={track.id}
-                        className={`hover:bg-zinc-800/30 transition-colors ${
-                          isTrackPlaying ? 'bg-[#2dd4bf]/5' : ''
-                        }`}
+                        className={`hover:bg-zinc-800/30 transition-colors ${isTrackPlaying ? 'bg-[#2dd4bf]/5' : ''
+                          }`}
                       >
                         {/* Artwork & Audition */}
                         <td className="py-3 px-4">
@@ -761,11 +760,10 @@ export default function AdminTracksPage() {
                               <button
                                 type="button"
                                 onClick={() => togglePlayTrack(track)}
-                                className={`absolute inset-0 rounded-md flex items-center justify-center transition-all ${
-                                  isTrackPlaying
-                                    ? 'bg-black/60 text-[#2dd4bf]'
-                                    : 'bg-black/40 text-white opacity-0 group-hover/play:opacity-100'
-                                }`}
+                                className={`absolute inset-0 rounded-md flex items-center justify-center transition-all ${isTrackPlaying
+                                  ? 'bg-black/60 text-[#2dd4bf]'
+                                  : 'bg-black/40 text-white opacity-0 group-hover/play:opacity-100'
+                                  }`}
                                 title={isTrackPlaying ? 'Pause' : 'Play preview'}
                               >
                                 {isTrackPlaying ? (
@@ -837,16 +835,14 @@ export default function AdminTracksPage() {
                           <button
                             type="button"
                             onClick={() => toggleStatus(track)}
-                            className={`inline-flex items-center gap-1 text-[10px] font-medium px-2.5 py-0.5 rounded-full border transition-all ${
-                              track.status === 'live'
-                                ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20 hover:bg-emerald-500/20'
-                                : 'bg-zinc-800 text-zinc-400 border-zinc-700 hover:bg-zinc-700/60'
-                            }`}
+                            className={`inline-flex items-center gap-1 text-[10px] font-medium px-2.5 py-0.5 rounded-full border transition-all ${track.status === 'live'
+                              ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20 hover:bg-emerald-500/20'
+                              : 'bg-zinc-800 text-zinc-400 border-zinc-700 hover:bg-zinc-700/60'
+                              }`}
                           >
                             <span
-                              className={`h-1.5 w-1.5 rounded-full ${
-                                track.status === 'live' ? 'bg-emerald-400' : 'bg-zinc-400'
-                              }`}
+                              className={`h-1.5 w-1.5 rounded-full ${track.status === 'live' ? 'bg-emerald-400' : 'bg-zinc-400'
+                                }`}
                             />
                             {track.status === 'live' ? 'Live' : 'Unlisted'}
                           </button>
@@ -997,24 +993,22 @@ export default function AdminTracksPage() {
                 </label>
                 <label
                   htmlFor="master-audio-file"
-                  className={`border-2 border-dashed rounded-lg p-5 text-center cursor-pointer transition-all block ${
-                    audioFile
-                      ? 'border-[#2dd4bf] bg-[#2dd4bf]/5'
-                      : 'border-zinc-800 hover:border-zinc-700 bg-zinc-900/40'
-                  }`}
+                  className={`border-2 border-dashed rounded-lg p-5 text-center cursor-pointer transition-all block ${audioFile
+                    ? 'border-[#2dd4bf] bg-[#2dd4bf]/5'
+                    : 'border-zinc-800 hover:border-zinc-700 bg-zinc-900/40'
+                    }`}
                 >
                   <input
                     id="master-audio-file"
                     type="file"
-                    accept="audio/*,.wav,.mp3,.flac"
+                    accept=".wav,.mp3,.m4a,.aac,.flac,.aif,.aiff,audio/wav,audio/wave,audio/mpeg,audio/mp3,audio/x-m4a,audio/aac,audio/flac"
                     className="hidden"
                     onChange={handleAudioChange}
                     disabled={uploading}
                   />
                   <FileAudio
-                    className={`h-7 w-7 mx-auto mb-1.5 ${
-                      audioFile ? 'text-[#2dd4bf]' : 'text-zinc-500'
-                    }`}
+                    className={`h-7 w-7 mx-auto mb-1.5 ${audioFile ? 'text-[#2dd4bf]' : 'text-zinc-500'
+                      }`}
                   />
                   {audioFile ? (
                     <div>
@@ -1045,11 +1039,10 @@ export default function AdminTracksPage() {
                   </label>
                   <label
                     htmlFor="cover-artwork-file"
-                    className={`border border-dashed rounded-lg p-3 text-center cursor-pointer transition-all flex items-center gap-2.5 ${
-                      coverPreviewUrl
-                        ? 'border-[#2dd4bf]/60 bg-zinc-900'
-                        : 'border-zinc-800 hover:border-zinc-700 bg-zinc-900/40'
-                    }`}
+                    className={`border border-dashed rounded-lg p-3 text-center cursor-pointer transition-all flex items-center gap-2.5 ${coverPreviewUrl
+                      ? 'border-[#2dd4bf]/60 bg-zinc-900'
+                      : 'border-zinc-800 hover:border-zinc-700 bg-zinc-900/40'
+                      }`}
                   >
                     <input
                       id="cover-artwork-file"
@@ -1086,11 +1079,10 @@ export default function AdminTracksPage() {
                   </label>
                   <label
                     htmlFor="stems-archive-file"
-                    className={`border border-dashed rounded-lg p-3 text-center cursor-pointer transition-all flex items-center gap-2.5 ${
-                      stemsFile
-                        ? 'border-[#2dd4bf]/60 bg-zinc-900'
-                        : 'border-zinc-800 hover:border-zinc-700 bg-zinc-900/40'
-                    }`}
+                    className={`border border-dashed rounded-lg p-3 text-center cursor-pointer transition-all flex items-center gap-2.5 ${stemsFile
+                      ? 'border-[#2dd4bf]/60 bg-zinc-900'
+                      : 'border-zinc-800 hover:border-zinc-700 bg-zinc-900/40'
+                      }`}
                   >
                     <input
                       id="stems-archive-file"

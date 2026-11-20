@@ -176,6 +176,16 @@ export default function PromoteMusicPage() {
     titleStr: string,
     authToken?: string
   ): Promise<string> => {
+    let targetContentType = file.type;
+    if (!targetContentType || targetContentType === 'application/octet-stream') {
+      if (type === 'audio') {
+        const ext = file.name.split('.').pop()?.toLowerCase();
+        targetContentType = ext === 'wav' ? 'audio/wav' : ext === 'mp3' ? 'audio/mpeg' : 'audio/wav';
+      } else if (type === 'cover') {
+        targetContentType = 'image/jpeg';
+      }
+    }
+
     // 1. First attempt: Direct presigned URL upload to Cloudflare R2
     // Bypasses reverse-proxy / serverless body size limits (e.g. 413 Payload Too Large on large WAV files)
     try {
@@ -187,7 +197,7 @@ export default function PromoteMusicPage() {
         },
         body: JSON.stringify({
           filename: file.name,
-          contentType: file.type,
+          contentType: targetContentType,
           type,
           title: titleStr
         })
@@ -199,9 +209,9 @@ export default function PromoteMusicPage() {
           await new Promise<void>((resolve, reject) => {
             const xhr = new XMLHttpRequest();
             xhr.open('PUT', presignJson.uploadUrl, true);
-            if (file.type) {
+            if (targetContentType) {
               try {
-                xhr.setRequestHeader('Content-Type', file.type);
+                xhr.setRequestHeader('Content-Type', targetContentType);
               } catch {}
             }
 
@@ -747,44 +757,83 @@ return (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
               <div>
                 <label className="text-xs font-medium text-gray-300 block mb-1.5">
-                  Audio Snippet (15-30s WAV / MP3)
+                  Audio Snippet (15-30s WAV / MP3) <span className="text-[#e53935]">*</span>
                 </label>
-                <div className="relative border border-dashed border-white/[0.12] hover:border-white/[0.25] rounded-xl p-4 bg-[#181a20] text-center cursor-pointer transition-colors">
-                  <input
-                    type="file"
-                    accept="audio/*"
-                    onChange={(e) => setAudioFile(e.target.files?.[0] || null)}
-                    className="absolute inset-0 opacity-0 cursor-pointer"
-                  />
-                  <Upload className="h-5 w-5 text-gray-400 mx-auto mb-1.5" />
+                <label
+                  htmlFor="ad-audio-input"
+                  className="flex flex-col items-center justify-center border border-dashed border-white/[0.12] hover:border-white/[0.25] active:border-[#e53935] rounded-xl p-5 bg-[#181a20] text-center cursor-pointer transition-colors select-none"
+                >
+                  <Upload className="h-5 w-5 text-gray-400 mb-1.5" />
                   <span className="text-xs font-semibold text-white block">
-                    {audioFile ? audioFile.name : 'Choose audio snippet'}
+                    {audioFile ? audioFile.name : 'Tap to select audio snippet'}
                   </span>
-                  <span className="text-[10px] text-gray-500 block mt-0.5">
-                    {audioFile ? `${(audioFile.size / (1024 * 1024)).toFixed(2)} MB` : '15-30 seconds uncompressed audio'}
+                  {audioFile ? (
+                    <span className="text-[10px] text-emerald-400 block mt-0.5 font-mono">
+                      {(audioFile.size / (1024 * 1024)).toFixed(2)} MB selected ✓
+                    </span>
+                  ) : (
+                    <span className="text-[10px] text-gray-500 block mt-0.5">
+                      Supports .wav, .mp3, .m4a (15-30 seconds recommended)
+                    </span>
+                  )}
+                  <input
+                    id="ad-audio-input"
+                    type="file"
+                    accept=".wav,.mp3,.m4a,.aac,.flac,.aif,.aiff,audio/wav,audio/wave,audio/mpeg,audio/mp3,audio/x-m4a,audio/aac,audio/flac"
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      if (f) {
+                        const ext = f.name.split('.').pop()?.toLowerCase();
+                        const isAudio = f.type.startsWith('audio/') || ['mp3', 'wav', 'm4a', 'aac', 'flac', 'aif', 'aiff'].includes(ext || '');
+                        if (!isAudio) {
+                          alert('Please select a valid audio snippet file (.wav, .mp3, .m4a).');
+                          return;
+                        }
+                        setAudioFile(f);
+                      } else {
+                        setAudioFile(null);
+                      }
+                    }}
+                    className="sr-only"
+                  />
+                  <span className="mt-2.5 inline-block px-3 py-1 bg-white/[0.08] hover:bg-white/[0.15] text-[11px] font-medium text-white rounded-lg pointer-events-none">
+                    Choose Audio File
                   </span>
-                </div>
+                </label>
               </div>
 
               <div>
                 <label className="text-xs font-medium text-gray-300 block mb-1.5">
                   Cover Artwork (JPG / PNG)
                 </label>
-                <div className="relative border border-dashed border-white/[0.12] hover:border-white/[0.25] rounded-xl p-4 bg-[#181a20] text-center cursor-pointer transition-colors">
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => setCoverFile(e.target.files?.[0] || null)}
-                    className="absolute inset-0 opacity-0 cursor-pointer"
-                  />
-                  <Upload className="h-5 w-5 text-gray-400 mx-auto mb-1.5" />
+                <label
+                  htmlFor="ad-cover-input"
+                  className="flex flex-col items-center justify-center border border-dashed border-white/[0.12] hover:border-white/[0.25] active:border-[#e53935] rounded-xl p-5 bg-[#181a20] text-center cursor-pointer transition-colors select-none"
+                >
+                  <Upload className="h-5 w-5 text-gray-400 mb-1.5" />
                   <span className="text-xs font-semibold text-white block">
-                    {coverFile ? coverFile.name : 'Choose cover artwork'}
+                    {coverFile ? coverFile.name : 'Tap to select cover artwork'}
                   </span>
-                  <span className="text-[10px] text-gray-500 block mt-0.5">
-                    Square image (minimum 1000x1000px)
+                  {coverFile ? (
+                    <span className="text-[10px] text-emerald-400 block mt-0.5 font-mono">
+                      {(coverFile.size / (1024 * 1024)).toFixed(2)} MB selected ✓
+                    </span>
+                  ) : (
+                    <span className="text-[10px] text-gray-500 block mt-0.5">
+                      Square image (Photo Library, Camera or Files)
+                    </span>
+                  )}
+                  <input
+                    id="ad-cover-input"
+                    type="file"
+                    accept="image/png,image/jpeg,image/jpg,image/webp,image/*"
+                    onChange={(e) => setCoverFile(e.target.files?.[0] || null)}
+                    className="sr-only"
+                  />
+                  <span className="mt-2.5 inline-block px-3 py-1 bg-white/[0.08] hover:bg-white/[0.15] text-[11px] font-medium text-white rounded-lg pointer-events-none">
+                    Choose Artwork
                   </span>
-                </div>
+                </label>
               </div>
             </div>
 
