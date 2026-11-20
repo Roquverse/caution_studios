@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import './globals.css';
 import { UserAuthGuard } from '../components/UserAuthGuard';
+import { AudioPlayerProvider } from '../context/AudioPlayerContext';
 
 export const metadata: Metadata = {
   title: 'Creator Portal | Caution Studio',
@@ -27,8 +28,12 @@ export default function RootLayout({
           rel="stylesheet"
         />
       </head>
-      <body className="min-h-screen bg-[#111214] text-[#eceef2] selection:bg-[#2bbbad] selection:text-black">
-        <UserAuthGuard>{children}</UserAuthGuard>
+      <body className="min-h-screen bg-[#111214] text-[#eceef2] selection:bg-[#e53935] selection:text-white">
+        <UserAuthGuard>
+          <AudioPlayerProvider>
+            {children}
+          </AudioPlayerProvider>
+        </UserAuthGuard>
       </body>
     </html>
   );

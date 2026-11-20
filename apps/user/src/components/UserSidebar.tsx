@@ -13,6 +13,8 @@ import {
   Heart,
   Clock,
   Sliders,
+  Megaphone,
+  Settings,
   ChevronDown
 } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
@@ -82,6 +84,11 @@ export function UserSidebar({
     { id: 'history', label: 'Listening History', icon: Clock, href: '/?tab=history' }
   ];
 
+  const creatorItems = [
+    { id: 'promote', label: 'Promote Music', icon: Megaphone, href: '/promote', badge: 'ADS' },
+    { id: 'settings', label: 'Settings', icon: Settings, href: '/settings' }
+  ];
+
   const handleItemClick = (id: string, href: string) => {
     if (onNavigate) {
       onNavigate(id);
@@ -100,9 +107,9 @@ export function UserSidebar({
 
   return (
     <aside
-      className={`w-60 border-r border-white/[0.06] bg-[#121316] p-4 shrink-0 hidden md:flex flex-col justify-between h-full overflow-y-auto pb-28 ${className}`}
+      className={`w-60 border-r border-white/[0.06] bg-[#121316] p-4 shrink-0 hidden md:flex flex-col justify-between h-full overflow-y-auto pb-6 select-none ${className}`}
     >
-      <div className="space-y-6">
+      <div className="space-y-5">
         {/* Discover Section */}
         <div>
           <p className="text-[11px] font-bold text-gray-500 uppercase tracking-wider px-3 mb-2">
@@ -123,7 +130,7 @@ export function UserSidebar({
                       : 'text-gray-400 hover:text-white hover:bg-white/[0.04]'
                   }`}
                 >
-                  <Icon className="h-4 w-4" />
+                  <Icon className="h-4 w-4 shrink-0" />
                   <span>{item.label}</span>
                 </button>
               );
@@ -150,17 +157,53 @@ export function UserSidebar({
                   onClick={() => handleItemClick(item.id, item.href)}
                   className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
                     isActive
-                      ? 'bg-white/[0.08] text-white font-bold'
+                      ? 'bg-[#e53935] text-white shadow-md shadow-red-500/20'
                       : 'text-gray-400 hover:text-white hover:bg-white/[0.04]'
                   }`}
                 >
                   <div className="flex items-center gap-3">
-                    <Icon className={`h-4 w-4 ${isPurchased ? 'text-[#e53935]' : isFav ? 'text-red-500' : 'text-gray-400'}`} />
+                    <Icon className={`h-4 w-4 shrink-0 ${isActive ? 'text-white' : isPurchased ? 'text-[#e53935]' : isFav ? 'text-red-500' : 'text-gray-400'}`} />
                     <span>{item.label}</span>
                   </div>
                   {isFav && favoritesCount > 0 && (
-                    <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-white/10 text-white">
+                    <span className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded ${isActive ? 'bg-black/30 text-white' : 'bg-white/10 text-white'}`}>
                       {favoritesCount}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Creator Section */}
+        <div>
+          <p className="text-[11px] font-bold text-gray-500 uppercase tracking-wider px-3 mb-2">
+            Creator
+          </p>
+          <div className="space-y-1">
+            {creatorItems.map((item) => {
+              const Icon = item.icon;
+              const isActive = activeNav === item.id;
+
+              return (
+                <button
+                  key={'left-nav-' + item.id}
+                  type="button"
+                  onClick={() => handleItemClick(item.id, item.href)}
+                  className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                    isActive
+                      ? 'bg-[#e53935] text-white shadow-md shadow-red-500/20'
+                      : 'text-gray-400 hover:text-white hover:bg-white/[0.04]'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <Icon className="h-4 w-4 shrink-0" />
+                    <span>{item.label}</span>
+                  </div>
+                  {item.badge && (
+                    <span className={`text-[9px] font-mono font-black px-1.5 py-0.5 rounded tracking-wider ${isActive ? 'bg-black/30 text-white' : 'bg-[#e53935]/20 text-[#e53935]'}`}>
+                      {item.badge}
                     </span>
                   )}
                 </button>
@@ -183,7 +226,10 @@ export function UserSidebar({
         </button>
 
         {/* Profile Row */}
-        <div className="flex items-center justify-between px-2 pt-1">
+        <Link
+          href="/profile"
+          className="flex items-center justify-between px-2 pt-1 hover:bg-white/[0.03] rounded-xl p-1.5 transition-colors cursor-pointer"
+        >
           <div className="flex items-center gap-2.5 min-w-0">
             <div className="w-8 h-8 rounded-full overflow-hidden bg-black border border-white/10 shrink-0">
               <img
@@ -198,7 +244,7 @@ export function UserSidebar({
             </div>
           </div>
           <ChevronDown className="h-4 w-4 text-gray-500" />
-        </div>
+        </Link>
       </div>
     </aside>
   );
