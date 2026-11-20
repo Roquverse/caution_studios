@@ -119,7 +119,6 @@ export default function AdminTracksPage() {
   const [status, setStatus] = useState<'live' | 'draft' | 'unlisted'>('live');
 
   // License Pricing in Naira (NGN ₦)
-  const [basicPrice, setBasicPrice] = useState<number | ''>('');
   const [premiumPrice, setPremiumPrice] = useState<number | ''>('');
   const [exclusivePrice, setExclusivePrice] = useState<number | ''>('');
 
@@ -131,8 +130,8 @@ export default function AdminTracksPage() {
 
   // Edit Modal & Price Editing
   const [editingTrack, setEditingTrack] = useState<BeatTrack | null>(null);
-  const [editPriceNgn, setEditPriceNgn] = useState<number>(15000);
-  const [editPremiumPriceNgn, setEditPremiumPriceNgn] = useState<number>(35000);
+  const [editPremiumPriceNgn, setEditPremiumPriceNgn] = useState<number>(50000);
+  const [editExclusivePriceNgn, setEditExclusivePriceNgn] = useState<number>(200000);
   const [editSaving, setEditSaving] = useState(false);
 
   // Dynamic Genres fetched from API
@@ -350,9 +349,8 @@ export default function AdminTracksPage() {
       setUploadStep('Publishing track to master catalog...');
       setUploadProgress(100);
 
-      const finalBasic = typeof basicPrice === 'number' && basicPrice > 0 ? basicPrice : 15000;
-      const finalPremium = typeof premiumPrice === 'number' && premiumPrice > 0 ? premiumPrice : 45000;
-      const finalExclusive = typeof exclusivePrice === 'number' && exclusivePrice > 0 ? exclusivePrice : 250000;
+      const finalPremium = typeof premiumPrice === 'number' && premiumPrice > 0 ? premiumPrice : 50000;
+      const finalExclusive = typeof exclusivePrice === 'number' && exclusivePrice > 0 ? exclusivePrice : 200000;
 
       const payload = {
         title: title.trim(),
@@ -365,7 +363,6 @@ export default function AdminTracksPage() {
         status,
         moods: [mood],
         tags: tags.trim() ? tags.split(',').map((t) => t.trim()).filter(Boolean) : ['Instrumental'],
-        basicPrice: Math.round(finalBasic * 100),
         premiumPrice: Math.round(finalPremium * 100),
         exclusivePrice: Math.round(finalExclusive * 100),
         masterAudioKey,
@@ -421,7 +418,6 @@ export default function AdminTracksPage() {
     setTags('');
     setDescription('');
     setStatus('live');
-    setBasicPrice('');
     setPremiumPrice('');
     setExclusivePrice('');
     setAudioFile(null);
@@ -510,8 +506,8 @@ export default function AdminTracksPage() {
 
     try {
       setEditSaving(true);
-      const basicPriceCents = Math.round(Number(editPriceNgn) * 100);
       const premiumPriceCents = Math.round(Number(editPremiumPriceNgn) * 100);
+      const exclusivePriceCents = Math.round(Number(editExclusivePriceNgn) * 100);
 
       const res = await fetch(`/api/tracks/${editingTrack.id}`, {
         method: 'PATCH',
@@ -524,8 +520,8 @@ export default function AdminTracksPage() {
           duration_seconds: editingTrack.duration_seconds,
           status: editingTrack.status,
           description: editingTrack.description,
-          basicPrice: basicPriceCents,
-          premiumPrice: premiumPriceCents
+          premiumPrice: premiumPriceCents,
+          exclusivePrice: exclusivePriceCents
         })
       });
 
@@ -545,8 +541,8 @@ export default function AdminTracksPage() {
                 ...t,
                 ...editingTrack,
                 licenses: updatedBeat?.licenses || [
-                  { id: 'basic', beat_id: editingTrack.id, type: 'basic', price_cents: basicPriceCents, enabled: true },
-                  { id: 'premium', beat_id: editingTrack.id, type: 'premium', price_cents: premiumPriceCents, enabled: true }
+                  { id: 'premium', beat_id: editingTrack.id, type: 'premium', price_cents: premiumPriceCents, enabled: true },
+                  { id: 'exclusive', beat_id: editingTrack.id, type: 'exclusive', price_cents: exclusivePriceCents, enabled: true }
                 ]
               }
             : t
@@ -567,9 +563,17 @@ export default function AdminTracksPage() {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const getBasicPrice = (track: BeatTrack) => {
-    const lic = track.licenses?.find((l) => l.type === 'basic');
-    return lic?.price_cents ? `₦${(lic.price_cents / 100).toLocaleString('en-NG')}` : '₦15,000';
+  const getLicensePricing = (track: BeatTrack) => {
+    const prem = track.licenses?.find((l) => l.type === 'premium');
+    const excl = track.licenses?.find((l) => l.type === 'exclusive');
+    const premStr = prem?.price_cents ? `₦${(prem.price_cents / 100).toLocaleString('en-NG')}` : '₦50,000';
+    const exclStr = excl?.price_cents ? `₦${(excl.price_cents / 100).toLocaleString('en-NG')}` : '₦200,000';
+    return (
+      <div className="space-y-0.5 text-[11px]">
+        <div className="text-zinc-200"><span className="text-zinc-500 font-sans">Prem:</span> {premStr}</div>
+        <div className="text-zinc-400"><span className="text-zinc-500 font-sans">Excl:</span> {exclStr}</div>
+      </div>
+    );
   };
 
   const allGenres = useMemo(() => {
@@ -708,7 +712,7 @@ export default function AdminTracksPage() {
                   <th className="py-3 px-4">BPM & Key</th>
                   <th className="py-3 px-4">Duration</th>
                   <th className="py-3 px-4 text-center">Plays / Downloads</th>
-                  <th className="py-3 px-4">Basic Lease (₦)</th>
+                  <th className="py-3 px-4">License Pricing</th>
                   <th className="py-3 px-4 text-center">Status</th>
                   <th className="py-3 px-4 text-right">Actions</th>
                 </tr>
@@ -823,9 +827,9 @@ export default function AdminTracksPage() {
                           </div>
                         </td>
 
-                        {/* Basic Price */}
-                        <td className="py-3 px-4 font-mono font-medium text-emerald-400">
-                          {getBasicPrice(track)}
+                        {/* License Pricing */}
+                        <td className="py-3 px-4 font-mono font-medium">
+                          {getLicensePricing(track)}
                         </td>
 
                         {/* Status Toggle */}
@@ -903,10 +907,10 @@ export default function AdminTracksPage() {
                               type="button"
                               onClick={() => {
                                 setEditingTrack(track);
-                                const basicLic = track.licenses?.find((l) => l.type === 'basic');
                                 const premLic = track.licenses?.find((l) => l.type === 'premium');
-                                setEditPriceNgn(basicLic?.price_cents ? basicLic.price_cents / 100 : 15000);
-                                setEditPremiumPriceNgn(premLic?.price_cents ? premLic.price_cents / 100 : 35000);
+                                const exclLic = track.licenses?.find((l) => l.type === 'exclusive');
+                                setEditPremiumPriceNgn(premLic?.price_cents ? premLic.price_cents / 100 : 50000);
+                                setEditExclusivePriceNgn(exclLic?.price_cents ? exclLic.price_cents / 100 : 200000);
                               }}
                               className="p-1.5 rounded-md text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors"
                               title="Edit track"
@@ -1203,18 +1207,7 @@ export default function AdminTracksPage() {
                 <span className="text-[11px] font-semibold uppercase tracking-wider text-zinc-400 block">
                   License Pricing (NGN ₦)
                 </span>
-                <div className="grid grid-cols-3 gap-2.5">
-                  <div>
-                    <label className="block text-[10px] text-zinc-500 mb-0.5">Basic (₦)</label>
-                    <input
-                      type="number"
-                      step="1000"
-                      value={basicPrice}
-                      onChange={(e) => setBasicPrice(e.target.value === '' ? '' : parseFloat(e.target.value))}
-                      placeholder="15000"
-                      className="w-full text-xs rounded-md border border-zinc-800 p-1.5 bg-zinc-900 text-white placeholder:text-zinc-600 focus:outline-none focus:border-[#2dd4bf]"
-                    />
-                  </div>
+                <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block text-[10px] text-zinc-500 mb-0.5">Premium (₦)</label>
                     <input
@@ -1222,7 +1215,7 @@ export default function AdminTracksPage() {
                       step="1000"
                       value={premiumPrice}
                       onChange={(e) => setPremiumPrice(e.target.value === '' ? '' : parseFloat(e.target.value))}
-                      placeholder="45000"
+                      placeholder="50000"
                       className="w-full text-xs rounded-md border border-zinc-800 p-1.5 bg-zinc-900 text-white placeholder:text-zinc-600 focus:outline-none focus:border-[#2dd4bf]"
                     />
                   </div>
@@ -1233,7 +1226,7 @@ export default function AdminTracksPage() {
                       step="5000"
                       value={exclusivePrice}
                       onChange={(e) => setExclusivePrice(e.target.value === '' ? '' : parseFloat(e.target.value))}
-                      placeholder="250000"
+                      placeholder="200000"
                       className="w-full text-xs rounded-md border border-zinc-800 p-1.5 bg-zinc-900 text-white placeholder:text-zinc-600 focus:outline-none focus:border-[#2dd4bf]"
                     />
                   </div>
@@ -1335,23 +1328,6 @@ export default function AdminTracksPage() {
               <div className="grid grid-cols-2 gap-2.5">
                 <div>
                   <label className="block text-xs font-medium text-zinc-300 mb-1">
-                    Basic Lease Price (₦)
-                  </label>
-                  <div className="relative">
-                    <span className="absolute left-2.5 top-2 text-xs font-mono text-zinc-500">₦</span>
-                    <input
-                      type="number"
-                      min="0"
-                      step="500"
-                      value={editPriceNgn}
-                      onChange={(e) => setEditPriceNgn(Number(e.target.value))}
-                      className="w-full text-xs rounded-md border border-zinc-800 pl-7 p-2 bg-zinc-900 text-white font-mono focus:outline-none focus:border-[#2dd4bf]"
-                      placeholder="15000"
-                    />
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-zinc-300 mb-1">
                     Premium Lease Price (₦)
                   </label>
                   <div className="relative">
@@ -1363,7 +1339,24 @@ export default function AdminTracksPage() {
                       value={editPremiumPriceNgn}
                       onChange={(e) => setEditPremiumPriceNgn(Number(e.target.value))}
                       className="w-full text-xs rounded-md border border-zinc-800 pl-7 p-2 bg-zinc-900 text-white font-mono focus:outline-none focus:border-[#2dd4bf]"
-                      placeholder="35000"
+                      placeholder="50000"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-zinc-300 mb-1">
+                    Exclusive Rights Price (₦)
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-2.5 top-2 text-xs font-mono text-zinc-500">₦</span>
+                    <input
+                      type="number"
+                      min="0"
+                      step="5000"
+                      value={editExclusivePriceNgn}
+                      onChange={(e) => setEditExclusivePriceNgn(Number(e.target.value))}
+                      className="w-full text-xs rounded-md border border-zinc-800 pl-7 p-2 bg-zinc-900 text-white font-mono focus:outline-none focus:border-[#2dd4bf]"
+                      placeholder="200000"
                     />
                   </div>
                 </div>

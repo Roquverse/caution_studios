@@ -57,15 +57,7 @@ export async function PATCH(
     }
 
     // Update licenses if provided
-    if (body.basicPrice || body.premiumPrice || body.exclusivePrice) {
-      if (body.basicPrice) {
-        await supabase
-          .from('beat_licenses')
-          .upsert(
-            { beat_id: params.id, type: 'basic', price_cents: body.basicPrice, enabled: true },
-            { onConflict: 'beat_id,type' }
-          );
-      }
+    if (body.premiumPrice || body.exclusivePrice) {
       if (body.premiumPrice) {
         await supabase
           .from('beat_licenses')
@@ -82,6 +74,13 @@ export async function PATCH(
             { onConflict: 'beat_id,type' }
           );
       }
+      // Keep basic disabled
+      await supabase
+        .from('beat_licenses')
+        .upsert(
+          { beat_id: params.id, type: 'basic', price_cents: 1, enabled: false },
+          { onConflict: 'beat_id,type' }
+        );
     }
 
     const { data: updatedLicenses } = await supabase

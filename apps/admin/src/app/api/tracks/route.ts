@@ -95,7 +95,6 @@ export async function POST(req: NextRequest) {
         status: formData.get('status') as string,
         moods: formData.get('moods') as string,
         tags: formData.get('tags') as string,
-        basicPrice: formData.get('basicPrice') as string,
         premiumPrice: formData.get('premiumPrice') as string,
         exclusivePrice: formData.get('exclusivePrice') as string,
         masterAudioKey: formData.get('masterAudioKey') as string,
@@ -117,9 +116,8 @@ export async function POST(req: NextRequest) {
     const status = (bodyData.status as string) || 'live';
 
     // Pricing (in kobo / cents: ₦15,000 = 1500000, ₦45,000 = 4500000, ₦250,000 = 25000000)
-    const basicPrice = parseInt(bodyData.basicPrice as string, 10) || 1500000;
-    const premiumPrice = parseInt(bodyData.premiumPrice as string, 10) || 4500000;
-    const exclusivePrice = parseInt(bodyData.exclusivePrice as string, 10) || 25000000;
+    const premiumPrice = parseInt(bodyData.premiumPrice as string, 10) || 5000000;
+    const exclusivePrice = parseInt(bodyData.exclusivePrice as string, 10) || 20000000;
 
     // Moods and Tags
     const moods = Array.isArray(bodyData.moods)
@@ -236,9 +234,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: beatErr.message }, { status: 500 });
     }
 
-    // 6. Insert License Tiers into `beat_licenses`
+    // 6. Insert License Tiers into `beat_licenses` (Basic disabled, Premium & Exclusive active)
     const licensesToInsert = [
-      { beat_id: newBeat.id, type: 'basic', price_cents: basicPrice, enabled: true },
+      { beat_id: newBeat.id, type: 'basic', price_cents: 1, enabled: false },
       { beat_id: newBeat.id, type: 'premium', price_cents: premiumPrice, enabled: true },
       { beat_id: newBeat.id, type: 'exclusive', price_cents: exclusivePrice, enabled: true }
     ];
@@ -266,7 +264,6 @@ export async function POST(req: NextRequest) {
         'Musical Key': musicalKey,
         'Master Audio Key': masterAudioKey || 'None',
         'Stems ZIP Key': stemsKey || 'None',
-        'Basic License': `₦${(basicPrice / 100).toLocaleString('en-NG')}`,
         'Premium License': `₦${(premiumPrice / 100).toLocaleString('en-NG')}`,
         'Exclusive License': `₦${(exclusivePrice / 100).toLocaleString('en-NG')}`
       },
