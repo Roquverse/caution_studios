@@ -238,18 +238,27 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
               b.title?.toLowerCase().includes('(free)') ||
               b.title?.toLowerCase().includes('[free]');
 
-            const rawPrice = basicLic?.price_cents ? basicLic.price_cents / 100 : (isFreeTagged ? 0 : 3000);
-            const priceNgn = isFreeTagged || rawPrice <= 1 ? 0 : rawPrice;
             const premiumPriceNgn = isFreeTagged
               ? 0
               : premiumLic?.price_cents && premiumLic.price_cents > 100
               ? Math.round(premiumLic.price_cents / 100)
-              : (priceNgn ? priceNgn * 3 : 50000);
+              : 50000;
             const exclusivePriceNgn = isFreeTagged
               ? 0
               : exclusiveLic?.price_cents && exclusiveLic.price_cents > 100
               ? Math.round(exclusiveLic.price_cents / 100)
               : 200000;
+
+            let priceNgn = 0;
+            if (!isFreeTagged) {
+              if (basicLic?.price_cents && basicLic.price_cents > 300000) {
+                priceNgn = Math.round(basicLic.price_cents / 100);
+              } else if (premiumPriceNgn > 0) {
+                priceNgn = Math.max(15000, Math.round(premiumPriceNgn * 0.35));
+              } else {
+                priceNgn = 15000;
+              }
+            }
 
             const durationSec = b.duration_seconds || 180;
             const mins = Math.floor(durationSec / 60);
@@ -546,6 +555,7 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
                 : '/api/media/masters/alex-morgan-afrobeat-instrumental-summer-groove-573648-hubz_1791151613114.mp3';
             }
             const basicLic = b.licenses?.find((l: any) => l.type === 'basic') || b.beat_licenses?.find((l: any) => l.type === 'basic');
+            const premiumLic = b.licenses?.find((l: any) => l.type === 'premium') || b.beat_licenses?.find((l: any) => l.type === 'premium');
             const exclusiveLic = b.licenses?.find((l: any) => l.type === 'exclusive') || b.beat_licenses?.find((l: any) => l.type === 'exclusive');
             const beatTags: string[] = Array.isArray(b.tags) ? b.tags : [];
             const isFreeBeatItem =
@@ -556,13 +566,27 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
               b.title?.toLowerCase().includes('(free)') ||
               b.title?.toLowerCase().includes('[free]');
 
-            const rawPrice = basicLic?.price_cents ? basicLic.price_cents / 100 : (isFreeBeatItem ? 0 : 3000);
-            const priceNgn = isFreeBeatItem || rawPrice <= 1 ? 0 : rawPrice;
+            const premiumPriceNgn = isFreeBeatItem
+              ? 0
+              : premiumLic?.price_cents && premiumLic.price_cents > 100
+              ? Math.round(premiumLic.price_cents / 100)
+              : 50000;
             const exclusivePriceNgn = isFreeBeatItem
               ? 0
-              : exclusiveLic?.price_cents
-              ? exclusiveLic.price_cents / 100
-              : 50000;
+              : exclusiveLic?.price_cents && exclusiveLic.price_cents > 100
+              ? Math.round(exclusiveLic.price_cents / 100)
+              : 200000;
+
+            let priceNgn = 0;
+            if (!isFreeBeatItem) {
+              if (basicLic?.price_cents && basicLic.price_cents > 300000) {
+                priceNgn = Math.round(basicLic.price_cents / 100);
+              } else if (premiumPriceNgn > 0) {
+                priceNgn = Math.max(15000, Math.round(premiumPriceNgn * 0.35));
+              } else {
+                priceNgn = 15000;
+              }
+            }
             const durationSec = b.duration_seconds || 180;
             const mins = Math.floor(durationSec / 60);
             const secs = Math.floor(durationSec % 60);
@@ -586,6 +610,7 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
               genre: b.genre || 'Electronic',
               musicalKey: b.musical_key || 'C Minor',
               priceNgn,
+              premiumPriceNgn,
               exclusivePriceNgn,
               isFree: isFreeBeatItem,
               tags: beatTags,
@@ -1497,7 +1522,7 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
       {/* 2. BODY CONTENT (3-COLUMN MARKETPLACE LAYOUT) */}
       <div className="flex-1 flex w-full max-w-full min-w-0 overflow-hidden relative pb-[72px]">
         {/* LEFT NAVIGATION SIDEBAR */}
-        <aside className="w-60 border-r border-white/[0.06] bg-[#121316] p-4 shrink-0 hidden md:flex flex-col justify-between h-full overflow-y-auto">
+        <aside className="w-60 border-r border-white/[0.06] bg-[#121316] p-4 shrink-0 hidden md:flex flex-col justify-between h-full overflow-y-auto pb-28">
           <div className="space-y-6">
             {/* Discover Section */}
             <div>
@@ -2530,7 +2555,7 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
         </main>
 
         {/* RIGHT SIDEBAR - COMMERCIAL MARKETPLACE WIDGETS */}
-        <aside className="w-80 border-l border-white/[0.06] bg-[#121316] p-4 shrink-0 hidden xl:flex flex-col space-y-6 h-full overflow-y-auto">
+        <aside className="w-80 border-l border-white/[0.06] bg-[#121316] p-4 shrink-0 hidden xl:flex flex-col space-y-6 h-full overflow-y-auto pb-28">
           {/* TOP PRODUCERS */}
           <div>
             <div className="flex items-center justify-between mb-3.5">
@@ -2627,7 +2652,7 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
           </div>
 
           {/* SELL YOUR BEATS PROMOTIONAL CARD */}
-          <div className="relative rounded-2xl overflow-hidden p-5 border border-white/[0.06] bg-[#16181d] space-y-3 mt-auto">
+          <div className="relative rounded-2xl overflow-hidden p-5 border border-white/[0.08] bg-[#16181d] space-y-3 mt-auto shrink-0 mb-4 shadow-lg">
             <img
               src="/images/artist_studio_mic.jpg"
               alt="Studio Microphone"
@@ -3323,191 +3348,202 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
               Produced by {paidBeatPurchaseTrack.artist} · {paidBeatPurchaseTrack.bpm || 110} BPM · {paidBeatPurchaseTrack.genre}
             </p>
 
-            <div className="mt-5 space-y-2.5">
-              {/* 1. MP3 Lease */}
-              <div
-                onClick={() => setPurchaseTier('mp3')}
-                className={`p-3 rounded-xl border transition-all cursor-pointer flex items-center justify-between ${
-                  purchaseTier === 'mp3'
-                    ? 'bg-[#e53935]/15 border-[#e53935]/40 text-white'
-                    : 'bg-white/[0.02] border-white/5 hover:bg-white/[0.05] text-gray-300'
-                }`}
-              >
-                <div>
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-xs font-black text-white">Starter MP3 Lease</span>
-                    <span className="px-1.5 py-0.2 rounded-full text-[9px] font-mono font-bold bg-white/10 text-gray-300">
-                      ENTRY
-                    </span>
-                  </div>
-                  <span className="text-[11px] text-gray-400">High-Quality 320kbps MP3 · 50,000 Streams</span>
-                </div>
-                <span className="text-sm font-black text-[#e53935]">
-                  ₦15,000
-                </span>
-              </div>
+            {(() => {
+              const starterPrice = paidBeatPurchaseTrack.priceNgn || Math.max(15000, Math.round((paidBeatPurchaseTrack.premiumPriceNgn || 50000) * 0.35));
+              const wavPrice = Math.round(starterPrice * 1.8);
+              const stemsPrice = paidBeatPurchaseTrack.premiumPriceNgn || 50000;
+              const exclusivePrice = paidBeatPurchaseTrack.exclusivePriceNgn || 200000;
 
-              {/* 2. WAV Lease */}
-              <div
-                onClick={() => setPurchaseTier('wav')}
-                className={`p-3 rounded-xl border transition-all cursor-pointer flex items-center justify-between ${
-                  purchaseTier === 'wav'
-                    ? 'bg-[#e53935]/15 border-[#e53935]/40 text-white'
-                    : 'bg-white/[0.02] border-white/5 hover:bg-white/[0.05] text-gray-300'
-                }`}
-              >
-                <div>
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-xs font-black text-white">WAV Lease</span>
-                    <span className="px-1.5 py-0.2 rounded-full text-[9px] font-mono font-bold bg-blue-500/20 text-blue-300">
-                      STUDIO
-                    </span>
-                  </div>
-                  <span className="text-[11px] text-gray-400">Lossless 24-Bit WAV Master · 100,000 Streams</span>
-                </div>
-                <span className="text-sm font-black text-[#e53935]">
-                  ₦30,000
-                </span>
-              </div>
+              return (
+                <>
+                  <div className="mt-5 space-y-2.5">
+                    {/* 1. MP3 Lease */}
+                    <div
+                      onClick={() => setPurchaseTier('mp3')}
+                      className={`p-3 rounded-xl border transition-all cursor-pointer flex items-center justify-between ${
+                        purchaseTier === 'mp3'
+                          ? 'bg-[#e53935]/15 border-[#e53935]/40 text-white'
+                          : 'bg-white/[0.02] border-white/5 hover:bg-white/[0.05] text-gray-300'
+                      }`}
+                    >
+                      <div>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-xs font-black text-white">Starter MP3 Lease</span>
+                          <span className="px-1.5 py-0.2 rounded-full text-[9px] font-mono font-bold bg-white/10 text-gray-300">
+                            ENTRY
+                          </span>
+                        </div>
+                        <span className="text-[11px] text-gray-400">High-Quality 320kbps MP3 · 50,000 Streams</span>
+                      </div>
+                      <span className="text-sm font-black text-[#e53935]">
+                        ₦{starterPrice.toLocaleString()}
+                      </span>
+                    </div>
 
-              {/* 3. Trackout Stems Lease */}
-              <div
-                onClick={() => setPurchaseTier('stems')}
-                className={`p-3 rounded-xl border transition-all cursor-pointer flex items-center justify-between ${
-                  purchaseTier === 'stems'
-                    ? 'bg-amber-500/15 border-amber-500/40 text-amber-300'
-                    : 'bg-white/[0.02] border-white/5 hover:bg-white/[0.05] text-gray-300'
-                }`}
-              >
-                <div>
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-xs font-black text-white">Trackout Lease (WAV + Stems)</span>
-                    <span className="px-1.5 py-0.2 rounded-full text-[9px] font-mono font-bold bg-amber-400/20 text-amber-300">
-                      MOST POPULAR
-                    </span>
-                  </div>
-                  <span className="text-[11px] text-gray-400">24-Bit WAV Master + Trackout ZIP Stems · 500,000 Streams</span>
-                </div>
-                <span className="text-sm font-black text-amber-400">
-                  ₦{(paidBeatPurchaseTrack.premiumPriceNgn || paidBeatPurchaseTrack.priceNgn || 50000).toLocaleString()}
-                </span>
-              </div>
+                    {/* 2. WAV Lease */}
+                    <div
+                      onClick={() => setPurchaseTier('wav')}
+                      className={`p-3 rounded-xl border transition-all cursor-pointer flex items-center justify-between ${
+                        purchaseTier === 'wav'
+                          ? 'bg-[#e53935]/15 border-[#e53935]/40 text-white'
+                          : 'bg-white/[0.02] border-white/5 hover:bg-white/[0.05] text-gray-300'
+                      }`}
+                    >
+                      <div>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-xs font-black text-white">WAV Lease</span>
+                          <span className="px-1.5 py-0.2 rounded-full text-[9px] font-mono font-bold bg-blue-500/20 text-blue-300">
+                            STUDIO
+                          </span>
+                        </div>
+                        <span className="text-[11px] text-gray-400">Lossless 24-Bit WAV Master · 100,000 Streams</span>
+                      </div>
+                      <span className="text-sm font-black text-[#e53935]">
+                        ₦{wavPrice.toLocaleString()}
+                      </span>
+                    </div>
 
-              {/* 4. 100% Exclusive Buyout */}
-              <div
-                onClick={() => setPurchaseTier('exclusive')}
-                className={`p-3 rounded-xl border transition-all cursor-pointer flex items-center justify-between ${
-                  purchaseTier === 'exclusive'
-                    ? 'bg-purple-500/15 border-purple-500/40 text-purple-300'
-                    : 'bg-white/[0.02] border-white/5 hover:bg-white/[0.05] text-gray-300'
-                }`}
-              >
-                <div>
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-xs font-black text-white">100% Exclusive Ownership</span>
-                    <span className="px-1.5 py-0.2 rounded-full text-[9px] font-mono font-bold bg-purple-400/20 text-purple-300">
-                      SOLE BUYOUT
-                    </span>
-                  </div>
-                  <span className="text-[11px] text-gray-400">Unlimited Streams · Sole Master Rights · Retired from Store</span>
-                </div>
-                <span className="text-sm font-black text-purple-400">
-                  ₦{(paidBeatPurchaseTrack.exclusivePriceNgn || 200000).toLocaleString()}
-                </span>
-              </div>
-            </div>
+                    {/* 3. Trackout Stems Lease */}
+                    <div
+                      onClick={() => setPurchaseTier('stems')}
+                      className={`p-3 rounded-xl border transition-all cursor-pointer flex items-center justify-between ${
+                        purchaseTier === 'stems'
+                          ? 'bg-amber-500/15 border-amber-500/40 text-amber-300'
+                          : 'bg-white/[0.02] border-white/5 hover:bg-white/[0.05] text-gray-300'
+                      }`}
+                    >
+                      <div>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-xs font-black text-white">Trackout Lease (WAV + Stems)</span>
+                          <span className="px-1.5 py-0.2 rounded-full text-[9px] font-mono font-bold bg-amber-400/20 text-amber-300">
+                            MOST POPULAR
+                          </span>
+                        </div>
+                        <span className="text-[11px] text-gray-400">24-Bit WAV Master + Trackout ZIP Stems · 500,000 Streams</span>
+                      </div>
+                      <span className="text-sm font-black text-amber-400">
+                        ₦{stemsPrice.toLocaleString()}
+                      </span>
+                    </div>
 
-            {/* Exclusive & Prior License Notice */}
-            <div className="mt-4 p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-[11px] text-amber-200/90 leading-relaxed">
-              <span className="font-bold text-amber-400">Important:</span> You can sell a beat under a Premium License and later sell it exclusively, but the exclusive buyer must understand that previous premium licenses remain valid.
-            </div>
-
-            <div className="mt-6">
-              {purchaseComplete ? (
-                <div className="p-3.5 rounded-xl bg-emerald-500/20 border border-emerald-500/40 text-center space-y-1">
-                  <p className="text-xs font-bold text-emerald-300">License Acquired Successfully!</p>
-                  <p className="text-[11px] text-gray-300">Beat master unlocked for full streaming & downloads.</p>
-                </div>
-              ) : (
-                <button
-                  type="button"
-                  disabled={isPurchasingBeat}
-                  onClick={async () => {
-                    if (!paidBeatPurchaseTrack) return;
-                    setIsPurchasingBeat(true);
-                    try {
-                      const sessionRes = await supabase.auth.getSession();
-                      const userEmail = sessionRes.data.session?.user?.email || 'buyer@cautionstudioz.com';
-                      const userId = sessionRes.data.session?.user?.id || null;
-
-                      const priceNgn =
+                    {/* 4. 100% Exclusive Buyout */}
+                    <div
+                      onClick={() => setPurchaseTier('exclusive')}
+                      className={`p-3 rounded-xl border transition-all cursor-pointer flex items-center justify-between ${
                         purchaseTier === 'exclusive'
-                          ? (paidBeatPurchaseTrack.exclusivePriceNgn || 200000)
-                          : purchaseTier === 'stems'
-                          ? (paidBeatPurchaseTrack.premiumPriceNgn || paidBeatPurchaseTrack.priceNgn || 50000)
-                          : purchaseTier === 'wav'
-                          ? 30000
-                          : 15000;
+                          ? 'bg-purple-500/15 border-purple-500/40 text-purple-300'
+                          : 'bg-white/[0.02] border-white/5 hover:bg-white/[0.05] text-gray-300'
+                      }`}
+                    >
+                      <div>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-xs font-black text-white">100% Exclusive Ownership</span>
+                          <span className="px-1.5 py-0.2 rounded-full text-[9px] font-mono font-bold bg-purple-400/20 text-purple-300">
+                            SOLE BUYOUT
+                          </span>
+                        </div>
+                        <span className="text-[11px] text-gray-400">Unlimited Streams · Sole Master Rights · Retired from Store</span>
+                      </div>
+                      <span className="text-sm font-black text-purple-400">
+                        ₦{exclusivePrice.toLocaleString()}
+                      </span>
+                    </div>
+                  </div>
 
-                      const orderId = `beat_${paidBeatPurchaseTrack.id.slice(0, 8)}_${Date.now()}`;
+                  {/* Exclusive & Prior License Notice */}
+                  <div className="mt-4 p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-[11px] text-amber-200/90 leading-relaxed">
+                    <span className="font-bold text-amber-400">Important:</span> You can sell a beat under a Premium License and later sell it exclusively, but the exclusive buyer must understand that previous premium licenses remain valid.
+                  </div>
 
-                      const res = await fetch('/api/paystack/initialize', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                          email: userEmail,
-                          amountNgn: priceNgn,
-                          orderId,
-                          callbackUrl: `${window.location.origin}/?type=purchase&beat_id=${paidBeatPurchaseTrack.id}`,
-                          metadata: {
-                            type: 'purchase',
-                            order_id: orderId,
-                            beat_id: paidBeatPurchaseTrack.id,
-                            beat_title: paidBeatPurchaseTrack.title,
-                            license: purchaseTier,
-                            priceNgn,
-                            user_id: userId
+                  <div className="mt-6">
+                    {purchaseComplete ? (
+                      <div className="p-3.5 rounded-xl bg-emerald-500/20 border border-emerald-500/40 text-center space-y-1">
+                        <p className="text-xs font-bold text-emerald-300">License Acquired Successfully!</p>
+                        <p className="text-[11px] text-gray-300">Beat master unlocked for full streaming & downloads.</p>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        disabled={isPurchasingBeat}
+                        onClick={async () => {
+                          if (!paidBeatPurchaseTrack) return;
+                          setIsPurchasingBeat(true);
+                          try {
+                            const sessionRes = await supabase.auth.getSession();
+                            const userEmail = sessionRes.data.session?.user?.email || 'buyer@cautionstudioz.com';
+                            const userId = sessionRes.data.session?.user?.id || null;
+
+                            const priceNgn =
+                              purchaseTier === 'exclusive'
+                                ? exclusivePrice
+                                : purchaseTier === 'stems'
+                                ? stemsPrice
+                                : purchaseTier === 'wav'
+                                ? wavPrice
+                                : starterPrice;
+
+                            const orderId = `beat_${paidBeatPurchaseTrack.id.slice(0, 8)}_${Date.now()}`;
+
+                            const res = await fetch('/api/paystack/initialize', {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({
+                                email: userEmail,
+                                amountNgn: priceNgn,
+                                orderId,
+                                callbackUrl: `${window.location.origin}/?type=purchase&beat_id=${paidBeatPurchaseTrack.id}`,
+                                metadata: {
+                                  type: 'purchase',
+                                  order_id: orderId,
+                                  beat_id: paidBeatPurchaseTrack.id,
+                                  beat_title: paidBeatPurchaseTrack.title,
+                                  license: purchaseTier,
+                                  priceNgn,
+                                  user_id: userId
+                                }
+                              })
+                            });
+
+                            const data = await res.json();
+                            const redirectUrl = data.data?.authorization_url || data.authorization_url;
+                            if (redirectUrl && (redirectUrl.startsWith('https://checkout.paystack.com') || redirectUrl.startsWith('http'))) {
+                              window.location.href = redirectUrl;
+                              return;
+                            }
+
+                            if (!data.status || data.configured === false || data.error === 'PAYSTACK_NOT_CONFIGURED') {
+                              throw new Error('Paystack API keys not configured in Vercel. Please add PAYSTACK_SECRET_KEY in Vercel settings.');
+                            } else {
+                              throw new Error(data.error || 'Failed to initialize payment gateway');
+                            }
+                          } catch (err: any) {
+                            console.error('License checkout error:', err);
+                            setRewardNotification('Could not start Paystack checkout: ' + (err.message || 'Error'));
+                            setIsPurchasingBeat(false);
                           }
-                        })
-                      });
-
-                      const data = await res.json();
-                      const redirectUrl = data.data?.authorization_url || data.authorization_url;
-                      if (redirectUrl && (redirectUrl.startsWith('https://checkout.paystack.com') || redirectUrl.startsWith('http'))) {
-                        window.location.href = redirectUrl;
-                        return;
-                      }
-
-                      if (!data.status || data.configured === false || data.error === 'PAYSTACK_NOT_CONFIGURED') {
-                        throw new Error('Paystack API keys not configured in Vercel. Please add PAYSTACK_SECRET_KEY in Vercel settings.');
-                      } else {
-                        throw new Error(data.error || 'Failed to initialize payment gateway');
-                      }
-                    } catch (err: any) {
-                      console.error('License checkout error:', err);
-                      setRewardNotification('Could not start Paystack checkout: ' + (err.message || 'Error'));
-                      setIsPurchasingBeat(false);
-                    }
-                  }}
-                  className="w-full py-3 rounded-xl bg-[#e53935] hover:bg-[#d32f2f] text-white font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-transform hover:scale-[1.01] shadow-lg shadow-[#e53935]/25 cursor-pointer disabled:opacity-60"
-                >
-                  <ShoppingBag className="h-4 w-4" />
-                  <span>
-                    {isPurchasingBeat
-                      ? 'Connecting to Paystack...'
-                      : `Pay & License ${
-                          purchaseTier === 'exclusive'
-                            ? `₦${(paidBeatPurchaseTrack.exclusivePriceNgn || 200000).toLocaleString()}`
-                            : purchaseTier === 'stems'
-                            ? `₦${(paidBeatPurchaseTrack.premiumPriceNgn || paidBeatPurchaseTrack.priceNgn || 50000).toLocaleString()}`
-                            : purchaseTier === 'wav'
-                            ? '₦30,000'
-                            : '₦15,000'
-                        }`}
-                  </span>
-                </button>
-              )}
-            </div>
+                        }}
+                        className="w-full py-3 rounded-xl bg-[#e53935] hover:bg-[#d32f2f] text-white font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-transform hover:scale-[1.01] shadow-lg shadow-[#e53935]/25 cursor-pointer disabled:opacity-60"
+                      >
+                        <ShoppingBag className="h-4 w-4" />
+                        <span>
+                          {isPurchasingBeat
+                            ? 'Connecting to Paystack...'
+                            : `Pay & License ${
+                                purchaseTier === 'exclusive'
+                                  ? `₦${exclusivePrice.toLocaleString()}`
+                                  : purchaseTier === 'stems'
+                                  ? `₦${stemsPrice.toLocaleString()}`
+                                  : purchaseTier === 'wav'
+                                  ? `₦${wavPrice.toLocaleString()}`
+                                  : `₦${starterPrice.toLocaleString()}`
+                              }`}
+                        </span>
+                      </button>
+                    )}
+                  </div>
+                </>
+              );
+            })()}
           </div>
         </div>
       )}

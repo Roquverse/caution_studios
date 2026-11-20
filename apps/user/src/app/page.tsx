@@ -91,18 +91,27 @@ export default async function UserPortalPage() {
           b.title?.toLowerCase().includes('(free)') ||
           b.title?.toLowerCase().includes('[free]');
 
-        const rawPrice = basicLic?.price_cents ? basicLic.price_cents / 100 : (isFreeTagged ? 0 : 3000);
-        const priceNgn = isFreeTagged || rawPrice <= 1 ? 0 : rawPrice;
         const premiumPriceNgn = isFreeTagged
           ? 0
           : premiumLic?.price_cents && premiumLic.price_cents > 100
           ? Math.round(premiumLic.price_cents / 100)
-          : (priceNgn ? priceNgn * 3 : 50000);
+          : 50000;
         const exclusivePriceNgn = isFreeTagged
           ? 0
           : exclusiveLic?.price_cents && exclusiveLic.price_cents > 100
           ? Math.round(exclusiveLic.price_cents / 100)
           : 200000;
+
+        let priceNgn = 0;
+        if (!isFreeTagged) {
+          if (basicLic?.price_cents && basicLic.price_cents > 300000) {
+            priceNgn = Math.round(basicLic.price_cents / 100);
+          } else if (premiumPriceNgn > 0) {
+            priceNgn = Math.max(15000, Math.round(premiumPriceNgn * 0.35));
+          } else {
+            priceNgn = 15000;
+          }
+        }
 
         const durationSec = b.duration_seconds || 180;
         const mins = Math.floor(durationSec / 60);

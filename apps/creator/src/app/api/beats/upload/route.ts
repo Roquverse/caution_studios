@@ -115,9 +115,11 @@ export async function POST(req: NextRequest) {
       if (!tags.includes('Free Download')) tags.push('Free Download');
     }
 
-    const priceBasic = isFreeBeat ? 0 : (parseInt(bodyData.priceBasic as string, 10) || 3000);
-    const pricePremium = isFreeBeat ? 0 : (parseInt(bodyData.pricePremium as string, 10) || 30000);
-    const priceExclusive = isFreeBeat ? 0 : (parseInt(bodyData.priceExclusive as string, 10) || 100000);
+    const pricePremium = isFreeBeat ? 0 : (parseInt(bodyData.pricePremium as string, 10) || 50000);
+    const priceExclusive = isFreeBeat ? 0 : (parseInt(bodyData.priceExclusive as string, 10) || 200000);
+    const priceBasic = isFreeBeat
+      ? 0
+      : (parseInt(bodyData.priceBasic as string, 10) || Math.max(15000, Math.round(pricePremium * 0.35)));
 
     const slug = generateSlug(title);
 

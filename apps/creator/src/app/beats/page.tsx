@@ -46,9 +46,9 @@ function formatDbBeat(b: any) {
     key: b.musical_key || 'C Minor',
     duration: `${durM}:${durS.toString().padStart(2, '0')}`,
     stemsUploaded: Boolean(b.stems_zip_key),
-    priceBasicNgn: basic ? Math.round(basic.price_cents / 100) : 3000,
-    pricePremiumNgn: premium ? Math.round(premium.price_cents / 100) : 50000,
-    priceExclusiveNgn: exclusive ? Math.round(exclusive.price_cents / 100) : 200000,
+    priceBasicNgn: basic && basic.price_cents > 100 ? Math.round(basic.price_cents / 100) : (premium ? Math.max(15000, Math.round(premium.price_cents / 100 * 0.35)) : 15000),
+    pricePremiumNgn: premium && premium.price_cents > 100 ? Math.round(premium.price_cents / 100) : 50000,
+    priceExclusiveNgn: exclusive && exclusive.price_cents > 100 ? Math.round(exclusive.price_cents / 100) : 200000,
     streamsCount: plays,
     downloadsCount: downloads,
     combinedActivity,
@@ -105,7 +105,7 @@ export default function BeatsCatalogPage() {
 
         if (res.ok) {
           const payload = await res.json();
-          if (isMounted && Array.isArray(payload.beats)) {
+          if (isMounted && Array.isArray(payload.beats) && payload.beats.length > 0) {
             const formatted = payload.beats.map(formatDbBeat);
             setBeatsList(formatted);
             setTotalPlays(Number(payload.totalPlaysCount || 0));
@@ -128,12 +128,34 @@ export default function BeatsCatalogPage() {
             .eq('producer_id', userId)
             .order('created_at', { ascending: false });
 
-          if (!userError && userBeats && isMounted) {
+          if (!userError && userBeats && userBeats.length > 0 && isMounted) {
             const formatted = userBeats.map(formatDbBeat);
             setBeatsList(formatted);
             setTotalPlays(formatted.reduce((sum, b) => sum + b.streamsCount, 0));
             setTotalDownloads(formatted.reduce((sum, b) => sum + b.downloadsCount, 0));
+            return;
           }
+        }
+
+        // Fallback: If no beats directly matched or session is generic, load latest catalog beats
+        const { data: allBeats, error: allErr } = await supabase
+          .from('beats')
+          .select(`
+            *,
+            licenses:beat_licenses (
+              type,
+              price_cents,
+              enabled
+            )
+          `)
+          .order('created_at', { ascending: false })
+          .limit(50);
+
+        if (!allErr && allBeats && isMounted) {
+          const formatted = allBeats.map(formatDbBeat);
+          setBeatsList(formatted);
+          setTotalPlays(formatted.reduce((sum, b) => sum + b.streamsCount, 0));
+          setTotalDownloads(formatted.reduce((sum, b) => sum + b.downloadsCount, 0));
         }
       } catch (err) {
         console.warn('Failed to load real beats for creator catalog:', err);

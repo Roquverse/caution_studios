@@ -33,6 +33,8 @@ export function MarketplaceBeatCard({
     ? 'FREE'
     : track.priceNgn && track.priceNgn > 0
     ? `₦${track.priceNgn.toLocaleString()}`
+    : track.premiumPriceNgn && track.premiumPriceNgn > 0
+    ? `₦${track.premiumPriceNgn.toLocaleString()}`
     : '₦45,000';
 
   return (

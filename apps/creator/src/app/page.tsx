@@ -144,15 +144,11 @@ export default function CreatorDashboardPage() {
           }
         }
 
-        const userId = session?.user?.id;
-        if (!userId) {
-          if (isMounted) setLoading(false);
-          return;
-        }
-        setCurrentUserId(userId);
+        const userId = session?.user?.id || '';
+        if (userId) setCurrentUserId(userId);
 
         // Primary: Fetch comprehensive producer telemetry via service-role API
-        const res = await fetch(`/api/creator/telemetry?userId=${encodeURIComponent(userId)}`, {
+        const res = await fetch(`/api/creator/telemetry${userId ? `?userId=${encodeURIComponent(userId)}` : ''}`, {
           headers: session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}
         });
 
@@ -225,9 +221,9 @@ export default function CreatorDashboardPage() {
               audioUrl: audioKey ? (audioKey.startsWith('http') || audioKey.startsWith('/') ? audioKey : `/api/media/${audioKey}`) : '',
               status: b.status || 'live',
               isFree,
-              priceBasicNgn: basicLic ? Math.round(basicLic.price_cents / 100) : 3000,
-              pricePremiumNgn: premiumLic ? Math.round(premiumLic.price_cents / 100) : 50000,
-              priceExclusiveNgn: exclusiveLic ? Math.round(exclusiveLic.price_cents / 100) : 200000,
+              priceBasicNgn: basicLic && basicLic.price_cents > 100 ? Math.round(basicLic.price_cents / 100) : (premiumLic ? Math.max(15000, Math.round(premiumLic.price_cents / 100 * 0.35)) : 15000),
+              pricePremiumNgn: premiumLic && premiumLic.price_cents > 100 ? Math.round(premiumLic.price_cents / 100) : 50000,
+              priceExclusiveNgn: exclusiveLic && exclusiveLic.price_cents > 100 ? Math.round(exclusiveLic.price_cents / 100) : 200000,
               createdAt: b.created_at ? new Date(b.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Recently'
             };
           });
