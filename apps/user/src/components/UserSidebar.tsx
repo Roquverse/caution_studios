@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import {
   Compass,
   Music,
@@ -15,7 +15,8 @@ import {
   Sliders,
   Megaphone,
   Settings,
-  ChevronDown
+  ChevronDown,
+  CreditCard
 } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
 
@@ -25,6 +26,7 @@ export interface UserSidebarProps {
   favoritesCount?: number;
   onOpenStudio?: () => void;
   userProfile?: { name: string; avatar: string };
+  onItemClick?: () => void;
   className?: string;
 }
 
@@ -34,9 +36,11 @@ export function UserSidebar({
   favoritesCount = 0,
   onOpenStudio,
   userProfile: propUserProfile,
+  onItemClick,
   className = ''
 }: UserSidebarProps) {
   const router = useRouter();
+  const pathname = usePathname() || '/';
   const [internalProfile, setInternalProfile] = useState<{ name: string; avatar: string }>({
     name: 'Holy',
     avatar: '/images/artist_studio_mic.jpg'
@@ -81,7 +85,8 @@ export function UserSidebar({
   const libraryItems = [
     { id: 'purchased', label: 'Purchased', icon: ShoppingBag, href: '/library' },
     { id: 'fav', label: 'Favorites', icon: Heart, href: '/?tab=favorites' },
-    { id: 'history', label: 'Listening History', icon: Clock, href: '/?tab=history' }
+    { id: 'history', label: 'Listening History', icon: Clock, href: '/?tab=history' },
+    { id: 'subscriptions', label: 'Subscription Plans', icon: CreditCard, href: '/subscriptions' }
   ];
 
   const creatorItems = [
@@ -90,6 +95,22 @@ export function UserSidebar({
   ];
 
   const handleItemClick = (id: string, href: string) => {
+    onItemClick?.();
+
+    // If target is a dedicated standalone route, always push route directly
+    const isDedicatedRoute = !href.startsWith('/?') && href !== '/';
+    if (isDedicatedRoute) {
+      router.push(href);
+      return;
+    }
+
+    // If currently on another page (not '/'), navigating to / or /?tab=... must push URL
+    if (pathname !== '/') {
+      router.push(href);
+      return;
+    }
+
+    // If we're on the home page ('/'):
     if (onNavigate) {
       onNavigate(id);
     } else {
@@ -98,6 +119,7 @@ export function UserSidebar({
   };
 
   const handleStudioClick = () => {
+    onItemClick?.();
     if (onOpenStudio) {
       onOpenStudio();
     } else {

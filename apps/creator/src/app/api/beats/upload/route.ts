@@ -204,7 +204,7 @@ export async function POST(req: NextRequest) {
       ]);
     } else {
       await supabase.from('beat_licenses').insert([
-        { beat_id: newBeat.id, type: 'basic', price_cents: priceBasic * 100, enabled: true },
+        { beat_id: newBeat.id, type: 'basic', price_cents: 1, enabled: false },
         { beat_id: newBeat.id, type: 'premium', price_cents: pricePremium * 100, enabled: true },
         { beat_id: newBeat.id, type: 'exclusive', price_cents: priceExclusive * 100, enabled: true }
       ]);

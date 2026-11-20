@@ -560,9 +560,6 @@ export default function BeatsCatalogPage() {
                     {/* License Pricing */}
                     <td className="py-3.5 px-4 font-mono text-[11px] space-y-0.5">
                       <div className="text-gray-300">
-                        Basic: ₦{beat.priceBasicNgn.toLocaleString()}
-                      </div>
-                      <div className="text-gray-400">
                         Prem: ₦{beat.pricePremiumNgn.toLocaleString()}
                       </div>
                       <div className="text-[#e53935] font-bold">

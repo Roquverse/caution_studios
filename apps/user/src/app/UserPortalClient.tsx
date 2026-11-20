@@ -134,7 +134,7 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
   const [isDownloadLimitModalOpen, setIsDownloadLimitModalOpen] = useState(false);
   const [rewardNotification, setRewardNotification] = useState<string | null>(null);
   const [paidBeatPurchaseTrack, setPaidBeatPurchaseTrack] = useState<TrackItem | null>(null);
-  const [purchaseTier, setPurchaseTier] = useState<'mp3' | 'wav' | 'stems' | 'exclusive'>('stems');
+  const [purchaseTier, setPurchaseTier] = useState<'premium' | 'exclusive'>('premium');
   const [purchaseComplete, setPurchaseComplete] = useState(false);
   const [isPurchasingBeat, setIsPurchasingBeat] = useState(false);
 
@@ -360,15 +360,23 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
   const [invoices, setInvoices] = useState<any[]>([]);
   const [loadingInvoices, setLoadingInvoices] = useState(false);
 
-  // Handle URL navigation tab parameter (e.g. ?tab=marketplace or ?tab=beats)
+  // Handle URL navigation tab parameter (e.g. ?tab=browse or ?tab=charts)
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
       const tab = params.get('tab');
-      if (tab === 'marketplace' || tab === 'beats') {
-        setActiveNav('marketplace');
-      } else if (tab === 'playlists' || tab === 'fav' || tab === 'later' || tab === 'history') {
+      if (tab === 'marketplace' || tab === 'beats' || tab === 'browse') {
+        setActiveNav('browse');
+      } else if (tab === 'charts') {
+        setActiveNav('charts');
+      } else if (tab === 'genres') {
+        setActiveNav('genres');
+      } else if (tab === 'favorites' || tab === 'fav') {
+        setActiveNav('fav');
+      } else if (tab === 'playlists' || tab === 'later' || tab === 'history') {
         setActiveNav(tab);
+      } else if (tab === 'discover' || tab === 'feed') {
+        setActiveNav('feed');
       }
     }
   }, []);
@@ -1327,141 +1335,30 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
 
       {/* MOBILE NAVIGATION DRAWER */}
       {mobileMenuOpen && (
-        <div className="fixed inset-0 top-16 z-50 md:hidden bg-[#121316] border-b border-white/[0.08] p-5 overflow-y-auto space-y-6">
-          {/* Mobile Search */}
-          <div className="relative flex items-center w-full">
-            <Search className="h-4 w-4 text-gray-400 absolute left-3.5 pointer-events-none" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search beats, producers, genres..."
-              className="w-full h-11 pl-10 pr-9 rounded-xl bg-[#0d0e12] border border-white/[0.08] text-xs text-white placeholder-gray-500 focus:outline-none focus:border-[#e53935]"
-            />
-            {searchQuery && (
-              <button
-                type="button"
-                onClick={() => setSearchQuery('')}
-                className="absolute right-3 text-gray-400 hover:text-white"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            )}
-          </div>
-
-          {/* Discover Section */}
-          <div>
-            <p className="text-[11px] font-bold text-gray-500 uppercase tracking-wider px-2 mb-2">Discover</p>
-            <div className="space-y-1">
-              {[
-                { id: 'discover', label: 'Discover', icon: Compass },
-                { id: 'browse', label: 'Browse Beats', icon: Music },
-                { id: 'charts', label: 'Top Charts', icon: Trophy },
-                { id: 'genres', label: 'Genres', icon: LayoutGrid },
-                { id: 'playlists', label: 'Playlists', icon: ListMusic }
-              ].map((item) => {
-                const Icon = item.icon;
-                const isActive = activeNav === item.id || (item.id === 'discover' && activeNav === 'feed');
-                return (
-                  <button
-                    key={'mob-nav-' + item.id}
-                    type="button"
-                    onClick={() => {
-                      setActiveNav(item.id);
-                      setMobileMenuOpen(false);
-                    }}
-                    className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
-                      isActive
-                        ? 'bg-[#e53935] text-white shadow-md shadow-red-500/20'
-                        : 'text-gray-400 hover:text-white hover:bg-white/[0.04]'
-                    }`}
-                  >
-                    <Icon className="h-4 w-4" />
-                    <span>{item.label}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Library Section */}
-          <div>
-            <p className="text-[11px] font-bold text-gray-500 uppercase tracking-wider px-2 mb-2">Library</p>
-            <div className="space-y-1">
-              <button
-                type="button"
-                onClick={() => {
-                  setActiveNav('purchased');
-                  setMobileMenuOpen(false);
-                }}
-                className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
-                  activeNav === 'purchased'
-                    ? 'bg-white/[0.08] text-white font-bold'
-                    : 'text-gray-400 hover:text-white hover:bg-white/[0.04]'
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  <ShoppingBag className="h-4 w-4 text-[#e53935]" />
-                  <span>Purchased</span>
-                </div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setActiveNav('fav');
-                  setMobileMenuOpen(false);
-                }}
-                className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
-                  activeNav === 'fav'
-                    ? 'bg-white/[0.08] text-white font-bold'
-                    : 'text-gray-400 hover:text-white hover:bg-white/[0.04]'
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  <Heart className="h-4 w-4 text-red-500" />
-                  <span>Favorites</span>
-                </div>
-                {favoritesList.length > 0 && (
-                  <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-white/10 text-white">
-                    {favoritesList.length}
-                  </span>
-                )}
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setActiveNav('history');
-                  setMobileMenuOpen(false);
-                }}
-                className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
-                  activeNav === 'history'
-                    ? 'bg-white/[0.08] text-white font-bold'
-                    : 'text-gray-400 hover:text-white hover:bg-white/[0.04]'
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  <Clock className="h-4 w-4 text-gray-400" />
-                  <span>Listening History</span>
-                </div>
-              </button>
-            </div>
-          </div>
-
-          {/* Open Studio Button */}
-          <div className="pt-2">
-            <button
-              type="button"
-              onClick={() => {
+        <div className="fixed inset-0 top-16 z-50 md:hidden flex">
+          <div
+            className="fixed inset-0 bg-black/80 backdrop-blur-sm"
+            onClick={() => setMobileMenuOpen(false)}
+          />
+          <div className="relative z-10 w-64 bg-[#121316] h-full flex flex-col p-4 border-r border-white/10 shadow-2xl">
+            <UserSidebar
+              activeNav={activeNav}
+              onNavigate={(id) => {
+                setMobileMenuOpen(false);
+                if (id === 'discover') setActiveNav('feed');
+                else if (['browse', 'charts', 'genres', 'playlists', 'fav', 'history'].includes(id)) {
+                  setActiveNav(id);
+                }
+              }}
+              favoritesCount={favoritesList.length}
+              onOpenStudio={() => {
                 setMobileMenuOpen(false);
                 handleOpenRecordStudio();
               }}
-              className="w-full flex items-center justify-center gap-2.5 px-4 py-3 rounded-xl text-xs font-bold text-white bg-white/[0.05] border border-white/10 hover:bg-white/[0.08] transition-colors"
-            >
-              <Sliders className="h-4 w-4 text-[#e53935]" />
-              <span>Open Studio</span>
-            </button>
+              userProfile={userProfile}
+              onItemClick={() => setMobileMenuOpen(false)}
+              className="!flex w-full border-r-0 p-0"
+            />
           </div>
         </div>
       )}
@@ -1471,7 +1368,12 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
         {/* REUSABLE UNIFIED USER SIDEBAR */}
         <UserSidebar
           activeNav={activeNav}
-          onNavigate={(id) => setActiveNav(id)}
+          onNavigate={(id) => {
+            if (id === 'discover') setActiveNav('feed');
+            else if (['browse', 'charts', 'genres', 'playlists', 'fav', 'history'].includes(id)) {
+              setActiveNav(id);
+            }
+          }}
           favoritesCount={favoritesList.length}
           onOpenStudio={() => handleOpenRecordStudio()}
           userProfile={userProfile}
@@ -3177,102 +3079,70 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
             </p>
 
             {(() => {
-              const starterPrice = paidBeatPurchaseTrack.priceNgn || Math.max(15000, Math.round((paidBeatPurchaseTrack.premiumPriceNgn || 50000) * 0.35));
-              const wavPrice = Math.round(starterPrice * 1.8);
-              const stemsPrice = paidBeatPurchaseTrack.premiumPriceNgn || 50000;
-              const exclusivePrice = paidBeatPurchaseTrack.exclusivePriceNgn || 200000;
+              const premiumPrice =
+                paidBeatPurchaseTrack.premiumPriceNgn && paidBeatPurchaseTrack.premiumPriceNgn > 0
+                  ? paidBeatPurchaseTrack.premiumPriceNgn
+                  : paidBeatPurchaseTrack.priceNgn && paidBeatPurchaseTrack.priceNgn >= 20000
+                  ? paidBeatPurchaseTrack.priceNgn
+                  : 30000;
+              const exclusivePrice =
+                paidBeatPurchaseTrack.exclusivePriceNgn && paidBeatPurchaseTrack.exclusivePriceNgn > 0
+                  ? paidBeatPurchaseTrack.exclusivePriceNgn
+                  : 100000;
 
               return (
                 <>
-                  <div className="mt-5 space-y-2.5">
-                    {/* 1. MP3 Lease */}
+                  <div className="mt-5 space-y-3">
+                    {/* 1. Premium Beat Plan (WAV Master + Stems) */}
                     <div
-                      onClick={() => setPurchaseTier('mp3')}
-                      className={`p-3 rounded-xl border transition-all cursor-pointer flex items-center justify-between ${
-                        purchaseTier === 'mp3'
-                          ? 'bg-[#e53935]/15 border-[#e53935]/40 text-white'
+                      onClick={() => setPurchaseTier('premium')}
+                      className={`p-3.5 rounded-xl border transition-all cursor-pointer flex items-center justify-between ${
+                        purchaseTier === 'premium'
+                          ? 'bg-[#e53935]/15 border-[#e53935]/60 ring-1 ring-[#e53935]/40 text-white'
                           : 'bg-white/[0.02] border-white/5 hover:bg-white/[0.05] text-gray-300'
                       }`}
                     >
-                      <div>
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-xs font-black text-white">Starter MP3 Lease</span>
-                          <span className="px-1.5 py-0.2 rounded-full text-[9px] font-mono font-bold bg-white/10 text-gray-300">
-                            ENTRY
+                      <div className="space-y-0.5">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-black text-white">
+                            Premium Beat Plan (WAV Master + Stems)
                           </span>
-                        </div>
-                        <span className="text-[11px] text-gray-400">High-Quality 320kbps MP3 · 50,000 Streams</span>
-                      </div>
-                      <span className="text-sm font-black text-[#e53935]">
-                        ₦{starterPrice.toLocaleString()}
-                      </span>
-                    </div>
-
-                    {/* 2. WAV Lease */}
-                    <div
-                      onClick={() => setPurchaseTier('wav')}
-                      className={`p-3 rounded-xl border transition-all cursor-pointer flex items-center justify-between ${
-                        purchaseTier === 'wav'
-                          ? 'bg-[#e53935]/15 border-[#e53935]/40 text-white'
-                          : 'bg-white/[0.02] border-white/5 hover:bg-white/[0.05] text-gray-300'
-                      }`}
-                    >
-                      <div>
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-xs font-black text-white">WAV Lease</span>
-                          <span className="px-1.5 py-0.2 rounded-full text-[9px] font-mono font-bold bg-blue-500/20 text-blue-300">
-                            STUDIO
-                          </span>
-                        </div>
-                        <span className="text-[11px] text-gray-400">Lossless 24-Bit WAV Master · 100,000 Streams</span>
-                      </div>
-                      <span className="text-sm font-black text-[#e53935]">
-                        ₦{wavPrice.toLocaleString()}
-                      </span>
-                    </div>
-
-                    {/* 3. Trackout Stems Lease */}
-                    <div
-                      onClick={() => setPurchaseTier('stems')}
-                      className={`p-3 rounded-xl border transition-all cursor-pointer flex items-center justify-between ${
-                        purchaseTier === 'stems'
-                          ? 'bg-amber-500/15 border-amber-500/40 text-amber-300'
-                          : 'bg-white/[0.02] border-white/5 hover:bg-white/[0.05] text-gray-300'
-                      }`}
-                    >
-                      <div>
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-xs font-black text-white">Trackout Lease (WAV + Stems)</span>
-                          <span className="px-1.5 py-0.2 rounded-full text-[9px] font-mono font-bold bg-amber-400/20 text-amber-300">
+                          <span className="px-1.5 py-0.5 rounded-full text-[9px] font-mono font-bold bg-[#e53935]/20 text-[#e53935] border border-[#e53935]/30">
                             MOST POPULAR
                           </span>
                         </div>
-                        <span className="text-[11px] text-gray-400">24-Bit WAV Master + Trackout ZIP Stems · 500,000 Streams</span>
+                        <p className="text-[11px] text-gray-400">
+                          24-Bit WAV Master + Trackout ZIP Stems · 500,000 Streams · Commercial Release
+                        </p>
                       </div>
-                      <span className="text-sm font-black text-amber-400">
-                        ₦{stemsPrice.toLocaleString()}
+                      <span className="text-sm font-black text-[#e53935] shrink-0 ml-3">
+                        ₦{premiumPrice.toLocaleString()}
                       </span>
                     </div>
 
-                    {/* 4. 100% Exclusive Buyout */}
+                    {/* 2. 100% Exclusive Rights Buyout */}
                     <div
                       onClick={() => setPurchaseTier('exclusive')}
-                      className={`p-3 rounded-xl border transition-all cursor-pointer flex items-center justify-between ${
+                      className={`p-3.5 rounded-xl border transition-all cursor-pointer flex items-center justify-between ${
                         purchaseTier === 'exclusive'
-                          ? 'bg-purple-500/15 border-purple-500/40 text-purple-300'
+                          ? 'bg-purple-500/15 border-purple-500/60 ring-1 ring-purple-500/40 text-purple-200'
                           : 'bg-white/[0.02] border-white/5 hover:bg-white/[0.05] text-gray-300'
                       }`}
                     >
-                      <div>
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-xs font-black text-white">100% Exclusive Ownership</span>
-                          <span className="px-1.5 py-0.2 rounded-full text-[9px] font-mono font-bold bg-purple-400/20 text-purple-300">
+                      <div className="space-y-0.5">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-black text-white">
+                            100% Exclusive Rights Buyout (1-of-1)
+                          </span>
+                          <span className="px-1.5 py-0.5 rounded-full text-[9px] font-mono font-bold bg-purple-500/20 text-purple-300 border border-purple-500/30">
                             SOLE BUYOUT
                           </span>
                         </div>
-                        <span className="text-[11px] text-gray-400">Unlimited Streams · Sole Master Rights · Retired from Store</span>
+                        <p className="text-[11px] text-gray-400">
+                          Unlimited Streams · Master + All Stems · Retired from Store · Full Legal Copyright Transfer
+                        </p>
                       </div>
-                      <span className="text-sm font-black text-purple-400">
+                      <span className="text-sm font-black text-purple-400 shrink-0 ml-3">
                         ₦{exclusivePrice.toLocaleString()}
                       </span>
                     </div>
@@ -3301,15 +3171,7 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
                             const userEmail = sessionRes.data.session?.user?.email || 'buyer@cautionstudioz.com';
                             const userId = sessionRes.data.session?.user?.id || null;
 
-                            const priceNgn =
-                              purchaseTier === 'exclusive'
-                                ? exclusivePrice
-                                : purchaseTier === 'stems'
-                                ? stemsPrice
-                                : purchaseTier === 'wav'
-                                ? wavPrice
-                                : starterPrice;
-
+                            const priceNgn = purchaseTier === 'exclusive' ? exclusivePrice : premiumPrice;
                             const orderId = `beat_${paidBeatPurchaseTrack.id.slice(0, 8)}_${Date.now()}`;
 
                             const res = await fetch('/api/paystack/initialize', {
@@ -3356,15 +3218,7 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
                         <span>
                           {isPurchasingBeat
                             ? 'Connecting to Paystack...'
-                            : `Pay & License ${
-                                purchaseTier === 'exclusive'
-                                  ? `₦${exclusivePrice.toLocaleString()}`
-                                  : purchaseTier === 'stems'
-                                  ? `₦${stemsPrice.toLocaleString()}`
-                                  : purchaseTier === 'wav'
-                                  ? `₦${wavPrice.toLocaleString()}`
-                                  : `₦${starterPrice.toLocaleString()}`
-                              }`}
+                            : `Pay & License ₦${(purchaseTier === 'exclusive' ? exclusivePrice : premiumPrice).toLocaleString()}`}
                         </span>
                       </button>
                     )}
