@@ -49,6 +49,8 @@ import {
 import { audioSynth, TrackRow, WaveformVisualizer } from '@caution/ui';
 import { MarketplaceBeatCard } from '../components/MarketplaceBeatCard';
 import { UserDropdown } from '../components/UserDropdown';
+import { UserHeader } from '../components/UserHeader';
+import { UserSidebar } from '../components/UserSidebar';
 import { UserAdModal } from '../components/UserAdModal';
 import { UserMarketplaceView, isFreeBeat } from '../components/UserMarketplaceView';
 import { UserRecordStudioModal } from '../components/UserRecordStudioModal';
@@ -1315,68 +1317,13 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
         }}
       />
 
-      {/* 1. TOP HEADER - EDITORIAL MUSIC MARKETPLACE */}
-      <header className="h-16 border-b border-white/[0.06] bg-[#121316] px-4 sm:px-6 flex items-center justify-between gap-4 shrink-0 z-40">
-        <div className="flex items-center shrink-0">
-          <Link href="/" className="inline-flex items-center gap-2 group">
-            <img
-              src="/logo.png"
-              alt="Caution Studio"
-              className="h-7 sm:h-8 w-auto object-contain brightness-0 invert"
-            />
-          </Link>
-        </div>
-
-        {/* Center Search Bar */}
-        <div className="hidden md:flex flex-1 max-w-xl mx-4">
-          <div className="relative flex items-center w-full">
-            <Search className="h-4 w-4 text-gray-400 absolute left-4 pointer-events-none" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search beats, producers, genres..."
-              className="w-full h-10 pl-11 pr-9 rounded-full bg-[#0d0e12] border border-white/[0.08] text-xs text-white placeholder-gray-500 focus:outline-none focus:border-[#e53935] transition-all"
-            />
-            {searchQuery && (
-              <button
-                type="button"
-                onClick={() => setSearchQuery('')}
-                className="absolute right-3.5 text-gray-400 hover:text-white"
-                title="Clear search"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            )}
-          </div>
-        </div>
-
-        <div className="flex items-center gap-3 shrink-0">
-          {/* Upload Button in Caution Red */}
-          <a
-            href="https://creator.cautionstudioz.com/beats/upload"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="hidden sm:inline-flex items-center gap-1.5 h-9 px-4 rounded-full bg-[#e53935] hover:bg-[#d32f2f] text-white text-xs font-bold transition-all shadow-md shadow-red-500/20 active:scale-95 cursor-pointer"
-          >
-            <Upload className="h-3.5 w-3.5" />
-            <span>Upload</span>
-          </a>
-
-          {/* Hamburger Menu Trigger (Mobile only) */}
-          <button
-            type="button"
-            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="flex md:hidden p-2 rounded-lg text-gray-400 hover:text-white hover:bg-white/[0.08] transition-colors cursor-pointer"
-            aria-label="Toggle navigation menu"
-          >
-            {mobileMenuOpen ? <X className="h-5 w-5 text-white" /> : <Menu className="h-5 w-5 text-white" />}
-          </button>
-
-          {/* User Profile Dropdown */}
-          <UserDropdown />
-        </div>
-      </header>
+      {/* 1. TOP HEADER - REUSABLE UNIFIED HEADER */}
+      <UserHeader
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
+        onToggleMobileMenu={() => setMobileMenuOpen(!mobileMenuOpen)}
+        mobileMenuOpen={mobileMenuOpen}
+      />
 
       {/* MOBILE NAVIGATION DRAWER */}
       {mobileMenuOpen && (
@@ -1521,133 +1468,14 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
 
       {/* 2. BODY CONTENT (3-COLUMN MARKETPLACE LAYOUT) */}
       <div className="flex-1 flex w-full max-w-full min-w-0 overflow-hidden relative pb-[72px]">
-        {/* LEFT NAVIGATION SIDEBAR */}
-        <aside className="w-60 border-r border-white/[0.06] bg-[#121316] p-4 shrink-0 hidden md:flex flex-col justify-between h-full overflow-y-auto pb-28">
-          <div className="space-y-6">
-            {/* Discover Section */}
-            <div>
-              <p className="text-[11px] font-bold text-gray-500 uppercase tracking-wider px-3 mb-2">
-                Discover
-              </p>
-              <nav className="space-y-1">
-                {[
-                  { id: 'discover', label: 'Discover', icon: Compass },
-                  { id: 'browse', label: 'Browse Beats', icon: Music },
-                  { id: 'charts', label: 'Top Charts', icon: Trophy },
-                  { id: 'genres', label: 'Genres', icon: LayoutGrid },
-                  { id: 'playlists', label: 'Playlists', icon: ListMusic }
-                ].map((item) => {
-                  const Icon = item.icon;
-                  const isActive = activeNav === item.id || (item.id === 'discover' && activeNav === 'feed');
-                  return (
-                    <button
-                      key={'left-nav-' + item.id}
-                      type="button"
-                      onClick={() => setActiveNav(item.id)}
-                      className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
-                        isActive
-                          ? 'bg-[#e53935] text-white shadow-md shadow-red-500/20'
-                          : 'text-gray-400 hover:text-white hover:bg-white/[0.04]'
-                      }`}
-                    >
-                      <Icon className="h-4 w-4" />
-                      <span>{item.label}</span>
-                    </button>
-                  );
-                })}
-              </nav>
-            </div>
-
-            {/* Collection / Library Section */}
-            <div>
-              <p className="text-[11px] font-bold text-gray-500 uppercase tracking-wider px-3 mb-2">
-                Library
-              </p>
-              <div className="space-y-1">
-                <button
-                  type="button"
-                  onClick={() => setActiveNav('purchased')}
-                  className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
-                    activeNav === 'purchased'
-                      ? 'bg-white/[0.08] text-white font-bold'
-                      : 'text-gray-400 hover:text-white hover:bg-white/[0.04]'
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <ShoppingBag className="h-4 w-4 text-[#e53935]" />
-                    <span>Purchased</span>
-                  </div>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setActiveNav('fav')}
-                  className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
-                    activeNav === 'fav'
-                      ? 'bg-white/[0.08] text-white font-bold'
-                      : 'text-gray-400 hover:text-white hover:bg-white/[0.04]'
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <Heart className="h-4 w-4 text-red-500" />
-                    <span>Favorites</span>
-                  </div>
-                  {favoritesList.length > 0 && (
-                    <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-white/10 text-white">
-                      {favoritesList.length}
-                    </span>
-                  )}
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setActiveNav('history')}
-                  className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
-                    activeNav === 'history'
-                      ? 'bg-white/[0.08] text-white font-bold'
-                      : 'text-gray-400 hover:text-white hover:bg-white/[0.04]'
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <Clock className="h-4 w-4 text-gray-400" />
-                    <span>Listening History</span>
-                  </div>
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {/* Creator / Studio & Bottom Profile */}
-          <div className="pt-4 border-t border-white/[0.06] space-y-3">
-            <button
-              type="button"
-              onClick={() => handleOpenRecordStudio()}
-              className="w-full flex items-center justify-center gap-2.5 px-3.5 py-2.5 rounded-xl text-xs font-bold text-white bg-white/[0.03] border border-white/10 hover:border-white/20 hover:bg-white/[0.06] transition-all cursor-pointer"
-              title="Open Studio DAW"
-            >
-              <Sliders className="h-4 w-4 text-[#e53935]" />
-              <span>Open Studio</span>
-            </button>
-
-            {/* Profile Row */}
-            <div className="flex items-center justify-between px-2 pt-1">
-              <div className="flex items-center gap-2.5 min-w-0">
-                <div className="w-8 h-8 rounded-full overflow-hidden bg-black border border-white/10 shrink-0">
-                  <img
-                    src={userProfile.avatar}
-                    alt={userProfile.name}
-                    className="w-full h-full object-cover"
-                  />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-xs font-bold text-white truncate">{userProfile.name}</p>
-                  <p className="text-[10px] text-gray-500 truncate">Creator Account</p>
-                </div>
-              </div>
-              <ChevronDown className="h-4 w-4 text-gray-500" />
-            </div>
-          </div>
-        </aside>
+        {/* REUSABLE UNIFIED USER SIDEBAR */}
+        <UserSidebar
+          activeNav={activeNav}
+          onNavigate={(id) => setActiveNav(id)}
+          favoritesCount={favoritesList.length}
+          onOpenStudio={() => handleOpenRecordStudio()}
+          userProfile={userProfile}
+        />
 
         {/* CENTER MAIN VIEW */}
         <main className="flex-1 p-3 sm:p-5 lg:p-6 pb-24 overflow-y-auto min-w-0 max-w-full space-y-5 sm:space-y-6 bg-[#111214]">

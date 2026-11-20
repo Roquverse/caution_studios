@@ -1,0 +1,205 @@
+'use client';
+
+import React, { useState, useEffect } from 'react';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import {
+  Compass,
+  Music,
+  Trophy,
+  LayoutGrid,
+  ListMusic,
+  ShoppingBag,
+  Heart,
+  Clock,
+  Sliders,
+  ChevronDown
+} from 'lucide-react';
+import { supabase } from '../lib/supabaseClient';
+
+export interface UserSidebarProps {
+  activeNav?: string;
+  onNavigate?: (navId: string) => void;
+  favoritesCount?: number;
+  onOpenStudio?: () => void;
+  userProfile?: { name: string; avatar: string };
+  className?: string;
+}
+
+export function UserSidebar({
+  activeNav = 'discover',
+  onNavigate,
+  favoritesCount = 0,
+  onOpenStudio,
+  userProfile: propUserProfile,
+  className = ''
+}: UserSidebarProps) {
+  const router = useRouter();
+  const [internalProfile, setInternalProfile] = useState<{ name: string; avatar: string }>({
+    name: 'Holy',
+    avatar: '/images/artist_studio_mic.jpg'
+  });
+
+  const effectiveProfile = propUserProfile || internalProfile;
+
+  useEffect(() => {
+    if (propUserProfile) return;
+    async function loadProfile() {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user) {
+          const { data: p } = await supabase
+            .from('profiles')
+            .select('display_name, handle, avatar_url')
+            .eq('id', session.user.id)
+            .maybeSingle();
+
+          if (p) {
+            setInternalProfile({
+              name: p.display_name || p.handle || session.user.email?.split('@')[0] || 'Holy',
+              avatar: p.avatar_url || '/images/artist_studio_mic.jpg'
+            });
+          }
+        }
+      } catch (e) {
+        console.warn('UserSidebar profile fetch error:', e);
+      }
+    }
+    loadProfile();
+  }, [propUserProfile]);
+
+  const discoverItems = [
+    { id: 'discover', label: 'Discover', icon: Compass, href: '/' },
+    { id: 'browse', label: 'Browse Beats', icon: Music, href: '/?tab=browse' },
+    { id: 'charts', label: 'Top Charts', icon: Trophy, href: '/?tab=charts' },
+    { id: 'genres', label: 'Genres', icon: LayoutGrid, href: '/?tab=genres' },
+    { id: 'playlists', label: 'Playlists', icon: ListMusic, href: '/?tab=playlists' }
+  ];
+
+  const libraryItems = [
+    { id: 'purchased', label: 'Purchased', icon: ShoppingBag, href: '/library' },
+    { id: 'fav', label: 'Favorites', icon: Heart, href: '/?tab=favorites' },
+    { id: 'history', label: 'Listening History', icon: Clock, href: '/?tab=history' }
+  ];
+
+  const handleItemClick = (id: string, href: string) => {
+    if (onNavigate) {
+      onNavigate(id);
+    } else {
+      router.push(href);
+    }
+  };
+
+  const handleStudioClick = () => {
+    if (onOpenStudio) {
+      onOpenStudio();
+    } else {
+      router.push('/studio');
+    }
+  };
+
+  return (
+    <aside
+      className={`w-60 border-r border-white/[0.06] bg-[#121316] p-4 shrink-0 hidden md:flex flex-col justify-between h-full overflow-y-auto pb-28 ${className}`}
+    >
+      <div className="space-y-6">
+        {/* Discover Section */}
+        <div>
+          <p className="text-[11px] font-bold text-gray-500 uppercase tracking-wider px-3 mb-2">
+            Discover
+          </p>
+          <nav className="space-y-1">
+            {discoverItems.map((item) => {
+              const Icon = item.icon;
+              const isActive = activeNav === item.id || (item.id === 'discover' && activeNav === 'feed');
+              return (
+                <button
+                  key={'left-nav-' + item.id}
+                  type="button"
+                  onClick={() => handleItemClick(item.id, item.href)}
+                  className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                    isActive
+                      ? 'bg-[#e53935] text-white shadow-md shadow-red-500/20'
+                      : 'text-gray-400 hover:text-white hover:bg-white/[0.04]'
+                  }`}
+                >
+                  <Icon className="h-4 w-4" />
+                  <span>{item.label}</span>
+                </button>
+              );
+            })}
+          </nav>
+        </div>
+
+        {/* Collection / Library Section */}
+        <div>
+          <p className="text-[11px] font-bold text-gray-500 uppercase tracking-wider px-3 mb-2">
+            Library
+          </p>
+          <div className="space-y-1">
+            {libraryItems.map((item) => {
+              const Icon = item.icon;
+              const isActive = activeNav === item.id || (item.id === 'fav' && activeNav === 'favorites');
+              const isFav = item.id === 'fav';
+              const isPurchased = item.id === 'purchased';
+
+              return (
+                <button
+                  key={'left-nav-' + item.id}
+                  type="button"
+                  onClick={() => handleItemClick(item.id, item.href)}
+                  className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                    isActive
+                      ? 'bg-white/[0.08] text-white font-bold'
+                      : 'text-gray-400 hover:text-white hover:bg-white/[0.04]'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <Icon className={`h-4 w-4 ${isPurchased ? 'text-[#e53935]' : isFav ? 'text-red-500' : 'text-gray-400'}`} />
+                    <span>{item.label}</span>
+                  </div>
+                  {isFav && favoritesCount > 0 && (
+                    <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-white/10 text-white">
+                      {favoritesCount}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
+      {/* Creator / Studio & Bottom Profile */}
+      <div className="pt-4 border-t border-white/[0.06] space-y-3">
+        <button
+          type="button"
+          onClick={handleStudioClick}
+          className="w-full flex items-center justify-center gap-2.5 px-3.5 py-2.5 rounded-xl text-xs font-bold text-white bg-white/[0.03] border border-white/10 hover:border-white/20 hover:bg-white/[0.06] transition-all cursor-pointer"
+          title="Open Studio DAW"
+        >
+          <Sliders className="h-4 w-4 text-[#e53935]" />
+          <span>Open Studio</span>
+        </button>
+
+        {/* Profile Row */}
+        <div className="flex items-center justify-between px-2 pt-1">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-8 h-8 rounded-full overflow-hidden bg-black border border-white/10 shrink-0">
+              <img
+                src={effectiveProfile.avatar}
+                alt={effectiveProfile.name}
+                className="w-full h-full object-cover"
+              />
+            </div>
+            <div className="min-w-0">
+              <p className="text-xs font-bold text-white truncate">{effectiveProfile.name}</p>
+              <p className="text-[10px] text-gray-500 truncate">Creator Account</p>
+            </div>
+          </div>
+          <ChevronDown className="h-4 w-4 text-gray-500" />
+        </div>
+      </div>
+    </aside>
+  );
+}
