@@ -12,7 +12,8 @@ import {
   Download,
   Gift,
   CheckCircle2,
-  Volume2
+  Volume2,
+  Headphones
 } from 'lucide-react';
 import { grantBonusDownload } from '../lib/downloadQuota';
 
@@ -36,6 +37,8 @@ interface ActiveAd {
   apple_music_url?: string;
   audiomack_url?: string;
   youtube_url?: string;
+  delivered_plays?: number;
+  target_plays?: number;
 }
 
 const R2_CDN = process.env.NEXT_PUBLIC_R2_PUBLIC_URL?.replace(/\/$/, '') || 'https://media.cautionstudioz.com';
@@ -83,6 +86,7 @@ export const UserAdModal: React.FC<UserAdModalProps> = ({
   adType = pendingDownloadTitle ? 'download' : 'listening'
 }) => {
   const [activeAd, setActiveAd] = useState<ActiveAd>(DEFAULT_AD);
+  const [adListenCount, setAdListenCount] = useState<number>(0);
   const [secondsRemaining, setSecondsRemaining] = useState(15);
   const [canSkip, setCanSkip] = useState(false);
   const [isPlaying, setIsPlaying] = useState(true);
@@ -131,13 +135,22 @@ export const UserAdModal: React.FC<UserAdModalProps> = ({
             // True random ad selection
             const randomPick = data.ads[Math.floor(Math.random() * data.ads.length)];
             setActiveAd(randomPick);
+            const initialPlays = (randomPick.delivered_plays || 0) + 1;
+            setAdListenCount(initialPlays);
 
-            // Track impression
+            // Track impression and receive updated listen count
             fetch('/api/ads/impression', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ campaignId: randomPick.id })
-            }).catch(() => {});
+              body: JSON.stringify({ campaignId: randomPick.id, adId: randomPick.id })
+            })
+              .then((r) => r.json())
+              .then((impData) => {
+                if (impData?.delivered_plays) {
+                  setAdListenCount(impData.delivered_plays);
+                }
+              })
+              .catch(() => {});
 
             // Stream directly from Cloudflare R2 CDN to align with Vercel Fast limits
             const adAudioSrc = resolveDirectCdnUrl(randomPick.audio_url);
@@ -149,6 +162,17 @@ export const UserAdModal: React.FC<UserAdModalProps> = ({
               setCanSkip(true);
               setSecondsRemaining(0);
               awardReward();
+              setAdListenCount((prev) => Math.max(prev, (randomPick.delivered_plays || 0) + 1));
+              fetch('/api/ads/impression', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ campaignId: randomPick.id, adId: randomPick.id, completed: true })
+              })
+                .then((r) => r.json())
+                .then((resData) => {
+                  if (resData?.delivered_plays) setAdListenCount(resData.delivered_plays);
+                })
+                .catch(() => {});
             };
 
             audio.play()
@@ -380,11 +404,23 @@ export const UserAdModal: React.FC<UserAdModalProps> = ({
               <Volume2 className="h-2.5 w-2.5 text-[#2dd4bf]" />
               <span>{secondsRemaining}s</span>
             </div>
+            <div className="absolute bottom-2 left-2 right-2 flex items-center justify-center pointer-events-none">
+              <span className="px-2 py-0.5 rounded-full bg-black/80 backdrop-blur-xs text-[9px] font-mono text-[#2dd4bf] border border-[#2dd4bf]/30 flex items-center gap-1 shadow-md">
+                <Headphones className="h-2.5 w-2.5" />
+                <span>{adListenCount > 0 ? adListenCount.toLocaleString() : '1'} listens</span>
+              </span>
+            </div>
           </div>
 
-          <span className="px-2.5 py-0.5 rounded-full bg-white/5 border border-white/10 text-[10px] font-mono text-amber-300 mb-1.5 uppercase font-semibold">
-            {activeAd.genre || 'Afrobeats'}
-          </span>
+          <div className="flex items-center gap-2 mb-2 flex-wrap justify-center">
+            <span className="px-2.5 py-0.5 rounded-full bg-white/5 border border-white/10 text-[10px] font-mono text-amber-300 uppercase font-semibold">
+              {activeAd.genre || 'Afrobeats'}
+            </span>
+            <span className="px-2.5 py-0.5 rounded-full bg-[#2dd4bf]/15 border border-[#2dd4bf]/30 text-[10px] font-mono text-[#2dd4bf] font-bold flex items-center gap-1.5 shadow-xs">
+              <Headphones className="h-3 w-3" />
+              <span>{adListenCount > 0 ? adListenCount.toLocaleString() : '1'} Listens</span>
+            </span>
+          </div>
           <h3 className="text-lg font-black text-white tracking-tight">{activeAd.song_title}</h3>
           <p className="text-xs text-gray-400 font-medium mt-0.5">by {activeAd.artist_name}</p>
           <p className="text-xs text-gray-300 mt-2 max-w-xs leading-relaxed italic">

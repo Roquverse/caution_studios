@@ -23,7 +23,8 @@ import {
   X,
   CreditCard,
   Trash2,
-  RefreshCw
+  RefreshCw,
+  Headphones
 } from 'lucide-react';
 
 interface AdCampaign {
@@ -619,7 +620,7 @@ export default function AdminAdsManagerPage() {
                 <th className="py-3 px-4">Artist / Sponsor</th>
                 <th className="py-3 px-4">Package</th>
                 <th className="py-3 px-4 text-right">Paid (₦)</th>
-                <th className="py-3 px-4">Delivery Progress</th>
+                <th className="py-3 px-4">Listen Count / Delivery</th>
                 <th className="py-3 px-4 text-center">DSP Clicks</th>
                 <th className="py-3 px-4">Status</th>
                 <th className="py-3 px-4 text-right">Actions</th>
@@ -681,8 +682,11 @@ export default function AdminAdsManagerPage() {
                     {/* Delivery Progress Bar */}
                     <td className="py-3 px-4 min-w-[160px]">
                       <div className="flex items-center justify-between text-[10px] font-mono mb-1">
-                        <span className="text-zinc-300">{camp.impressionsDelivered.toLocaleString()}</span>
-                        <span className="text-zinc-500">/ {camp.impressionsTarget.toLocaleString()}</span>
+                        <span className="text-[#2dd4bf] font-bold flex items-center gap-1">
+                          <Headphones className="h-3 w-3" />
+                          <span>{camp.impressionsDelivered.toLocaleString()}</span>
+                        </span>
+                        <span className="text-zinc-500">/ {camp.impressionsTarget.toLocaleString()} plays</span>
                       </div>
                       <div className="w-full h-1.5 rounded-full bg-zinc-800 overflow-hidden">
                         <div

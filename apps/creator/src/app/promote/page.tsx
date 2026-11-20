@@ -14,7 +14,8 @@ import {
   Sparkles,
   ShoppingBag,
   Play,
-  Pause
+  Pause,
+  Headphones
 } from 'lucide-react';
 
 interface AdPricingConfig {
@@ -651,8 +652,12 @@ export default function ProducerPromotePage() {
 
                     <div className="flex items-center gap-6">
                       <div>
-                        <div className="text-[10px] text-zinc-400 font-mono mb-1">
-                          {(camp.delivered_plays || 0).toLocaleString()} / {(camp.target_plays || 0).toLocaleString()} plays
+                        <div className="text-[10px] text-zinc-400 font-mono mb-1 flex items-center justify-between gap-3">
+                          <span className="flex items-center gap-1 text-zinc-400">
+                            <Headphones className="h-3 w-3 text-[#e53935]" />
+                            <span>Listen Count:</span>
+                          </span>
+                          <span className="font-bold text-white">{(camp.delivered_plays || 0).toLocaleString()} <span className="text-zinc-500 font-normal">/ {(camp.target_plays || 0).toLocaleString()}</span></span>
                         </div>
                         <div className="w-32 h-1.5 rounded-full bg-zinc-800 overflow-hidden">
                           <div className="h-full bg-[#e53935]" style={{ width: `${progress}%` }} />

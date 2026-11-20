@@ -966,9 +966,12 @@ return (
 
                   <div className="flex items-center gap-6">
                     <div>
-                      <div className="text-[10px] text-gray-400 font-mono mb-1.5 flex items-center justify-between">
-                        <span>Progress:</span>
-                        <span className="font-bold text-white">{(camp.delivered_plays || 0).toLocaleString()} / {(camp.target_plays || 0).toLocaleString()}</span>
+                      <div className="text-[10px] text-gray-400 font-mono mb-1.5 flex items-center justify-between gap-3">
+                        <span className="flex items-center gap-1 text-gray-400">
+                          <Headphones className="h-3 w-3 text-[#e53935]" />
+                          <span>Listen Count:</span>
+                        </span>
+                        <span className="font-bold text-white">{(camp.delivered_plays || 0).toLocaleString()} <span className="text-gray-500 font-normal">/ {(camp.target_plays || 0).toLocaleString()}</span></span>
                       </div>
                       <div className="w-36 h-2 rounded-full bg-white/[0.06] overflow-hidden">
                         <div className="h-full bg-gradient-to-r from-[#e53935] to-emerald-400 rounded-full" style={{ width: `${progress}%` }} />
