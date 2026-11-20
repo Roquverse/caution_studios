@@ -105,7 +105,7 @@ export default function BeatsCatalogPage() {
         const accessToken = session?.access_token;
 
         const res = await fetch(
-          `/api/creator/telemetry${userId ? `?userId=${encodeURIComponent(userId)}` : ''}`,
+          `/api/creator/telemetry${userId ? `?userId=${encodeURIComponent(userId)}&_t=${Date.now()}` : `?_t=${Date.now()}`}`,
           {
             headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
             cache: 'no-store'

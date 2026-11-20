@@ -212,8 +212,9 @@ export default function BeatUploadPage() {
 
       setSuccess(true);
       setTimeout(() => {
-        router.push('/beats');
-      }, 1200);
+        router.refresh();
+        window.location.href = '/beats';
+      }, 1000);
     } catch (err: any) {
       console.error('Error uploading beat:', err);
       setErrorMessage(err.message || 'Failed to upload beat. Please try again.');

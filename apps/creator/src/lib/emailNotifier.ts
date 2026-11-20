@@ -206,20 +206,29 @@ export async function sendAdminNotification(
   }
 
   // 2. Try SMTP Transport via Nodemailer
-  if (process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS) {
+  const smtpHost = (process.env.SMTP_HOST || '').trim();
+  const smtpUser = (process.env.SMTP_USER || '').trim().replace(/^['"]|['"]$/g, '');
+  const smtpPass = (process.env.SMTP_PASS || '').trim().replace(/^['"]|['"]$/g, '');
+  const smtpPort = parseInt(process.env.SMTP_PORT || '587', 10);
+  const smtpSecure = process.env.SMTP_SECURE === 'true' || smtpPort === 465;
+
+  if (smtpHost && smtpUser && smtpPass) {
     try {
       const transporter = nodemailer.createTransport({
-        host: process.env.SMTP_HOST,
-        port: parseInt(process.env.SMTP_PORT || '587', 10),
-        secure: process.env.SMTP_SECURE === 'true' || process.env.SMTP_PORT === '465',
+        host: smtpHost,
+        port: smtpPort,
+        secure: smtpSecure,
         auth: {
-          user: process.env.SMTP_USER,
-          pass: process.env.SMTP_PASS
-        }
+          user: smtpUser,
+          pass: smtpPass
+        },
+        connectionTimeout: 10000,
+        greetingTimeout: 6000,
+        socketTimeout: 12000
       });
 
       const info = await transporter.sendMail({
-        from: process.env.EMAIL_FROM || `"Caution Studio" <${process.env.SMTP_USER}>`,
+        from: process.env.EMAIL_FROM || `"Caution Studio" <${smtpUser}>`,
         to: recipient,
         subject: `${cfg.icon} ${notification.subject}`,
         html: htmlContent

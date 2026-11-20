@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabase as publicSupabase, getServiceRoleClient } from '../../../../lib/supabaseClient';
 
 export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+export const fetchCache = 'force-no-store';
 
 export async function GET(req: NextRequest) {
   try {
@@ -69,6 +71,10 @@ export async function GET(req: NextRequest) {
         trialDaysRemaining: 85,
         beats,
         purchases: []
+      }, {
+        headers: {
+          'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate'
+        }
       });
     }
 
@@ -306,6 +312,10 @@ export async function GET(req: NextRequest) {
       licensesSoldCount: paidOrderItems.length,
       orderItems: paidOrderItems,
       payouts: payouts || []
+    }, {
+      headers: {
+        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate'
+      }
     });
   } catch (err: any) {
     console.error('Error in GET /api/creator/telemetry:', err);
