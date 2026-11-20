@@ -208,7 +208,10 @@ export default function CreatorDashboardPage() {
             const basicLic = licenses.find((l: any) => l.type === 'basic');
             const premiumLic = licenses.find((l: any) => l.type === 'premium');
             const exclusiveLic = licenses.find((l: any) => l.type === 'exclusive');
-            const isFree = b.is_free_stream_enabled === true || (basicLic?.price_cents !== undefined && basicLic.price_cents <= 100);
+            const hasPaidPremium = Boolean(premiumLic && premiumLic.enabled !== false && Number(premiumLic.price_cents) > 100);
+            const hasPaidExclusive = Boolean(exclusiveLic && exclusiveLic.enabled !== false && Number(exclusiveLic.price_cents) > 100);
+            const hasPaidBasic = Boolean(basicLic && basicLic.enabled !== false && Number(basicLic.price_cents) > 100);
+            const isFree = !hasPaidPremium && !hasPaidExclusive && !hasPaidBasic;
 
             return {
               id: b.id,
@@ -223,9 +226,9 @@ export default function CreatorDashboardPage() {
               audioUrl: audioKey ? (audioKey.startsWith('http') || audioKey.startsWith('/') ? audioKey : `/api/media/${audioKey}`) : '',
               status: b.status || 'live',
               isFree,
-              priceBasicNgn: basicLic && basicLic.price_cents > 100 ? Math.round(basicLic.price_cents / 100) : (premiumLic ? Math.max(15000, Math.round(premiumLic.price_cents / 100 * 0.35)) : 15000),
-              pricePremiumNgn: premiumLic && premiumLic.price_cents > 100 ? Math.round(premiumLic.price_cents / 100) : 50000,
-              priceExclusiveNgn: exclusiveLic && exclusiveLic.price_cents > 100 ? Math.round(exclusiveLic.price_cents / 100) : 200000,
+              priceBasicNgn: hasPaidBasic ? Math.round(basicLic.price_cents / 100) : undefined,
+              pricePremiumNgn: hasPaidPremium ? Math.round(premiumLic.price_cents / 100) : undefined,
+              priceExclusiveNgn: hasPaidExclusive ? Math.round(exclusiveLic.price_cents / 100) : undefined,
               createdAt: b.created_at ? new Date(b.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Recently'
             };
           });
@@ -1021,19 +1024,23 @@ export default function CreatorDashboardPage() {
                         </td>
 
                         <td className="py-2.5 px-3 font-mono text-[11px]">
-                          {beat.isFree ? (
+                          {beat.isFree || (!beat.pricePremiumNgn && !beat.priceExclusiveNgn) ? (
                             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
                               <Sparkles className="h-2.5 w-2.5" />
                               <span>100% Free Beat</span>
                             </span>
                           ) : (
                             <div className="space-y-0.5">
-                              <div className="text-amber-300 font-semibold">
-                                Prem: ₦{(beat.pricePremiumNgn || 50000).toLocaleString()}
-                              </div>
-                              <div className="text-purple-300 text-[10px]">
-                                Excl: ₦{(beat.priceExclusiveNgn || 200000).toLocaleString()}
-                              </div>
+                              {beat.pricePremiumNgn ? (
+                                <div className="text-amber-300 font-semibold">
+                                  Prem: ₦{beat.pricePremiumNgn.toLocaleString()}
+                                </div>
+                              ) : null}
+                              {beat.priceExclusiveNgn ? (
+                                <div className="text-purple-300 text-[10px]">
+                                  Excl: ₦{beat.priceExclusiveNgn.toLocaleString()}
+                                </div>
+                              ) : null}
                             </div>
                           )}
                         </td>

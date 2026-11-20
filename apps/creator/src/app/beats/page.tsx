@@ -44,6 +44,11 @@ function formatDbBeat(b: any) {
   const combinedActivity = Math.max(plays, downloads, plays + downloads);
   const thresholdPct = Math.min(100, Math.round((combinedActivity / 10000) * 100));
 
+  const hasPaidPremium = Boolean(premium && premium.enabled !== false && Number(premium.price_cents) > 100);
+  const hasPaidExclusive = Boolean(exclusive && exclusive.enabled !== false && Number(exclusive.price_cents) > 100);
+  const hasPaidBasic = Boolean(basic && basic.enabled !== false && Number(basic.price_cents) > 100);
+  const isFree = !hasPaidPremium && !hasPaidExclusive && !hasPaidBasic;
+
   return {
     id: b.id,
     title: b.title,
@@ -52,9 +57,10 @@ function formatDbBeat(b: any) {
     key: b.musical_key || 'C Minor',
     duration: `${durM}:${durS.toString().padStart(2, '0')}`,
     stemsUploaded: Boolean(b.stems_zip_key),
-    priceBasicNgn: basic && basic.price_cents > 100 ? Math.round(basic.price_cents / 100) : (premium ? Math.max(15000, Math.round(premium.price_cents / 100 * 0.35)) : 15000),
-    pricePremiumNgn: premium && premium.price_cents > 100 ? Math.round(premium.price_cents / 100) : 50000,
-    priceExclusiveNgn: exclusive && exclusive.price_cents > 100 ? Math.round(exclusive.price_cents / 100) : 200000,
+    isFree,
+    priceBasicNgn: hasPaidBasic ? Math.round(basic.price_cents / 100) : null,
+    pricePremiumNgn: hasPaidPremium ? Math.round(premium.price_cents / 100) : null,
+    priceExclusiveNgn: hasPaidExclusive ? Math.round(exclusive.price_cents / 100) : null,
     streamsCount: plays,
     downloadsCount: downloads,
     combinedActivity,
@@ -242,7 +248,8 @@ export default function BeatsCatalogPage() {
   // Derived from telemetry (actual order_items & licenses net split + download incentive rewards)
   // or catalog sold beats (salesCount * 80% producer cut)
   const computedSalesFromBeatsNgn = beatsList.reduce((sum, b) => {
-    const cut = b.pricePremiumNgn ? Math.round(b.pricePremiumNgn * 0.8) : 40000;
+    if (b.isFree) return sum;
+    const cut = b.pricePremiumNgn ? Math.round(b.pricePremiumNgn * 0.8) : 0;
     return sum + ((b.salesCount || 0) * cut);
   }, 0);
   const actualGeneratedIncomeNgn = totalEarningsNgn > 0
@@ -558,13 +565,26 @@ export default function BeatsCatalogPage() {
                     </td>
 
                     {/* License Pricing */}
-                    <td className="py-3.5 px-4 font-mono text-[11px] space-y-0.5">
-                      <div className="text-gray-300">
-                        Prem: ₦{beat.pricePremiumNgn.toLocaleString()}
-                      </div>
-                      <div className="text-[#e53935] font-bold">
-                        Excl: ₦{beat.priceExclusiveNgn.toLocaleString()}
-                      </div>
+                    <td className="py-3.5 px-4 font-mono text-[11px]">
+                      {beat.isFree || (!beat.pricePremiumNgn && !beat.priceExclusiveNgn) ? (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                          <span>Free Beat</span>
+                        </span>
+                      ) : (
+                        <div className="space-y-0.5">
+                          {beat.pricePremiumNgn ? (
+                            <div className="text-gray-300">
+                              Prem: ₦{beat.pricePremiumNgn.toLocaleString()}
+                            </div>
+                          ) : null}
+                          {beat.priceExclusiveNgn ? (
+                            <div className="text-[#e53935] font-bold">
+                              Excl: ₦{beat.priceExclusiveNgn.toLocaleString()}
+                            </div>
+                          ) : null}
+                        </div>
+                      )}
                     </td>
 
                     {/* Plays */}
