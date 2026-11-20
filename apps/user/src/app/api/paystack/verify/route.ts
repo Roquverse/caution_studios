@@ -149,7 +149,86 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // 2. Handle Beat License Purchase Verification
+    // 2. Handle Ad Promotion Campaign Verification
+    const isAdCampaign =
+      metadata.type === 'ad_campaign' ||
+      (bodyOrderId && bodyOrderId.startsWith('ad_')) ||
+      reference.includes('ad_camp') ||
+      reference.includes('ad_order');
+
+    if (isAdCampaign) {
+      const campId = metadata.campaignId || metadata.campaign_id;
+      let adRecord: any = null;
+
+      if (campId) {
+        const { data: updatedCamp } = await supabase
+          .from('ad_campaigns')
+          .update({
+            status: 'active',
+            paystack_reference: reference
+          })
+          .eq('id', campId)
+          .select()
+          .maybeSingle();
+        adRecord = updatedCamp;
+      } else if (metadata.songTitle) {
+        const adType = metadata.adType || 'listening';
+        const tagPrefix = adType === 'download' ? '[DOWNLOAD AD] ' : '[STREAM AD] ';
+        const rawCampaignName = metadata.campaignName || `Promote "${metadata.songTitle}"`;
+        const resolvedCampaignName = rawCampaignName.includes('[') ? rawCampaignName : `${tagPrefix}${rawCampaignName}`;
+
+        const insertPayload: any = {
+          advertiser_id: metadata.advertiserId || bodyUserId || null,
+          campaign_name: resolvedCampaignName,
+          artist_name: metadata.artistName || 'Artist',
+          song_title: metadata.songTitle,
+          package_name: metadata.packageName || adType,
+          price_ngn: metadata.priceNgn || 15000,
+          target_plays: metadata.targetPlays || 5000,
+          delivered_plays: 0,
+          clicks_count: 0,
+          audio_url: metadata.audioUrl || '',
+          cover_url: metadata.coverUrl || '/images/hero_boombox.jpg',
+          spotify_url: metadata.spotifyUrl || null,
+          apple_music_url: metadata.appleMusicUrl || null,
+          audiomack_url: metadata.audiomackUrl || null,
+          youtube_url: metadata.youtubeUrl || null,
+          status: 'active',
+          paystack_reference: reference,
+          starts_at: new Date().toISOString()
+        };
+
+        const { data: createdCamp } = await supabase
+          .from('ad_campaigns')
+          .insert(insertPayload)
+          .select()
+          .maybeSingle();
+        adRecord = createdCamp;
+      }
+
+      // Record transaction into orders ledger
+      const amountCents = data.amount || (metadata.priceNgn ? Number(metadata.priceNgn) * 100 : 1500000);
+      await supabase.from('orders').insert({
+        buyer_id: metadata.advertiserId || bodyUserId || null,
+        status: 'paid',
+        subtotal_cents: amountCents,
+        credit_cents: 0,
+        tax_cents: 0,
+        total_cents: amountCents,
+        paystack_reference: reference,
+        created_at: new Date().toISOString()
+      });
+
+      return NextResponse.json({
+        status: true,
+        verified: true,
+        type: 'ad_campaign',
+        campaign: adRecord,
+        reference
+      });
+    }
+
+    // 3. Handle Beat License Purchase Verification
     const orderId = metadata.order_id || bodyOrderId;
     const items = metadata.items || [];
     const beatId = metadata.beat_id;

@@ -123,6 +123,7 @@ export async function POST(req: NextRequest) {
     const rawCampaignName = bodyData.campaignName || `Promote "${songTitle}"`;
     const resolvedCampaignName = rawCampaignName.includes('[') ? rawCampaignName : `${tagPrefix}${rawCampaignName}`;
 
+    const paystackReference = bodyData.paystackReference || bodyData.paystack_reference || `ad_ref_${Date.now()}`;
     const insertPayload: any = {
       advertiser_id: advertiserId || null,
       campaign_name: resolvedCampaignName,
@@ -140,6 +141,7 @@ export async function POST(req: NextRequest) {
       audiomack_url: bodyData.audiomackUrl || null,
       youtube_url: bodyData.youtubeUrl || null,
       status: 'active',
+      paystack_reference: paystackReference,
       starts_at: new Date().toISOString()
     };
 
@@ -157,6 +159,24 @@ export async function POST(req: NextRequest) {
         .single();
       newCampaign = fallbackInsert.data;
       dbError = fallbackInsert.error;
+    }
+
+    // Record into orders ledger for admin reporting & accounting
+    if (newCampaign) {
+      try {
+        await supabase.from('orders').insert({
+          buyer_id: advertiserId || null,
+          status: 'paid',
+          subtotal_cents: priceNgn * 100,
+          credit_cents: 0,
+          tax_cents: 0,
+          total_cents: priceNgn * 100,
+          paystack_reference: paystackReference,
+          created_at: new Date().toISOString()
+        });
+      } catch (e) {
+        console.warn('Could not insert ad order record:', e);
+      }
     }
 
     if (dbError) {
