@@ -148,8 +148,148 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
   });
   const [purchasedBeats, setPurchasedBeats] = useState<any[]>([]);
   const [loadingPurchased, setLoadingPurchased] = useState(false);
+  const [selectedProducer, setSelectedProducer] = useState<{
+    name: string;
+    handle: string;
+    coverUrl: string;
+    beatsCount?: string;
+  } | null>(null);
+  const [producerUploads, setProducerUploads] = useState<TrackItem[]>([]);
+  const [loadingProducerUploads, setLoadingProducerUploads] = useState(false);
   const downloadQuota = useDailyDownloadQuota();
   const router = useRouter();
+
+  const handleSelectProducer = async (producer: {
+    name: string;
+    handle: string;
+    coverUrl: string;
+    beatsCount?: string;
+  }) => {
+    setSelectedProducer(producer);
+    setActiveNav('discover');
+    setLoadingProducerUploads(true);
+    try {
+      // 1. Immediately extract from current playlistRows
+      const localMatches = playlistRows.filter(
+        (b) =>
+          b.artist?.toLowerCase() === producer.name.toLowerCase() ||
+          (producer.handle && b.subscribers?.toLowerCase().includes(producer.handle.toLowerCase())) ||
+          (b.title && b.title.toLowerCase().includes(producer.name.toLowerCase()))
+      );
+      setProducerUploads(localMatches);
+
+      // 2. Query Supabase for all beats uploaded by this producer
+      const { data: dbBeats } = await supabase
+        .from('beats')
+        .select(`
+          *,
+          producer:producer_id (
+            id,
+            display_name,
+            handle,
+            avatar_url
+          ),
+          licenses:beat_licenses (
+            type,
+            price_cents,
+            enabled
+          )
+        `)
+        .order('created_at', { ascending: false });
+
+      if (dbBeats && dbBeats.length > 0) {
+        const r2Cdn = process.env.NEXT_PUBLIC_R2_PUBLIC_URL?.replace(/\/$/, '') || 'https://media.cautionstudioz.com';
+        const matches = dbBeats.filter((b: any) => {
+          const prodName = b.producer?.display_name || '';
+          const prodHandle = b.producer?.handle || '';
+          return (
+            prodName.toLowerCase() === producer.name.toLowerCase() ||
+            (producer.handle && prodHandle.toLowerCase() === producer.handle.toLowerCase()) ||
+            (b.title && b.title.toLowerCase().includes(producer.name.toLowerCase()))
+          );
+        });
+
+        if (matches.length > 0) {
+          const mappedMatches: TrackItem[] = matches.map((b: any) => {
+            const audioKey = b.preview_clean_key || b.preview_tagged_key || b.master_wav_key;
+            let audioUrl = '';
+            if (audioKey) {
+              if (audioKey.startsWith('http') || audioKey.startsWith('/')) {
+                audioUrl = audioKey;
+              } else if (r2Cdn) {
+                audioUrl = `${r2Cdn}/${audioKey}`;
+              } else {
+                audioUrl = `/api/media/${audioKey}`;
+              }
+            } else {
+              audioUrl = r2Cdn
+                ? `${r2Cdn}/masters/alex-morgan-afrobeat-instrumental-summer-groove-573648-hubz_1791151613114.mp3`
+                : '/api/media/masters/alex-morgan-afrobeat-instrumental-summer-groove-573648-hubz_1791151613114.mp3';
+            }
+            const basicLic = b.licenses?.find((l: any) => l.type === 'basic') || b.beat_licenses?.find((l: any) => l.type === 'basic');
+            const premiumLic = b.licenses?.find((l: any) => l.type === 'premium') || b.beat_licenses?.find((l: any) => l.type === 'premium');
+            const exclusiveLic = b.licenses?.find((l: any) => l.type === 'exclusive') || b.beat_licenses?.find((l: any) => l.type === 'exclusive');
+            const beatTags: string[] = Array.isArray(b.tags) ? b.tags : [];
+            const isFreeTagged =
+              (basicLic?.price_cents !== undefined && basicLic.price_cents <= 100) ||
+              b.category === 'free' ||
+              b.is_free_beat === true ||
+              beatTags.some((t: string) => t.toLowerCase() === 'free' || t.toLowerCase() === 'free download') ||
+              b.title?.toLowerCase().includes('(free)') ||
+              b.title?.toLowerCase().includes('[free]');
+
+            const rawPrice = basicLic?.price_cents ? basicLic.price_cents / 100 : (isFreeTagged ? 0 : 3000);
+            const priceNgn = isFreeTagged || rawPrice <= 1 ? 0 : rawPrice;
+            const premiumPriceNgn = isFreeTagged
+              ? 0
+              : premiumLic?.price_cents && premiumLic.price_cents > 100
+              ? Math.round(premiumLic.price_cents / 100)
+              : (priceNgn ? priceNgn * 3 : 50000);
+            const exclusivePriceNgn = isFreeTagged
+              ? 0
+              : exclusiveLic?.price_cents && exclusiveLic.price_cents > 100
+              ? Math.round(exclusiveLic.price_cents / 100)
+              : 200000;
+
+            const durationSec = b.duration_seconds || 180;
+            const mins = Math.floor(durationSec / 60);
+            const secs = Math.floor(durationSec % 60);
+
+            return {
+              id: b.id,
+              title: b.title,
+              artist: b.producer?.display_name || producer.name,
+              subscribers: '@' + (b.producer?.handle || producer.handle),
+              tracksCount: `${b.bpm || 120} BPM • ${b.genre || 'Beat'}`,
+              date: new Date(b.created_at).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' }),
+              duration: `${mins}:${secs.toString().padStart(2, '0')}`,
+              durationSeconds: durationSec,
+              coverUrl: b.cover_url || producer.coverUrl,
+              category: isFreeTagged ? 'free' : 'playlists',
+              audioUrl,
+              bpm: b.bpm || 120,
+              genre: b.genre || 'Electronic',
+              musicalKey: b.musical_key || 'C Minor',
+              priceNgn,
+              premiumPriceNgn,
+              exclusivePriceNgn,
+              isFree: isFreeTagged,
+              tags: beatTags,
+              playCount: b.play_count || 0,
+              downloadCount: Number(b.download_count || b.free_commercial_downloads_count || 0),
+              purchaseCount: 0
+            };
+          });
+
+          setProducerUploads(mappedMatches);
+        }
+      }
+    } catch (err) {
+      console.warn('Error fetching producer uploads:', err);
+    } finally {
+      setLoadingProducerUploads(false);
+    }
+  };
 
   const handleOpenRecordStudio = (track?: TrackItem) => {
     if (audioRef.current) audioRef.current.pause();
@@ -892,25 +1032,62 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
     return tracks.sort((a, b) => (b.playCount || 0) - (a.playCount || 0)).slice(0, 5);
   }, [allKnownTracks]);
 
-  // Redesign Right Sidebar: Top Producers
+  // Redesign Right Sidebar: Real Top Producers from live database beats and creator profiles
   const topProducersList = useMemo(() => {
-    const curated = [
-      { name: 'Olamide Beats', beatsCount: '1.2K beats', coverUrl: '/images/african_producer_beats.jpg', handle: 'olamidebeats' },
-      { name: 'Trillz', beatsCount: '928 beats', coverUrl: '/images/african_mixing_engineer.jpg', handle: 'trillz' },
-      { name: 'Jay Cactus', beatsCount: '750 beats', coverUrl: '/images/artist_studio_mic.jpg', handle: 'jaycactus' },
-      { name: 'Maceo', beatsCount: '620 beats', coverUrl: '/images/african_vocal_session.jpg', handle: 'maceo' }
-    ];
+    const realProducersMap = new Map<
+      string,
+      { name: string; beatsCount: string; coverUrl: string; handle: string; count: number }
+    >();
 
-    if (producers && producers.length >= 4) {
-      return producers.slice(0, 4).map((p, idx) => ({
-        name: p.name,
-        beatsCount: `${playlistRows.filter((b) => b.artist === p.name).length * 10 + 240} beats`,
-        coverUrl: p.coverUrl || curated[idx % curated.length].coverUrl,
-        handle: p.handle
-      }));
-    }
+    // 1. Group from loaded playlistRows (real database beats)
+    playlistRows.forEach((b) => {
+      const artistName = (b.artist || '').trim();
+      if (artistName && artistName.toLowerCase() !== 'caution studio') {
+        const key = artistName.toLowerCase();
+        const existing = realProducersMap.get(key);
+        if (existing) {
+          existing.count += 1;
+          existing.beatsCount = `${existing.count} ${existing.count === 1 ? 'beat' : 'beats'}`;
+        } else {
+          realProducersMap.set(key, {
+            name: artistName,
+            beatsCount: '1 beat',
+            coverUrl: b.coverUrl || '/images/african_producer_beats.jpg',
+            handle: b.subscribers?.replace(/^@/, '') || artistName.toLowerCase().replace(/\s+/g, ''),
+            count: 1
+          });
+        }
+      }
+    });
 
-    return curated;
+    // 2. Merge with server-provided producer profiles
+    (producers || []).forEach((p) => {
+      const pName = (p.name || '').trim();
+      if (pName && !pName.toLowerCase().includes('admin') && pName.toLowerCase() !== 'caution producer') {
+        const key = pName.toLowerCase();
+        const count = playlistRows.filter((b) => b.artist?.toLowerCase() === key).length;
+        const existing = realProducersMap.get(key);
+        if (existing) {
+          if (p.coverUrl && !p.coverUrl.includes('placeholder')) existing.coverUrl = p.coverUrl;
+          if (p.handle) existing.handle = p.handle;
+          if (count > existing.count) {
+            existing.count = count;
+            existing.beatsCount = `${count} ${count === 1 ? 'beat' : 'beats'}`;
+          }
+        } else {
+          realProducersMap.set(key, {
+            name: pName,
+            beatsCount: `${count > 0 ? count : 1} ${count === 1 ? 'beat' : 'beats'}`,
+            coverUrl: p.coverUrl || '/images/african_producer_beats.jpg',
+            handle: p.handle || pName.toLowerCase().replace(/\s+/g, ''),
+            count: count > 0 ? count : 1
+          });
+        }
+      }
+    });
+
+    const list = Array.from(realProducersMap.values()).sort((a, b) => b.count - a.count);
+    return list;
   }, [producers, playlistRows]);
 
   // Redesign Right Sidebar: This Week's Charts
@@ -1037,7 +1214,7 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
   const progressRatio = currentTrack.durationSeconds > 0 ? (currentTime / currentTrack.durationSeconds) * 100 : 0;
 
   return (
-    <div className="min-h-screen w-full max-w-[100vw] overflow-x-hidden bg-[#111214] text-[#eceef2] flex flex-col font-sans selection:bg-[#2bbbad] selection:text-black pb-20">
+    <div className="h-screen w-full max-w-[100vw] overflow-hidden bg-[#111214] text-[#eceef2] flex flex-col font-sans selection:bg-[#2bbbad] selection:text-black">
       {/* HTML5 Audio Element for Real Streaming from Cloudflare R2 & Database */}
       {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
       <audio
@@ -1114,12 +1291,14 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
       />
 
       {/* 1. TOP HEADER - EDITORIAL MUSIC MARKETPLACE */}
-      <header className="h-16 border-b border-white/[0.06] bg-[#121316]/95 backdrop-blur-md px-4 sm:px-6 flex items-center justify-between gap-4 sticky top-0 z-40">
+      <header className="h-16 border-b border-white/[0.06] bg-[#121316] px-4 sm:px-6 flex items-center justify-between gap-4 shrink-0 z-40">
         <div className="flex items-center shrink-0">
           <Link href="/" className="inline-flex items-center gap-2 group">
-            <span className="text-xl font-black tracking-tight text-white group-hover:text-red-500 transition-colors">
-              Caution<span className="text-[#e53935]">.</span>
-            </span>
+            <img
+              src="/logo.png"
+              alt="Caution Studio"
+              className="h-7 sm:h-8 w-auto object-contain brightness-0 invert"
+            />
           </Link>
         </div>
 
@@ -1316,9 +1495,9 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
       )}
 
       {/* 2. BODY CONTENT (3-COLUMN MARKETPLACE LAYOUT) */}
-      <div className="flex-1 flex w-full max-w-full min-w-0 overflow-x-hidden">
+      <div className="flex-1 flex w-full max-w-full min-w-0 overflow-hidden relative pb-[72px]">
         {/* LEFT NAVIGATION SIDEBAR */}
-        <aside className="w-60 border-r border-white/[0.06] bg-[#121316] p-4 shrink-0 hidden md:flex flex-col justify-between">
+        <aside className="w-60 border-r border-white/[0.06] bg-[#121316] p-4 shrink-0 hidden md:flex flex-col justify-between h-full overflow-y-auto">
           <div className="space-y-6">
             {/* Discover Section */}
             <div>
@@ -1446,7 +1625,7 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
         </aside>
 
         {/* CENTER MAIN VIEW */}
-        <main className="flex-1 p-3 sm:p-5 lg:p-6 pb-24 overflow-y-auto overflow-x-hidden min-w-0 max-w-full space-y-5 sm:space-y-6 bg-[#111214]">
+        <main className="flex-1 p-3 sm:p-5 lg:p-6 pb-24 overflow-y-auto min-w-0 max-w-full space-y-5 sm:space-y-6 bg-[#111214]">
           {activeNav === 'fav' ? (
             <div className="space-y-6">
               <div className="flex items-center justify-between pb-3 border-b border-white/[0.06]">
@@ -2092,6 +2271,83 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
                 ))}
               </div>
             </div>
+          ) : selectedProducer ? (
+            <div className="space-y-6">
+              {/* Producer Header Banner */}
+              <div className="relative rounded-2xl overflow-hidden bg-[#121316] border border-white/[0.06] p-6 sm:p-8 flex flex-col sm:flex-row sm:items-center justify-between gap-6">
+                <div className="flex items-center gap-5">
+                  <div className="w-20 h-20 rounded-full overflow-hidden border-2 border-[#e53935] shrink-0 shadow-lg shadow-[#e53935]/20">
+                    <img src={selectedProducer.coverUrl} alt={selectedProducer.name} className="w-full h-full object-cover" />
+                  </div>
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight">{selectedProducer.name}</h1>
+                      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-[#e53935]/15 text-[#e53935] border border-[#e53935]/30">
+                        VERIFIED PRODUCER
+                      </span>
+                    </div>
+                    <p className="text-xs text-gray-400">
+                      @{selectedProducer.handle} · Creator Catalog · {producerUploads.length} {producerUploads.length === 1 ? 'beat' : 'beats'} uploaded
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setSelectedProducer(null)}
+                  className="px-4 py-2 rounded-full bg-white/[0.06] hover:bg-white/[0.1] text-white text-xs font-bold border border-white/10 transition-colors cursor-pointer self-start sm:self-auto flex items-center gap-1.5"
+                >
+                  <ArrowRight className="h-3.5 w-3.5 rotate-180" />
+                  <span>Back to all beats</span>
+                </button>
+              </div>
+
+              {/* Producer Uploads Grid */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-xl font-bold text-white tracking-tight">
+                    All beats by {selectedProducer.name}
+                  </h2>
+                  <span className="text-xs font-mono font-bold text-gray-400">
+                    {producerUploads.length} tracks
+                  </span>
+                </div>
+
+                {loadingProducerUploads ? (
+                  <div className="p-12 text-center rounded-2xl bg-[#121316] border border-white/[0.04] space-y-2">
+                    <div className="w-8 h-8 rounded-full border-2 border-[#e53935] border-t-transparent animate-spin mx-auto" />
+                    <p className="text-xs text-gray-400">Fetching all uploads by {selectedProducer.name}...</p>
+                  </div>
+                ) : producerUploads.length === 0 ? (
+                  <div className="p-10 text-center rounded-2xl bg-[#121316] border border-white/[0.04] space-y-3">
+                    <p className="text-sm font-semibold text-white">No beats found for {selectedProducer.name}.</p>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedProducer(null)}
+                      className="px-4 py-2 rounded-full bg-[#e53935] text-white text-xs font-bold hover:bg-[#d32f2f] transition-colors cursor-pointer"
+                    >
+                      Browse Marketplace
+                    </button>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                    {producerUploads.map((beat) => (
+                      <MarketplaceBeatCard
+                        key={beat.id}
+                        track={beat}
+                        isCurrent={currentTrack.id === beat.id}
+                        isPlaying={currentTrack.id === beat.id && isPlaying}
+                        isLiked={Boolean(beat.isLiked || likedTrackIds.includes(beat.id))}
+                        onPlayToggle={handlePlayToggle}
+                        onLikeToggle={(id: string) => toggleLike(id)}
+                        onLicenseClick={(t: TrackItem) => setPaidBeatPurchaseTrack(t)}
+                        onDownloadClick={(t: TrackItem) => handleDownload(t)}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
           ) : (
             <>
               {/* 1. EDITORIAL HERO BANNER */}
@@ -2253,10 +2509,7 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
                   {topProducersList.map((producer) => (
                     <div
                       key={producer.handle || producer.name}
-                      onClick={() => {
-                        setSearchQuery(producer.name);
-                        setActiveNav('browse');
-                      }}
+                      onClick={() => handleSelectProducer(producer)}
                       className="p-3 rounded-2xl bg-[#121316] border border-white/[0.04] hover:border-white/15 transition-all text-center cursor-pointer group"
                     >
                       <div className="w-16 h-16 rounded-full overflow-hidden bg-black/40 border border-white/10 mx-auto mb-2.5 relative">
@@ -2277,7 +2530,7 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
         </main>
 
         {/* RIGHT SIDEBAR - COMMERCIAL MARKETPLACE WIDGETS */}
-        <aside className="w-80 border-l border-white/[0.06] bg-[#121316] p-4 shrink-0 hidden xl:flex flex-col space-y-6 overflow-y-auto">
+        <aside className="w-80 border-l border-white/[0.06] bg-[#121316] p-4 shrink-0 hidden xl:flex flex-col space-y-6 h-full overflow-y-auto">
           {/* TOP PRODUCERS */}
           <div>
             <div className="flex items-center justify-between mb-3.5">
@@ -2296,10 +2549,7 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
               {topProducersList.slice(0, 4).map((producer) => (
                 <div
                   key={producer.handle || producer.name}
-                  onClick={() => {
-                    setSearchQuery(producer.name);
-                    setActiveNav('browse');
-                  }}
+                  onClick={() => handleSelectProducer(producer)}
                   className="flex items-center gap-3 p-2 rounded-xl hover:bg-white/[0.04] transition-colors cursor-pointer group"
                 >
                   <div className="w-10 h-10 rounded-full overflow-hidden bg-black/40 border border-white/10 shrink-0">
