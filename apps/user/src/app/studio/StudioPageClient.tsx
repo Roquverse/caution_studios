@@ -129,7 +129,7 @@ export default function StudioPageClient({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           email,
-          amountNgn: 30000,
+          amountNgn: 10000,
           orderId,
           callbackUrl: `${window.location.origin}/studio`,
           metadata: {
@@ -252,7 +252,7 @@ export default function StudioPageClient({
                 Unlock Caution Recording Studio
               </h1>
               <p className="text-xs sm:text-sm text-gray-400 max-w-lg mx-auto leading-relaxed">
-                The in-browser Studio Suite is available with <strong>Caution Plus</strong> (2 sessions / month at ₦3,000) and unlimited with <strong>Caution Pro</strong> (₦30,000 / month with project file saving).
+                The in-browser Studio Suite is available with <strong>Caution Plus</strong> (2 sessions / month at ₦3,000) and unlimited with <strong>Caution Pro</strong> (₦10,000 / month with project file saving).
               </p>
             </div>
 

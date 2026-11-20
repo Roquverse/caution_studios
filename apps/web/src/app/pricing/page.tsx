@@ -154,7 +154,7 @@ export default function PricingPage() {
                 <h3 className="text-xl font-bold text-text">Caution Pro</h3>
                 <div className="mt-3 flex items-baseline gap-1">
                   <span className="text-3xl sm:text-4xl font-black font-mono text-text">
-                    {formatNaira(30000)}
+                    {formatNaira(10000)}
                   </span>
                   <span className="text-xs text-text-muted">/ month</span>
                 </div>
@@ -195,7 +195,7 @@ export default function PricingPage() {
                   href="/subscriptions"
                   className="w-full h-11 rounded-full bg-accent hover:bg-[#135d56] text-text font-semibold text-xs flex items-center justify-center border border-accent shadow-sm uppercase tracking-wider"
                 >
-                  Subscribe to Pro ({formatNaira(30000)}/mo)
+                  Subscribe to Pro ({formatNaira(10000)}/mo)
                 </Link>
               </div>
             </div>

@@ -126,11 +126,11 @@ export default function UserBillingPage() {
                 ? 'Full Pro studio license clearance enabled with unlimited downloads, zero ads, in-browser Studio Suite enabled, and full trackout WAV stems.'
                 : isPlus
                 ? 'Caution Plus license clearance enabled with 62 beats per month, ad-supported downloads, and commercial synchronization rights.'
-                : 'Caution Studio is an exclusive paid platform. Activate your Caution Plus (₦3,000) or Caution Pro (₦30,000) membership to unlock full access.'}
+                : 'Caution Studio is an exclusive paid platform. Activate your Caution Plus (₦3,000) or Caution Pro (₦10,000) membership to unlock full access.'}
             </p>
             <div className="pt-2 flex items-center gap-3 font-mono text-xs">
               <span className="text-xl font-black text-white">
-                {isPro ? '₦30,000' : isPlus ? '₦3,000' : 'Inactive'}
+                {isPro ? '₦10,000' : isPlus ? '₦3,000' : 'Inactive'}
               </span>
               <span className="text-gray-400">
                 {isSubscribed ? '/ month (auto-renews via Paystack)' : '— Select a paid plan to activate'}

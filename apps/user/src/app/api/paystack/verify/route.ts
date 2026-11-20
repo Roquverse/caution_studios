@@ -126,7 +126,7 @@ export async function POST(req: NextRequest) {
         .maybeSingle();
 
       if (!existingOrder) {
-        const amountCents = data.amount || (targetPlan === 'pro' ? 3000000 : 300000);
+        const amountCents = data.amount || (targetPlan === 'pro' ? 1000000 : 300000);
         await supabase.from('orders').insert({
           buyer_id: targetUserId || null,
           status: 'paid',

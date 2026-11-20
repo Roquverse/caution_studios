@@ -17,7 +17,9 @@ import {
   Copy,
   ExternalLink,
   X,
-  Loader2
+  Loader2,
+  Sliders,
+  ChevronRight
 } from 'lucide-react';
 import { supabase } from '../../lib/supabaseClient';
 import { UserProfileData } from '../../components/UserDropdown';
@@ -224,7 +226,7 @@ export default function SubscriptionsPage() {
     setPendingTier(tier);
 
     try {
-      const amountNgn = tier === 'pro' ? 30000 : 3000;
+      const amountNgn = tier === 'pro' ? 10000 : 3000;
       const { data: { session } } = await supabase.auth.getSession();
       const userEmail = session?.user?.email || (profile as any)?.email || 'artist@cautionstudio.com';
       const userId = profile?.id || session?.user?.id || null;
@@ -384,11 +386,11 @@ export default function SubscriptionsPage() {
                   : 'Subscription Inactive'}
               </h2>
               {isPro ? (
-                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-[#04564f] text-[#2dd4bf] border border-[#2dd4bf]/40 flex items-center gap-1 shadow-sm">
+                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-[#e53935]/15 text-[#e53935] border border-[#e53935]/30 flex items-center gap-1 shadow-sm">
                   <Sparkles className="h-3 w-3" /> ACTIVE PRO
                 </span>
               ) : isPlus ? (
-                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-[#04564f]/60 text-[#2dd4bf] border border-[#2dd4bf]/30">
+                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-[#e53935]/15 text-[#e53935] border border-[#e53935]/30">
                   ACTIVE PLUS
                 </span>
               ) : (
@@ -402,7 +404,7 @@ export default function SubscriptionsPage() {
                 ? 'Your Caution Pro plan includes unlimited beat downloads with zero ads, commercial synchronization rights, full WAV trackout stems (.ZIP), and unlocked access to the in-browser recording Studio Suite.'
                 : isPlus
                 ? 'Your Caution Plus plan includes 62 beats per month (2 daily free downloads + 2 ad bonus downloads) and commercial release rights. Upgrade to Caution Pro to unlock the in-browser Recording Studio and unlimited ad-free downloads.'
-                : 'Caution Studio requires an active membership. Choose Caution Plus (₦3,000/mo) or Caution Pro (₦30,000/mo) below to get full access, downloads, and commercial licensing.'}
+                : 'Caution Studio requires an active membership. Choose Caution Plus (₦3,000/mo) or Caution Pro (₦10,000/mo) below to get full access, downloads, and commercial licensing.'}
             </p>
           </div>
 
@@ -421,10 +423,10 @@ export default function SubscriptionsPage() {
                   type="button"
                   onClick={() => handleSubscribe('pro')}
                   disabled={isLoading}
-                  className="px-5 py-2.5 rounded-full bg-[#04564f] hover:bg-[#03453f] text-[#2dd4bf] text-xs font-bold uppercase tracking-wider flex items-center gap-2 border border-[#2dd4bf]/30 transition-colors shadow-lg cursor-pointer disabled:opacity-50"
+                  className="px-5 py-2.5 rounded-full bg-[#e53935] hover:bg-[#d32f2f] text-white text-xs font-bold uppercase tracking-wider flex items-center gap-2 transition-all shadow-lg shadow-red-500/20 cursor-pointer disabled:opacity-50"
                 >
                   <Sparkles className="h-4 w-4" />
-                  <span>Get Pro (₦30,000)</span>
+                  <span>Get Pro (₦10,000)</span>
                 </button>
               </div>
             ) : isPlus ? (
@@ -432,13 +434,13 @@ export default function SubscriptionsPage() {
                 type="button"
                 onClick={() => handleSubscribe('pro')}
                 disabled={isLoading}
-                className="px-5 py-2.5 rounded-full bg-[#04564f] hover:bg-[#03453f] text-[#2dd4bf] border border-[#2dd4bf]/40 text-xs font-bold uppercase tracking-wider transition-colors cursor-pointer disabled:opacity-50 flex items-center gap-1.5 shadow-md"
+                className="px-5 py-2.5 rounded-full bg-[#e53935] hover:bg-[#d32f2f] text-white text-xs font-bold uppercase tracking-wider transition-all cursor-pointer disabled:opacity-50 flex items-center gap-1.5 shadow-lg shadow-red-500/20"
               >
                 <Sparkles className="h-3.5 w-3.5" />
-                <span>Upgrade to Pro (₦30,000)</span>
+                <span>Upgrade to Pro (₦10,000)</span>
               </button>
             ) : (
-              <div className="px-4 py-2 rounded-full bg-[#04564f]/40 border border-[#2dd4bf]/30 text-xs font-mono font-bold text-[#2dd4bf] flex items-center gap-1.5">
+              <div className="px-4 py-2 rounded-full bg-[#e53935]/15 border border-[#e53935]/30 text-xs font-mono font-bold text-[#e53935] flex items-center gap-1.5">
                 <CheckCircle2 className="h-4 w-4" />
                 <span>Pro Member Active</span>
               </div>
@@ -450,30 +452,30 @@ export default function SubscriptionsPage() {
         <div className="space-y-4">
           <div>
             <h3 className="text-sm font-bold uppercase tracking-wider font-mono text-white">
-              Available Membership Plans
+              Available Plans &amp; Beat Purchases
             </h3>
             <p className="text-[11px] text-gray-500 font-mono mt-0.5">
-              Select Caution Plus or Caution Pro. Instant activation via Paystack.
+              Choose an artist subscription or purchase individual beat licenses. Instant activation via Paystack.
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            {/* Plan 1: Caution Plus */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+            {/* Plan 1: Caution Plus (₦3,000) */}
             <div
               className={`p-6 rounded-2xl bg-[#121316] border transition-all flex flex-col justify-between ${
                 isPlus
-                  ? 'border-[#2dd4bf] shadow-xl ring-1 ring-[#2dd4bf]/40'
+                  ? 'border-[#e53935] shadow-xl ring-1 ring-[#e53935]/40'
                   : 'border-white/[0.08] hover:border-white/20'
               }`}
             >
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <Sparkles className="h-4 w-4 text-[#2dd4bf]" />
-                    <h4 className="text-lg font-black text-white">Caution Plus</h4>
+                    <Sparkles className="h-4 w-4 text-[#e53935]" />
+                    <h4 className="text-base font-black text-white">Caution Plus</h4>
                   </div>
                   {isPlus ? (
-                    <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-[#04564f] text-[#2dd4bf] border border-[#2dd4bf]/30">
+                    <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-[#e53935] text-white">
                       CURRENT
                     </span>
                   ) : (
@@ -483,40 +485,36 @@ export default function SubscriptionsPage() {
                   )}
                 </div>
                 <div>
-                  <span className="text-3xl font-black text-white">
-                    <span className="font-sans font-semibold text-2xl text-[#2dd4bf] mr-1 select-none">₦</span>
+                  <span className="text-2xl sm:text-3xl font-black text-white">
+                    <span className="font-sans font-semibold text-xl text-[#e53935] mr-1 select-none">₦</span>
                     3,000
                   </span>
                   <span className="text-xs text-gray-400"> / month</span>
                 </div>
-                <p className="text-xs text-gray-400 leading-relaxed">
-                  Ad-supported full catalog access for independent recording artists and creators.
+                <p className="text-xs text-gray-400 leading-relaxed min-h-[36px]">
+                  Ad-supported full catalog access with 62 beats per month.
                 </p>
 
                 <div className="space-y-2.5 pt-2 text-xs text-gray-300">
                   <div className="flex items-center gap-2">
-                    <Check className="h-4 w-4 text-[#2dd4bf] shrink-0" />
-                    <span><strong>2 Free Daily Downloads</strong> (resets every 24 hours)</span>
+                    <Check className="h-4 w-4 text-[#e53935] shrink-0" />
+                    <span><strong>2 Free Daily Downloads</strong></span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Check className="h-4 w-4 text-[#2dd4bf] shrink-0" />
-                    <span><strong>+2 Bonus Downloads daily</strong> via 15s sponsored ads</span>
+                    <Check className="h-4 w-4 text-[#e53935] shrink-0" />
+                    <span><strong>+2 Bonus Downloads</strong> via 15s ads</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Check className="h-4 w-4 text-[#2dd4bf] shrink-0" />
+                    <Check className="h-4 w-4 text-[#e53935] shrink-0" />
                     <span>Access to <strong>62 beats every month</strong></span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Check className="h-4 w-4 text-[#2dd4bf] shrink-0" />
-                    <span>24-bit lossless streaming with audio ads</span>
+                    <Check className="h-4 w-4 text-[#e53935] shrink-0" />
+                    <span>24-bit streaming with audio ads</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Check className="h-4 w-4 text-[#2dd4bf] shrink-0" />
-                    <span>Non-exclusive commercial release rights (YouTube, DSPs)</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Check className="h-4 w-4 text-[#2dd4bf] shrink-0" />
-                    <span>Standard pay-as-you-go flexibility (cancel anytime)</span>
+                    <Check className="h-4 w-4 text-[#e53935] shrink-0" />
+                    <span>Non-exclusive commercial release</span>
                   </div>
                 </div>
               </div>
@@ -526,10 +524,10 @@ export default function SubscriptionsPage() {
                   type="button"
                   onClick={() => handleSubscribe('plus')}
                   disabled={isLoading || isPlus}
-                  className={`w-full py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-colors flex items-center justify-center gap-2 cursor-pointer ${
+                  className={`w-full py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center justify-center gap-2 cursor-pointer ${
                     isPlus
-                      ? 'bg-[#04564f] text-[#2dd4bf] cursor-default border border-[#2dd4bf]/30'
-                      : 'bg-[#04564f] hover:bg-[#03453f] text-[#2dd4bf] border border-[#2dd4bf]/40 shadow-lg'
+                      ? 'bg-white/10 text-white cursor-default border border-white/20'
+                      : 'bg-[#e53935] hover:bg-[#d32f2f] text-white shadow-lg shadow-red-500/20'
                   }`}
                 >
                   {isPlus ? (
@@ -540,81 +538,73 @@ export default function SubscriptionsPage() {
                   ) : (
                     <>
                       <Sparkles className="h-3.5 w-3.5" />
-                      <span>{isPro ? 'Switch to Plus (₦3,000)' : 'Subscribe to Plus (₦3,000)'}</span>
+                      <span>{isPro ? 'Switch to Plus (₦3,000)' : 'Subscribe (₦3,000)'}</span>
                     </>
                   )}
                 </button>
               </div>
             </div>
 
-            {/* Plan 2: Caution Pro */}
+            {/* Plan 2: Caution Pro (₦10,000) */}
             <div
               className={`p-6 rounded-2xl bg-[#121316] border relative overflow-hidden transition-all flex flex-col justify-between ${
                 isPro
-                  ? 'border-[#2dd4bf] shadow-xl ring-1 ring-[#2dd4bf]/40'
-                  : 'border-[#04564f]/70 hover:border-[#2dd4bf]/50'
+                  ? 'border-[#e53935] shadow-xl ring-1 ring-[#e53935]/40'
+                  : 'border-[#e53935]/40 hover:border-[#e53935]'
               }`}
             >
-              <div className="absolute top-0 right-0 px-4 py-1 bg-gradient-to-l from-[#04564f] to-[#2dd4bf] text-black text-[10px] font-black uppercase tracking-wider rounded-bl-xl shadow-md">
-                RECOMMENDED • UNLIMITED &amp; STUDIO
+              <div className="absolute top-0 right-0 px-3 py-1 bg-[#e53935] text-white text-[9px] font-black uppercase tracking-wider rounded-bl-xl shadow-md">
+                RECOMMENDED
               </div>
 
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <Zap className="h-4 w-4 text-[#2dd4bf]" />
-                    <h4 className="text-lg font-black text-white">Caution Pro</h4>
+                    <Zap className="h-4 w-4 text-[#e53935]" />
+                    <h4 className="text-base font-black text-white">Caution Pro</h4>
                   </div>
                   {isPro && (
-                    <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-[#04564f] text-[#2dd4bf] border border-[#2dd4bf]/30">
+                    <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-[#e53935] text-white">
                       CURRENT
                     </span>
                   )}
                 </div>
                 <div>
-                  <div className="flex items-baseline gap-2">
-                    <span className="text-3xl font-black text-white">
-                      <span className="font-sans font-semibold text-2xl text-[#2dd4bf] mr-1 select-none">₦</span>
-                      30,000
+                  <div className="flex items-baseline gap-1">
+                    <span className="text-2xl sm:text-3xl font-black text-white">
+                      <span className="font-sans font-semibold text-xl text-[#e53935] mr-1 select-none">₦</span>
+                      10,000
                     </span>
                     <span className="text-xs text-gray-400"> / month</span>
                   </div>
-                  <span className="text-[11px] font-mono text-[#2dd4bf]">
-                    Unlimited Downloads &bull; Studio Recording Suite
+                  <span className="text-[10px] font-mono text-[#e53935] font-bold">
+                    Unlimited &bull; Studio Suite Enabled
                   </span>
                 </div>
-                <p className="text-xs text-gray-400 leading-relaxed">
-                  Ultimate tier for professional artists &amp; producers. Unlimited downloads with no ads and in-browser Studio Suite enabled.
+                <p className="text-xs text-gray-400 leading-relaxed min-h-[36px]">
+                  Unlimited downloads with zero ads &amp; in-browser Studio Suite enabled.
                 </p>
 
                 <div className="space-y-2.5 pt-2 text-xs text-gray-300">
                   <div className="flex items-center gap-2 text-white font-medium">
-                    <Check className="h-4 w-4 text-[#2dd4bf] shrink-0" />
-                    <span><strong>Unlimited Downloads &bull; 100% Ad-Free</strong> (Zero limits)</span>
+                    <Check className="h-4 w-4 text-[#e53935] shrink-0" />
+                    <span><strong>Unlimited Downloads &bull; 100% Ad-Free</strong></span>
                   </div>
                   <div className="flex items-center gap-2 text-white font-medium">
-                    <Check className="h-4 w-4 text-[#2dd4bf] shrink-0" />
-                    <span><strong>Studio Page Enabled (/studio)</strong> &bull; Record vocals &amp; export masters</span>
+                    <Check className="h-4 w-4 text-[#e53935] shrink-0" />
+                    <span><strong>In-Browser Studio Suite (/studio)</strong></span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Check className="h-4 w-4 text-[#2dd4bf] shrink-0" />
-                    <span>Full WAV Trackout Stems (.ZIP) for every beat</span>
+                    <Check className="h-4 w-4 text-[#e53935] shrink-0" />
+                    <span>Full WAV audio downloads</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Check className="h-4 w-4 text-[#2dd4bf] shrink-0" />
-                    <span>100% Royalty retention on commercial releases</span>
+                    <Check className="h-4 w-4 text-[#e53935] shrink-0" />
+                    <span>100% Royalty retention</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Check className="h-4 w-4 text-[#2dd4bf] shrink-0" />
-                    <span>Radio airplay, TV, Cinema &amp; video game sync clearance</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Check className="h-4 w-4 text-[#2dd4bf] shrink-0" />
-                    <span>Automated Content ID clearance</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Check className="h-4 w-4 text-[#2dd4bf] shrink-0" />
-                    <span>Priority A&amp;R playlist pitching &amp; VIP Studio support</span>
+                    <Check className="h-4 w-4 text-[#e53935] shrink-0" />
+                    <span>Radio, TV &amp; video game sync</span>
                   </div>
                 </div>
               </div>
@@ -624,10 +614,10 @@ export default function SubscriptionsPage() {
                   type="button"
                   onClick={() => handleSubscribe('pro')}
                   disabled={isLoading || isPro}
-                  className={`w-full py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-colors flex items-center justify-center gap-2 cursor-pointer ${
+                  className={`w-full py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center justify-center gap-2 cursor-pointer ${
                     isPro
-                      ? 'bg-[#04564f] text-[#2dd4bf] cursor-default border border-[#2dd4bf]/30'
-                      : 'bg-[#04564f] hover:bg-[#03453f] text-[#2dd4bf] border border-[#2dd4bf]/40 shadow-lg'
+                      ? 'bg-white/10 text-white cursor-default border border-white/20'
+                      : 'bg-[#e53935] hover:bg-[#d32f2f] text-white shadow-lg shadow-red-500/25'
                   }`}
                 >
                   {isPro ? (
@@ -638,10 +628,136 @@ export default function SubscriptionsPage() {
                   ) : (
                     <>
                       <Sparkles className="h-3.5 w-3.5" />
-                      <span>Subscribe to Caution Pro (₦30,000)</span>
+                      <span>Subscribe to Pro (₦10,000)</span>
                     </>
                   )}
                 </button>
+              </div>
+            </div>
+
+            {/* Plan 3: Trackout Beat Purchase Plan (₦30,000+) */}
+            <div className="p-6 rounded-2xl bg-[#121316] border border-white/[0.08] hover:border-white/20 transition-all flex flex-col justify-between">
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Sliders className="h-4 w-4 text-[#e53935]" />
+                    <h4 className="text-base font-black text-white">Trackout Beat</h4>
+                  </div>
+                  <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-white/5 text-gray-300 border border-white/10 uppercase">
+                    Stems
+                  </span>
+                </div>
+                <div>
+                  <div className="flex items-baseline gap-1">
+                    <span className="text-2xl sm:text-3xl font-black text-white">
+                      <span className="font-sans font-semibold text-xl text-[#e53935] mr-1 select-none">₦</span>
+                      30,000+
+                    </span>
+                    <span className="text-xs text-gray-400"> / beat</span>
+                  </div>
+                  <span className="text-[10px] font-mono text-gray-400">
+                    Individual Multitrack Stems (.ZIP)
+                  </span>
+                </div>
+                <p className="text-xs text-gray-400 leading-relaxed min-h-[36px]">
+                  Individual stems &amp; master WAV lease for custom arrangement &amp; mixing.
+                </p>
+
+                <div className="space-y-2.5 pt-2 text-xs text-gray-300">
+                  <div className="flex items-center gap-2">
+                    <Check className="h-4 w-4 text-[#e53935] shrink-0" />
+                    <span><strong>Master 24-bit WAV file</strong></span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Check className="h-4 w-4 text-[#e53935] shrink-0" />
+                    <span><strong>Separated trackout stems (.ZIP)</strong></span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Check className="h-4 w-4 text-[#e53935] shrink-0" />
+                    <span>Up to 500,000 monetized streams</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Check className="h-4 w-4 text-[#e53935] shrink-0" />
+                    <span>Music video &amp; broadcast rights</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Check className="h-4 w-4 text-[#e53935] shrink-0" />
+                    <span>Instant signed PDF agreement</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="pt-6">
+                <Link
+                  href="/?tab=browse"
+                  className="w-full py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center justify-center gap-2 cursor-pointer bg-white/10 hover:bg-white/15 text-white border border-white/10"
+                >
+                  <span>Browse Stems (₦30k+)</span>
+                  <ChevronRight className="h-3.5 w-3.5" />
+                </Link>
+              </div>
+            </div>
+
+            {/* Plan 4: Exclusive Rights Plan (₦100,000+) */}
+            <div className="p-6 rounded-2xl bg-[#121316] border border-white/[0.08] hover:border-white/20 transition-all flex flex-col justify-between">
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Shield className="h-4 w-4 text-[#e53935]" />
+                    <h4 className="text-base font-black text-white">Exclusive Rights</h4>
+                  </div>
+                  <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-[#e53935]/15 text-[#e53935] border border-[#e53935]/30 uppercase">
+                    Sole Buyout
+                  </span>
+                </div>
+                <div>
+                  <div className="flex items-baseline gap-1">
+                    <span className="text-2xl sm:text-3xl font-black text-white">
+                      <span className="font-sans font-semibold text-xl text-[#e53935] mr-1 select-none">₦</span>
+                      100,000+
+                    </span>
+                    <span className="text-xs text-gray-400"> / buyout</span>
+                  </div>
+                  <span className="text-[10px] font-mono text-gray-400">
+                    100% Sole Ownership Transfer
+                  </span>
+                </div>
+                <p className="text-xs text-gray-400 leading-relaxed min-h-[36px]">
+                  Full master ownership &amp; unlimited commercial reach. Beat removed from store.
+                </p>
+
+                <div className="space-y-2.5 pt-2 text-xs text-gray-300">
+                  <div className="flex items-center gap-2">
+                    <Check className="h-4 w-4 text-[#e53935] shrink-0" />
+                    <span><strong>100% Sole Master Ownership</strong></span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Check className="h-4 w-4 text-[#e53935] shrink-0" />
+                    <span><strong>Beat retired from marketplace</strong></span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Check className="h-4 w-4 text-[#e53935] shrink-0" />
+                    <span>Unlimited streams, sales &amp; sync</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Check className="h-4 w-4 text-[#e53935] shrink-0" />
+                    <span>Master WAV + All Stems included</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Check className="h-4 w-4 text-[#e53935] shrink-0" />
+                    <span>Full legal copyright transfer</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="pt-6">
+                <Link
+                  href="/?tab=browse"
+                  className="w-full py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center justify-center gap-2 cursor-pointer bg-white/10 hover:bg-white/15 text-white border border-white/10"
+                >
+                  <span>Browse Buyouts (₦100k+)</span>
+                  <ChevronRight className="h-3.5 w-3.5" />
+                </Link>
               </div>
             </div>
           </div>

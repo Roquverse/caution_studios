@@ -14,6 +14,7 @@ export const PricingSection: React.FC<PricingSectionProps> = ({ onSelectPlan }) 
     {
       id: 'plus',
       name: 'Caution Plus',
+      badge: 'Ad-Supported',
       price: '₦3,000',
       period: '/ month',
       description: 'Ad-supported studio tier with 62 beats per month',
@@ -31,14 +32,14 @@ export const PricingSection: React.FC<PricingSectionProps> = ({ onSelectPlan }) 
       id: 'pro',
       name: 'Caution Pro',
       badge: 'Recommended',
-      price: '₦30,000',
+      price: '₦10,000',
       period: '/ month',
       description: 'Unlimited downloads with zero ads & in-browser Studio Suite enabled',
       isRecommended: true,
       features: [
         'Unlimited Beat Downloads (100% Ad-Free)',
         'In-Browser Studio Recording Suite enabled (/studio)',
-        'Full Trackout WAV Stems (.ZIP) included',
+        'Full Master WAV audio downloads included',
         '100% Royalty keeping on your releases',
         'Radio airplay, TV, cinema & music video sync',
         'Automated Content ID clearance',
@@ -46,18 +47,36 @@ export const PricingSection: React.FC<PricingSectionProps> = ({ onSelectPlan }) 
       ]
     },
     {
+      id: 'trackout',
+      name: 'Trackout Beat Plan',
+      badge: 'Stems License',
+      price: '₦30,000+',
+      period: '/ beat',
+      description: 'Individual multitrack stems & master WAV for custom mixing',
+      isRecommended: false,
+      features: [
+        'Full 24-bit/48kHz Master WAV audio file',
+        'Complete separated trackout stems (.ZIP)',
+        'Commercial streaming rights up to 500k plays',
+        'Music video, YouTube & TV broadcast rights',
+        'Full mixing, vocal tracking & arrangement freedom',
+        'Instant signed PDF synchronization agreement'
+      ]
+    },
+    {
       id: 'exclusive',
       name: 'Exclusive Rights Plan',
+      badge: 'Sole Buyout',
       price: '₦100,000+',
-      period: 'one-time',
+      period: '/ buyout',
       description: 'Full master ownership & unlimited commercial reach',
       isRecommended: false,
       features: [
-        '100% Sole Exclusive Ownership',
-        'Unlimited Streams, Sales & Broadcast',
-        'Full Master WAV + Separated Stems',
+        '100% Sole Exclusive Ownership & Master Buyout',
+        'Unlimited Streams, Sales, Radio & Cinema Sync',
+        'Full Master WAV + complete individual trackout stems (.ZIP)',
         'Beat permanently removed from store',
-        'TV, Film, Cinema, Game & Sync rights',
+        'TV, Film, Cinema, Game & Sync rights included',
         'Custom legal contract & copyright transfer'
       ]
     }
@@ -73,18 +92,18 @@ export const PricingSection: React.FC<PricingSectionProps> = ({ onSelectPlan }) 
             Plans for Every Artist
           </h2>
           <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gray-100 text-gray-800">
-            <Disc3 className="h-6 w-6 text-[#04564f]" />
+            <Disc3 className="h-6 w-6 text-[#e53935]" />
           </div>
         </div>
 
-        {/* 3 Pricing Cards Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8">
+        {/* 4 Pricing Cards Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {plans.map((plan) => (
             <div
               key={plan.id}
-              className={`rounded-3xl p-7 sm:p-8 transition-all duration-300 relative flex flex-col justify-between ${
+              className={`rounded-3xl p-6 sm:p-7 transition-all duration-300 relative flex flex-col justify-between ${
                 plan.isRecommended
-                  ? 'border-2 border-[#04564f] shadow-2xl shadow-[#04564f]/15 bg-white ring-1 ring-[#04564f]/20'
+                  ? 'border-2 border-[#e53935] shadow-2xl shadow-[#e53935]/15 bg-white ring-1 ring-[#e53935]/20'
                   : 'border border-gray-200 bg-white hover:border-gray-300 shadow-sm'
               }`}
             >
@@ -95,7 +114,13 @@ export const PricingSection: React.FC<PricingSectionProps> = ({ onSelectPlan }) 
                   <span className="h-1.5 w-1.5 rounded-full bg-gray-200" />
                 </div>
                 {plan.badge && (
-                  <span className="bg-[#04564f] text-white text-[11px] font-bold uppercase tracking-wider px-3 py-1 rounded-full shadow-sm">
+                  <span
+                    className={`text-[11px] font-bold uppercase tracking-wider px-3 py-1 rounded-full shadow-sm ${
+                      plan.isRecommended
+                        ? 'bg-[#e53935] text-white'
+                        : 'bg-gray-100 text-gray-700'
+                    }`}
+                  >
                     {plan.badge}
                   </span>
                 )}
@@ -111,11 +136,11 @@ export const PricingSection: React.FC<PricingSectionProps> = ({ onSelectPlan }) 
 
                 {/* Price Display */}
                 <div className="mt-6 flex items-baseline gap-1.5 pb-6 border-b border-gray-100">
-                  <span className="text-3xl sm:text-4xl font-black text-gray-950">
+                  <span className="text-3xl font-black text-gray-950">
                     {plan.price.replace('+', '')}
                   </span>
                   {plan.price.endsWith('+') && (
-                    <span className="text-xl font-black text-[#04564f]">+</span>
+                    <span className="text-xl font-black text-[#e53935]">+</span>
                   )}
                   <span className="text-xs text-gray-400 font-medium">
                     {plan.period}
@@ -132,12 +157,13 @@ export const PricingSection: React.FC<PricingSectionProps> = ({ onSelectPlan }) 
                     const label = feat.replace(' (optional)', '');
                     return (
                       <div key={idx} className="flex items-start gap-2.5 text-xs text-gray-700">
-                        <Check className={`h-4 w-4 shrink-0 stroke-[2.5] mt-0.5 ${isOptional ? 'text-gray-300' : 'text-[#04564f]'}`} />
+                        <Check
+                          className={`h-4 w-4 shrink-0 stroke-[2.5] mt-0.5 ${
+                            plan.isRecommended ? 'text-[#e53935]' : 'text-gray-900'
+                          }`}
+                        />
                         <span className={`leading-snug ${isOptional ? 'text-gray-400 italic' : ''}`}>
                           {label}
-                          {isOptional && (
-                            <span className="ml-1 text-[10px] not-italic font-semibold text-[#04564f] bg-[#04564f]/10 px-1.5 py-0.5 rounded-full">optional</span>
-                          )}
                         </span>
                       </div>
                     );
@@ -160,7 +186,7 @@ export const PricingSection: React.FC<PricingSectionProps> = ({ onSelectPlan }) 
                   }}
                   className={`w-full text-xs font-bold uppercase tracking-wider py-3 ${
                     plan.isRecommended
-                      ? 'bg-[#04564f] hover:bg-[#03453f] text-white shadow-md'
+                      ? 'bg-[#e53935] hover:bg-[#d32f2f] text-white shadow-md'
                       : 'border-gray-300 text-gray-800 hover:border-black hover:bg-gray-50'
                   }`}
                 >
