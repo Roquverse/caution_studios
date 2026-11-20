@@ -298,8 +298,25 @@ export default function BeatUploadPage() {
                 </span>
                 <input
                   type="file"
-                  accept="audio/mpeg,audio/wav,audio/x-wav,audio/mp4,audio/aac,audio/*,.mp3,.wav,.m4a,.aac,.flac"
-                  onChange={(e) => setAudioFileObj(e.target.files?.[0] || null)}
+                  accept=".wav,.mp3,.m4a,.aac,.flac,.aif,.aiff,audio/wav,audio/wave,audio/mpeg,audio/mp3,audio/x-m4a,audio/aac,audio/flac"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      const ext = file.name.split('.').pop()?.toLowerCase();
+                      const isAudio = file.type.startsWith('audio/') || ['mp3', 'wav', 'm4a', 'aac', 'flac', 'aif', 'aiff'].includes(ext || '');
+                      if (!isAudio) {
+                        alert('Please select a valid audio master file (.wav, .mp3, .m4a, .flac).');
+                        return;
+                      }
+                      if (file.size > 150 * 1024 * 1024) {
+                        alert('Audio file exceeds the maximum allowed size of 150MB.');
+                        return;
+                      }
+                      setAudioFileObj(file);
+                    } else {
+                      setAudioFileObj(null);
+                    }
+                  }}
                   className="sr-only"
                   id="master-audio-input"
                 />

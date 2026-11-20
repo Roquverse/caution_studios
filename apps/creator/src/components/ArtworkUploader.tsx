@@ -8,7 +8,8 @@ import {
   Check,
   Sparkles,
   RefreshCw,
-  AlertCircle
+  AlertCircle,
+  Camera
 } from 'lucide-react';
 
 export interface StudioPresetArtwork {
@@ -197,89 +198,108 @@ export function ArtworkUploader({
         <div className="md:col-span-5">
           <input
             ref={fileInputRef}
+            id="artwork-file-input"
             type="file"
-            accept="image/jpeg,image/png,image/webp"
-            className="hidden"
+            accept="image/*,image/jpeg,image/png,image/webp"
+            className="sr-only"
             onChange={handleInputChange}
           />
 
           {previewUrl ? (
-            <div className="relative group rounded-xl overflow-hidden border-2 border-zinc-700/80 bg-zinc-950 aspect-square shadow-lg shadow-black/40">
-              <img
-                src={previewUrl}
-                alt="Beat Artwork Preview"
-                className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-              />
+            <div className="space-y-2.5">
+              <div className="relative group rounded-xl overflow-hidden border-2 border-zinc-700/80 bg-zinc-950 aspect-square shadow-lg shadow-black/40">
+                <img
+                  src={previewUrl}
+                  alt="Beat Artwork Preview"
+                  className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                />
 
-              {/* Hover Overlay */}
-              <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-2 p-3 text-center backdrop-blur-xs">
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  className="px-3 py-1.5 rounded-xl bg-[#e53935] hover:bg-[#d32f2f] text-white text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer shadow-sm"
-                >
-                  <RefreshCw className="h-3.5 w-3.5" />
-                  <span>Replace Image</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={handleRemoveArtwork}
-                  className="px-2.5 py-1 rounded-md bg-zinc-800/90 hover:bg-rose-500/80 text-white text-[11px] font-medium flex items-center gap-1 transition-colors cursor-pointer"
-                >
-                  <X className="h-3 w-3" />
-                  <span>Clear</span>
-                </button>
-              </div>
+                {/* Desktop Hover Overlay */}
+                <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity hidden md:flex flex-col items-center justify-center gap-2 p-3 text-center backdrop-blur-xs">
+                  <label
+                    htmlFor="artwork-file-input"
+                    className="px-3 py-1.5 rounded-xl bg-[#e53935] hover:bg-[#d32f2f] text-white text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer shadow-sm"
+                  >
+                    <RefreshCw className="h-3.5 w-3.5" />
+                    <span>Replace Image</span>
+                  </label>
+                  <button
+                    type="button"
+                    onClick={handleRemoveArtwork}
+                    className="px-2.5 py-1 rounded-md bg-zinc-800/90 hover:bg-rose-500/80 text-white text-[11px] font-medium flex items-center gap-1 transition-colors cursor-pointer"
+                  >
+                    <X className="h-3 w-3" />
+                    <span>Clear</span>
+                  </button>
+                </div>
 
-              {/* Badge for source */}
-              <div className="absolute top-2 left-2 pointer-events-none">
-                {selectedFile ? (
-                  <span className="bg-emerald-500/90 backdrop-blur-xs text-white text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full shadow-sm">
-                    Custom Upload
-                  </span>
-                ) : selectedPresetId ? (
-                  <span className="bg-[#e53935]/90 backdrop-blur-xs text-zinc-950 text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full shadow-sm">
-                    Preset Theme
-                  </span>
-                ) : (
-                  <span className="bg-zinc-800/80 backdrop-blur-xs text-zinc-300 text-[9px] font-medium px-2 py-0.5 rounded-full shadow-sm">
-                    Current Cover
-                  </span>
+                {/* Badge for source */}
+                <div className="absolute top-2 left-2 pointer-events-none">
+                  {selectedFile ? (
+                    <span className="bg-emerald-500/90 backdrop-blur-xs text-white text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full shadow-sm">
+                      Custom Upload
+                    </span>
+                  ) : selectedPresetId ? (
+                    <span className="bg-[#e53935]/90 backdrop-blur-xs text-zinc-950 text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full shadow-sm">
+                      Preset Theme
+                    </span>
+                  ) : (
+                    <span className="bg-zinc-800/80 backdrop-blur-xs text-zinc-300 text-[9px] font-medium px-2 py-0.5 rounded-full shadow-sm">
+                      Current Cover
+                    </span>
+                  )}
+                </div>
+
+                {selectedFile && (
+                  <div className="absolute bottom-2 inset-x-2 bg-zinc-900/90 backdrop-blur-xs rounded px-2 py-1 text-[10px] text-zinc-300 truncate pointer-events-none border border-zinc-700/50">
+                    {selectedFile.name} ({(selectedFile.size / 1024).toFixed(0)} KB)
+                  </div>
                 )}
               </div>
 
-              {selectedFile && (
-                <div className="absolute bottom-2 inset-x-2 bg-zinc-900/90 backdrop-blur-xs rounded px-2 py-1 text-[10px] text-zinc-300 truncate pointer-events-none border border-zinc-700/50">
-                  {selectedFile.name} ({(selectedFile.size / 1024).toFixed(0)} KB)
-                </div>
-              )}
+              {/* Action buttons (Tappable on mobile & desktop without requiring hover) */}
+              <div className="flex items-center gap-2">
+                <label
+                  htmlFor="artwork-file-input"
+                  className="flex-1 py-2 px-3 rounded-xl bg-zinc-800 hover:bg-[#e53935] hover:text-white text-zinc-200 text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer border border-zinc-700/60 shadow-xs"
+                >
+                  <Camera className="h-3.5 w-3.5 text-[#e53935]" />
+                  <span>Choose Photo / Library</span>
+                </label>
+                <button
+                  type="button"
+                  onClick={handleRemoveArtwork}
+                  className="py-2 px-3 rounded-xl bg-zinc-900 hover:bg-rose-500/20 text-zinc-400 hover:text-rose-300 text-xs font-medium border border-zinc-800 transition-colors cursor-pointer"
+                >
+                  Clear
+                </button>
+              </div>
             </div>
           ) : (
-            <div
+            <label
+              htmlFor="artwork-file-input"
               onDragOver={handleDragOver}
               onDragLeave={handleDragLeave}
               onDrop={handleDrop}
-              onClick={() => fileInputRef.current?.click()}
-              className={`border-2 border-dashed rounded-xl aspect-square flex flex-col items-center justify-center p-6 text-center cursor-pointer transition-all duration-200 ${
+              className={`border-2 border-dashed rounded-xl aspect-square flex flex-col items-center justify-center p-6 text-center cursor-pointer transition-all duration-200 block ${
                 isDragging
                   ? 'border-[#e53935] bg-[#e53935]/10 scale-[1.01]'
                   : 'border-zinc-700 hover:border-[#e53935]/70 bg-zinc-950/70 hover:bg-zinc-900/60'
               }`}
             >
-              <div className="w-12 h-12 rounded-full bg-zinc-800/80 border border-zinc-700 flex items-center justify-center mb-3 text-[#e53935] group-hover:scale-110 transition-transform">
-                <Upload className="h-6 w-6" />
+              <div className="w-12 h-12 rounded-full bg-zinc-800/80 border border-zinc-700 flex items-center justify-center mb-3 text-[#e53935] group-hover:scale-110 transition-transform mx-auto">
+                <Camera className="h-6 w-6" />
               </div>
               <span className="text-xs font-semibold text-white block">
                 Upload Custom Artwork
               </span>
               <span className="text-[11px] text-zinc-400 mt-1 block">
-                Drag and drop image here, or{' '}
-                <span className="text-[#e53935] underline">browse</span>
+                Tap to choose from <span className="text-[#e53935] underline font-semibold">Photo Library</span> or Camera
               </span>
               <span className="text-[10px] text-zinc-500 mt-2 block font-mono">
                 PNG, JPG, WebP up to 10MB
               </span>
-            </div>
+            </label>
           )}
         </div>
 
@@ -291,13 +311,12 @@ export function ArtworkUploader({
                 <Sparkles className="h-3.5 w-3.5 text-[#e53935]" />
                 <span>Need quick artwork? Choose a studio preset</span>
               </span>
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                className="text-[11px] text-[#e53935] hover:underline font-medium"
+              <label
+                htmlFor="artwork-file-input"
+                className="text-[11px] text-[#e53935] hover:underline font-medium cursor-pointer"
               >
                 Upload your own
-              </button>
+              </label>
             </div>
             <p className="text-[11px] text-zinc-400">
               Producers can upload custom album art anytime, or select one of our curated high-resolution studio covers below:
