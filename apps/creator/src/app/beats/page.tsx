@@ -74,6 +74,9 @@ export default function BeatsCatalogPage() {
   const [beatsList, setBeatsList] = useState<any[]>([]);
   const [totalPlays, setTotalPlays] = useState(0);
   const [totalDownloads, setTotalDownloads] = useState(0);
+  const [totalEarningsNgn, setTotalEarningsNgn] = useState(0);
+  const [availableBalanceNgn, setAvailableBalanceNgn] = useState(0);
+  const [totalSalesEarningsNgn, setTotalSalesEarningsNgn] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [artworkModalBeat, setArtworkModalBeat] = useState<{ id: string; title: string; coverUrl?: string } | null>(null);
@@ -111,12 +114,18 @@ export default function BeatsCatalogPage() {
 
         if (res.ok) {
           const payload = await res.json();
-          if (isMounted && Array.isArray(payload.beats) && payload.beats.length > 0) {
-            const formatted = payload.beats.map(formatDbBeat);
-            setBeatsList(formatted);
+          if (isMounted) {
             setTotalPlays(Number(payload.totalPlaysCount || 0));
             setTotalDownloads(Number(payload.totalDownloadsCount || 0));
-            return;
+            setTotalEarningsNgn(Number(payload.totalEarningsNgn || 0));
+            setAvailableBalanceNgn(Number(payload.availableBalanceNgn || 0));
+            setTotalSalesEarningsNgn(Number(payload.totalSalesEarningsNgn || 0));
+
+            if (Array.isArray(payload.beats) && payload.beats.length > 0) {
+              const formatted = payload.beats.map(formatDbBeat);
+              setBeatsList(formatted);
+              return;
+            }
           }
         }
 
@@ -228,8 +237,19 @@ export default function BeatsCatalogPage() {
   });
 
   const totalSalesCount = beatsList.reduce((sum, b) => sum + (b.salesCount || 0), 0);
-  const totalRevenueUsd = Math.round((totalPlays * 0.05 + totalDownloads * 0.5 + totalSalesCount * 50) || 284);
-  const combinedActivity = Math.max(totalPlays, totalDownloads, totalPlays + totalDownloads);
+  
+  // Real producer generated income in Naira:
+  // Derived from telemetry (actual order_items & licenses net split + download incentive rewards)
+  // or catalog sold beats (salesCount * 80% producer cut)
+  const computedSalesFromBeatsNgn = beatsList.reduce((sum, b) => {
+    const cut = b.pricePremiumNgn ? Math.round(b.pricePremiumNgn * 0.8) : 40000;
+    return sum + ((b.salesCount || 0) * cut);
+  }, 0);
+  const actualGeneratedIncomeNgn = totalEarningsNgn > 0
+    ? totalEarningsNgn
+    : (totalSalesEarningsNgn > 0 ? totalSalesEarningsNgn : computedSalesFromBeatsNgn);
+
+  const combinedActivity = totalPlays + totalDownloads;
   const thresholdPct = Math.min(100, Math.round((combinedActivity / 10000) * 100));
 
   return (
@@ -291,8 +311,8 @@ export default function BeatsCatalogPage() {
                   <span className="text-2xl font-black font-mono text-white">
                     {totalPlays.toLocaleString()}
                   </span>
-                  <span className="text-[11px] font-bold text-emerald-400 flex items-center">
-                    ↑ 12%
+                  <span className="text-[11px] font-bold text-gray-400 flex items-center">
+                    Live Streams
                   </span>
                 </div>
               </div>
@@ -325,8 +345,8 @@ export default function BeatsCatalogPage() {
                   <span className="text-2xl font-black font-mono text-white">
                     {totalDownloads.toLocaleString()}
                   </span>
-                  <span className="text-[11px] font-bold text-emerald-400 flex items-center">
-                    ↑ 8%
+                  <span className="text-[11px] font-bold text-gray-400 flex items-center">
+                    Commercial DLs
                   </span>
                 </div>
               </div>
@@ -346,18 +366,23 @@ export default function BeatsCatalogPage() {
           </div>
         </div>
 
-        {/* Card 3: Total Revenue */}
+        {/* Card 3: Total Generated Income (Naira) */}
         <div className="relative rounded-2xl border border-white/[0.06] bg-[#13151b] p-5 shadow-lg flex flex-col justify-between overflow-hidden group hover:border-white/[0.12] transition-colors">
           <div className="flex items-start justify-between gap-3">
-            <div>
-              <span className="text-xs text-gray-400 font-medium block">Total Revenue (USD)</span>
-              <div className="flex items-baseline gap-2 mt-0.5">
-                <span className="text-2xl font-black font-mono text-white">
-                  ${totalRevenueUsd.toLocaleString()}
-                </span>
-                <span className="text-[11px] font-bold text-emerald-400 flex items-center">
-                  ↑ 24%
-                </span>
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0 font-mono font-black text-lg">
+                ₦
+              </div>
+              <div>
+                <span className="text-xs text-gray-400 font-medium block">Total Generated Income</span>
+                <div className="flex items-baseline gap-2 mt-0.5">
+                  <span className="text-2xl font-black font-mono text-white">
+                    ₦{actualGeneratedIncomeNgn.toLocaleString()}
+                  </span>
+                  <span className="text-[11px] font-bold text-emerald-400 flex items-center">
+                    80% Cut
+                  </span>
+                </div>
               </div>
             </div>
           </div>
@@ -366,7 +391,7 @@ export default function BeatsCatalogPage() {
             <svg className="w-full h-8 overflow-visible" viewBox="0 0 160 32" fill="none">
               <path
                 d="M0 28 C 30 26, 60 22, 90 14 C 120 6, 140 12, 160 4"
-                stroke="#e5e7eb"
+                stroke="#10b981"
                 strokeWidth="2"
                 strokeLinecap="round"
                 fill="none"
@@ -392,18 +417,22 @@ export default function BeatsCatalogPage() {
                 {combinedActivity.toLocaleString()}
               </span>
               <span className="text-xs font-mono text-gray-500">
-                / 10,000 plays
+                / 10,000 plays &amp; dls
               </span>
             </div>
           </div>
 
           {/* Red Progress Bar */}
-          <div className="mt-4 space-y-1">
+          <div className="mt-4 space-y-1.5">
             <div className="w-full h-2 rounded-full bg-white/[0.06] overflow-hidden">
               <div
-                className="h-full rounded-full bg-[#e53935] transition-all duration-500 shadow-sm shadow-[#e53935]/50"
-                style={{ width: `${Math.max(4, thresholdPct)}%` }}
+                className="h-full rounded-full bg-gradient-to-r from-[#e53935] to-amber-400 transition-all duration-500 shadow-sm shadow-[#e53935]/50"
+                style={{ width: `${Math.max(thresholdPct, combinedActivity > 0 ? 3 : 0)}%` }}
               />
+            </div>
+            <div className="flex items-center justify-between text-[10px] text-gray-400 font-mono">
+              <span>Pay Threshold Goal</span>
+              <span className="text-amber-300 font-semibold">₦30,000 payout</span>
             </div>
           </div>
         </div>
