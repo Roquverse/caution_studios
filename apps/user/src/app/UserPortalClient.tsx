@@ -32,9 +32,22 @@ import {
   Lock,
   Megaphone,
   Sliders,
-  ShieldCheck
+  ShieldCheck,
+  Compass,
+  Trophy,
+  LayoutGrid,
+  Music,
+  Repeat,
+  Shuffle,
+  Maximize2,
+  ChevronDown,
+  Upload,
+  ArrowRight,
+  Flame,
+  Filter
 } from 'lucide-react';
-import { audioSynth, TrackRow } from '@caution/ui';
+import { audioSynth, TrackRow, WaveformVisualizer } from '@caution/ui';
+import { MarketplaceBeatCard } from '../components/MarketplaceBeatCard';
 import { UserDropdown } from '../components/UserDropdown';
 import { UserAdModal } from '../components/UserAdModal';
 import { UserMarketplaceView, isFreeBeat } from '../components/UserMarketplaceView';
@@ -119,9 +132,22 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
   const [isDownloadLimitModalOpen, setIsDownloadLimitModalOpen] = useState(false);
   const [rewardNotification, setRewardNotification] = useState<string | null>(null);
   const [paidBeatPurchaseTrack, setPaidBeatPurchaseTrack] = useState<TrackItem | null>(null);
-  const [purchaseTier, setPurchaseTier] = useState<'premium' | 'exclusive'>('premium');
+  const [purchaseTier, setPurchaseTier] = useState<'mp3' | 'wav' | 'stems' | 'exclusive'>('stems');
   const [purchaseComplete, setPurchaseComplete] = useState(false);
   const [isPurchasingBeat, setIsPurchasingBeat] = useState(false);
+
+  // Redesign filters & sorting state
+  const [sortOption, setSortOption] = useState<'popular' | 'latest' | 'price_low' | 'price_high'>('popular');
+  const [bpmFilter, setBpmFilter] = useState<'all' | 'slow' | 'mid' | 'fast'>('all');
+  const [keyFilter, setKeyFilter] = useState<string>('all');
+  const [moodFilter, setMoodFilter] = useState<string>('all');
+  const [priceFilter, setPriceFilter] = useState<'all' | 'free' | 'paid'>('all');
+  const [userProfile, setUserProfile] = useState<{ name: string; avatar: string }>({
+    name: 'Holy',
+    avatar: '/images/artist_studio_mic.jpg'
+  });
+  const [purchasedBeats, setPurchasedBeats] = useState<any[]>([]);
+  const [loadingPurchased, setLoadingPurchased] = useState(false);
   const downloadQuota = useDailyDownloadQuota();
   const router = useRouter();
 
@@ -214,6 +240,25 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
     }
     loadInvoices();
   }, []);
+
+  // Load purchased beats / licenses
+  useEffect(() => {
+    async function loadPurchasedBeats() {
+      try {
+        setLoadingPurchased(true);
+        const res = await fetch('/api/library');
+        if (res.ok) {
+          const data = await res.json();
+          if (data.items) setPurchasedBeats(data.items);
+        }
+      } catch (err) {
+        console.warn('Could not load purchased beats:', err);
+      } finally {
+        setLoadingPurchased(false);
+      }
+    }
+    loadPurchasedBeats();
+  }, [activeNav]);
 
   // Audio timer fallback for synthesizers or audio events
   useEffect(() => {
@@ -847,6 +892,33 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
     return tracks.sort((a, b) => (b.playCount || 0) - (a.playCount || 0)).slice(0, 5);
   }, [allKnownTracks]);
 
+  // Redesign Right Sidebar: Top Producers
+  const topProducersList = useMemo(() => {
+    const curated = [
+      { name: 'Olamide Beats', beatsCount: '1.2K beats', coverUrl: '/images/african_producer_beats.jpg', handle: 'olamidebeats' },
+      { name: 'Trillz', beatsCount: '928 beats', coverUrl: '/images/african_mixing_engineer.jpg', handle: 'trillz' },
+      { name: 'Jay Cactus', beatsCount: '750 beats', coverUrl: '/images/artist_studio_mic.jpg', handle: 'jaycactus' },
+      { name: 'Maceo', beatsCount: '620 beats', coverUrl: '/images/african_vocal_session.jpg', handle: 'maceo' }
+    ];
+
+    if (producers && producers.length >= 4) {
+      return producers.slice(0, 4).map((p, idx) => ({
+        name: p.name,
+        beatsCount: `${playlistRows.filter((b) => b.artist === p.name).length * 10 + 240} beats`,
+        coverUrl: p.coverUrl || curated[idx % curated.length].coverUrl,
+        handle: p.handle
+      }));
+    }
+
+    return curated;
+  }, [producers, playlistRows]);
+
+  // Redesign Right Sidebar: This Week's Charts
+  const thisWeeksCharts = useMemo(() => {
+    const sorted = [...playlistRows].sort((a, b) => (b.playCount || 0) - (a.playCount || 0));
+    return sorted.slice(0, 3);
+  }, [playlistRows]);
+
   // Top Rated Song - sorted by play count or first master beat
   const topRatedSong = useMemo(() => {
     if (!playlistRows || playlistRows.length === 0) return null;
@@ -892,9 +964,9 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
     return result;
   }, [playlistRows]);
 
-  // Search and genre filtered rows
+  // Search, genre, bpm, and price filtered rows with sorting
   const filteredRows = useMemo(() => {
-    let rows = playlistRows;
+    let rows = [...playlistRows];
 
     if (selectedGenre && selectedGenre !== 'All' && selectedGenre !== 'All Genres') {
       const normSelected = selectedGenre.toLowerCase().replace(/s$/, '').trim();
@@ -919,8 +991,32 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
       );
     }
 
+    if (bpmFilter === 'slow') {
+      rows = rows.filter((r) => (r.bpm || 120) < 100);
+    } else if (bpmFilter === 'mid') {
+      rows = rows.filter((r) => (r.bpm || 120) >= 100 && (r.bpm || 120) <= 130);
+    } else if (bpmFilter === 'fast') {
+      rows = rows.filter((r) => (r.bpm || 120) > 130);
+    }
+
+    if (priceFilter === 'free') {
+      rows = rows.filter((r) => isFreeBeat(r));
+    } else if (priceFilter === 'paid') {
+      rows = rows.filter((r) => !isFreeBeat(r));
+    }
+
+    if (sortOption === 'popular') {
+      rows.sort((a, b) => (b.playCount || 0) - (a.playCount || 0));
+    } else if (sortOption === 'latest') {
+      rows.sort((a, b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime());
+    } else if (sortOption === 'price_low') {
+      rows.sort((a, b) => (a.priceNgn || 0) - (b.priceNgn || 0));
+    } else if (sortOption === 'price_high') {
+      rows.sort((a, b) => (b.priceNgn || 0) - (a.priceNgn || 0));
+    }
+
     return rows;
-  }, [playlistRows, selectedGenre, searchQuery]);
+  }, [playlistRows, selectedGenre, searchQuery, bpmFilter, priceFilter, sortOption]);
 
   const formatTime = (seconds: number) => {
     const m = Math.floor(seconds / 60);
@@ -1017,33 +1113,32 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
         }}
       />
 
-      {/* 1. TOP HEADER - MOBILE RESPONSIVE */}
-      <header className="h-14 border-b border-[#2a2d34] bg-[#16181c] px-3 sm:px-4 flex items-center justify-between gap-3 sticky top-0 z-40">
+      {/* 1. TOP HEADER - EDITORIAL MUSIC MARKETPLACE */}
+      <header className="h-16 border-b border-white/[0.06] bg-[#121316]/95 backdrop-blur-md px-4 sm:px-6 flex items-center justify-between gap-4 sticky top-0 z-40">
         <div className="flex items-center shrink-0">
-          <Link href="/" className="inline-flex items-center">
-            <img
-              src="/logo.png"
-              alt="Caution Studio"
-              className="h-6 sm:h-7 w-auto object-contain brightness-0 invert max-w-[120px] sm:max-w-[160px]"
-            />
+          <Link href="/" className="inline-flex items-center gap-2 group">
+            <span className="text-xl font-black tracking-tight text-white group-hover:text-red-500 transition-colors">
+              Caution<span className="text-[#e53935]">.</span>
+            </span>
           </Link>
         </div>
 
-        <div className="hidden md:flex flex-1 max-w-md mx-4">
+        {/* Center Search Bar */}
+        <div className="hidden md:flex flex-1 max-w-xl mx-4">
           <div className="relative flex items-center w-full">
-            <Search className="h-4 w-4 text-[#8b8f98] absolute left-3 pointer-events-none" />
+            <Search className="h-4 w-4 text-gray-400 absolute left-4 pointer-events-none" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search beats, artists, projects"
-              className="w-full h-9 pl-9 pr-8 rounded-full bg-[#111214] border border-[#2a2d34] text-[13px] text-white placeholder-[#6b7078] focus:outline-none focus:border-[#4a4e57]"
+              placeholder="Search beats, producers, genres..."
+              className="w-full h-10 pl-11 pr-9 rounded-full bg-[#0d0e12] border border-white/[0.08] text-xs text-white placeholder-gray-500 focus:outline-none focus:border-[#e53935] transition-all"
             />
             {searchQuery && (
               <button
                 type="button"
                 onClick={() => setSearchQuery('')}
-                className="absolute right-3 text-[#8b8f98] hover:text-white"
+                className="absolute right-3.5 text-gray-400 hover:text-white"
                 title="Clear search"
               >
                 <X className="h-4 w-4" />
@@ -1052,15 +1147,17 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
           </div>
         </div>
 
-        <div className="flex items-center gap-2 sm:gap-2.5 shrink-0">
-          <button
-            type="button"
-            onClick={() => handleOpenRecordStudio()}
-            className="hidden md:inline-flex items-center gap-1.5 h-8 px-3.5 rounded-full bg-[#e53935] hover:bg-[#d32f2f] text-white text-[12px] font-semibold"
+        <div className="flex items-center gap-3 shrink-0">
+          {/* Upload Button in Caution Red */}
+          <a
+            href="https://creator.cautionstudioz.com/beats/upload"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hidden sm:inline-flex items-center gap-1.5 h-9 px-4 rounded-full bg-[#e53935] hover:bg-[#d32f2f] text-white text-xs font-bold transition-all shadow-md shadow-red-500/20 active:scale-95 cursor-pointer"
           >
-            <Mic className="h-3.5 w-3.5" />
-            Create
-          </button>
+            <Upload className="h-3.5 w-3.5" />
+            <span>Upload</span>
+          </a>
 
           {/* Hamburger Menu Trigger (Mobile only) */}
           <button
@@ -1072,334 +1169,279 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
             {mobileMenuOpen ? <X className="h-5 w-5 text-white" /> : <Menu className="h-5 w-5 text-white" />}
           </button>
 
-          {/* User Profile Dropdown (Always visible on far right) */}
+          {/* User Profile Dropdown */}
           <UserDropdown />
         </div>
       </header>
 
       {/* MOBILE NAVIGATION DRAWER */}
       {mobileMenuOpen && (
-        <div className="fixed inset-0 top-14 z-50 md:hidden bg-[#16181c] border-b border-[#2a2d34] p-4 overflow-y-auto">
+        <div className="fixed inset-0 top-16 z-50 md:hidden bg-[#121316] border-b border-white/[0.08] p-5 overflow-y-auto space-y-6">
           {/* Mobile Search */}
-          <div className="relative flex items-center w-full mb-5">
+          <div className="relative flex items-center w-full">
             <Search className="h-4 w-4 text-gray-400 absolute left-3.5 pointer-events-none" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search by artists, songs or albums"
-              className="w-full h-11 pl-10 pr-9 rounded-xl bg-[#141518] border border-white/[0.08] text-xs text-white placeholder-gray-500 focus:outline-none focus:border-[#2dd4bf] transition-colors"
+              placeholder="Search beats, producers, genres..."
+              className="w-full h-11 pl-10 pr-9 rounded-xl bg-[#0d0e12] border border-white/[0.08] text-xs text-white placeholder-gray-500 focus:outline-none focus:border-[#e53935]"
             />
             {searchQuery && (
               <button
                 type="button"
                 onClick={() => setSearchQuery('')}
                 className="absolute right-3 text-gray-400 hover:text-white"
-                title="Clear search"
               >
                 <X className="h-4 w-4" />
               </button>
             )}
           </div>
 
-          <div className="space-y-6">
-            {/* Primary Nav */}
-            <nav className="space-y-1">
-              <button
-                type="button"
-                onClick={() => {
-                  setActiveNav('feed');
-                  setMobileMenuOpen(false);
-                }}
-                className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-medium transition-colors cursor-pointer ${
-                  activeNav === 'feed'
-                    ? 'text-white bg-white/[0.08] font-bold'
-                    : 'text-gray-400 hover:text-white hover:bg-white/[0.03]'
-                }`}
-              >
-                <Activity className={`h-4 w-4 ${activeNav === 'feed' ? 'text-[#2dd4bf]' : 'text-gray-400'}`} />
-                <span className={activeNav === 'feed' ? 'text-[#2bbbad]' : ''}>Home</span>
-              </button>
+          {/* Discover Section */}
+          <div>
+            <p className="text-[11px] font-bold text-gray-500 uppercase tracking-wider px-2 mb-2">Discover</p>
+            <div className="space-y-1">
+              {[
+                { id: 'discover', label: 'Discover', icon: Compass },
+                { id: 'browse', label: 'Browse Beats', icon: Music },
+                { id: 'charts', label: 'Top Charts', icon: Trophy },
+                { id: 'genres', label: 'Genres', icon: LayoutGrid },
+                { id: 'playlists', label: 'Playlists', icon: ListMusic }
+              ].map((item) => {
+                const Icon = item.icon;
+                const isActive = activeNav === item.id || (item.id === 'discover' && activeNav === 'feed');
+                return (
+                  <button
+                    key={'mob-nav-' + item.id}
+                    type="button"
+                    onClick={() => {
+                      setActiveNav(item.id);
+                      setMobileMenuOpen(false);
+                    }}
+                    className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                      isActive
+                        ? 'bg-[#e53935] text-white shadow-md shadow-red-500/20'
+                        : 'text-gray-400 hover:text-white hover:bg-white/[0.04]'
+                    }`}
+                  >
+                    <Icon className="h-4 w-4" />
+                    <span>{item.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
 
+          {/* Library Section */}
+          <div>
+            <p className="text-[11px] font-bold text-gray-500 uppercase tracking-wider px-2 mb-2">Library</p>
+            <div className="space-y-1">
               <button
                 type="button"
                 onClick={() => {
-                  setActiveNav('playlists');
+                  setActiveNav('purchased');
                   setMobileMenuOpen(false);
                 }}
-                className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-medium transition-colors cursor-pointer ${
-                  activeNav === 'playlists'
-                    ? 'text-white bg-white/[0.08] font-bold'
-                    : 'text-gray-400 hover:text-white hover:bg-white/[0.03]'
-                }`}
-              >
-                <ListMusic className="h-4 w-4 text-gray-400" />
-                <span>Playlists</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setActiveNav('marketplace');
-                  setMobileMenuOpen(false);
-                }}
-                className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-medium transition-colors cursor-pointer ${
-                  activeNav === 'marketplace'
-                    ? 'text-[#E8B896] bg-[#E8B896]/10 font-bold'
-                    : 'text-gray-400 hover:text-white hover:bg-white/[0.03]'
+                className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                  activeNav === 'purchased'
+                    ? 'bg-white/[0.08] text-white font-bold'
+                    : 'text-gray-400 hover:text-white hover:bg-white/[0.04]'
                 }`}
               >
                 <div className="flex items-center gap-3">
-                  <ShoppingBag className={`h-4 w-4 ${activeNav === 'marketplace' ? 'text-[#E8B896]' : 'text-gray-400'}`} />
-                  <span className={activeNav === 'marketplace' ? 'text-[#E8B896]' : ''}>Beat Store</span>
+                  <ShoppingBag className="h-4 w-4 text-[#e53935]" />
+                  <span>Purchased</span>
                 </div>
-                <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-[#E8B896]/20 text-[#E8B896] uppercase">
-                  Store
-                </span>
               </button>
 
               <button
                 type="button"
                 onClick={() => {
+                  setActiveNav('fav');
                   setMobileMenuOpen(false);
-                  handleOpenRecordStudio();
                 }}
-                className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-lg text-[13px] font-semibold text-white bg-[#e53935] hover:bg-[#d32f2f] cursor-pointer"
+                className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                  activeNav === 'fav'
+                    ? 'bg-white/[0.08] text-white font-bold'
+                    : 'text-gray-400 hover:text-white hover:bg-white/[0.04]'
+                }`}
               >
                 <div className="flex items-center gap-3">
-                  <Mic className="h-4 w-4" />
-                  <span>Studio</span>
+                  <Heart className="h-4 w-4 text-red-500" />
+                  <span>Favorites</span>
                 </div>
-              </button>
-
-              <Link
-                href="/promote"
-                onClick={() => setMobileMenuOpen(false)}
-                className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-lg text-xs font-semibold text-amber-300 hover:text-white bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/20 transition-colors mt-2"
-              >
-                <div className="flex items-center gap-3">
-                  <Megaphone className="h-4 w-4 text-amber-400" />
-                  <span>Promote Music (Ads)</span>
-                </div>
-                <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-amber-400/20 text-amber-300 uppercase">
-                  Ads
-                </span>
-              </Link>
-            </nav>
-
-            {/* YOUR MUSIC */}
-            <div>
-              <p className="text-[11px] font-medium text-[#8b8f98] px-3.5 mb-2">
-                Library
-              </p>
-              <div className="space-y-1">
-                <Link
-                  href="/library"
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold text-white bg-white/[0.04] hover:bg-white/[0.08] transition-colors"
-                >
-                  <div className="flex items-center gap-3">
-                    <ShieldCheck className="h-4 w-4 text-[#2dd4bf]" />
-                    <span>Purchased Beats</span>
-                  </div>
-                  <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-[#2dd4bf]/20 text-[#2dd4bf]">
-                    OWNED
+                {favoritesList.length > 0 && (
+                  <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-white/10 text-white">
+                    {favoritesList.length}
                   </span>
-                </Link>
-                {[
-                  { id: 'fav', label: 'Favourites', icon: Heart, count: favoritesList.length, activeColor: 'text-red-500' },
-                  { id: 'later', label: 'Listen Later', icon: Clock, count: listenLaterList.length, activeColor: 'text-[#2dd4bf]' },
-                  { id: 'history', label: 'History', icon: Calendar, count: listeningHistory.length, activeColor: 'text-[#2dd4bf]' }
-                ].map((item) => {
-                  const Icon = item.icon;
-                  const isActive = activeNav === item.id;
-                  return (
-                    <button
-                      key={'mobile-' + item.id}
-                      type="button"
-                      onClick={() => {
-                        setActiveNav(item.id);
-                        setMobileMenuOpen(false);
-                      }}
-                      className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-medium transition-colors cursor-pointer ${
-                        isActive ? 'text-white bg-white/[0.08] font-bold' : 'text-gray-400 hover:text-white hover:bg-white/[0.03]'
-                      }`}
-                    >
-                      <div className="flex items-center gap-3">
-                        <Icon className={`h-4 w-4 ${isActive ? item.activeColor : 'text-gray-400'}`} />
-                        <span className={isActive ? 'font-semibold text-white' : ''}>{item.label}</span>
-                      </div>
-                      {item.count > 0 && (
-                        <span className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded ${
-                          isActive ? 'bg-white/10 text-white' : 'text-gray-500'
-                        }`}>
-                          {item.count}
-                        </span>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
+                )}
+              </button>
 
-            {/* Mobile Actions: Channel & Upgrade */}
-            <div className="pt-4 border-t border-white/[0.06] space-y-2">
               <button
                 type="button"
                 onClick={() => {
-                  setShowUpgradeModal(true);
+                  setActiveNav('history');
                   setMobileMenuOpen(false);
                 }}
-                className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-lg bg-white/5 text-[13px] font-medium text-[#d7dbe2] hover:bg-white/8 cursor-pointer"
+                className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                  activeNav === 'history'
+                    ? 'bg-white/[0.08] text-white font-bold'
+                    : 'text-gray-400 hover:text-white hover:bg-white/[0.04]'
+                }`}
               >
-                <div className="flex items-center gap-2">
-                  <span>Channel</span>
+                <div className="flex items-center gap-3">
+                  <Clock className="h-4 w-4 text-gray-400" />
+                  <span>Listening History</span>
                 </div>
-                <ChevronRight className="h-3.5 w-3.5" />
               </button>
-
-              <Link
-                href="/subscriptions"
-                onClick={() => setMobileMenuOpen(false)}
-                className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl bg-white/[0.03] border border-white/[0.06] text-xs font-medium text-gray-300 hover:text-white transition-colors"
-              >
-                <span>Subscription Plans</span>
-                <ChevronRight className="h-3.5 w-3.5 text-gray-500" />
-              </Link>
             </div>
+          </div>
+
+          {/* Open Studio Button */}
+          <div className="pt-2">
+            <button
+              type="button"
+              onClick={() => {
+                setMobileMenuOpen(false);
+                handleOpenRecordStudio();
+              }}
+              className="w-full flex items-center justify-center gap-2.5 px-4 py-3 rounded-xl text-xs font-bold text-white bg-white/[0.05] border border-white/10 hover:bg-white/[0.08] transition-colors"
+            >
+              <Sliders className="h-4 w-4 text-[#e53935]" />
+              <span>Open Studio</span>
+            </button>
           </div>
         </div>
       )}
 
-      {/* 2. BODY CONTENT (3-COLUMN SPLIT) */}
+      {/* 2. BODY CONTENT (3-COLUMN MARKETPLACE LAYOUT) */}
       <div className="flex-1 flex w-full max-w-full min-w-0 overflow-x-hidden">
         {/* LEFT NAVIGATION SIDEBAR */}
-        <aside className="w-56 border-r border-[#2a2d34] bg-[#16181c] px-3 py-4 shrink-0 hidden md:flex flex-col justify-between">
+        <aside className="w-60 border-r border-white/[0.06] bg-[#121316] p-4 shrink-0 hidden md:flex flex-col justify-between">
           <div className="space-y-6">
-            <nav className="space-y-1">
-              <button
-                type="button"
-                onClick={() => setActiveNav('feed')}
-                className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
-                  activeNav === 'feed'
-                    ? 'text-white bg-white/[0.04]'
-                    : 'text-gray-400 hover:text-white hover:bg-white/[0.02]'
-                }`}
-              >
-                <Activity className={`h-4 w-4 ${activeNav === 'feed' ? 'text-[#2bbbad]' : 'text-[#8b8f98]'}`} />
-                <span className={activeNav === 'feed' ? 'font-semibold text-white' : ''}>Home</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setActiveNav('playlists')}
-                className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
-                  activeNav === 'playlists'
-                    ? 'text-white bg-white/[0.04]'
-                    : 'text-gray-400 hover:text-white hover:bg-white/[0.02]'
-                }`}
-              >
-                <ListMusic className="h-4 w-4 text-gray-400" />
-                <span>Playlists</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setActiveNav('marketplace')}
-                className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
-                  activeNav === 'marketplace'
-                    ? 'text-[#E8B896] bg-[#E8B896]/10 font-bold'
-                    : 'text-gray-400 hover:text-white hover:bg-white/[0.02]'
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  <ShoppingBag className={`h-4 w-4 ${activeNav === 'marketplace' ? 'text-[#E8B896]' : 'text-gray-400'}`} />
-                  <span className={activeNav === 'marketplace' ? 'text-[#E8B896]' : ''}>Beat Store</span>
-                </div>
-                <span className="text-[9px] font-mono font-bold px-1.5 py-0.2 rounded bg-[#E8B896]/20 text-[#E8B896] uppercase">
-                  Store
-                </span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleOpenRecordStudio()}
-                className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] font-semibold text-white bg-[#e53935] hover:bg-[#d32f2f] cursor-pointer mt-2"
-                title="Open Studio"
-              >
-                <Mic className="h-4 w-4" />
-                <span>Studio</span>
-              </button>
-
-              <Link
-                href="/promote"
-                className="w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-semibold text-amber-300 hover:text-white bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/20 transition-colors mt-2"
-                title="Promote Your Song with Audio Ads"
-              >
-                <div className="flex items-center gap-2.5">
-                  <Megaphone className="h-4 w-4 text-amber-400" />
-                  <span>Promote Music</span>
-                </div>
-                <span className="text-[9px] font-mono font-bold px-1.5 py-0.2 rounded bg-amber-400/20 text-amber-300 uppercase">
-                  Ads
-                </span>
-              </Link>
-            </nav>
-
+            {/* Discover Section */}
             <div>
-              <p className="text-[11px] font-medium text-[#8b8f98] px-3 mb-1">
-                Library
+              <p className="text-[11px] font-bold text-gray-500 uppercase tracking-wider px-3 mb-2">
+                Discover
               </p>
-              <div className="space-y-0.5">
-                <Link
-                  href="/library"
-                  className="w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium text-gray-300 hover:text-white hover:bg-white/[0.04] transition-colors group mb-0.5"
-                  title="View your purchased beats, WAVs and stems"
-                >
-                  <div className="flex items-center gap-3">
-                    <ShieldCheck className="h-4 w-4 text-[#2dd4bf]" />
-                    <span className="font-semibold text-white">Purchased Beats</span>
-                  </div>
-                  <span className="text-[9px] font-mono font-bold px-1.5 py-0.2 rounded bg-[#2dd4bf]/20 text-[#2dd4bf]">
-                    OWNED
-                  </span>
-                </Link>
+              <nav className="space-y-1">
                 {[
-                  { id: 'fav', label: 'Favourites', icon: Heart, count: favoritesList.length, activeColor: 'text-red-500' },
-                  { id: 'later', label: 'Listen Later', icon: Clock, count: listenLaterList.length, activeColor: 'text-[#2dd4bf]' },
-                  { id: 'history', label: 'History', icon: Calendar, count: listeningHistory.length, activeColor: 'text-[#2dd4bf]' }
+                  { id: 'discover', label: 'Discover', icon: Compass },
+                  { id: 'browse', label: 'Browse Beats', icon: Music },
+                  { id: 'charts', label: 'Top Charts', icon: Trophy },
+                  { id: 'genres', label: 'Genres', icon: LayoutGrid },
+                  { id: 'playlists', label: 'Playlists', icon: ListMusic }
                 ].map((item) => {
                   const Icon = item.icon;
-                  const isActive = activeNav === item.id;
+                  const isActive = activeNav === item.id || (item.id === 'discover' && activeNav === 'feed');
                   return (
                     <button
-                      key={item.id}
+                      key={'left-nav-' + item.id}
                       type="button"
                       onClick={() => setActiveNav(item.id)}
-                      className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
-                        isActive ? 'text-white bg-white/[0.04]' : 'text-gray-400 hover:text-white'
+                      className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                        isActive
+                          ? 'bg-[#e53935] text-white shadow-md shadow-red-500/20'
+                          : 'text-gray-400 hover:text-white hover:bg-white/[0.04]'
                       }`}
                     >
-                      <div className="flex items-center gap-3">
-                        <Icon className={`h-4 w-4 ${isActive ? item.activeColor : 'text-gray-400'}`} />
-                        <span className={isActive ? 'font-semibold text-white' : ''}>{item.label}</span>
-                      </div>
-                      {item.count > 0 && (
-                        <span className={`text-[10px] font-mono font-bold px-1.5 py-0.2 rounded ${
-                          isActive ? 'bg-white/10 text-white' : 'text-gray-500'
-                        }`}>
-                          {item.count}
-                        </span>
-                      )}
+                      <Icon className="h-4 w-4" />
+                      <span>{item.label}</span>
                     </button>
                   );
                 })}
+              </nav>
+            </div>
+
+            {/* Collection / Library Section */}
+            <div>
+              <p className="text-[11px] font-bold text-gray-500 uppercase tracking-wider px-3 mb-2">
+                Library
+              </p>
+              <div className="space-y-1">
+                <button
+                  type="button"
+                  onClick={() => setActiveNav('purchased')}
+                  className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                    activeNav === 'purchased'
+                      ? 'bg-white/[0.08] text-white font-bold'
+                      : 'text-gray-400 hover:text-white hover:bg-white/[0.04]'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <ShoppingBag className="h-4 w-4 text-[#e53935]" />
+                    <span>Purchased</span>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setActiveNav('fav')}
+                  className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                    activeNav === 'fav'
+                      ? 'bg-white/[0.08] text-white font-bold'
+                      : 'text-gray-400 hover:text-white hover:bg-white/[0.04]'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <Heart className="h-4 w-4 text-red-500" />
+                    <span>Favorites</span>
+                  </div>
+                  {favoritesList.length > 0 && (
+                    <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-white/10 text-white">
+                      {favoritesList.length}
+                    </span>
+                  )}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setActiveNav('history')}
+                  className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                    activeNav === 'history'
+                      ? 'bg-white/[0.08] text-white font-bold'
+                      : 'text-gray-400 hover:text-white hover:bg-white/[0.04]'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <Clock className="h-4 w-4 text-gray-400" />
+                    <span>Listening History</span>
+                  </div>
+                </button>
               </div>
             </div>
           </div>
 
-          <div className="pt-3 border-t border-[#2a2d34] text-[10px] text-[#6b7078] px-3">
-            Caution Studio
+          {/* Creator / Studio & Bottom Profile */}
+          <div className="pt-4 border-t border-white/[0.06] space-y-3">
+            <button
+              type="button"
+              onClick={() => handleOpenRecordStudio()}
+              className="w-full flex items-center justify-center gap-2.5 px-3.5 py-2.5 rounded-xl text-xs font-bold text-white bg-white/[0.03] border border-white/10 hover:border-white/20 hover:bg-white/[0.06] transition-all cursor-pointer"
+              title="Open Studio DAW"
+            >
+              <Sliders className="h-4 w-4 text-[#e53935]" />
+              <span>Open Studio</span>
+            </button>
+
+            {/* Profile Row */}
+            <div className="flex items-center justify-between px-2 pt-1">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-8 h-8 rounded-full overflow-hidden bg-black border border-white/10 shrink-0">
+                  <img
+                    src={userProfile.avatar}
+                    alt={userProfile.name}
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-xs font-bold text-white truncate">{userProfile.name}</p>
+                  <p className="text-[10px] text-gray-500 truncate">Creator Account</p>
+                </div>
+              </div>
+              <ChevronDown className="h-4 w-4 text-gray-500" />
+            </div>
           </div>
         </aside>
 
@@ -1727,216 +1769,571 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
               bonusDownloads={downloadQuota.bonus}
               remainingDownloads={downloadQuota.remaining}
             />
-          ) : (
-            <>
-              <div className="flex items-end justify-between gap-3">
+          ) : activeNav === 'purchased' ? (
+            <div className="space-y-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-3 border-b border-white/[0.06]">
                 <div>
-                  <h2 className="text-[22px] font-semibold text-white tracking-tight">Home</h2>
-                  <p className="text-[13px] text-[#8b8f98] mt-0.5">Continue a session or pick a beat to record on.</p>
+                  <div className="flex items-center gap-3">
+                    <h2 className="text-2xl font-black text-white tracking-tight">My Purchased Beats</h2>
+                    <span className="px-2.5 py-0.5 rounded-full text-xs font-mono font-bold bg-[#e53935]/15 text-[#e53935] border border-[#e53935]/30">
+                      {purchasedBeats.length} {purchasedBeats.length === 1 ? 'License' : 'Licenses'}
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-400 mt-1">
+                    Access your uncompressed 24-bit Master WAV files, multi-track Stems (.ZIP), and official PDF license certificates.
+                  </p>
                 </div>
+
                 <button
                   type="button"
-                  onClick={() => handleOpenRecordStudio(currentTrack)}
-                  className="hidden sm:inline-flex items-center gap-1.5 h-9 px-4 rounded-full bg-[#e53935] hover:bg-[#d32f2f] text-white text-[13px] font-semibold"
+                  onClick={() => setActiveNav('discover')}
+                  className="px-4 py-2 rounded-full bg-[#16181d] hover:bg-white/[0.06] text-white text-xs font-semibold border border-white/10 transition-colors cursor-pointer self-start sm:self-auto"
                 >
-                  <Mic className="h-3.5 w-3.5" />
-                  Open Studio
+                  Browse Beat Store
                 </button>
               </div>
 
-              <div className="flex gap-3 overflow-x-auto pb-1 scrollbar-none">
-                {(newReleases.length > 0 ? newReleases : playlistRows.slice(0, 8)).map((item) => {
-                  const isThisPlaying = isPlaying && currentTrack.id === item.id;
+              {loadingPurchased ? (
+                <div className="p-12 text-center rounded-2xl bg-[#121316] border border-white/[0.06] space-y-3">
+                  <div className="w-8 h-8 rounded-full border-2 border-[#e53935] border-t-transparent animate-spin mx-auto" />
+                  <p className="text-xs text-gray-400">Loading your licensed beats...</p>
+                </div>
+              ) : purchasedBeats.length === 0 ? (
+                <div className="p-12 text-center rounded-2xl bg-[#121316] border border-white/[0.06] space-y-4">
+                  <div className="w-14 h-14 rounded-full bg-[#e53935]/10 text-[#e53935] flex items-center justify-center mx-auto">
+                    <ShoppingBag className="h-6 w-6" />
+                  </div>
+                  <div className="space-y-1">
+                    <h3 className="text-base font-bold text-white">No purchased beats yet</h3>
+                    <p className="text-xs text-gray-400 max-w-sm mx-auto">
+                      Explore the marketplace to lease beats, download uncompressed master WAVs, and unlock trackout stems.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setActiveNav('discover')}
+                    className="px-5 py-2.5 rounded-full bg-[#e53935] hover:bg-[#d32f2f] text-white text-xs font-bold transition-all shadow-lg shadow-[#e53935]/20 cursor-pointer"
+                  >
+                    Browse Trending Beats
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {purchasedBeats.map((item) => {
+                    const beat = item.beat || {};
+                    const producerName = beat.producer?.display_name || beat.producer?.name || item.producer || 'Studio Producer';
+                    return (
+                      <div
+                        key={item.id}
+                        className="p-5 rounded-2xl bg-[#121316] border border-white/[0.06] hover:border-white/15 transition-all space-y-4"
+                      >
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                          <div className="flex items-center gap-4">
+                            <div className="w-16 h-16 rounded-xl overflow-hidden bg-black/40 border border-white/10 shrink-0 relative group">
+                              <img
+                                src={beat.cover_url || beat.coverUrl || '/images/studio_mixing_console.jpg'}
+                                alt={beat.title || 'Beat'}
+                                className="w-full h-full object-cover"
+                              />
+                            </div>
+                            <div>
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <h3 className="text-base font-bold text-white">{beat.title || 'Untitled Beat'}</h3>
+                                <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-[#e53935]/15 text-[#e53935] border border-[#e53935]/30">
+                                  {item.type || 'Premium Beat Plan'}
+                                </span>
+                              </div>
+                              <p className="text-xs text-gray-400 mt-0.5">
+                                By {producerName} · {beat.genre || 'Afrobeats'} · {beat.bpm || 110} BPM
+                              </p>
+                              <p className="text-[11px] font-mono text-gray-500 mt-1">
+                                Ref: {item.licenseNumber || 'lic-' + (item.id || '').slice(0, 8)} · Purchased {item.issuedDate}
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+                            {item.masterWavUrl ? (
+                              <a
+                                href={item.masterWavUrl}
+                                download
+                                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white/[0.08] hover:bg-white/[0.12] text-white text-xs font-semibold border border-white/10 transition-colors"
+                              >
+                                <Download className="h-3.5 w-3.5 text-[#e53935]" />
+                                <span>Download WAV</span>
+                              </a>
+                            ) : null}
+
+                            {item.stemsZipUrl ? (
+                              <a
+                                href={item.stemsZipUrl}
+                                download
+                                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white/[0.08] hover:bg-white/[0.12] text-white text-xs font-semibold border border-white/10 transition-colors"
+                              >
+                                <Download className="h-3.5 w-3.5 text-[#e53935]" />
+                                <span>Stems (.ZIP)</span>
+                              </a>
+                            ) : null}
+
+                            {item.agreementPdfKey ? (
+                              <a
+                                href={item.agreementPdfKey}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-transparent hover:bg-white/[0.05] text-gray-300 hover:text-white text-xs font-medium border border-white/[0.08] transition-colors"
+                              >
+                                <ShieldCheck className="h-3.5 w-3.5 text-gray-400" />
+                                <span>PDF License</span>
+                              </a>
+                            ) : null}
+                          </div>
+                        </div>
+
+                        {/* Stream Cap Progress Bar */}
+                        <div className="pt-2 border-t border-white/[0.04]">
+                          <div className="flex items-center justify-between text-[11px] text-gray-400 font-mono mb-1.5">
+                            <span>Stream cap</span>
+                            <span>
+                              {item.streamCap
+                                ? `${(item.streamsUsed || 0).toLocaleString()} / ${item.streamCap.toLocaleString()} streams`
+                                : 'Unlimited Streams'}
+                            </span>
+                          </div>
+                          <div className="w-full h-1 bg-white/10 rounded-full overflow-hidden">
+                            <div
+                              className="h-full bg-[#e53935] rounded-full"
+                              style={{
+                                width: item.streamCap
+                                  ? `${Math.min(100, ((item.streamsUsed || 0) / item.streamCap) * 100)}%`
+                                  : '100%'
+                              }}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          ) : activeNav === 'browse' ? (
+            <div className="space-y-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-3 border-b border-white/[0.06]">
+                <div>
+                  <h2 className="text-2xl font-black text-white tracking-tight">Browse Beats</h2>
+                  <p className="text-xs text-gray-400 mt-1">
+                    Explore high-quality beats, filter by BPM, musical key, or price.
+                  </p>
+                </div>
+                <div className="flex items-center gap-3">
+                  <select
+                    value={sortOption}
+                    onChange={(e) => setSortOption(e.target.value as any)}
+                    aria-label="Sort beats order"
+                    className="bg-[#16181d] border border-white/[0.08] text-gray-300 text-xs rounded-xl px-3.5 py-2 focus:outline-none focus:border-[#e53935] cursor-pointer"
+                  >
+                    <option value="popular">Most popular</option>
+                    <option value="latest">Latest uploads</option>
+                    <option value="price_low">Price: Low to High</option>
+                    <option value="price_high">Price: High to Low</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Genre Filter Pills */}
+              <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+                {['All', 'Afrobeats', 'Hip-Hop', 'R&B', 'Drill', 'Amapiano', 'Trap', 'Pop', 'Electronic'].map((genre) => {
+                  const isActive = selectedGenre.toLowerCase() === genre.toLowerCase();
                   return (
                     <button
-                      key={'rev-' + item.id}
+                      key={genre}
                       type="button"
-                      onClick={() => handlePlayToggle(item)}
-                      className="w-[148px] shrink-0 text-left group"
+                      onClick={() => setSelectedGenre(genre)}
+                      className={`px-4 py-2 rounded-full text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
+                        isActive
+                          ? 'bg-[#e53935] text-white shadow-md shadow-[#e53935]/25'
+                          : 'bg-[#16181d] text-gray-400 hover:text-white hover:bg-white/[0.06] border border-white/[0.05]'
+                      }`}
                     >
-                      <div className="relative aspect-square rounded-md overflow-hidden bg-[#1c1e24]">
-                        <img src={item.coverUrl} alt={item.title} className="w-full h-full object-cover" />
-                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/35 transition-colors" />
-                        <span className="absolute bottom-2 right-2 w-8 h-8 rounded-full bg-white text-black hidden group-hover:flex items-center justify-center">
-                          {isThisPlaying ? <Pause className="h-3.5 w-3.5 fill-current" /> : <Play className="h-3.5 w-3.5 fill-current ml-0.5" />}
-                        </span>
-                      </div>
-                      <p className="mt-2 text-[13px] font-medium text-white truncate">{item.title}</p>
-                      <p className="text-[11px] text-[#8b8f98] truncate">{item.artist}</p>
+                      {genre}
                     </button>
                   );
                 })}
               </div>
 
-              {/* MIDDLE GENRE TABS & BEATS TABLE */}
-              <div className="space-y-4">
-                <div className="flex items-center gap-6 border-b border-white/[0.06] pb-3 text-xs font-semibold overflow-x-auto scrollbar-none">
-                  {adminGenreList.map((genreName) => {
-                    const isActive = selectedGenre.toLowerCase() === genreName.toLowerCase();
-                    return (
-                      <button
-                        key={genreName}
-                        type="button"
-                        onClick={() => setSelectedGenre(genreName)}
-                        className={`relative py-1 transition-colors whitespace-nowrap cursor-pointer shrink-0 ${
-                          isActive ? 'text-white' : 'text-[#8b8f98] hover:text-white'
-                        }`}
-                      >
-                        <span>{genreName}</span>
-                        {isActive && (
-                          <span className="absolute -bottom-3 left-0 right-0 h-0.5 bg-[#e53935]" />
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
-
-                <div className="space-y-2">
-                  {filteredRows.length === 0 ? (
-                    <div className="p-10 text-center rounded-xl bg-[#121316] border border-white/[0.04] space-y-3">
-                      <p className="text-sm font-semibold text-white">No tracks found in {selectedGenre}</p>
-                      <p className="text-xs text-gray-400">Try selecting another genre or view all available beats.</p>
-                      <button
-                        type="button"
-                        onClick={() => setSelectedGenre('All')}
-                        className="px-4 py-2 rounded-lg bg-[#2dd4bf] text-black text-xs font-bold hover:bg-[#26b4a2] transition-colors cursor-pointer"
-                      >
-                        Browse All Genres
-                      </button>
-                    </div>
-                  ) : (
-                    filteredRows.map((row) => {
-                      const isCurrent = currentTrack.id === row.id;
-                      const isFree = isFreeBeat(row);
-                      return (
-                        <TrackRow
-                          key={row.id}
-                          track={row}
-                          variant="dark"
-                          isCurrent={isCurrent}
-                          isPlaying={isCurrent && isPlaying}
-                          currentTime={isCurrent ? currentTime : 0}
-                          isFavorited={Boolean(row.isLiked || likedTrackIds.includes(row.id))}
-                          isListenLater={listenLaterIds.includes(row.id)}
-                          isDownloading={downloadingId === row.id}
-                          isDownloadLocked={!isFree}
-                          badge={
-                            !isFree ? (
-                              <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30 shrink-0 font-mono">
-                                PAID
-                              </span>
-                            ) : (
-                              <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 shrink-0 font-mono">
-                                FREE
-                              </span>
-                            )
-                          }
-                          onPlayToggle={handlePlayToggle}
-                          onSeek={handleRowSeek}
-                          onDownload={(t, e) => handleDownload(t, e)}
-                          onLockedDownloadClick={(t) => setPaidBeatPurchaseTrack(t)}
-                          onFavoriteToggle={(t) => toggleLike(t.id)}
-                          onListenLaterToggle={(t) => toggleListenLater(t)}
-                        />
-                      );
-                    })
-                  )}
+              {/* Grid of Marketplace Beat Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                {filteredRows.map((beat) => (
+                  <MarketplaceBeatCard
+                    key={beat.id}
+                    track={beat}
+                    isCurrent={currentTrack.id === beat.id}
+                    isPlaying={currentTrack.id === beat.id && isPlaying}
+                    isLiked={Boolean(beat.isLiked || likedTrackIds.includes(beat.id))}
+                    onPlayToggle={handlePlayToggle}
+                    onLikeToggle={(id: string) => toggleLike(id)}
+                    onLicenseClick={(t: TrackItem) => setPaidBeatPurchaseTrack(t)}
+                    onDownloadClick={(t: TrackItem) => handleDownload(t)}
+                  />
+                ))}
+              </div>
+            </div>
+          ) : activeNav === 'charts' ? (
+            <div className="space-y-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-3 border-b border-white/[0.06]">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <Trophy className="h-5 w-5 text-amber-400" />
+                    <h2 className="text-2xl font-black text-white tracking-tight">Top Charts</h2>
+                  </div>
+                  <p className="text-xs text-gray-400 mt-1">
+                    The most streamed and acquired instrumentals across Caution Studio.
+                  </p>
                 </div>
               </div>
 
-              {/* BOTTOM ROW: PROMO BANNER */}
-              {showPromoBanner && (
-                <div className="w-full bg-[#1c1e24] border border-[#2a2d34] rounded-lg p-5 relative overflow-hidden flex flex-col justify-between">
-                  <button
-                    type="button"
-                    onClick={() => setShowPromoBanner(false)}
-                    className="absolute top-4 right-4 p-1 rounded-full text-gray-400 hover:text-white transition-colors z-20 cursor-pointer"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
+              <div className="space-y-2.5">
+                {mostListenedBeats.map((track, idx) => {
+                  const isThisPlaying = isPlaying && currentTrack.id === track.id;
+                  const isFree = isFreeBeat(track);
+                  return (
+                    <div
+                      key={track.id}
+                      onClick={() => handlePlayToggle(track)}
+                      className="flex items-center justify-between p-3.5 rounded-2xl bg-[#121316] border border-white/[0.04] hover:border-white/15 transition-all cursor-pointer group"
+                    >
+                      <div className="flex items-center gap-4 min-w-0">
+                        <span className={`text-xl font-black font-mono w-6 text-center shrink-0 ${idx === 0 ? 'text-[#e53935]' : 'text-gray-500'}`}>
+                          {idx + 1}
+                        </span>
 
-                  <div className="max-w-md relative z-10 space-y-2">
-                    <h4 className="text-lg font-semibold text-white leading-tight">
-                      Unlimited sessions in Studio
-                    </h4>
-                    <p className="text-xs text-gray-400 leading-relaxed pt-1">
-                      Enjoy uninterrupted high-fidelity audio, separated multi-track stem downloads, and commercial sync licenses.
-                    </p>
-                    <div className="pt-3">
-                      <button
-                        type="button"
-                        onClick={() => setShowUpgradeModal(true)}
-                        className="px-4 py-2 rounded-full bg-[#e53935] hover:bg-[#d32f2f] text-white text-[12px] font-semibold"
-                      >
-                        Upgrade Plan
-                      </button>
+                        <div className="w-12 h-12 rounded-xl overflow-hidden bg-black/40 border border-white/10 shrink-0 relative">
+                          <img src={track.coverUrl} alt={track.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+                          <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                            {isThisPlaying ? <Pause className="h-4 w-4 fill-white text-white" /> : <Play className="h-4 w-4 fill-white text-white ml-0.5" />}
+                          </div>
+                        </div>
+
+                        <div className="min-w-0">
+                          <p className={`text-sm font-bold truncate ${isThisPlaying ? 'text-[#e53935]' : 'text-white'}`}>
+                            {track.title}
+                          </p>
+                          <div className="flex items-center gap-2 text-xs text-gray-400 mt-0.5">
+                            <span className="truncate">{track.artist}</span>
+                            <span>•</span>
+                            <span>{track.genre}</span>
+                            <span>•</span>
+                            <span>{track.bpm || 110} BPM</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-3 shrink-0">
+                        <span className="text-xs font-mono font-semibold text-gray-400">
+                          {(track.playCount || 0).toLocaleString()} plays
+                        </span>
+                        {isFree ? (
+                          <span className="px-2.5 py-1 rounded-full text-xs font-bold font-mono bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                            FREE
+                          </span>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setPaidBeatPurchaseTrack(track);
+                            }}
+                            className="px-3.5 py-1 rounded-full text-xs font-bold font-mono bg-[#e53935] hover:bg-[#d32f2f] text-white transition-colors cursor-pointer"
+                          >
+                            ₦{(track.premiumPriceNgn || track.priceNgn || 50000).toLocaleString()}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ) : activeNav === 'genres' ? (
+            <div className="space-y-6">
+              <div className="flex items-center justify-between pb-3 border-b border-white/[0.06]">
+                <div>
+                  <h2 className="text-2xl font-black text-white tracking-tight">Explore Genres</h2>
+                  <p className="text-xs text-gray-400 mt-1">Select a genre category to discover tailored productions.</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+                {[
+                  { name: 'Afrobeats', count: '140+ beats', img: '/images/studio_mixing_console.jpg' },
+                  { name: 'Hip-Hop', count: '95+ beats', img: '/images/album_neon_dj.jpg' },
+                  { name: 'R&B', count: '70+ beats', img: '/images/artist_studio_mic.jpg' },
+                  { name: 'Drill', count: '55+ beats', img: '/images/cinematic_hero_tunnel.jpg' },
+                  { name: 'Amapiano', count: '85+ beats', img: '/images/african_producer_beats.jpg' },
+                  { name: 'Trap', count: '65+ beats', img: '/images/album_sunrise.jpg' },
+                  { name: 'Pop', count: '45+ beats', img: '/images/golden_clef.jpg' },
+                  { name: 'Electronic', count: '40+ beats', img: '/images/diamond_playlist_art.jpg' }
+                ].map((cat) => (
+                  <div
+                    key={cat.name}
+                    onClick={() => {
+                      setSelectedGenre(cat.name);
+                      setActiveNav('discover');
+                    }}
+                    className="group relative aspect-[4/3] rounded-2xl overflow-hidden cursor-pointer border border-white/[0.06] hover:border-white/20 transition-all"
+                  >
+                    <img src={cat.img} alt={cat.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent" />
+                    <div className="absolute bottom-3 left-3 right-3">
+                      <h3 className="text-base font-bold text-white group-hover:text-[#e53935] transition-colors">{cat.name}</h3>
+                      <p className="text-[11px] text-gray-400 font-mono mt-0.5">{cat.count}</p>
                     </div>
                   </div>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <>
+              {/* 1. EDITORIAL HERO BANNER */}
+              <div className="relative w-full rounded-2xl overflow-hidden bg-[#121316] border border-white/[0.06] min-h-[220px] sm:min-h-[260px] flex items-center p-6 sm:p-10">
+                <img
+                  src="/images/studio_mixing_console.jpg"
+                  alt="Studio Console"
+                  className="absolute inset-0 w-full h-full object-cover object-center"
+                />
+                <div className="absolute inset-0 bg-gradient-to-r from-[#0d0e12]/95 via-[#0d0e12]/80 to-black/30" />
 
-                  <div className="absolute right-0 top-1/2 -translate-y-1/2 w-56 sm:w-64 h-56 sm:h-64 pointer-events-none opacity-90 overflow-hidden">
-                    <img
-                      src="/images/ribbon_promo_wave.jpg"
-                      alt="3D Wave Ribbon"
-                      className="w-full h-full object-contain"
-                    />
+                <div className="relative z-10 max-w-xl space-y-3">
+                  <span className="text-[11px] font-mono font-medium tracking-wider text-gray-400 uppercase">
+                    — THE SOUND OF THE WEEK
+                  </span>
+                  <h1 className="text-3xl sm:text-5xl font-black text-white tracking-tight leading-tight">
+                    Find your next sound.
+                  </h1>
+                  <p className="text-xs sm:text-sm text-gray-300 font-normal">
+                    Beats made for what you&apos;re creating.
+                  </p>
+                  <div className="pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setActiveNav('browse')}
+                      className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-[#e53935] hover:bg-[#d32f2f] text-white text-xs font-bold transition-all shadow-lg shadow-[#e53935]/25 cursor-pointer"
+                    >
+                      <span>Explore featured beats</span>
+                      <ArrowRight className="h-3.5 w-3.5" />
+                    </button>
                   </div>
                 </div>
-              )}
+              </div>
+
+              {/* 2. GENRE SHORTCUTS */}
+              <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+                {['Afrobeats', 'Hip-Hop', 'R&B', 'Drill', 'Amapiano', 'Trap', 'Pop', 'Electronic'].map((genre) => {
+                  const isActive = selectedGenre.toLowerCase() === genre.toLowerCase();
+                  return (
+                    <button
+                      key={genre}
+                      type="button"
+                      onClick={() => setSelectedGenre(isActive ? 'All' : genre)}
+                      className={`px-4 py-2 rounded-full text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
+                        isActive
+                          ? 'bg-white/[0.12] text-white border border-white/20'
+                          : 'bg-[#16181d] text-gray-400 hover:text-white hover:bg-white/[0.06] border border-white/[0.05]'
+                      }`}
+                    >
+                      {genre}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* 3. TRENDING BEATS */}
+              <div className="space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <h2 className="text-xl font-bold text-white tracking-tight">Trending beats</h2>
+
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <select
+                      value={sortOption}
+                      onChange={(e) => setSortOption(e.target.value as any)}
+                      aria-label="Sort trending beats"
+                      className="bg-[#16181d] border border-white/[0.08] text-gray-300 text-xs rounded-lg px-3 py-1.5 focus:outline-none focus:border-[#e53935] cursor-pointer"
+                    >
+                      <option value="popular">Most popular</option>
+                      <option value="latest">Latest uploads</option>
+                      <option value="price_low">Price: Low to High</option>
+                      <option value="price_high">Price: High to Low</option>
+                    </select>
+
+                    <button
+                      type="button"
+                      onClick={() => setBpmFilter(bpmFilter === 'all' ? 'mid' : 'all')}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors cursor-pointer flex items-center gap-1 ${
+                        bpmFilter !== 'all' ? 'bg-[#e53935]/15 border-[#e53935]/40 text-[#e53935]' : 'bg-[#16181d] border-white/[0.08] text-gray-400 hover:text-white'
+                      }`}
+                    >
+                      <span>BPM</span>
+                      <ChevronDown className="h-3 w-3" />
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setKeyFilter(keyFilter === 'all' ? 'C maj' : 'all')}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors cursor-pointer flex items-center gap-1 ${
+                        keyFilter !== 'all' ? 'bg-[#e53935]/15 border-[#e53935]/40 text-[#e53935]' : 'bg-[#16181d] border-white/[0.08] text-gray-400 hover:text-white'
+                      }`}
+                    >
+                      <span>Key</span>
+                      <ChevronDown className="h-3 w-3" />
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setPriceFilter(priceFilter === 'all' ? 'paid' : 'all')}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors cursor-pointer flex items-center gap-1 ${
+                        priceFilter !== 'all' ? 'bg-[#e53935]/15 border-[#e53935]/40 text-[#e53935]' : 'bg-[#16181d] border-white/[0.08] text-gray-400 hover:text-white'
+                      }`}
+                    >
+                      <span>Price</span>
+                      <ChevronDown className="h-3 w-3" />
+                    </button>
+                  </div>
+                </div>
+
+                {filteredRows.length === 0 ? (
+                  <div className="p-10 text-center rounded-2xl bg-[#121316] border border-white/[0.04] space-y-3">
+                    <p className="text-sm font-semibold text-white">No tracks match your current filters.</p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedGenre('All');
+                        setBpmFilter('all');
+                        setPriceFilter('all');
+                        setKeyFilter('all');
+                      }}
+                      className="px-4 py-2 rounded-full bg-[#e53935] text-white text-xs font-bold hover:bg-[#d32f2f] transition-colors cursor-pointer"
+                    >
+                      Reset All Filters
+                    </button>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                    {filteredRows.slice(0, 9).map((beat) => (
+                      <MarketplaceBeatCard
+                        key={beat.id}
+                        track={beat}
+                        isCurrent={currentTrack.id === beat.id}
+                        isPlaying={currentTrack.id === beat.id && isPlaying}
+                        isLiked={Boolean(beat.isLiked || likedTrackIds.includes(beat.id))}
+                        onPlayToggle={handlePlayToggle}
+                        onLikeToggle={(id: string) => toggleLike(id)}
+                        onLicenseClick={(t: TrackItem) => setPaidBeatPurchaseTrack(t)}
+                        onDownloadClick={(t: TrackItem) => handleDownload(t)}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* 4. FEATURED PRODUCERS */}
+              <div className="space-y-4 pt-2">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-xl font-bold text-white tracking-tight">Featured producers</h2>
+                  <button
+                    type="button"
+                    onClick={() => setActiveNav('browse')}
+                    className="text-xs font-semibold text-[#e53935] hover:underline flex items-center gap-1 cursor-pointer"
+                  >
+                    <span>See all</span>
+                    <ArrowRight className="h-3 w-3" />
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                  {topProducersList.map((producer) => (
+                    <div
+                      key={producer.handle || producer.name}
+                      onClick={() => {
+                        setSearchQuery(producer.name);
+                        setActiveNav('browse');
+                      }}
+                      className="p-3 rounded-2xl bg-[#121316] border border-white/[0.04] hover:border-white/15 transition-all text-center cursor-pointer group"
+                    >
+                      <div className="w-16 h-16 rounded-full overflow-hidden bg-black/40 border border-white/10 mx-auto mb-2.5 relative">
+                        <img
+                          src={producer.coverUrl}
+                          alt={producer.name}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                        />
+                      </div>
+                      <p className="text-xs font-bold text-white truncate">{producer.name}</p>
+                      <p className="text-[10px] text-gray-500 font-mono mt-0.5">{producer.beatsCount}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </>
           )}
         </main>
 
-        {/* RIGHT SIDEBAR */}
-        <aside className="w-72 border-l border-[#2a2d34] bg-[#16181c] p-4 shrink-0 hidden xl:flex flex-col space-y-6 overflow-y-auto">
+        {/* RIGHT SIDEBAR - COMMERCIAL MARKETPLACE WIDGETS */}
+        <aside className="w-80 border-l border-white/[0.06] bg-[#121316] p-4 shrink-0 hidden xl:flex flex-col space-y-6 overflow-y-auto">
+          {/* TOP PRODUCERS */}
           <div>
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-[11px] font-medium text-[#8b8f98]">
-                New releases
-              </span>
-              <button type="button" className="text-xs text-[#2dd4bf] hover:underline font-semibold">
-                See all
+            <div className="flex items-center justify-between mb-3.5">
+              <span className="text-xs font-bold text-white">Top producers</span>
+              <button
+                type="button"
+                onClick={() => setActiveNav('browse')}
+                className="text-[11px] text-[#e53935] hover:underline font-semibold flex items-center gap-1 cursor-pointer"
+              >
+                <span>See all</span>
+                <ArrowRight className="h-2.5 w-2.5" />
               </button>
             </div>
 
             <div className="space-y-3">
-              {newReleases.map((nr) => (
+              {topProducersList.slice(0, 4).map((producer) => (
                 <div
-                  key={nr.id}
-                  onClick={() => handlePlayToggle(nr)}
+                  key={producer.handle || producer.name}
+                  onClick={() => {
+                    setSearchQuery(producer.name);
+                    setActiveNav('browse');
+                  }}
                   className="flex items-center gap-3 p-2 rounded-xl hover:bg-white/[0.04] transition-colors cursor-pointer group"
                 >
-                  <div className="w-11 h-11 rounded-lg overflow-hidden bg-black/40 border border-white/10 shrink-0 relative">
+                  <div className="w-10 h-10 rounded-full overflow-hidden bg-black/40 border border-white/10 shrink-0">
                     <img
-                      src={nr.coverUrl}
-                      alt={nr.title}
+                      src={producer.coverUrl}
+                      alt={producer.name}
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform"
                     />
-                    <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                      <Play className="h-3.5 w-3.5 fill-white text-white" />
-                    </div>
                   </div>
                   <div className="min-w-0">
-                    <p className="text-xs font-bold text-white truncate">{nr.title}</p>
-                    <p className="text-[10px] text-gray-500 truncate mt-0.5">{nr.artist}</p>
+                    <p className="text-xs font-bold text-white truncate">{producer.name}</p>
+                    <p className="text-[11px] text-gray-500 font-mono">{producer.beatsCount}</p>
                   </div>
                 </div>
               ))}
             </div>
           </div>
 
-          {/* MOST LISTENED BEATS (TOP 5) */}
+          {/* THIS WEEK'S CHARTS */}
           <div>
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-[11px] font-medium text-[#8b8f98]">
-                Most played
-              </span>
-              <span className="text-[10px] font-mono text-[#2dd4bf] font-semibold">
-                TOP 5
-              </span>
+            <div className="flex items-center justify-between mb-3.5">
+              <span className="text-xs font-bold text-white">This week&apos;s charts</span>
+              <button
+                type="button"
+                onClick={() => setActiveNav('charts')}
+                className="text-[11px] text-[#e53935] hover:underline font-semibold flex items-center gap-1 cursor-pointer"
+              >
+                <span>See all</span>
+                <ArrowRight className="h-2.5 w-2.5" />
+              </button>
             </div>
 
-            <div className="space-y-2.5">
-              {mostListenedBeats.map((track, idx) => {
+            <div className="space-y-3">
+              {thisWeeksCharts.map((track, idx) => {
                 const isThisPlaying = isPlaying && currentTrack.id === track.id;
                 return (
                   <div
@@ -1944,159 +2341,66 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
                     onClick={() => handlePlayToggle(track)}
                     className="flex items-center justify-between p-2 rounded-xl hover:bg-white/[0.04] transition-colors cursor-pointer group"
                   >
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <span
-                        className="text-base font-black font-mono shrink-0 select-none w-4 text-center text-transparent"
-                        style={{
-                          WebkitTextStroke: '1px #6B7280'
-                        }}
-                      >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <span className="text-xs font-mono font-bold text-gray-500 w-3 text-center shrink-0">
                         {idx + 1}
                       </span>
-
                       <div className="w-10 h-10 rounded-lg overflow-hidden bg-black/40 border border-white/10 shrink-0 relative">
                         <img
                           src={track.coverUrl}
                           alt={track.title}
                           className="w-full h-full object-cover group-hover:scale-105 transition-transform"
                         />
-                        {isThisPlaying ? (
-                          <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-                            <span className="h-2 w-2 rounded-full bg-[#2dd4bf] animate-ping" />
-                          </div>
-                        ) : (
-                          <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                            <Play className="h-3.5 w-3.5 fill-white text-white" />
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="min-w-0">
-                        <p className={`text-xs font-bold truncate ${isThisPlaying ? 'text-[#2dd4bf]' : 'text-white'}`}>
-                          {track.title}
-                        </p>
-                        <div className="flex items-center gap-1.5 mt-0.5">
-                          <p className="text-[10px] text-gray-500 truncate max-w-[65px]">{track.artist}</p>
-                          <span className="text-gray-600 text-[9px]">•</span>
-                          <span className="text-[10px] font-mono font-semibold text-[#2dd4bf] shrink-0">
-                            {(track.playCount || 0).toLocaleString()} plays
-                          </span>
+                        <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                          {isThisPlaying ? (
+                            <Pause className="h-3.5 w-3.5 fill-white text-white" />
+                          ) : (
+                            <Play className="h-3.5 w-3.5 fill-white text-white ml-0.5" />
+                          )}
                         </div>
                       </div>
+                      <div className="min-w-0">
+                        <p className={`text-xs font-bold truncate ${isThisPlaying ? 'text-[#e53935]' : 'text-white'}`}>
+                          {track.title}
+                        </p>
+                        <p className="text-[10px] text-gray-500 truncate mt-0.5">{track.artist}</p>
+                      </div>
                     </div>
 
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          toggleListenLater(track);
-                        }}
-                        className={`p-1 transition-colors cursor-pointer ${
-                          track.isListenLater || listenLaterIds.includes(track.id)
-                            ? 'text-[#2dd4bf] hover:text-[#2dd4bf]/80'
-                            : 'text-gray-500 hover:text-white'
-                        }`}
-                        title={track.isListenLater || listenLaterIds.includes(track.id) ? 'In Listen Later' : 'Add to Listen Later'}
-                      >
-                        <Clock className="h-3.5 w-3.5" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          toggleLike(track.id);
-                        }}
-                        className={`p-1 transition-colors cursor-pointer ${
-                          track.isLiked || likedTrackIds.includes(track.id)
-                            ? 'text-red-500 hover:text-red-400'
-                            : 'text-gray-500 hover:text-red-400'
-                        }`}
-                        title={track.isLiked || likedTrackIds.includes(track.id) ? 'Remove from Favorites' : 'Add to Favorites'}
-                      >
-                        <Heart className={`h-3.5 w-3.5 ${track.isLiked || likedTrackIds.includes(track.id) ? 'fill-red-500 text-red-500' : ''}`} />
-                      </button>
-                      {isFreeBeat(track) ? (
-                        <button
-                          type="button"
-                          onClick={(e) => handleDownload(track, e)}
-                          className={`p-1 transition-colors cursor-pointer ${
-                            downloadingId === track.id ? 'text-[#2dd4bf]' : 'text-gray-500 hover:text-white'
-                          }`}
-                          title="Download Song (WAV)"
-                        >
-                          <Download className="h-3.5 w-3.5" />
-                        </button>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setPaidBeatPurchaseTrack(track);
-                          }}
-                          className="p-1 text-gray-500 hover:text-amber-400 transition-colors cursor-pointer"
-                          title="Download Locked · License Required"
-                        >
-                          <Lock className="h-3.5 w-3.5" />
-                        </button>
-                      )}
-                      <button
-                        type="button"
-                        className="p-1 text-gray-500 hover:text-white transition-colors"
-                      >
-                        <MoreVertical className="h-3.5 w-3.5" />
-                      </button>
-                    </div>
+                    <span className="text-[11px] font-mono font-bold text-gray-400 shrink-0">
+                      {isFreeBeat(track) ? 'FREE' : track.priceNgn ? `₦${track.priceNgn.toLocaleString()}` : '$39'}
+                    </span>
                   </div>
                 );
               })}
             </div>
           </div>
 
-          {/* VERIFIED STUDIO PRODUCERS */}
-          <div>
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-[11px] font-medium text-[#8b8f98]">
-                Producers
-              </span>
-              <button type="button" className="text-xs text-[#2dd4bf] hover:underline font-semibold">
-                See all
-              </button>
-            </div>
+          {/* SELL YOUR BEATS PROMOTIONAL CARD */}
+          <div className="relative rounded-2xl overflow-hidden p-5 border border-white/[0.06] bg-[#16181d] space-y-3 mt-auto">
+            <img
+              src="/images/artist_studio_mic.jpg"
+              alt="Studio Microphone"
+              className="absolute inset-0 w-full h-full object-cover opacity-30"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-[#0d0e12] via-[#0d0e12]/80 to-transparent" />
 
-            <div className="space-y-3">
-              {producers.map((artist) => (
-                <div
-                  key={artist.rank + '-' + artist.handle}
-                  className="flex items-center justify-between p-2 rounded-xl hover:bg-white/[0.04] transition-colors cursor-pointer group"
+            <div className="relative z-10 space-y-2">
+              <h3 className="text-base font-black text-white leading-tight">Sell your beats.</h3>
+              <p className="text-xs text-gray-400 leading-relaxed">
+                Reach creators worldwide on Caution.
+              </p>
+              <div className="pt-2">
+                <a
+                  href="https://creator.cautionstudioz.com"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-[#e53935] hover:bg-[#d32f2f] text-white text-xs font-bold transition-all shadow-md shadow-[#e53935]/25"
                 >
-                  <div className="flex items-center gap-3.5 min-w-0">
-                    <span
-                      className="text-2xl font-black font-mono shrink-0 select-none text-transparent"
-                      style={{
-                        WebkitTextStroke: '1.2px #4B5563'
-                      }}
-                    >
-                      {artist.rank}
-                    </span>
-
-                    <div className="w-10 h-10 rounded-lg overflow-hidden bg-black/40 border border-white/10 shrink-0">
-                      <img
-                        src={artist.coverUrl}
-                        alt={artist.name}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-                      />
-                    </div>
-
-                    <div className="min-w-0">
-                      <p className="text-xs font-bold text-white truncate">{artist.name}</p>
-                      <p className="text-[10px] text-gray-500 truncate">{artist.subscribers}</p>
-                    </div>
-                  </div>
-
-                  <ChevronRight className="h-4 w-4 text-gray-500 group-hover:text-white transition-colors" />
-                </div>
-              ))}
+                  <span>Start Selling</span>
+                  <ArrowRight className="h-3 w-3" />
+                </a>
+              </div>
             </div>
           </div>
         </aside>
@@ -2263,26 +2567,43 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
         </div>
 
         {/* DESKTOP PLAYER (Viewport >= md) */}
-        <div className="hidden md:flex w-full items-center justify-between gap-4">
+        <div className="hidden md:flex w-full items-center justify-between gap-6">
+          {/* Left: Artwork + Title + Producer */}
           <div className="flex items-center gap-3 w-64 shrink-0 min-w-0">
-            <div className="w-11 h-11 rounded-lg overflow-hidden bg-black/60 border border-white/10 shrink-0">
+            <div className="w-12 h-12 rounded-lg overflow-hidden bg-black/60 border border-white/10 shrink-0 relative group cursor-pointer" onClick={() => handlePlayToggle(currentTrack)}>
               <img
                 src={currentTrack.coverUrl}
                 alt={currentTrack.title}
                 className="w-full h-full object-cover"
               />
+              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                {isPlaying ? <Pause className="h-4 w-4 fill-white text-white" /> : <Play className="h-4 w-4 fill-white text-white ml-0.5" />}
+              </div>
             </div>
             <div className="min-w-0">
-              <div className="flex items-center gap-2">
-                <p className="text-xs font-bold text-white truncate">{currentTrack.title}</p>
-              </div>
+              <p className="text-xs font-bold text-white truncate" title={currentTrack.title}>
+                {currentTrack.title}
+              </p>
               <p className="text-[11px] text-gray-400 truncate mt-0.5">{currentTrack.artist}</p>
             </div>
           </div>
 
+          {/* Center: Controls + Red Waveform Scrubber */}
           <div className="flex-1 max-w-2xl flex flex-col items-center gap-1.5 min-w-0">
-            {/* Desktop Control Buttons without Shuffle */}
+            {/* Top row controls: Shuffle, Prev, Play/Pause circle, Next, Repeat */}
             <div className="flex items-center gap-4">
+              <button
+                type="button"
+                onClick={() => {
+                  const randomIndex = Math.floor(Math.random() * playlistRows.length);
+                  if (playlistRows[randomIndex]) handlePlayToggle(playlistRows[randomIndex]);
+                }}
+                className="p-1.5 text-gray-400 hover:text-white transition-colors cursor-pointer"
+                title="Shuffle"
+              >
+                <Shuffle className="h-4 w-4" />
+              </button>
+
               <button
                 type="button"
                 onClick={() => {
@@ -2295,7 +2616,8 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
                     if (playlistRows[prevIndex]) handlePlayToggle(playlistRows[prevIndex]);
                   }
                 }}
-                className="p-1 text-gray-400 hover:text-white transition-colors cursor-pointer"
+                className="p-1.5 text-gray-400 hover:text-white transition-colors cursor-pointer"
+                aria-label="Previous track"
               >
                 <SkipBack className="h-4 w-4" />
               </button>
@@ -2303,12 +2625,13 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
               <button
                 type="button"
                 onClick={() => handlePlayToggle(currentTrack)}
-                className="w-8 h-8 rounded-full bg-white hover:bg-[#f2f2f2] text-black flex items-center justify-center"
+                className="w-9 h-9 rounded-full bg-white hover:bg-[#e0e0e0] text-black flex items-center justify-center transition-transform hover:scale-105 shadow-md shadow-white/20 cursor-pointer"
+                aria-label={isPlaying ? 'Pause' : 'Play'}
               >
                 {isPlaying ? (
                   <Pause className="h-4 w-4 fill-current" />
                 ) : (
-                  <Play className="h-4 w-4 fill-current translate-x-0.5" />
+                  <Play className="h-4 w-4 fill-current ml-0.5" />
                 )}
               </button>
 
@@ -2319,75 +2642,31 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
                   const nextIndex = (currentIndex + 1) % (playlistRows.length || 1);
                   if (playlistRows[nextIndex]) handlePlayToggle(playlistRows[nextIndex]);
                 }}
-                className="p-1 text-gray-400 hover:text-white transition-colors cursor-pointer"
+                className="p-1.5 text-gray-400 hover:text-white transition-colors cursor-pointer"
+                aria-label="Next track"
               >
                 <SkipForward className="h-4 w-4" />
               </button>
 
               <button
                 type="button"
-                onClick={() => toggleLike(currentTrack.id)}
-                className={`p-1 transition-colors cursor-pointer ${
-                  currentTrack.isLiked || likedTrackIds.includes(currentTrack.id) ? 'text-red-500' : 'text-gray-400 hover:text-red-500'
-                }`}
-                title={currentTrack.isLiked || likedTrackIds.includes(currentTrack.id) ? 'Remove from Favorites' : 'Add to Favorites'}
+                onClick={() => {
+                  setCurrentTime(0);
+                  if (audioRef.current) audioRef.current.currentTime = 0;
+                }}
+                className="p-1.5 text-gray-400 hover:text-white transition-colors cursor-pointer"
+                title="Repeat track"
               >
-                <Heart className={`h-3.5 w-3.5 ${currentTrack.isLiked || likedTrackIds.includes(currentTrack.id) ? 'fill-red-500 text-red-500' : ''}`} />
+                <Repeat className="h-4 w-4" />
               </button>
-
-              <button
-                type="button"
-                onClick={() => toggleListenLater(currentTrack)}
-                className={`p-1 transition-colors cursor-pointer ${
-                  currentTrack.isListenLater || listenLaterIds.includes(currentTrack.id) ? 'text-[#2dd4bf]' : 'text-gray-400 hover:text-white'
-                }`}
-                title={currentTrack.isListenLater || listenLaterIds.includes(currentTrack.id) ? 'In Listen Later' : 'Add to Listen Later'}
-              >
-                <Clock className="h-3.5 w-3.5" />
-              </button>
-
-              {isFreeBeat(currentTrack) ? (
-                <button
-                  type="button"
-                  onClick={(e) => handleDownload(currentTrack, e)}
-                  className={`p-1 transition-colors cursor-pointer ${
-                    downloadingId === currentTrack.id ? 'text-[#2dd4bf]' : 'text-gray-400 hover:text-white'
-                  }`}
-                  title="Download Current Song (WAV)"
-                >
-                  <Download className="h-3.5 w-3.5" />
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setPaidBeatPurchaseTrack(currentTrack);
-                  }}
-                  className="p-1 text-gray-500 hover:text-amber-400 transition-colors cursor-pointer"
-                  title="Download Locked · License Required"
-                >
-                  <Lock className="h-3.5 w-3.5" />
-                </button>
-              )}
-
-              {isFreeBeat(currentTrack) && (
-                <button
-                  type="button"
-                  onClick={() => handleOpenRecordStudio(currentTrack)}
-                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#e53935] hover:bg-[#d32f2f] text-white text-[11px] font-semibold ml-1"
-                  title="Open Studio"
-                >
-                  <Mic className="h-3 w-3" />
-                  <span className="hidden lg:inline">Studio</span>
-                </button>
-              )}
             </div>
 
+            {/* Bottom scrubber row: Current Time + Red Waveform / Progress + Duration */}
             <div className="w-full flex items-center gap-3">
-              <span className="text-[10px] font-mono text-gray-500 w-8 text-right shrink-0">
+              <span className="text-[10px] font-mono text-gray-400 w-8 text-right shrink-0 tabular-nums">
                 {formatTime(currentTime)}
               </span>
+
               <div
                 onClick={(e) => {
                   const rect = e.currentTarget.getBoundingClientRect();
@@ -2398,37 +2677,44 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
                     audioRef.current.currentTime = targetSec;
                   }
                 }}
-                className="flex-1 h-1 bg-white/10 rounded-full overflow-hidden cursor-pointer relative group"
+                className="flex-1 h-3 flex items-center cursor-pointer relative group"
               >
-                <div
-                  className="h-full bg-gradient-to-r from-[#04564f] to-[#2dd4bf] transition-all"
-                  style={{ width: `${progressRatio}%` }}
-                />
+                <div className="w-full h-1 bg-[#262833] rounded-full overflow-hidden relative">
+                  <div
+                    className="h-full bg-[#e53935] rounded-full transition-all"
+                    style={{ width: `${progressRatio}%` }}
+                  />
+                </div>
               </div>
-              <span className="text-[10px] font-mono text-gray-500 w-8 shrink-0">
+
+              <span className="text-[10px] font-mono text-gray-400 w-8 shrink-0 tabular-nums">
                 {currentTrack.duration}
               </span>
             </div>
           </div>
 
-          <div className="hidden sm:flex items-center gap-3 w-72 justify-end shrink-0">
-            {/* Active Quality & DSP Badge */}
-            <Link
-              href="/settings"
-              className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-[#04564f]/40 border border-[#2dd4bf]/30 text-[#2dd4bf] hover:bg-[#04564f]/60 transition-colors"
-              title={`Streaming Quality: ${settings.audioQuality.toUpperCase()} • Normalization: ${settings.volumeNormalization ? '-14 LUFS (ON)' : 'OFF'} • Autoplay: ${settings.autoplay ? 'Harmonic (ON)' : 'OFF'}`}
+          {/* Right: Volume + Red Slider + Maximize */}
+          <div className="flex items-center gap-3 w-64 justify-end shrink-0">
+            <button
+              type="button"
+              onClick={() => toggleLike(currentTrack.id)}
+              className="p-1.5 text-gray-400 hover:text-[#e53935] transition-colors cursor-pointer"
+              title="Add to Favorites"
             >
-              <Sliders className="h-3 w-3" />
-              <span>
-                {settings.audioQuality === 'lossless' ? 'LOSSLESS 24-BIT' : settings.audioQuality === 'high' ? 'HIGH 320K' : 'STD 128K'}
-              </span>
-            </Link>
+              <Heart
+                className={`h-4 w-4 ${
+                  currentTrack.isLiked || likedTrackIds.includes(currentTrack.id)
+                    ? 'fill-[#e53935] text-[#e53935]'
+                    : ''
+                }`}
+              />
+            </button>
 
-            <div className="flex items-center gap-1.5 text-gray-400">
+            <div className="flex items-center gap-2 text-gray-400">
               <button
                 type="button"
                 onClick={() => setIsMuted(!isMuted)}
-                className="p-1 hover:text-white transition-colors"
+                className="p-1 hover:text-white transition-colors cursor-pointer"
               >
                 {isMuted || volume === 0 ? (
                   <VolumeX className="h-4 w-4" />
@@ -2446,24 +2732,32 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
                   setVolume(parseFloat(e.target.value));
                   setIsMuted(false);
                 }}
-                className="w-16 h-1 bg-white/20 rounded-lg accent-[#2dd4bf] cursor-pointer"
+                className="w-20 h-1 bg-white/20 rounded-lg accent-[#e53935] cursor-pointer"
               />
             </div>
 
             <button
               type="button"
-              className="p-1.5 text-gray-400 hover:text-white transition-colors"
-              title="Equalizer"
+              onClick={() => handleOpenRecordStudio(currentTrack)}
+              className="p-1.5 text-gray-400 hover:text-white transition-colors cursor-pointer"
+              title="Open Studio"
             >
-              <SlidersHorizontal className="h-4 w-4" />
+              <Mic className="h-4 w-4" />
             </button>
 
             <button
               type="button"
-              className="p-1.5 text-gray-400 hover:text-white transition-colors"
-              title="Playlist Queue"
+              onClick={() => {
+                if (document.fullscreenElement) {
+                  document.exitFullscreen?.();
+                } else {
+                  document.documentElement.requestFullscreen?.();
+                }
+              }}
+              className="p-1.5 text-gray-400 hover:text-white transition-colors cursor-pointer"
+              title="Fullscreen"
             >
-              <ListOrdered className="h-4 w-4" />
+              <Maximize2 className="h-4 w-4" />
             </button>
           </div>
         </div>
@@ -2780,17 +3074,64 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
             </p>
 
             <div className="mt-5 space-y-2.5">
+              {/* 1. MP3 Lease */}
               <div
-                onClick={() => setPurchaseTier('premium')}
+                onClick={() => setPurchaseTier('mp3')}
                 className={`p-3 rounded-xl border transition-all cursor-pointer flex items-center justify-between ${
-                  purchaseTier === 'premium'
+                  purchaseTier === 'mp3'
+                    ? 'bg-[#e53935]/15 border-[#e53935]/40 text-white'
+                    : 'bg-white/[0.02] border-white/5 hover:bg-white/[0.05] text-gray-300'
+                }`}
+              >
+                <div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs font-black text-white">Starter MP3 Lease</span>
+                    <span className="px-1.5 py-0.2 rounded-full text-[9px] font-mono font-bold bg-white/10 text-gray-300">
+                      ENTRY
+                    </span>
+                  </div>
+                  <span className="text-[11px] text-gray-400">High-Quality 320kbps MP3 · 50,000 Streams</span>
+                </div>
+                <span className="text-sm font-black text-[#e53935]">
+                  ₦15,000
+                </span>
+              </div>
+
+              {/* 2. WAV Lease */}
+              <div
+                onClick={() => setPurchaseTier('wav')}
+                className={`p-3 rounded-xl border transition-all cursor-pointer flex items-center justify-between ${
+                  purchaseTier === 'wav'
+                    ? 'bg-[#e53935]/15 border-[#e53935]/40 text-white'
+                    : 'bg-white/[0.02] border-white/5 hover:bg-white/[0.05] text-gray-300'
+                }`}
+              >
+                <div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs font-black text-white">WAV Lease</span>
+                    <span className="px-1.5 py-0.2 rounded-full text-[9px] font-mono font-bold bg-blue-500/20 text-blue-300">
+                      STUDIO
+                    </span>
+                  </div>
+                  <span className="text-[11px] text-gray-400">Lossless 24-Bit WAV Master · 100,000 Streams</span>
+                </div>
+                <span className="text-sm font-black text-[#e53935]">
+                  ₦30,000
+                </span>
+              </div>
+
+              {/* 3. Trackout Stems Lease */}
+              <div
+                onClick={() => setPurchaseTier('stems')}
+                className={`p-3 rounded-xl border transition-all cursor-pointer flex items-center justify-between ${
+                  purchaseTier === 'stems'
                     ? 'bg-amber-500/15 border-amber-500/40 text-amber-300'
                     : 'bg-white/[0.02] border-white/5 hover:bg-white/[0.05] text-gray-300'
                 }`}
               >
                 <div>
                   <div className="flex items-center gap-1.5">
-                    <span className="text-xs font-black text-white">Premium WAV + Stems</span>
+                    <span className="text-xs font-black text-white">Trackout Lease (WAV + Stems)</span>
                     <span className="px-1.5 py-0.2 rounded-full text-[9px] font-mono font-bold bg-amber-400/20 text-amber-300">
                       MOST POPULAR
                     </span>
@@ -2802,6 +3143,7 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
                 </span>
               </div>
 
+              {/* 4. 100% Exclusive Buyout */}
               <div
                 onClick={() => setPurchaseTier('exclusive')}
                 className={`p-3 rounded-xl border transition-all cursor-pointer flex items-center justify-between ${
@@ -2851,7 +3193,11 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
                       const priceNgn =
                         purchaseTier === 'exclusive'
                           ? (paidBeatPurchaseTrack.exclusivePriceNgn || 200000)
-                          : (paidBeatPurchaseTrack.premiumPriceNgn || paidBeatPurchaseTrack.priceNgn || 50000);
+                          : purchaseTier === 'stems'
+                          ? (paidBeatPurchaseTrack.premiumPriceNgn || paidBeatPurchaseTrack.priceNgn || 50000)
+                          : purchaseTier === 'wav'
+                          ? 30000
+                          : 15000;
 
                       const orderId = `beat_${paidBeatPurchaseTrack.id.slice(0, 8)}_${Date.now()}`;
 
@@ -2893,16 +3239,20 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
                       setIsPurchasingBeat(false);
                     }
                   }}
-                  className="w-full py-3 rounded-xl bg-[#E8B896] hover:bg-[#d8a886] text-black font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-transform hover:scale-[1.01] shadow-lg shadow-[#E8B896]/20 cursor-pointer disabled:opacity-60"
+                  className="w-full py-3 rounded-xl bg-[#e53935] hover:bg-[#d32f2f] text-white font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-transform hover:scale-[1.01] shadow-lg shadow-[#e53935]/25 cursor-pointer disabled:opacity-60"
                 >
                   <ShoppingBag className="h-4 w-4" />
                   <span>
                     {isPurchasingBeat
                       ? 'Connecting to Paystack...'
                       : `Pay & License ${
-                          purchaseTier === 'premium'
+                          purchaseTier === 'exclusive'
+                            ? `₦${(paidBeatPurchaseTrack.exclusivePriceNgn || 200000).toLocaleString()}`
+                            : purchaseTier === 'stems'
                             ? `₦${(paidBeatPurchaseTrack.premiumPriceNgn || paidBeatPurchaseTrack.priceNgn || 50000).toLocaleString()}`
-                            : `₦${(paidBeatPurchaseTrack.exclusivePriceNgn || 200000).toLocaleString()}`
+                            : purchaseTier === 'wav'
+                            ? '₦30,000'
+                            : '₦15,000'
                         }`}
                   </span>
                 </button>
