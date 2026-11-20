@@ -293,15 +293,19 @@ export async function POST(req: NextRequest) {
 
     // Helper to process beat item
     const processBeatItem = async (bId: string, bLicense: string, bPriceNgn: number) => {
-      if (bLicense === 'exclusive') {
+      const isExclusive = String(bLicense || '').toLowerCase().trim() === 'exclusive';
+      if (isExclusive) {
         try {
           await supabase.rpc('acquire_exclusive_beat', { p_beat_id: bId });
         } catch (e) {
           console.warn('Exclusive lock error:', e);
         }
         try {
-          await supabase.from('beats').update({ status: 'sold' }).eq('id', bId);
-        } catch (e) {}
+          await supabase.from('beats').update({ status: 'sold', sold_at: new Date().toISOString() }).eq('id', bId);
+          await supabase.from('beat_licenses').update({ enabled: false }).eq('beat_id', bId);
+        } catch (e) {
+          console.warn('Error setting beat to sold:', e);
+        }
       }
 
       try {

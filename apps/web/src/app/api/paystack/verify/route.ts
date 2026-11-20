@@ -227,7 +227,8 @@ export async function POST(req: NextRequest) {
             console.warn('Exclusive lock error:', e);
           }
           try {
-            await supabase.from('beats').update({ status: 'sold' }).eq('id', item.beat_id);
+            await supabase.from('beats').update({ status: 'sold', sold_at: new Date().toISOString() }).eq('id', item.beat_id);
+            await supabase.from('beat_licenses').update({ enabled: false }).eq('beat_id', item.beat_id);
           } catch (e) {}
         }
 

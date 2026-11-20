@@ -26,19 +26,24 @@ export async function getStudioBeats(): Promise<{ beats: TrackItem[]; producers:
         `)
         .eq('status', 'live')
         .order('created_at', { ascending: false }),
-      supabase.from('licenses').select('beat_id'),
-      supabase.from('order_items').select('beat_id, order:orders!order_id(status)')
+      supabase.from('licenses').select('beat_id, type'),
+      supabase.from('order_items').select('beat_id, license, order:orders!order_id(status)')
     ]);
 
     const dbBeats = beatsRes.data;
 
     const licenseCountMap: Record<string, number> = {};
     const orderItemCountMap: Record<string, number> = {};
+    const exclusiveSoldBeatIds = new Set<string>();
 
     if (licRes.data) {
       licRes.data.forEach((l: any) => {
         if (l.beat_id) {
           licenseCountMap[l.beat_id] = (licenseCountMap[l.beat_id] || 0) + 1;
+          const licType = String(l.type || (l as any).license_type || '').toLowerCase().trim();
+          if (licType === 'exclusive') {
+            exclusiveSoldBeatIds.add(l.beat_id);
+          }
         }
       });
     }
@@ -46,10 +51,30 @@ export async function getStudioBeats(): Promise<{ beats: TrackItem[]; producers:
     if (oiRes.data) {
       oiRes.data.forEach((oi: any) => {
         const orderStatus = (oi as any)?.order?.status;
+        const licType = String(oi.license || '').toLowerCase().trim();
         if (oi.beat_id && (!orderStatus || orderStatus === 'paid' || orderStatus === 'completed')) {
           orderItemCountMap[oi.beat_id] = (orderItemCountMap[oi.beat_id] || 0) + 1;
+          if (licType === 'exclusive') {
+            exclusiveSoldBeatIds.add(oi.beat_id);
+          }
         }
       });
+    }
+
+    // Synchronize status = 'sold' in DB for exclusively purchased beats
+    if (exclusiveSoldBeatIds.size > 0) {
+      const soldIds = Array.from(exclusiveSoldBeatIds);
+      supabase
+        .from('beats')
+        .update({ status: 'sold', sold_at: new Date().toISOString() })
+        .in('id', soldIds)
+        .eq('status', 'live')
+        .then(() => {}, () => {});
+      supabase
+        .from('beat_licenses')
+        .update({ enabled: false })
+        .in('beat_id', soldIds)
+        .then(() => {}, () => {});
     }
 
     const purchaseCountMap: Record<string, number> = {};
@@ -58,7 +83,11 @@ export async function getStudioBeats(): Promise<{ beats: TrackItem[]; producers:
       purchaseCountMap[id] = Math.max(licenseCountMap[id] || 0, orderItemCountMap[id] || 0);
     });
 
-    if (dbBeats && dbBeats.length > 0) {
+    const availableDbBeats = (dbBeats || []).filter(
+      (b: any) => b.status === 'live' && !exclusiveSoldBeatIds.has(b.id)
+    );
+
+    if (availableDbBeats && availableDbBeats.length > 0) {
       const r2Cdn = process.env.NEXT_PUBLIC_R2_PUBLIC_URL?.replace(/\/$/, '') || 'https://media.cautionstudioz.com';
       const resolveAudioKey = (key?: string) => {
         if (!key) return undefined;
@@ -66,7 +95,7 @@ export async function getStudioBeats(): Promise<{ beats: TrackItem[]; producers:
         return `${r2Cdn}/${key}`;
       };
 
-      const allMapped: TrackItem[] = dbBeats.map((b) => {
+      const allMapped: TrackItem[] = availableDbBeats.map((b) => {
         const masterUrl = resolveAudioKey(b.master_wav_key);
         const previewCleanUrl = resolveAudioKey(b.preview_clean_key);
         const previewTaggedUrl = resolveAudioKey(b.preview_tagged_key);

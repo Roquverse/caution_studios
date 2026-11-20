@@ -180,24 +180,39 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
       );
       setProducerUploads(localMatches);
 
-      // 2. Query Supabase for all beats uploaded by this producer
-      const { data: dbBeats } = await supabase
-        .from('beats')
-        .select(`
-          *,
-          producer:producer_id (
-            id,
-            display_name,
-            handle,
-            avatar_url
-          ),
-          licenses:beat_licenses (
-            type,
-            price_cents,
-            enabled
-          )
-        `)
-        .order('created_at', { ascending: false });
+      // 2. Query Supabase for all active beats uploaded by this producer (exclude sold / exclusive beats)
+      const [beatsRes, licRes] = await Promise.all([
+        supabase
+          .from('beats')
+          .select(`
+            *,
+            producer:producer_id (
+              id,
+              display_name,
+              handle,
+              avatar_url
+            ),
+            licenses:beat_licenses (
+              type,
+              price_cents,
+              enabled
+            )
+          `)
+          .eq('status', 'live')
+          .order('created_at', { ascending: false }),
+        supabase.from('licenses').select('beat_id, type')
+      ]);
+
+      const exclusiveIds = new Set<string>();
+      if (licRes.data) {
+        licRes.data.forEach((l: any) => {
+          if (l.beat_id && String(l.type || '').toLowerCase().trim() === 'exclusive') {
+            exclusiveIds.add(l.beat_id);
+          }
+        });
+      }
+
+      const dbBeats = (beatsRes.data || []).filter((b: any) => b.status === 'live' && !exclusiveIds.has(b.id));
 
       if (dbBeats && dbBeats.length > 0) {
         const r2Cdn = process.env.NEXT_PUBLIC_R2_PUBLIC_URL?.replace(/\/$/, '') || 'https://media.cautionstudioz.com';
@@ -502,7 +517,15 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
               setRewardNotification('🎉 Caution Plus active! Monthly beats & commercial clearance unlocked.');
             } else {
               const beatName = data.beatTitle ? `"${data.beatTitle}"` : 'beat';
-              setRewardNotification(`🎉 Payment verified via Paystack! Commercial license & master stems for ${beatName} unlocked.`);
+              const isExclusive = data.license === 'exclusive' || (data.items && data.items.some((it: any) => it.license === 'exclusive'));
+              if (isExclusive && data.beatId) {
+                // Immediately deactivate the exclusively purchased beat from the dashboard
+                setPlaylistRows((prev) => prev.filter((b) => b.id !== data.beatId));
+                setNewReleases((prev) => prev.filter((b) => b.id !== data.beatId));
+                setRewardNotification(`🎉 Congratulations! You have acquired exclusive rights to ${beatName}. It is now deactivated from the public store and available in your Library.`);
+              } else {
+                setRewardNotification(`🎉 Payment verified via Paystack! Commercial license & master stems for ${beatName} unlocked.`);
+              }
             }
             window.history.replaceState({}, document.title, window.location.pathname);
           }
@@ -513,28 +536,42 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
     }
   }, []);
 
-  // Background refresh to catch any newly created beats seamlessly without flashing
+  // Background refresh to catch any newly created beats seamlessly without flashing (filters out sold / exclusive beats)
   useEffect(() => {
     async function refreshDatabaseBeats() {
       try {
-        const { data: dbBeats, error } = await supabase
-          .from('beats')
-          .select(`
-            *,
-            producer:producer_id (
-              id,
-              display_name,
-              handle,
-              avatar_url
-            ),
-            licenses:beat_licenses (
-              type,
-              price_cents,
-              enabled
-            )
-          `)
-          .eq('status', 'live')
-          .order('created_at', { ascending: false });
+        const [beatsRes, licRes] = await Promise.all([
+          supabase
+            .from('beats')
+            .select(`
+              *,
+              producer:producer_id (
+                id,
+                display_name,
+                handle,
+                avatar_url
+              ),
+              licenses:beat_licenses (
+                type,
+                price_cents,
+                enabled
+              )
+            `)
+            .eq('status', 'live')
+            .order('created_at', { ascending: false }),
+          supabase.from('licenses').select('beat_id, type')
+        ]);
+
+        const exclusiveIds = new Set<string>();
+        if (licRes.data) {
+          licRes.data.forEach((l: any) => {
+            if (l.beat_id && String(l.type || '').toLowerCase().trim() === 'exclusive') {
+              exclusiveIds.add(l.beat_id);
+            }
+          });
+        }
+
+        const dbBeats = (beatsRes.data || []).filter((b: any) => b.status === 'live' && !exclusiveIds.has(b.id));
 
         if (dbBeats && dbBeats.length > 0) {
           const savedCounts = localStorage.getItem('caution_beat_play_counts');

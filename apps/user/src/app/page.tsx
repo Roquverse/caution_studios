@@ -29,19 +29,24 @@ export default async function UserPortalPage() {
         `)
         .eq('status', 'live')
         .order('created_at', { ascending: false }),
-      supabase.from('licenses').select('beat_id'),
-      supabase.from('order_items').select('beat_id, order:orders!order_id(status)')
+      supabase.from('licenses').select('beat_id, type'),
+      supabase.from('order_items').select('beat_id, license, order:orders!order_id(status)')
     ]);
 
     const dbBeats = beatsRes.data;
 
     const licenseCountMap: Record<string, number> = {};
     const orderItemCountMap: Record<string, number> = {};
+    const exclusiveSoldBeatIds = new Set<string>();
 
     if (licRes.data) {
       licRes.data.forEach((l: any) => {
         if (l.beat_id) {
           licenseCountMap[l.beat_id] = (licenseCountMap[l.beat_id] || 0) + 1;
+          const licType = String(l.type || (l as any).license_type || '').toLowerCase().trim();
+          if (licType === 'exclusive') {
+            exclusiveSoldBeatIds.add(l.beat_id);
+          }
         }
       });
     }
@@ -49,10 +54,30 @@ export default async function UserPortalPage() {
     if (oiRes.data) {
       oiRes.data.forEach((oi: any) => {
         const orderStatus = (oi as any)?.order?.status;
+        const licType = String(oi.license || '').toLowerCase().trim();
         if (oi.beat_id && (!orderStatus || orderStatus === 'paid' || orderStatus === 'completed')) {
           orderItemCountMap[oi.beat_id] = (orderItemCountMap[oi.beat_id] || 0) + 1;
+          if (licType === 'exclusive') {
+            exclusiveSoldBeatIds.add(oi.beat_id);
+          }
         }
       });
+    }
+
+    // Deactivate exclusively purchased beats: sync database status
+    if (exclusiveSoldBeatIds.size > 0) {
+      const soldIds = Array.from(exclusiveSoldBeatIds);
+      supabase
+        .from('beats')
+        .update({ status: 'sold', sold_at: new Date().toISOString() })
+        .in('id', soldIds)
+        .eq('status', 'live')
+        .then(() => {}, () => {});
+      supabase
+        .from('beat_licenses')
+        .update({ enabled: false })
+        .in('beat_id', soldIds)
+        .then(() => {}, () => {});
     }
 
     const purchaseCountMap: Record<string, number> = {};
@@ -61,9 +86,14 @@ export default async function UserPortalPage() {
       purchaseCountMap[id] = Math.max(licenseCountMap[id] || 0, orderItemCountMap[id] || 0);
     });
 
-    if (dbBeats && dbBeats.length > 0) {
+    // Exclude any beat that is not live or has been bought exclusively
+    const availableDbBeats = (dbBeats || []).filter(
+      (b: any) => b.status === 'live' && !exclusiveSoldBeatIds.has(b.id)
+    );
+
+    if (availableDbBeats.length > 0) {
       const r2Cdn = process.env.NEXT_PUBLIC_R2_PUBLIC_URL?.replace(/\/$/, '') || 'https://media.cautionstudioz.com';
-      initialBeats = dbBeats.map((b) => {
+      initialBeats = availableDbBeats.map((b) => {
         const audioKey = b.preview_clean_key || b.preview_tagged_key || b.master_wav_key;
         let audioUrl = '';
         if (audioKey) {
