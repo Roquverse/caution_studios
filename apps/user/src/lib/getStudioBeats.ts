@@ -92,32 +92,27 @@ export async function getStudioBeats(): Promise<{ beats: TrackItem[]; producers:
         const exclusiveLic = licenses.find((l: any) => l.type === 'exclusive');
         const beatTags: string[] = Array.isArray(b.tags) ? b.tags : [];
 
-        const paidLicensesDisabled =
-          licenses.length > 0 &&
-          (!premiumLic || premiumLic.enabled === false || premiumLic.price_cents <= 100) &&
-          (!exclusiveLic || exclusiveLic.enabled === false || exclusiveLic.price_cents <= 100);
+        const hasPaidPremium = Boolean(premiumLic && premiumLic.enabled !== false && Number(premiumLic.price_cents) > 100);
+        const hasPaidExclusive = Boolean(exclusiveLic && exclusiveLic.enabled !== false && Number(exclusiveLic.price_cents) > 100);
+        const hasPaidBasic = Boolean(basicLic && basicLic.enabled !== false && Number(basicLic.price_cents) > 100);
 
-        const isFreeTagged =
-          (basicLic?.price_cents !== undefined && basicLic.price_cents <= 100) ||
-          paidLicensesDisabled ||
-          b.is_free_beat === true ||
-          beatTags.some((t: string) => t.toLowerCase() === 'free' || t.toLowerCase() === 'free download') ||
-          b.title?.toLowerCase().includes('(free)') ||
-          b.title?.toLowerCase().includes('[free]') ||
-          b.category === 'free';
+        // A beat is a Paid Beat if it has an enabled paid license
+        const isPaidBeat = hasPaidPremium || hasPaidExclusive || hasPaidBasic;
+        const isFree = !isPaidBeat;
 
-        const rawPrice = basicLic?.price_cents ? basicLic.price_cents / 100 : (isFreeTagged ? 0 : 3000);
-        const priceNgn = isFreeTagged || rawPrice <= 1 ? 0 : rawPrice;
-        const premiumPriceNgn = isFreeTagged
-          ? 0
-          : premiumLic?.price_cents && premiumLic.price_cents > 100
+        const premiumPriceNgn = hasPaidPremium
           ? Math.round(premiumLic.price_cents / 100)
-          : (priceNgn ? priceNgn * 3 : 50000);
-        const exclusivePriceNgn = isFreeTagged
-          ? 0
-          : exclusiveLic?.price_cents && exclusiveLic.price_cents > 100
+          : (hasPaidExclusive ? Math.max(30000, Math.round(exclusiveLic.price_cents / 100 * 0.25)) : 0);
+
+        const exclusivePriceNgn = hasPaidExclusive
           ? Math.round(exclusiveLic.price_cents / 100)
-          : 200000;
+          : 0;
+
+        const basicPriceNgn = hasPaidBasic
+          ? Math.round(basicLic.price_cents / 100)
+          : 0;
+
+        const priceNgn = isFree ? 0 : (premiumPriceNgn || basicPriceNgn || exclusivePriceNgn);
 
         const durationSec = b.duration_seconds || 180;
         const mins = Math.floor(durationSec / 60);
@@ -133,7 +128,7 @@ export async function getStudioBeats(): Promise<{ beats: TrackItem[]; producers:
           duration: `${mins}:${secs.toString().padStart(2, '0')}`,
           durationSeconds: durationSec,
           coverUrl: b.cover_url || '/images/album_neon_dj.jpg',
-          category: isFreeTagged ? 'free' : 'playlists',
+          category: isFree ? 'free' : 'playlists',
           audioUrl,
           masterUrl,
           previewCleanUrl,
@@ -144,7 +139,7 @@ export async function getStudioBeats(): Promise<{ beats: TrackItem[]; producers:
           priceNgn,
           premiumPriceNgn,
           exclusivePriceNgn,
-          isFree: isFreeTagged,
+          isFree,
           tags: beatTags,
           playCount: b.play_count || 0,
           downloadCount: Number(b.download_count || b.free_commercial_downloads_count || 0),
@@ -152,11 +147,7 @@ export async function getStudioBeats(): Promise<{ beats: TrackItem[]; producers:
         };
       });
 
-      const freeBeats = allMapped.filter((b) => b.isFree || !b.priceNgn || b.priceNgn <= 1);
-      beats = [
-        ...freeBeats,
-        ...allMapped.filter((b) => !(b.isFree || !b.priceNgn || b.priceNgn <= 1))
-      ];
+      beats = allMapped;
     }
 
     const { data: dbProfiles } = await supabase

@@ -95,33 +95,33 @@ export async function GET() {
         audioUrl = `${r2Cdn}/masters/alex-morgan-afrobeat-instrumental-summer-groove-573648-hubz_1791151613114.mp3`;
       }
 
-      const licenses = Array.isArray(b.licenses) ? b.licenses : [];
+      const licenses = Array.isArray(b.licenses) ? b.licenses : Array.isArray(b.beat_licenses) ? b.beat_licenses : [];
       const basicLic = licenses.find((l: any) => l.type === 'basic');
       const premiumLic = licenses.find((l: any) => l.type === 'premium');
       const exclusiveLic = licenses.find((l: any) => l.type === 'exclusive');
       const beatTags: string[] = Array.isArray(b.tags) ? b.tags : [];
 
-      const paidLicensesDisabled =
-        licenses.length > 0 &&
-        (!premiumLic || premiumLic.enabled === false || premiumLic.price_cents <= 100) &&
-        (!exclusiveLic || exclusiveLic.enabled === false || exclusiveLic.price_cents <= 100);
+      const hasPaidPremium = Boolean(premiumLic && premiumLic.enabled !== false && Number(premiumLic.price_cents) > 100);
+      const hasPaidExclusive = Boolean(exclusiveLic && exclusiveLic.enabled !== false && Number(exclusiveLic.price_cents) > 100);
+      const hasPaidBasic = Boolean(basicLic && basicLic.enabled !== false && Number(basicLic.price_cents) > 100);
 
-      const isFreeTagged =
-        (basicLic?.price_cents !== undefined && basicLic.price_cents <= 100) ||
-        paidLicensesDisabled ||
-        b.is_free_beat === true ||
-        beatTags.some((t: string) => t.toLowerCase() === 'free' || t.toLowerCase() === 'free download') ||
-        b.title?.toLowerCase().includes('(free)') ||
-        b.title?.toLowerCase().includes('[free]') ||
-        b.category === 'free';
+      // A beat is a Paid Beat if it has an enabled paid license
+      const isPaidBeat = hasPaidPremium || hasPaidExclusive || hasPaidBasic;
+      const isFree = !isPaidBeat;
 
-      const rawPrice = basicLic?.price_cents ? basicLic.price_cents / 100 : (isFreeTagged ? 0 : 3000);
-      const priceNgn = isFreeTagged || rawPrice <= 1 ? 0 : rawPrice;
-      const exclusivePriceNgn = isFreeTagged
-        ? 0
-        : exclusiveLic?.price_cents
-        ? exclusiveLic.price_cents / 100
-        : 50000;
+      const premiumPriceNgn = hasPaidPremium
+        ? Math.round(premiumLic.price_cents / 100)
+        : (hasPaidExclusive ? Math.max(30000, Math.round(exclusiveLic.price_cents / 100 * 0.25)) : 0);
+
+      const exclusivePriceNgn = hasPaidExclusive
+        ? Math.round(exclusiveLic.price_cents / 100)
+        : 0;
+
+      const basicPriceNgn = hasPaidBasic
+        ? Math.round(basicLic.price_cents / 100)
+        : 0;
+
+      const priceNgn = isFree ? 0 : (premiumPriceNgn || basicPriceNgn || exclusivePriceNgn);
 
       const durationSec = b.duration_seconds || 180;
       const mins = Math.floor(durationSec / 60);
@@ -137,7 +137,7 @@ export async function GET() {
         duration: `${mins}:${secs.toString().padStart(2, '0')}`,
         durationSeconds: durationSec,
         coverUrl: b.cover_url || '/images/album_neon_dj.jpg',
-        category: isFreeTagged ? 'free' : 'playlists',
+        category: isFree ? 'free' : 'playlists',
         audioUrl,
         masterUrl,
         previewCleanUrl,
@@ -146,8 +146,9 @@ export async function GET() {
         genre: b.genre || 'Afrobeats',
         musicalKey: b.musical_key || 'C Minor',
         priceNgn,
+        premiumPriceNgn,
         exclusivePriceNgn,
-        isFree: isFreeTagged,
+        isFree,
         tags: beatTags,
         playCount: b.play_count || 0,
         downloadCount: Number(b.download_count || b.free_commercial_downloads_count || 0),
@@ -155,18 +156,12 @@ export async function GET() {
       };
     });
 
-    const freeBeats = allMapped.filter((b) => b.isFree || !b.priceNgn || b.priceNgn <= 1);
-
-    // Sort allBeats so Free Beats appear first, followed by the rest of the catalog
-    const sortedAllBeats = [
-      ...freeBeats,
-      ...allMapped.filter((b) => !(b.isFree || !b.priceNgn || b.priceNgn <= 1))
-    ];
+    const freeBeats = allMapped.filter((b) => b.isFree);
 
     return NextResponse.json({
-      beats: sortedAllBeats,
+      beats: allMapped,
       freeBeats,
-      allBeats: sortedAllBeats
+      allBeats: allMapped
     });
   } catch (err: any) {
     console.error('Error in GET /api/beats/studio:', err);

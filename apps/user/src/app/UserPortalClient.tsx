@@ -232,35 +232,28 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
             const premiumLic = b.licenses?.find((l: any) => l.type === 'premium') || b.beat_licenses?.find((l: any) => l.type === 'premium');
             const exclusiveLic = b.licenses?.find((l: any) => l.type === 'exclusive') || b.beat_licenses?.find((l: any) => l.type === 'exclusive');
             const beatTags: string[] = Array.isArray(b.tags) ? b.tags : [];
-            const isFreeTagged =
-              (basicLic?.price_cents !== undefined && basicLic.price_cents <= 100) ||
-              b.category === 'free' ||
-              b.is_free_beat === true ||
-              beatTags.some((t: string) => t.toLowerCase() === 'free' || t.toLowerCase() === 'free download') ||
-              b.title?.toLowerCase().includes('(free)') ||
-              b.title?.toLowerCase().includes('[free]');
 
-            const premiumPriceNgn = isFreeTagged
-              ? 0
-              : premiumLic?.price_cents && premiumLic.price_cents > 100
+            const hasPaidPremium = Boolean(premiumLic && premiumLic.enabled !== false && Number(premiumLic.price_cents) > 100);
+            const hasPaidExclusive = Boolean(exclusiveLic && exclusiveLic.enabled !== false && Number(exclusiveLic.price_cents) > 100);
+            const hasPaidBasic = Boolean(basicLic && basicLic.enabled !== false && Number(basicLic.price_cents) > 100);
+
+            // A beat is a Paid Beat if it has an enabled paid license
+            const isPaidBeat = hasPaidPremium || hasPaidExclusive || hasPaidBasic;
+            const isFree = !isPaidBeat;
+
+            const premiumPriceNgn = hasPaidPremium
               ? Math.round(premiumLic.price_cents / 100)
-              : 50000;
-            const exclusivePriceNgn = isFreeTagged
-              ? 0
-              : exclusiveLic?.price_cents && exclusiveLic.price_cents > 100
-              ? Math.round(exclusiveLic.price_cents / 100)
-              : 200000;
+              : (hasPaidExclusive ? Math.max(30000, Math.round(exclusiveLic.price_cents / 100 * 0.25)) : 0);
 
-            let priceNgn = 0;
-            if (!isFreeTagged) {
-              if (basicLic?.price_cents && basicLic.price_cents > 300000) {
-                priceNgn = Math.round(basicLic.price_cents / 100);
-              } else if (premiumPriceNgn > 0) {
-                priceNgn = Math.max(15000, Math.round(premiumPriceNgn * 0.35));
-              } else {
-                priceNgn = 15000;
-              }
-            }
+            const exclusivePriceNgn = hasPaidExclusive
+              ? Math.round(exclusiveLic.price_cents / 100)
+              : 0;
+
+            const basicPriceNgn = hasPaidBasic
+              ? Math.round(basicLic.price_cents / 100)
+              : 0;
+
+            const priceNgn = isFree ? 0 : (premiumPriceNgn || basicPriceNgn || exclusivePriceNgn);
 
             const durationSec = b.duration_seconds || 180;
             const mins = Math.floor(durationSec / 60);
@@ -276,7 +269,7 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
               duration: `${mins}:${secs.toString().padStart(2, '0')}`,
               durationSeconds: durationSec,
               coverUrl: b.cover_url || producer.coverUrl,
-              category: isFreeTagged ? 'free' : 'playlists',
+              category: isFree ? 'free' : 'playlists',
               audioUrl,
               bpm: b.bpm || 120,
               genre: b.genre || 'Electronic',
@@ -284,7 +277,7 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
               priceNgn,
               premiumPriceNgn,
               exclusivePriceNgn,
-              isFree: isFreeTagged,
+              isFree,
               tags: beatTags,
               playCount: b.play_count || 0,
               downloadCount: Number(b.download_count || b.free_commercial_downloads_count || 0),
@@ -568,35 +561,28 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
             const premiumLic = b.licenses?.find((l: any) => l.type === 'premium') || b.beat_licenses?.find((l: any) => l.type === 'premium');
             const exclusiveLic = b.licenses?.find((l: any) => l.type === 'exclusive') || b.beat_licenses?.find((l: any) => l.type === 'exclusive');
             const beatTags: string[] = Array.isArray(b.tags) ? b.tags : [];
-            const isFreeBeatItem =
-              (basicLic?.price_cents !== undefined && basicLic.price_cents <= 100) ||
-              b.category === 'free' ||
-              b.is_free_beat === true ||
-              beatTags.some((t: string) => t.toLowerCase() === 'free' || t.toLowerCase() === 'free download') ||
-              b.title?.toLowerCase().includes('(free)') ||
-              b.title?.toLowerCase().includes('[free]');
 
-            const premiumPriceNgn = isFreeBeatItem
-              ? 0
-              : premiumLic?.price_cents && premiumLic.price_cents > 100
+            const hasPaidPremium = Boolean(premiumLic && premiumLic.enabled !== false && Number(premiumLic.price_cents) > 100);
+            const hasPaidExclusive = Boolean(exclusiveLic && exclusiveLic.enabled !== false && Number(exclusiveLic.price_cents) > 100);
+            const hasPaidBasic = Boolean(basicLic && basicLic.enabled !== false && Number(basicLic.price_cents) > 100);
+
+            // A beat is a Paid Beat if it has an enabled paid license
+            const isPaidBeat = hasPaidPremium || hasPaidExclusive || hasPaidBasic;
+            const isFreeBeatItem = !isPaidBeat;
+
+            const premiumPriceNgn = hasPaidPremium
               ? Math.round(premiumLic.price_cents / 100)
-              : 50000;
-            const exclusivePriceNgn = isFreeBeatItem
-              ? 0
-              : exclusiveLic?.price_cents && exclusiveLic.price_cents > 100
-              ? Math.round(exclusiveLic.price_cents / 100)
-              : 200000;
+              : (hasPaidExclusive ? Math.max(30000, Math.round(exclusiveLic.price_cents / 100 * 0.25)) : 0);
 
-            let priceNgn = 0;
-            if (!isFreeBeatItem) {
-              if (basicLic?.price_cents && basicLic.price_cents > 300000) {
-                priceNgn = Math.round(basicLic.price_cents / 100);
-              } else if (premiumPriceNgn > 0) {
-                priceNgn = Math.max(15000, Math.round(premiumPriceNgn * 0.35));
-              } else {
-                priceNgn = 15000;
-              }
-            }
+            const exclusivePriceNgn = hasPaidExclusive
+              ? Math.round(exclusiveLic.price_cents / 100)
+              : 0;
+
+            const basicPriceNgn = hasPaidBasic
+              ? Math.round(basicLic.price_cents / 100)
+              : 0;
+
+            const priceNgn = isFreeBeatItem ? 0 : (premiumPriceNgn || basicPriceNgn || exclusivePriceNgn);
             const durationSec = b.duration_seconds || 180;
             const mins = Math.floor(durationSec / 60);
             const secs = Math.floor(durationSec % 60);

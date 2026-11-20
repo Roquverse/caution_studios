@@ -34,8 +34,13 @@ import {
 
 export function isFreeBeat(track?: TrackItem | null): boolean {
   if (!track) return false;
+  // If track explicitly has paid prices > 0, it is unequivocally a PAID commercial beat
+  if ((track.premiumPriceNgn && track.premiumPriceNgn > 0) || (track.exclusivePriceNgn && track.exclusivePriceNgn > 0)) {
+    return false;
+  }
+  if (track.isFree === false) return false;
   if (track.isFree === true) return true;
-  if (track.priceNgn === 0 || (track.priceNgn !== undefined && track.priceNgn <= 1)) return true;
+  if (track.priceNgn && track.priceNgn > 100) return false;
   if (track.category === 'free') return true;
   if (
     Array.isArray(track.tags) &&
@@ -49,7 +54,7 @@ export function isFreeBeat(track?: TrackItem | null): boolean {
   ) {
     return true;
   }
-  return false;
+  return true;
 }
 
 function formatPriceBadge(val: number): string {
