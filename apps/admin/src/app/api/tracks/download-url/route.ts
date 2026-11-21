@@ -54,6 +54,18 @@ export async function POST(req: NextRequest) {
 
     const safeFilename = targetFilename || targetKey.split('/').pop() || 'caution-beat-asset';
 
+    // Increment download count for creator statistics and threshold tracking
+    if (beatId) {
+      try {
+        const supabase = getServiceRoleClient();
+        const { data: b } = await supabase.from('beats').select('free_commercial_downloads_count').eq('id', beatId).maybeSingle();
+        const currentCount = b?.free_commercial_downloads_count || 0;
+        await supabase.from('beats').update({ free_commercial_downloads_count: currentCount + 1 }).eq('id', beatId);
+      } catch (countErr) {
+        console.warn('Could not increment download count on admin download:', countErr);
+      }
+    }
+
     try {
       const downloadUrl = await getPresignedDownloadUrl(targetKey, safeFilename, 60 * 60 * 24 * 7);
       return NextResponse.json({

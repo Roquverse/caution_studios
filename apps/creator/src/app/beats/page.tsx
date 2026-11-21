@@ -40,8 +40,8 @@ function formatDbBeat(b: any) {
   }
 
   const plays = Number(b.play_count || 0);
-  const downloads = Number(b.free_commercial_downloads_count || b.download_count || 0);
-  const combinedActivity = Math.max(plays, downloads, plays + downloads);
+  const downloads = Number(b.free_commercial_downloads_count || b.downloads_count || b.download_count || 0);
+  const combinedActivity = plays + downloads;
   const thresholdPct = Math.min(100, Math.round((combinedActivity / 10000) * 100));
 
   const hasPaidPremium = Boolean(premium && premium.enabled !== false && Number(premium.price_cents) > 100);
@@ -503,7 +503,10 @@ export default function BeatsCatalogPage() {
                   <th className="py-3.5 px-4 font-bold">License Pricing</th>
                   <th className="py-3.5 px-4 font-bold text-center">Plays</th>
                   <th className="py-3.5 px-4 font-bold text-center">Downloads</th>
-                  <th className="py-3.5 px-4 font-bold text-center">Pay Threshold</th>
+                  <th className="py-3.5 px-4 font-bold text-center">
+                    <div>Pay Threshold</div>
+                    <div className="text-[9px] font-normal text-zinc-400 font-mono tracking-tight">Plays + Downloads</div>
+                  </th>
                   <th className="py-3.5 px-4 font-bold text-center">Sales</th>
                   <th className="py-3.5 px-4 font-bold">Status</th>
                   <th className="py-3.5 px-4 font-bold text-right">Actions</th>
@@ -600,6 +603,9 @@ export default function BeatsCatalogPage() {
                     {/* Pay Threshold Progress */}
                     <td className="py-3.5 px-4 text-center font-mono text-[11px]">
                       <div className="text-white font-bold">{(beat.combinedActivity || 0).toLocaleString()} / 10k</div>
+                      <div className="text-[10px] text-zinc-400 font-medium mt-0.5 whitespace-nowrap">
+                        {beat.streamsCount} plays + {beat.downloadsCount} dls
+                      </div>
                       <div className="text-[10px] text-amber-400 font-semibold mt-0.5">{beat.thresholdPct || 0}%</div>
                     </td>
 

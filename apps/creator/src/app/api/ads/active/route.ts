@@ -1,11 +1,14 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { getServiceRoleClient } from '../../../../lib/supabaseClient';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
+    const { searchParams } = new URL(req.url);
+    const requestedType = searchParams.get('type') || 'listening'; // 'listening' | 'download'
+
     const supabase = getServiceRoleClient();
     const { data: campaigns, error } = await supabase
       .from('ad_campaigns')
@@ -21,20 +24,56 @@ export async function GET() {
       (c) => c.audio_url && c.audio_url.trim().length > 0 && (c.target_plays == null || (c.delivered_plays || 0) < c.target_plays)
     );
 
-    if (validCampaigns.length > 0) {
+    // Filter by requested ad type with strict separation between stream ads and download ads
+    const isDownloadRequest = requestedType === 'download';
+
+    const filtered = validCampaigns.filter((c) => {
+      const type = ((c as any).ad_type || '').toLowerCase();
+      const name = (c.campaign_name || '').toLowerCase();
+      const pkg = (c.package_name || '').toLowerCase();
+
+      const isExplicitDownload =
+        type === 'download' ||
+        pkg === 'download' ||
+        name.includes('[download ad]') ||
+        name.includes('download');
+
+      const isExplicitStream =
+        type === 'listening' ||
+        pkg === 'listening' ||
+        name.includes('[stream ad]') ||
+        name.includes('stream') ||
+        name.includes('listen');
+
+      if (isDownloadRequest) {
+        // Download ad modal: MUST be a download ad and NEVER a stream-only ad
+        if (isExplicitStream && !isExplicitDownload) return false;
+        if (isExplicitDownload) return true;
+        if (type === 'all' && !isExplicitStream) return true;
+        return false;
+      } else {
+        // Music streaming audition: MUST be a stream ad and NEVER a download ad
+        if (isExplicitDownload && !isExplicitStream) return false;
+        if (isExplicitStream) return true;
+        if (type === 'all' && !isExplicitDownload) return true;
+        return false;
+      }
+    });
+
+    if (filtered.length > 0) {
       // Fisher-Yates shuffle for true random distribution
-      const shuffled = [...validCampaigns];
+      const shuffled = [...filtered];
       for (let i = shuffled.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
         [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
       }
-      return NextResponse.json({ ads: shuffled, count: shuffled.length });
+      return NextResponse.json({ ads: shuffled, count: shuffled.length, type: requestedType });
     }
 
-    // Default high-converting fallbacks if no database ads are active yet
-    const fallbacks = [
+    // Default high-converting fallbacks tailored for listening vs downloads
+    const listeningFallbacks = [
       {
-        id: 'promo-fallback-1',
+        id: 'promo-fallback-listening-1',
         song_title: 'Midnight Lagos',
         artist_name: 'Teniola Sound',
         campaign_name: 'Stream the new breakout single "Midnight Lagos" out on all DSPs now!',
@@ -44,10 +83,11 @@ export async function GET() {
         apple_music_url: 'https://music.apple.com',
         audiomack_url: 'https://audiomack.com',
         youtube_url: 'https://youtube.com',
-        status: 'active'
+        status: 'active',
+        ad_type: 'listening'
       },
       {
-        id: 'promo-fallback-2',
+        id: 'promo-fallback-listening-2',
         song_title: 'Golden Horizon',
         artist_name: 'Zino Waves',
         campaign_name: 'Infectious Amapiano summer fusion playing across clubs & radio.',
@@ -57,13 +97,45 @@ export async function GET() {
         apple_music_url: 'https://music.apple.com',
         audiomack_url: 'https://audiomack.com',
         youtube_url: 'https://youtube.com',
-        status: 'active'
+        status: 'active',
+        ad_type: 'listening'
       }
     ];
 
-    // Pick random fallback
-    const shuffledFallbacks = fallbacks.sort(() => 0.5 - Math.random());
-    return NextResponse.json({ ads: shuffledFallbacks, count: shuffledFallbacks.length });
+    const downloadFallbacks = [
+      {
+        id: 'promo-fallback-download-1',
+        song_title: 'Lagos Nightdrive',
+        artist_name: 'Seyi Blaze',
+        campaign_name: 'Sponsored Download: Stream 15s to unlock your free high-definition beat master!',
+        genre: 'Afro-Fusion',
+        cover_url: '/images/hero_boombox.jpg',
+        spotify_url: 'https://open.spotify.com',
+        apple_music_url: 'https://music.apple.com',
+        audiomack_url: 'https://audiomack.com',
+        youtube_url: 'https://youtube.com',
+        status: 'active',
+        ad_type: 'download'
+      },
+      {
+        id: 'promo-fallback-download-2',
+        song_title: 'Soundstage Vibe',
+        artist_name: 'Caution All-Stars',
+        campaign_name: 'Unlock 1 extra beat download per 15s sponsor audition (restricted to 2 extra/day).',
+        genre: 'Highlife Drill',
+        cover_url: '/images/album_neon_dj.jpg',
+        spotify_url: 'https://open.spotify.com',
+        apple_music_url: 'https://music.apple.com',
+        audiomack_url: 'https://audiomack.com',
+        youtube_url: 'https://youtube.com',
+        status: 'active',
+        ad_type: 'download'
+      }
+    ];
+
+    const chosenFallbacks = requestedType === 'download' ? downloadFallbacks : listeningFallbacks;
+    const shuffledFallbacks = chosenFallbacks.sort(() => 0.5 - Math.random());
+    return NextResponse.json({ ads: shuffledFallbacks, count: shuffledFallbacks.length, type: requestedType });
   } catch (err: any) {
     console.error('Active ads route error:', err);
     return NextResponse.json({ error: 'Failed to fetch ads', ads: [] }, { status: 500 });

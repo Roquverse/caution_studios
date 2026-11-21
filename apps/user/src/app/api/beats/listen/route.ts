@@ -35,6 +35,63 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: true, beatId, play_count: 1, download_count: 1 });
     }
 
+    // Helper function to check and credit 10k threshold milestones (plays + downloads combined)
+    const checkProducerThreshold = async (producerId: string) => {
+      try {
+        const { data: producerBeats } = await supabase
+          .from('beats')
+          .select('play_count, free_commercial_downloads_count')
+          .eq('producer_id', producerId);
+
+        const totalPlays = (producerBeats || []).reduce((acc: number, b: any) => acc + (Number(b.play_count) || 0), 0);
+        const totalDownloads = (producerBeats || []).reduce(
+          (acc: number, b: any) => acc + (Number(b.free_commercial_downloads_count) || 0),
+          0
+        );
+        const combinedActivity = totalPlays + totalDownloads;
+
+        // Check how many 10k milestones have been achieved
+        const milestoneCount = Math.floor(combinedActivity / 10000);
+        if (milestoneCount > 0) {
+          const { data: existingIncentives } = await supabase
+            .from('producer_download_incentives')
+            .select('id')
+            .eq('producer_id', producerId);
+
+          const alreadyCredited = existingIncentives?.length || 0;
+          if (milestoneCount > alreadyCredited) {
+            const milestonesToCredit = milestoneCount - alreadyCredited;
+            const rewardTotal = milestonesToCredit * 30000;
+
+            for (let i = 0; i < milestonesToCredit; i++) {
+              await supabase.from('producer_download_incentives').insert({
+                producer_id: producerId,
+                qualifying_downloads: 10000,
+                reward_amount_ngn: 30000,
+                status: 'credited'
+              });
+            }
+
+            const { data: prodProfile } = await supabase
+              .from('profiles')
+              .select('available_balance_ngn')
+              .eq('id', producerId)
+              .maybeSingle();
+
+            await supabase
+              .from('profiles')
+              .update({
+                is_verified: true,
+                available_balance_ngn: (Number(prodProfile?.available_balance_ngn) || 0) + rewardTotal
+              })
+              .eq('id', producerId);
+          }
+        }
+      } catch (e) {
+        console.warn('Error checking producer combined threshold milestone:', e);
+      }
+    };
+
     if (action === 'download') {
       const newDownloadCount = (beat.free_commercial_downloads_count || 0) + 1;
 
@@ -48,44 +105,9 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ success: false, error: updateError.message }, { status: 500 });
       }
 
-      // Check if producer crossed a 10,000 pay threshold milestone
+      // Check if producer crossed a 10,000 milestone (plays + downloads)
       if (beat.producer_id) {
-        try {
-          const { data: producerBeats } = await supabase
-            .from('beats')
-            .select('play_count, free_commercial_downloads_count')
-            .eq('producer_id', beat.producer_id);
-
-          const totalDownloads = (producerBeats || []).reduce(
-            (acc, b) => acc + (b.free_commercial_downloads_count || 0),
-            0
-          );
-
-          if (totalDownloads > 0 && totalDownloads % 10000 === 0) {
-            await supabase.from('producer_download_incentives').insert({
-              producer_id: beat.producer_id,
-              qualifying_downloads: 10000,
-              reward_amount_ngn: 30000,
-              status: 'credited'
-            });
-
-            const { data: prodProfile } = await supabase
-              .from('profiles')
-              .select('available_balance_ngn')
-              .eq('id', beat.producer_id)
-              .maybeSingle();
-
-            await supabase
-              .from('profiles')
-              .update({
-                is_verified: true,
-                available_balance_ngn: (Number(prodProfile?.available_balance_ngn) || 0) + 30000
-              })
-              .eq('id', beat.producer_id);
-          }
-        } catch (e) {
-          console.warn('Error checking producer download threshold:', e);
-        }
+        await checkProducerThreshold(beat.producer_id);
       }
 
       return NextResponse.json({
@@ -110,7 +132,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: updateError.message }, { status: 500 });
     }
 
-    // Also increment producer's streaming_streams_count in profiles if producer_id exists
+    // Also increment producer's streaming_streams_count in profiles & check milestone
     if (beat.producer_id) {
       try {
         const { data: prodProfile } = await supabase
@@ -125,6 +147,8 @@ export async function POST(req: NextRequest) {
             streaming_streams_count: (Number(prodProfile?.streaming_streams_count) || 0) + 1
           })
           .eq('id', beat.producer_id);
+
+        await checkProducerThreshold(beat.producer_id);
       } catch (e) {}
     }
 

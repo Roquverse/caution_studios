@@ -384,7 +384,7 @@ export default function PayoutsPage() {
               <span className="text-xs font-medium text-zinc-400 block">Plays &amp; Downloads Threshold</span>
               <div className="mt-2">
                 <span className="text-2xl font-bold font-mono text-[#e53935]">
-                  {Math.max(totalPlaysCount, totalDownloadsCount, totalPlaysCount + totalDownloadsCount).toLocaleString()} / 10k
+                  {(totalPlaysCount + totalDownloadsCount).toLocaleString()} / 10k
                 </span>
               </div>
               <p className="text-[11px] text-amber-300 mt-1 font-mono">

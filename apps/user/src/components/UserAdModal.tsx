@@ -64,13 +64,27 @@ export function resolveDirectCdnUrl(url?: string | null): string {
   return `${R2_CDN}/${url}`;
 }
 
-const DEFAULT_AD: ActiveAd = {
-  id: 'promo-default-1',
+const DEFAULT_STREAM_AD: ActiveAd = {
+  id: 'promo-default-listening',
   song_title: 'Midnight Lagos',
   artist_name: 'Teniola Sound',
   campaign_name: 'Stream the new breakout single "Midnight Lagos" out on all DSPs now!',
   genre: 'Afro-Soul',
   cover_url: '/images/artist_studio_mic.jpg',
+  audio_url: `${R2_CDN}/masters/alex-morgan-afrobeat-instrumental-summer-groove-573648-hubz_1791151613114.mp3`,
+  spotify_url: 'https://open.spotify.com',
+  apple_music_url: 'https://music.apple.com',
+  audiomack_url: 'https://audiomack.com',
+  youtube_url: 'https://youtube.com'
+};
+
+const DEFAULT_DOWNLOAD_AD: ActiveAd = {
+  id: 'promo-default-download',
+  song_title: 'Lagos Nightdrive',
+  artist_name: 'Seyi Blaze',
+  campaign_name: 'Sponsored Download: Stream 15s to unlock your free high-definition beat master!',
+  genre: 'Afro-Fusion',
+  cover_url: '/images/hero_boombox.jpg',
   audio_url: `${R2_CDN}/masters/alex-morgan-afrobeat-instrumental-summer-groove-573648-hubz_1791151613114.mp3`,
   spotify_url: 'https://open.spotify.com',
   apple_music_url: 'https://music.apple.com',
@@ -85,7 +99,7 @@ export const UserAdModal: React.FC<UserAdModalProps> = ({
   pendingDownloadTitle,
   adType = pendingDownloadTitle ? 'download' : 'listening'
 }) => {
-  const [activeAd, setActiveAd] = useState<ActiveAd>(DEFAULT_AD);
+  const [activeAd, setActiveAd] = useState<ActiveAd>(adType === 'download' ? DEFAULT_DOWNLOAD_AD : DEFAULT_STREAM_AD);
   const [adListenCount, setAdListenCount] = useState<number>(0);
   const [secondsRemaining, setSecondsRemaining] = useState(15);
   const [canSkip, setCanSkip] = useState(false);
@@ -124,11 +138,12 @@ export const UserAdModal: React.FC<UserAdModalProps> = ({
     setIsPlaying(true);
     setRewardAwarded(false);
     rewardGrantedRef.current = false;
+    setActiveAd(adType === 'download' ? DEFAULT_DOWNLOAD_AD : DEFAULT_STREAM_AD);
 
-    // Fetch randomized active ad
+    // Fetch randomized active ad strictly for the requested placement
     async function loadActiveAd() {
       try {
-        const res = await fetch(`/api/ads/active?type=${adType}`);
+        const res = await fetch(`/api/ads/active?type=${adType}&_t=${Date.now()}`);
         if (res.ok) {
           const data = await res.json();
           if (Array.isArray(data.ads) && data.ads.length > 0) {

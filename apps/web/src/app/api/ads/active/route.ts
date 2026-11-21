@@ -24,26 +24,41 @@ export async function GET(req: NextRequest) {
       (c) => c.audio_url && c.audio_url.trim().length > 0 && (c.target_plays == null || (c.delivered_plays || 0) < c.target_plays)
     );
 
-    // Filter by requested ad type (listening vs download)
-    let filtered = validCampaigns.filter((c) => {
-      const type = (c as any).ad_type;
+    // Filter by requested ad type with strict separation between stream ads and download ads
+    const isDownloadRequest = requestedType === 'download';
+
+    const filtered = validCampaigns.filter((c) => {
+      const type = ((c as any).ad_type || '').toLowerCase();
       const name = (c.campaign_name || '').toLowerCase();
       const pkg = (c.package_name || '').toLowerCase();
 
-      if (requestedType === 'download') {
-        if (type === 'download' || name.includes('download') || pkg.includes('download')) return true;
-        if (!type || type === 'all') return true;
+      const isExplicitDownload =
+        type === 'download' ||
+        pkg === 'download' ||
+        name.includes('[download ad]') ||
+        name.includes('download');
+
+      const isExplicitStream =
+        type === 'listening' ||
+        pkg === 'listening' ||
+        name.includes('[stream ad]') ||
+        name.includes('stream') ||
+        name.includes('listen');
+
+      if (isDownloadRequest) {
+        // Download ad modal: MUST be a download ad and NEVER a stream-only ad
+        if (isExplicitStream && !isExplicitDownload) return false;
+        if (isExplicitDownload) return true;
+        if (type === 'all' && !isExplicitStream) return true;
         return false;
       } else {
-        if (type === 'listening' || name.includes('stream') || name.includes('listen')) return true;
-        if (!type || type === 'all') return true;
+        // Music streaming audition: MUST be a stream ad and NEVER a download ad
+        if (isExplicitDownload && !isExplicitStream) return false;
+        if (isExplicitStream) return true;
+        if (type === 'all' && !isExplicitDownload) return true;
         return false;
       }
     });
-
-    if (filtered.length === 0 && validCampaigns.length > 0) {
-      filtered = validCampaigns;
-    }
 
     if (filtered.length > 0) {
       // Fisher-Yates shuffle for true random distribution

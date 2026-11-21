@@ -98,7 +98,7 @@ export default function StreamingRoyaltiesPage() {
               const mappedTracks: DownloadTrackRow[] = payload.beats.map((b: any) => {
                 const plays = Number(b.play_count || 0);
                 const dl = Number(b.free_commercial_downloads_count || b.download_count || 0);
-                const combined = Math.max(plays, dl, plays + dl);
+                const combined = plays + dl;
                 const progress = Math.min(100, Math.round((combined / 10000) * 100));
                 const earned = Math.floor(combined / 10000) * 30000;
                 return {
@@ -148,13 +148,13 @@ export default function StreamingRoyaltiesPage() {
           );
           setTotalPlaysCount(totalPlays);
           setTotalDownloadsCount(totalDownloads);
-          const computedReward = Math.floor(Math.max(totalPlays + totalDownloads, totalDownloads) / 10000) * 30000;
+          const computedReward = Math.floor((totalPlays + totalDownloads) / 10000) * 30000;
           setRewardAmountNgn(computedReward);
 
           const mappedTracks: DownloadTrackRow[] = userBeats.map((b) => {
             const plays = Number(b.play_count || 0);
             const dl = Number(b.free_commercial_downloads_count || b.download_count || 0);
-            const combined = Math.max(plays, dl, plays + dl);
+            const combined = plays + dl;
             const progress = Math.min(100, Math.round((combined / 10000) * 100));
             const earned = Math.floor(combined / 10000) * 30000;
             return {

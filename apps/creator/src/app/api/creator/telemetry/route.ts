@@ -154,7 +154,8 @@ export async function GET(req: NextRequest) {
     const playsThresholdPct = Math.min(100, Number(((totalPlaysCount / payThreshold) * 100).toFixed(2)));
     const downloadsThresholdPct = Math.min(100, Number(((totalDownloadsCount / payThreshold) * 100).toFixed(2)));
     const combinedThresholdPct = Math.min(100, Number(((combinedActivityCount / payThreshold) * 100).toFixed(2)));
-    const computedReward = Math.floor(totalDownloadsCount / payThreshold) * 30000;
+    // Pay threshold rewards: Both plays AND downloads count towards the ₦30,000 / 10k threshold
+    const computedReward = Math.floor(combinedActivityCount / payThreshold) * 30000;
     const downloadRewardNgn = Math.max(computedReward, incReward);
 
     // 4. Fetch Order Items & Sales (via Service Role so RLS on orders never blocks producer visibility)
