@@ -268,12 +268,74 @@ export default function BeatUploadPage() {
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left Column: Metadata & Audio Files */}
-        <div className="lg:col-span-2 space-y-6">
-          {/* File Upload Dropzones */}
-          <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-5 shadow-sm space-y-4">
-            <h3 className="text-sm font-semibold text-white">1. Master Files</h3>
+      <form onSubmit={handleSubmit} className="space-y-6">
+        {/* Step 1: Distribution Model (Full Width at Top so producers choose upfront) */}
+        <div className="rounded-xl border border-zinc-800 bg-zinc-900/70 p-5 sm:p-6 shadow-md space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#e53935] text-[11px] font-bold text-white">
+                  1
+                </span>
+                <h3 className="text-sm sm:text-base font-bold text-white">Distribution Model</h3>
+              </div>
+              <p className="text-xs text-zinc-400 mt-1">
+                Choose whether this beat is for paid commercial licensing or 100% free community download
+              </p>
+            </div>
+            <span className={`self-start sm:self-auto text-[11px] font-mono font-bold px-3 py-1 rounded-full ${
+              isFreeBeat
+                ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                : 'bg-[#e53935]/20 text-[#e53935] border border-[#e53935]/30'
+            }`}>
+              {isFreeBeat ? '✦ FREE BEAT (COMMUNITY)' : '$ PAID BEAT (FOR SALE)'}
+            </span>
+          </div>
+
+          {/* Segmented Toggle Control */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 p-1.5 rounded-xl bg-zinc-950 border border-zinc-800">
+            <button
+              type="button"
+              onClick={() => setIsFreeBeat(false)}
+              className={`py-3 px-4 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                !isFreeBeat
+                  ? 'bg-[#e53935] text-white shadow-md'
+                  : 'text-zinc-400 hover:text-white hover:bg-zinc-900/50'
+              }`}
+            >
+              <DollarSign className="h-4 w-4" />
+              <span>Paid Beat (For Sale)</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setIsFreeBeat(true);
+                setStemsFileObj(null);
+              }}
+              className={`py-3 px-4 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                isFreeBeat
+                  ? 'bg-emerald-500 text-zinc-950 shadow-md font-extrabold'
+                  : 'text-zinc-400 hover:text-white hover:bg-zinc-900/50'
+              }`}
+            >
+              <Sparkles className="h-4 w-4" />
+              <span>Free Beat (100% Free)</span>
+            </button>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Left Column: Metadata & Audio Files */}
+          <div className="lg:col-span-2 space-y-6">
+            {/* File Upload Dropzones */}
+            <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-5 shadow-sm space-y-4">
+              <div className="flex items-center gap-2">
+                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-zinc-800 text-[11px] font-bold text-zinc-200">
+                  2
+                </span>
+                <h3 className="text-sm font-semibold text-white">Master Audio &amp; Artwork</h3>
+              </div>
 
             {/* Master WAV / MP3 */}
             <div>
@@ -396,7 +458,12 @@ export default function BeatUploadPage() {
 
           {/* Beat Information */}
           <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-5 shadow-sm space-y-4">
-            <h3 className="text-sm font-semibold text-white">2. Beat Details & Tagging</h3>
+            <div className="flex items-center gap-2">
+              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-zinc-800 text-[11px] font-bold text-zinc-200">
+                3
+              </span>
+              <h3 className="text-sm font-semibold text-white">Beat Details &amp; Tagging</h3>
+            </div>
 
             <div className="space-y-1.5">
               <label className="text-xs font-medium text-zinc-300">Beat Title *</label>
@@ -469,60 +536,16 @@ export default function BeatUploadPage() {
 
         {/* Right Column: Pricing & Verification Boost */}
         <div className="space-y-6">
-          {/* Beat Distribution Model Toggle: Paid Beat vs Free Beat */}
-          <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-5 shadow-sm space-y-3.5">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-sm font-bold text-white">3. Distribution Model</h3>
-                <p className="text-[11px] text-zinc-400">Choose whether this beat is for paid commercial licensing or free download</p>
-              </div>
-              <span className={`text-[10px] font-mono font-bold px-2.5 py-1 rounded-full ${
-                isFreeBeat
-                  ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
-                  : 'bg-[#e53935]/20 text-[#e53935] border border-[#e53935]/30'
-              }`}>
-                {isFreeBeat ? 'FREE BEAT' : 'PAID BEAT'}
-              </span>
-            </div>
-
-            {/* Segmented Toggle Control */}
-            <div className="grid grid-cols-2 gap-2 p-1 rounded-lg bg-zinc-950 border border-zinc-800">
-              <button
-                type="button"
-                onClick={() => setIsFreeBeat(false)}
-                className={`py-2 px-3 rounded-md text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-                  !isFreeBeat
-                    ? 'bg-[#e53935] text-white shadow-sm'
-                    : 'text-zinc-400 hover:text-white'
-                }`}
-              >
-                <DollarSign className="h-3.5 w-3.5" />
-                <span>Paid Beat (For Sale)</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setIsFreeBeat(true);
-                  setStemsFileObj(null);
-                }}
-                className={`py-2 px-3 rounded-md text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-                  isFreeBeat
-                    ? 'bg-emerald-500 text-zinc-950 shadow-sm'
-                    : 'text-zinc-400 hover:text-white'
-                }`}
-              >
-                <Sparkles className="h-3.5 w-3.5" />
-                <span>Free Beat (100% Free)</span>
-              </button>
-            </div>
-          </div>
-
           {/* PAID BEAT: Commercial License Pricing (Only shown for Paid Beat) */}
           {!isFreeBeat && (
             <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-5 shadow-sm space-y-4 animate-in fade-in duration-200">
               <div className="flex items-center justify-between">
-                <h3 className="text-sm font-semibold text-white">Commercial License Pricing</h3>
+                <div className="flex items-center gap-2">
+                  <span className="flex h-5 w-5 items-center justify-center rounded-full bg-zinc-800 text-[11px] font-bold text-zinc-200">
+                    4
+                  </span>
+                  <h3 className="text-sm font-semibold text-white">Commercial License Pricing</h3>
+                </div>
                 <span className="text-[10px] font-mono text-zinc-500">80% Producer Cut</span>
               </div>
               <p className="text-[11px] text-zinc-400">
@@ -591,10 +614,15 @@ export default function BeatUploadPage() {
               <div className="flex items-start gap-2.5">
                 <Sparkles className="h-5 w-5 text-emerald-400 shrink-0 mt-0.5" />
                 <div>
-                  <span className="text-sm font-bold text-white block">
-                    Free Beat Community Distribution &amp; Rewards
-                  </span>
-                  <span className="text-xs text-emerald-300 font-medium block mt-0.5">
+                  <div className="flex items-center gap-2">
+                    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500/20 text-[11px] font-bold text-emerald-300">
+                      4
+                    </span>
+                    <span className="text-sm font-bold text-white block">
+                      Free Beat Community Distribution &amp; Rewards
+                    </span>
+                  </div>
+                  <span className="text-xs text-emerald-300 font-medium block mt-1">
                     Earn ₦30,000 per 10k downloads &amp; support upcoming talent
                   </span>
                   <p className="text-[11px] text-zinc-300 block mt-1.5 leading-relaxed">
@@ -668,6 +696,7 @@ export default function BeatUploadPage() {
               Cancel
             </Link>
           </div>
+        </div>
         </div>
       </form>
     </CreatorShell>

@@ -1082,6 +1082,37 @@ export default function AdminTracksPage() {
                 </div>
               )}
 
+              {/* Distribution Model: Paid vs Free Download (Step 1 at top) */}
+              <div className="flex items-center justify-between p-3.5 rounded-xl bg-white/[0.03] border border-white/[0.08]">
+                <div>
+                  <span className="text-xs font-bold text-white block">Distribution Model</span>
+                  <span className="text-[10px] text-gray-400">Choose between Free Download or Commercial Licensing</span>
+                </div>
+                <div className="flex items-center gap-1.5 p-1 rounded-lg bg-[#16181d] border border-white/[0.06]">
+                  <button
+                    type="button"
+                    onClick={() => setIsFreeTrack(false)}
+                    className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all cursor-pointer ${!isFreeTrack ? 'bg-[#e53935] text-white shadow-sm' : 'text-gray-400 hover:text-white'
+                      }`}
+                  >
+                    Paid Beat
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsFreeTrack(true);
+                      setStemsFile(null);
+                      setPremiumPrice('');
+                      setExclusivePrice('');
+                    }}
+                    className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all cursor-pointer ${isFreeTrack ? 'bg-emerald-500 text-black shadow-sm' : 'text-gray-400 hover:text-white'
+                      }`}
+                  >
+                    Free Download
+                  </button>
+                </div>
+              </div>
+
               {/* Master Audio Upload Dropzone */}
               <div>
                 <label className="block text-xs font-bold text-gray-300 mb-1.5">
@@ -1304,37 +1335,6 @@ export default function AdminTracksPage() {
                     placeholder="e.g. C Minor"
                     className="w-full text-xs rounded-xl border border-white/[0.06] p-2 bg-[#16181d] text-white placeholder:text-gray-500 focus:outline-none focus:border-[#e53935]/60"
                   />
-                </div>
-              </div>
-
-              {/* Distribution Model: Paid vs Free Download */}
-              <div className="flex items-center justify-between p-3 rounded-xl bg-white/[0.02] border border-white/[0.06]">
-                <div>
-                  <span className="text-xs font-bold text-white block">Distribution Model</span>
-                  <span className="text-[10px] text-gray-400">Choose between Free Download or Commercial Licensing</span>
-                </div>
-                <div className="flex items-center gap-1.5 p-1 rounded-lg bg-[#16181d] border border-white/[0.06]">
-                  <button
-                    type="button"
-                    onClick={() => setIsFreeTrack(false)}
-                    className={`px-3 py-1 rounded-md text-xs font-bold transition-all cursor-pointer ${!isFreeTrack ? 'bg-[#e53935] text-white shadow-sm' : 'text-gray-400 hover:text-white'
-                      }`}
-                  >
-                    Paid Beat
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsFreeTrack(true);
-                      setStemsFile(null);
-                      setPremiumPrice('');
-                      setExclusivePrice('');
-                    }}
-                    className={`px-3 py-1 rounded-md text-xs font-bold transition-all cursor-pointer ${isFreeTrack ? 'bg-emerald-500 text-black shadow-sm' : 'text-gray-400 hover:text-white'
-                      }`}
-                  >
-                    Free Download
-                  </button>
                 </div>
               </div>
 
