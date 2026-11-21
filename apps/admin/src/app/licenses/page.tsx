@@ -178,9 +178,9 @@ export default function AdminLicensesPage() {
       case 'exclusive':
         return 'bg-purple-500/15 text-purple-400 border-purple-500/30';
       case 'premium':
-        return 'bg-amber-500/15 text-amber-400 border-amber-500/30';
+        return 'bg-[#e53935]/15 text-[#ff6b67] border-[#e53935]/30';
       default:
-        return 'bg-[#2dd4bf]/15 text-[#2dd4bf] border-[#2dd4bf]/30';
+        return 'bg-white/[0.06] text-gray-300 border-white/[0.08]';
     }
   };
 
@@ -210,7 +210,7 @@ export default function AdminLicensesPage() {
 
             <Link
               href="/tracks"
-              className="inline-flex items-center gap-1.5 bg-[#2dd4bf] hover:bg-[#20b8a4] text-zinc-950 font-semibold text-xs px-3.5 py-1.5 rounded-md transition-colors shadow-sm"
+              className="inline-flex items-center gap-1.5 bg-[#e53935] hover:bg-[#d32f2f] text-white font-bold text-xs px-4 py-2 rounded-xl transition-all shadow-md shadow-[#e53935]/25"
             >
               <Music className="h-3.5 w-3.5 stroke-[2.5]" />
               <span>Catalog Tracks</span>
@@ -220,61 +220,61 @@ export default function AdminLicensesPage() {
 
         {/* 4 Metric Summary Cards */}
         <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
-          <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-4 shadow-xs">
+          <div className="rounded-2xl border border-white/[0.06] bg-[#12141c] p-4 shadow-sm hover:border-white/[0.12] transition-colors">
             <div className="flex items-center justify-between pb-2">
-              <span className="text-xs font-medium text-zinc-400">Total Songs</span>
-              <Music className="h-4 w-4 text-[#2dd4bf]" />
+              <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Total Songs</span>
+              <Music className="h-4 w-4 text-[#ff6b67]" />
             </div>
-            <div className="text-2xl font-bold text-white tracking-tight">
+            <div className="text-2xl font-black text-white tracking-tight">
               {loading ? '-' : metrics.totalSongs}
             </div>
-            <p className="text-[11px] text-zinc-500 mt-1">Cataloged beats & recordings</p>
+            <p className="text-[11px] text-gray-400 mt-1">Cataloged beats & recordings</p>
           </div>
 
-          <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-4 shadow-xs">
+          <div className="rounded-2xl border border-white/[0.06] bg-[#12141c] p-4 shadow-sm hover:border-white/[0.12] transition-colors">
             <div className="flex items-center justify-between pb-2">
-              <span className="text-xs font-medium text-zinc-400">Generated Licenses</span>
+              <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Generated Licenses</span>
               <Award className="h-4 w-4 text-emerald-400" />
             </div>
-            <div className="text-2xl font-bold text-white tracking-tight">
+            <div className="text-2xl font-black text-white tracking-tight">
               {loading ? '-' : metrics.totalIssued}
             </div>
-            <p className="text-[11px] text-zinc-500 mt-1">Issued commercial certificates</p>
+            <p className="text-[11px] text-gray-400 mt-1">Issued commercial certificates</p>
           </div>
 
-          <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-4 shadow-xs">
+          <div className="rounded-2xl border border-white/[0.06] bg-[#12141c] p-4 shadow-sm hover:border-white/[0.12] transition-colors">
             <div className="flex items-center justify-between pb-2">
-              <span className="text-xs font-medium text-zinc-400">Uploading Producers</span>
+              <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Uploading Producers</span>
               <Users className="h-4 w-4 text-indigo-400" />
             </div>
-            <div className="text-2xl font-bold text-white tracking-tight">
+            <div className="text-2xl font-black text-white tracking-tight">
               {loading ? '-' : metrics.uniqueProducers}
             </div>
-            <p className="text-[11px] text-zinc-500 mt-1">Verified creator uploaders</p>
+            <p className="text-[11px] text-gray-400 mt-1">Verified creator uploaders</p>
           </div>
 
-          <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-4 shadow-xs">
+          <div className="rounded-2xl border border-white/[0.06] bg-[#12141c] p-4 shadow-sm hover:border-white/[0.12] transition-colors">
             <div className="flex items-center justify-between pb-2">
-              <span className="text-xs font-medium text-zinc-400">License Volume</span>
+              <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">License Volume</span>
               <ShieldCheck className="h-4 w-4 text-purple-400" />
             </div>
-            <div className="text-2xl font-bold text-white tracking-tight">
+            <div className="text-2xl font-black text-white tracking-tight">
               {loading ? '-' : formatNaira(metrics.totalIssuedRevenue)}
             </div>
-            <p className="text-[11px] text-zinc-500 mt-1">Processed license fees</p>
+            <p className="text-[11px] text-gray-400 mt-1">Processed license fees</p>
           </div>
         </div>
 
         {/* View Tabs & Search Toolbar */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-zinc-800 pb-3">
-          <div className="flex items-center gap-6 text-xs font-medium">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/[0.06] pb-3">
+          <div className="flex items-center gap-6 text-xs font-bold">
             <button
               type="button"
               onClick={() => setActiveTab('issued')}
-              className={`pb-3 -mb-[13px] transition-colors border-b-2 flex items-center gap-2 ${
+              className={`pb-3 -mb-[13px] transition-colors border-b-2 flex items-center gap-2 cursor-pointer ${
                 activeTab === 'issued'
-                  ? 'border-[#2dd4bf] text-white font-semibold'
-                  : 'border-transparent text-zinc-400 hover:text-zinc-200'
+                  ? 'border-[#e53935] text-white font-bold'
+                  : 'border-transparent text-gray-400 hover:text-gray-200'
               }`}
             >
               <FileCheck2 className="h-4 w-4" />
@@ -284,10 +284,10 @@ export default function AdminLicensesPage() {
             <button
               type="button"
               onClick={() => setActiveTab('catalog')}
-              className={`pb-3 -mb-[13px] transition-colors border-b-2 flex items-center gap-2 ${
+              className={`pb-3 -mb-[13px] transition-colors border-b-2 flex items-center gap-2 cursor-pointer ${
                 activeTab === 'catalog'
-                  ? 'border-[#2dd4bf] text-white font-semibold'
-                  : 'border-transparent text-zinc-400 hover:text-zinc-200'
+                  ? 'border-[#e53935] text-white font-bold'
+                  : 'border-transparent text-gray-400 hover:text-gray-200'
               }`}
             >
               <Layers className="h-4 w-4" />

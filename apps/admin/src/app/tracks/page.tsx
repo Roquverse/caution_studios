@@ -15,6 +15,8 @@ import {
   Image as ImageIcon,
   Layers,
   CheckCircle,
+  CheckCircle2,
+  Crown,
   X,
   Filter,
   Music,
@@ -41,7 +43,7 @@ export interface BeatTrack {
   duration_seconds?: number;
   play_count?: number;
   free_commercial_downloads_count?: number;
-  status: 'draft' | 'live' | 'unlisted' | 'archived';
+  status: 'draft' | 'live' | 'unlisted' | 'archived' | 'sold';
   created_at: string;
   producer?: {
     id?: string;
@@ -73,9 +75,29 @@ export default function AdminTracksPage() {
   const handleAdminDownload = async (track: BeatTrack, type: 'wav' | 'stems' | 'preview') => {
     try {
       setDownloadingId(`${track.id}-${type}`);
+
+      let { data: { session } } = await supabase.auth.getSession();
+      if (!session && typeof document !== 'undefined') {
+        const matchToken = document.cookie.match(/(?:^|;\s*)sb-token=([^;]*)/);
+        const matchRefresh = document.cookie.match(/(?:^|;\s*)sb-refresh=([^;]*)/);
+        if (matchToken && matchRefresh) {
+          try {
+            const { data } = await supabase.auth.setSession({
+              access_token: decodeURIComponent(matchToken[1]),
+              refresh_token: decodeURIComponent(matchRefresh[1])
+            });
+            if (data?.session) session = data.session;
+          } catch (e) { }
+        }
+      }
+      const authToken = session?.access_token;
+
       const res = await fetch('/api/tracks/download-url', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(authToken ? { Authorization: `Bearer ${authToken}` } : {})
+        },
         body: JSON.stringify({ beatId: track.id, type })
       });
       const data = await res.json();
@@ -151,6 +173,12 @@ export default function AdminTracksPage() {
   useEffect(() => {
     fetchTracks();
     fetchGenres();
+    if (typeof window !== 'undefined') {
+      const urlParams = new URLSearchParams(window.location.search);
+      if (urlParams.get('upload') === '1') {
+        setIsUploadOpen(true);
+      }
+    }
   }, []);
 
   const fetchGenres = async () => {
@@ -596,6 +624,11 @@ export default function AdminTracksPage() {
     return matchesSearch && matchesGenre && matchesStatus;
   });
 
+  const totalCatalogPlays = tracks.reduce((acc, t) => acc + (t.play_count || 0), 0);
+  const totalCatalogDownloads = tracks.reduce((acc, t) => acc + (t.free_commercial_downloads_count || 0), 0);
+  const liveTracksCount = tracks.filter((t) => t.status === 'live').length;
+  const soldTracksCount = tracks.filter((t) => t.status === 'sold').length;
+
   return (
     <AdminShell activePath="/tracks">
       <audio
@@ -614,11 +647,11 @@ export default function AdminTracksPage() {
         {/* Header Bar */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white">
-              Master Catalog
+            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white">
+              Master Beat Catalog
             </h1>
-            <p className="text-xs sm:text-sm text-zinc-400 mt-0.5">
-              Upload master audio, manage license tiers, and monitor Cloudflare R2 synchronization.
+            <p className="text-xs sm:text-sm text-gray-400 mt-0.5">
+              Manage master recordings, inspect audio files, download assets, and configure commercial license pricing.
             </p>
           </div>
 
@@ -626,41 +659,96 @@ export default function AdminTracksPage() {
             <button
               type="button"
               onClick={fetchTracks}
-              className="p-1.5 rounded-md border border-zinc-800 bg-zinc-900/60 hover:bg-zinc-800 text-zinc-300 transition-colors"
+              className="p-2 rounded-xl border border-white/[0.06] bg-[#121316] hover:bg-white/[0.04] text-gray-300 transition-colors cursor-pointer"
               title="Refresh Catalog"
             >
-              <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+              <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin text-[#e53935]' : ''}`} />
             </button>
 
             <button
               type="button"
               onClick={() => setIsUploadOpen(true)}
-              className="inline-flex items-center gap-1.5 bg-[#2dd4bf] hover:bg-[#20b8a4] text-zinc-950 font-semibold text-xs px-3.5 py-1.5 rounded-md transition-colors shadow-sm"
+              className="inline-flex items-center gap-1.5 bg-[#e53935] hover:bg-[#d32f2f] text-white font-bold text-xs px-4 py-2 rounded-xl transition-all shadow-md shadow-[#e53935]/25 cursor-pointer"
             >
-              <Plus className="h-3.5 w-3.5 stroke-[2.5]" />
+              <Plus className="h-4 w-4 stroke-[2.5]" />
               <span>Upload Master Track</span>
             </button>
           </div>
         </div>
 
+        {/* 4 Top Metric Cards */}
+        <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="rounded-2xl border border-white/[0.06] bg-[#12141c] p-4 shadow-sm hover:border-white/[0.12] transition-colors">
+            <div className="flex items-center justify-between pb-1.5">
+              <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Total Plays</span>
+              <div className="h-7 w-7 rounded-lg bg-[#e53935]/10 border border-[#e53935]/20 flex items-center justify-center text-[#ff6b67]">
+                <Play className="h-3.5 w-3.5 fill-current" />
+              </div>
+            </div>
+            <div className="text-2xl font-black text-white">
+              {loading ? '-' : totalCatalogPlays.toLocaleString()}
+            </div>
+            <p className="text-[11px] text-gray-400 mt-1 font-medium">Live playback telemetry</p>
+          </div>
+
+          <div className="rounded-2xl border border-white/[0.06] bg-[#12141c] p-4 shadow-sm hover:border-white/[0.12] transition-colors">
+            <div className="flex items-center justify-between pb-1.5">
+              <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Downloads</span>
+              <div className="h-7 w-7 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
+                <Download className="h-3.5 w-3.5" />
+              </div>
+            </div>
+            <div className="text-2xl font-black text-white">
+              {loading ? '-' : totalCatalogDownloads.toLocaleString()}
+            </div>
+            <p className="text-[11px] text-gray-400 mt-1 font-medium">Commercial DL count</p>
+          </div>
+
+          <div className="rounded-2xl border border-white/[0.06] bg-[#12141c] p-4 shadow-sm hover:border-white/[0.12] transition-colors">
+            <div className="flex items-center justify-between pb-1.5">
+              <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Active Live</span>
+              <div className="h-7 w-7 rounded-lg bg-teal-500/10 border border-teal-500/20 flex items-center justify-center text-teal-400">
+                <CheckCircle2 className="h-3.5 w-3.5" />
+              </div>
+            </div>
+            <div className="text-2xl font-black text-white">
+              {loading ? '-' : liveTracksCount}
+            </div>
+            <p className="text-[11px] text-gray-400 mt-1 font-medium">In public marketplace</p>
+          </div>
+
+          <div className="rounded-2xl border border-white/[0.06] bg-[#12141c] p-4 shadow-sm hover:border-white/[0.12] transition-colors">
+            <div className="flex items-center justify-between pb-1.5">
+              <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Sold Exclusive</span>
+              <div className="h-7 w-7 rounded-lg bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-400">
+                <Crown className="h-3.5 w-3.5" />
+              </div>
+            </div>
+            <div className="text-2xl font-black text-white">
+              {loading ? '-' : soldTracksCount}
+            </div>
+            <p className="text-[11px] text-gray-400 mt-1 font-medium">1-of-1 exclusive rights buyouts</p>
+          </div>
+        </div>
+
         {/* Toolbar: Search, Filters, Count */}
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-3 rounded-lg border border-zinc-800 bg-zinc-900/50">
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-3.5 rounded-2xl border border-white/[0.06] bg-[#12141c]">
           <div className="flex flex-wrap items-center gap-2.5 w-full sm:w-auto">
             {/* Search Input */}
-            <div className="relative w-full sm:w-72">
-              <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-zinc-500" />
+            <div className="relative w-full sm:w-80">
+              <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-gray-500" />
               <input
                 type="text"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Filter by title, genre, key..."
-                className="w-full bg-zinc-900 border border-zinc-800 rounded-md py-1.5 pl-8 pr-7 text-xs text-white placeholder:text-zinc-500 focus:outline-none focus:border-zinc-700"
+                placeholder="Search by title, producer, genre..."
+                className="w-full bg-[#16181d] border border-white/[0.06] rounded-xl py-2 pl-9 pr-8 text-xs text-white placeholder:text-gray-500 focus:outline-none focus:border-[#e53935]/50 transition-colors"
               />
               {search && (
                 <button
                   type="button"
                   onClick={() => setSearch('')}
-                  className="absolute right-2 top-2 text-zinc-500 hover:text-zinc-300"
+                  className="absolute right-2.5 top-2.5 text-gray-500 hover:text-white"
                   title="Clear search"
                 >
                   <X className="h-3.5 w-3.5" />
@@ -672,7 +760,7 @@ export default function AdminTracksPage() {
             <select
               value={genreFilter}
               onChange={(e) => setGenreFilter(e.target.value)}
-              className="bg-zinc-900 border border-zinc-800 text-xs text-zinc-300 rounded-md py-1.5 px-2.5 focus:outline-none focus:border-zinc-700"
+              className="bg-[#16181d] border border-white/[0.06] text-xs font-semibold text-gray-300 rounded-xl py-2 px-3 focus:outline-none focus:border-[#e53935]/50"
             >
               <option value="all">All Genres</option>
               {allGenres.map((g) => (
@@ -686,53 +774,54 @@ export default function AdminTracksPage() {
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="bg-zinc-900 border border-zinc-800 text-xs text-zinc-300 rounded-md py-1.5 px-2.5 focus:outline-none focus:border-zinc-700"
+              className="bg-[#16181d] border border-white/[0.06] text-xs font-semibold text-gray-300 rounded-xl py-2 px-3 focus:outline-none focus:border-[#e53935]/50"
             >
               <option value="all">All Statuses</option>
-              <option value="live">Live</option>
-              <option value="unlisted">Unlisted</option>
+              <option value="live">Live in Catalog</option>
+              <option value="unlisted">Unlisted / Hidden</option>
               <option value="draft">Draft</option>
+              <option value="sold">Sold Exclusive</option>
             </select>
           </div>
 
-          <span className="text-xs text-zinc-500 font-medium whitespace-nowrap">
-            {filtered.length} {filtered.length === 1 ? 'track' : 'tracks'} registered
+          <span className="text-xs text-gray-400 font-bold whitespace-nowrap">
+            {filtered.length} {filtered.length === 1 ? 'beat' : 'beats'} found
           </span>
         </div>
 
         {/* Data Table */}
-        <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 overflow-hidden shadow-xs">
+        <div className="rounded-2xl border border-white/[0.06] bg-[#12141c]/90 overflow-hidden shadow-sm">
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
-              <thead className="bg-zinc-900/80 border-b border-zinc-800 text-zinc-400 font-medium uppercase tracking-wider text-[10px]">
+              <thead className="bg-[#16181d]/80 border-b border-white/[0.06] text-gray-400 font-bold uppercase tracking-wider text-[10px]">
                 <tr>
-                  <th className="py-3 px-4">Track & Preview</th>
-                  <th className="py-3 px-4">Producer</th>
-                  <th className="py-3 px-4">Genre / Mood</th>
-                  <th className="py-3 px-4">BPM & Key</th>
-                  <th className="py-3 px-4">Duration</th>
-                  <th className="py-3 px-4 text-center">Plays / Downloads</th>
-                  <th className="py-3 px-4">License Pricing</th>
-                  <th className="py-3 px-4 text-center">Status</th>
-                  <th className="py-3 px-4 text-right">Actions</th>
+                  <th className="py-3.5 px-4">Track</th>
+                  <th className="py-3.5 px-4">Producer</th>
+                  <th className="py-3.5 px-4">Genre</th>
+                  <th className="py-3.5 px-4">BPM & Key</th>
+                  <th className="py-3.5 px-4">Duration</th>
+                  <th className="py-3.5 px-4 text-center">Plays / Downloads</th>
+                  <th className="py-3.5 px-4">License Pricing</th>
+                  <th className="py-3.5 px-4 text-center">Status</th>
+                  <th className="py-3.5 px-4 text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-zinc-800/60">
+              <tbody className="divide-y divide-white/[0.04]">
                 {loading ? (
                   <tr>
-                    <td colSpan={8} className="py-12 text-center text-zinc-400">
-                      <div className="flex flex-col items-center justify-center gap-2">
-                        <div className="h-5 w-5 border-2 border-[#2dd4bf] border-t-transparent rounded-full animate-spin" />
-                        <span className="text-xs text-zinc-500">Loading catalog...</span>
+                    <td colSpan={9} className="py-14 text-center text-gray-400 font-mono">
+                      <div className="flex flex-col items-center justify-center gap-2.5">
+                        <div className="h-6 w-6 border-2 border-[#e53935] border-t-transparent rounded-full animate-spin" />
+                        <span className="text-xs text-gray-400">Loading master catalog...</span>
                       </div>
                     </td>
                   </tr>
                 ) : filtered.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="py-12 text-center text-zinc-500">
-                      <Music className="h-8 w-8 text-zinc-700 mx-auto mb-2" />
-                      <p className="font-medium text-zinc-300">No catalog recordings found</p>
-                      <p className="text-xs text-zinc-500 mt-1">
+                    <td colSpan={9} className="py-14 text-center text-gray-400">
+                      <Music className="h-8 w-8 text-gray-600 mx-auto mb-2" />
+                      <p className="font-bold text-white">No catalog recordings found</p>
+                      <p className="text-xs text-gray-500 mt-1">
                         {tracks.length === 0
                           ? 'Get started by uploading your first audio master.'
                           : 'Try clearing your filters.'}
@@ -745,23 +834,23 @@ export default function AdminTracksPage() {
                     return (
                       <tr
                         key={track.id}
-                        className={`hover:bg-zinc-800/30 transition-colors ${isTrackPlaying ? 'bg-[#2dd4bf]/5' : ''
+                        className={`hover:bg-white/[0.02] transition-colors ${isTrackPlaying ? 'bg-[#e53935]/5' : ''
                           }`}
                       >
                         {/* Artwork & Audition */}
-                        <td className="py-3 px-4">
+                        <td className="py-3.5 px-4">
                           <div className="flex items-center gap-3">
                             <div className="relative group/play shrink-0">
                               <img
-                                src={track.cover_url || '/images/album_neon_dj.jpg'}
+                                src={track.cover_url || '/images/studio_mixing_console.jpg'}
                                 alt={track.title}
-                                className="h-10 w-10 rounded-md object-cover border border-zinc-800 shadow-xs"
+                                className="h-10 w-10 rounded-xl object-cover border border-white/[0.08] shadow-xs"
                               />
                               <button
                                 type="button"
                                 onClick={() => togglePlayTrack(track)}
-                                className={`absolute inset-0 rounded-md flex items-center justify-center transition-all ${isTrackPlaying
-                                  ? 'bg-black/60 text-[#2dd4bf]'
+                                className={`absolute inset-0 rounded-xl flex items-center justify-center transition-all cursor-pointer ${isTrackPlaying
+                                  ? 'bg-black/60 text-[#e53935]'
                                   : 'bg-black/40 text-white opacity-0 group-hover/play:opacity-100'
                                   }`}
                                 title={isTrackPlaying ? 'Pause' : 'Play preview'}
@@ -775,10 +864,10 @@ export default function AdminTracksPage() {
                             </div>
 
                             <div className="min-w-0">
-                              <span className="font-semibold text-white block truncate">
+                              <span className="font-bold text-white block truncate text-xs">
                                 {track.title}
                               </span>
-                              <span className="text-[10px] text-zinc-500 font-mono truncate block">
+                              <span className="text-[10px] text-gray-400 font-mono truncate block">
                                 /{track.slug}
                               </span>
                             </div>
@@ -786,18 +875,18 @@ export default function AdminTracksPage() {
                         </td>
 
                         {/* Producer */}
-                        <td className="py-3 px-4 text-zinc-300 font-medium">
+                        <td className="py-3.5 px-4 text-gray-200 font-medium">
                           {track.producer?.display_name || 'Caution Studio'}
                         </td>
 
                         {/* Genre / Mood */}
-                        <td className="py-3 px-4">
+                        <td className="py-3.5 px-4">
                           <div className="flex items-center gap-1.5 flex-wrap">
-                            <span className="text-[10px] font-medium px-2 py-0.5 rounded bg-zinc-800 text-zinc-300 border border-zinc-700/60">
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-white/[0.06] text-gray-300 border border-white/[0.08]">
                               {track.genre}
                             </span>
                             {track.moods && track.moods[0] && (
-                              <span className="text-[10px] font-medium px-2 py-0.5 rounded bg-[#2dd4bf]/10 text-[#2dd4bf] border border-[#2dd4bf]/20">
+                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#e53935]/15 text-[#ff6b67] border border-[#e53935]/20">
                                 {track.moods[0]}
                               </span>
                             )}
@@ -805,52 +894,58 @@ export default function AdminTracksPage() {
                         </td>
 
                         {/* BPM & Key */}
-                        <td className="py-3 px-4 font-mono text-zinc-300">
+                        <td className="py-3.5 px-4 font-mono text-gray-200">
                           <div>{track.bpm || 120} BPM</div>
-                          <div className="text-[10px] text-zinc-500">{track.musical_key || 'C Minor'}</div>
+                          <div className="text-[10px] text-gray-400">{track.musical_key || 'C Minor'}</div>
                         </td>
 
                         {/* Duration */}
-                        <td className="py-3 px-4 font-mono text-zinc-400">
+                        <td className="py-3.5 px-4 font-mono text-gray-400">
                           {formatDuration(track.duration_seconds)}
                         </td>
 
                         {/* Plays / Downloads */}
-                        <td className="py-3 px-4 text-center font-mono text-[11px]">
-                          <div className="text-[#2dd4bf] font-semibold">
+                        <td className="py-3.5 px-4 text-center font-mono text-[11px]">
+                          <div className="text-white font-bold">
                             {(track.play_count || 0).toLocaleString()} plays
                           </div>
-                          <div className="text-emerald-400 text-[10px]">
+                          <div className="text-gray-400 text-[10px]">
                             {(track.free_commercial_downloads_count || 0).toLocaleString()} dl
                           </div>
                         </td>
 
                         {/* License Pricing */}
-                        <td className="py-3 px-4 font-mono font-medium">
+                        <td className="py-3.5 px-4 font-mono font-medium">
                           {getLicensePricing(track)}
                         </td>
 
                         {/* Status Toggle */}
-                        <td className="py-3 px-4 text-center">
+                        <td className="py-3.5 px-4 text-center">
                           <button
                             type="button"
                             onClick={() => toggleStatus(track)}
-                            className={`inline-flex items-center gap-1 text-[10px] font-medium px-2.5 py-0.5 rounded-full border transition-all ${track.status === 'live'
+                            className={`inline-flex items-center gap-1.5 text-[10px] font-bold px-2.5 py-0.5 rounded-full border transition-all cursor-pointer ${track.status === 'live'
                               ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20 hover:bg-emerald-500/20'
-                              : 'bg-zinc-800 text-zinc-400 border-zinc-700 hover:bg-zinc-700/60'
+                              : track.status === 'sold'
+                                ? 'bg-purple-500/10 text-purple-400 border-purple-500/20 hover:bg-purple-500/20'
+                                : 'bg-white/[0.04] text-gray-400 border-white/[0.06] hover:bg-white/[0.08]'
                               }`}
                           >
                             <span
-                              className={`h-1.5 w-1.5 rounded-full ${track.status === 'live' ? 'bg-emerald-400' : 'bg-zinc-400'
+                              className={`h-1.5 w-1.5 rounded-full ${track.status === 'live'
+                                ? 'bg-emerald-400'
+                                : track.status === 'sold'
+                                  ? 'bg-purple-400'
+                                  : 'bg-gray-400'
                                 }`}
                             />
-                            {track.status === 'live' ? 'Live' : 'Unlisted'}
+                            {track.status === 'live' ? 'Live' : track.status === 'sold' ? 'Sold' : 'Unlisted'}
                           </button>
                         </td>
 
                         {/* Actions */}
-                        <td className="py-3 px-4 text-right">
-                          <div className="flex items-center justify-end gap-1">
+                        <td className="py-3.5 px-4 text-right">
+                          <div className="flex items-center justify-end gap-1.5">
                             {/* Admin Instant Download Menu */}
                             <div className="relative">
                               <button
@@ -858,42 +953,42 @@ export default function AdminTracksPage() {
                                 onClick={() =>
                                   setOpenDownloadMenuId(openDownloadMenuId === track.id ? null : track.id)
                                 }
-                                className="p-1.5 rounded-md text-zinc-400 hover:text-[#2dd4bf] hover:bg-[#2dd4bf]/10 transition-colors"
+                                className="p-2 rounded-xl text-gray-400 hover:text-white hover:bg-white/[0.06] transition-colors cursor-pointer"
                                 title="Download beat assets (Master WAV / Stems / MP3)"
                               >
-                                <Download className="h-3.5 w-3.5" />
+                                <Download className="h-4 w-4" />
                               </button>
                               {openDownloadMenuId === track.id && (
-                                <div className="absolute right-0 top-8 z-30 w-48 rounded-lg bg-zinc-900 border border-zinc-700 shadow-2xl p-1 text-left text-xs font-sans">
-                                  <div className="px-2 py-1 text-[10px] font-semibold text-zinc-500 uppercase tracking-wider">
+                                <div className="absolute right-0 top-9 z-30 w-52 rounded-2xl bg-[#16181d] border border-white/[0.1] shadow-2xl p-2 text-left text-xs font-sans">
+                                  <div className="px-2.5 py-1 text-[10px] font-bold text-gray-400 uppercase tracking-wider">
                                     Admin Beat Download
                                   </div>
                                   <button
                                     type="button"
                                     onClick={() => handleAdminDownload(track, 'wav')}
                                     disabled={!track.master_wav_key || !!downloadingId}
-                                    className="w-full text-left px-2.5 py-1.5 rounded text-zinc-200 hover:bg-zinc-800 hover:text-[#2dd4bf] flex items-center justify-between disabled:opacity-40"
+                                    className="w-full text-left px-2.5 py-2 rounded-xl text-gray-200 hover:bg-white/[0.06] hover:text-white flex items-center justify-between disabled:opacity-40 transition-colors cursor-pointer"
                                   >
-                                    <span>🎵 24-bit WAV</span>
-                                    {downloadingId === `${track.id}-wav` && <Loader2 className="h-3 w-3 animate-spin text-[#2dd4bf]" />}
+                                    <span className="font-semibold">🎵 24-bit WAV</span>
+                                    {downloadingId === `${track.id}-wav` && <Loader2 className="h-3 w-3 animate-spin text-[#e53935]" />}
                                   </button>
                                   <button
                                     type="button"
                                     onClick={() => handleAdminDownload(track, 'stems')}
                                     disabled={!track.stems_zip_key || !!downloadingId}
-                                    className="w-full text-left px-2.5 py-1.5 rounded text-zinc-200 hover:bg-zinc-800 hover:text-[#2dd4bf] flex items-center justify-between disabled:opacity-40"
+                                    className="w-full text-left px-2.5 py-2 rounded-xl text-gray-200 hover:bg-white/[0.06] hover:text-white flex items-center justify-between disabled:opacity-40 transition-colors cursor-pointer"
                                   >
-                                    <span>🎛️ Stems (.ZIP)</span>
-                                    {downloadingId === `${track.id}-stems` && <Loader2 className="h-3 w-3 animate-spin text-[#2dd4bf]" />}
+                                    <span className="font-semibold">🎛️ Stems (.ZIP)</span>
+                                    {downloadingId === `${track.id}-stems` && <Loader2 className="h-3 w-3 animate-spin text-[#e53935]" />}
                                   </button>
                                   <button
                                     type="button"
                                     onClick={() => handleAdminDownload(track, 'preview')}
                                     disabled={(!track.preview_clean_key && !track.master_wav_key) || !!downloadingId}
-                                    className="w-full text-left px-2.5 py-1.5 rounded text-zinc-200 hover:bg-zinc-800 hover:text-[#2dd4bf] flex items-center justify-between disabled:opacity-40"
+                                    className="w-full text-left px-2.5 py-2 rounded-xl text-gray-200 hover:bg-white/[0.06] hover:text-white flex items-center justify-between disabled:opacity-40 transition-colors cursor-pointer"
                                   >
-                                    <span>🎧 Clean MP3</span>
-                                    {downloadingId === `${track.id}-preview` && <Loader2 className="h-3 w-3 animate-spin text-[#2dd4bf]" />}
+                                    <span className="font-semibold">🎧 Clean MP3</span>
+                                    {downloadingId === `${track.id}-preview` && <Loader2 className="h-3 w-3 animate-spin text-[#e53935]" />}
                                   </button>
                                 </div>
                               )}
@@ -908,18 +1003,18 @@ export default function AdminTracksPage() {
                                 setEditPremiumPriceNgn(premLic?.price_cents ? premLic.price_cents / 100 : 50000);
                                 setEditExclusivePriceNgn(exclLic?.price_cents ? exclLic.price_cents / 100 : 200000);
                               }}
-                              className="p-1.5 rounded-md text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors"
+                              className="p-2 rounded-xl text-gray-400 hover:text-white hover:bg-white/[0.06] transition-colors cursor-pointer"
                               title="Edit track"
                             >
-                              <Edit className="h-3.5 w-3.5" />
+                              <Edit className="h-4 w-4" />
                             </button>
                             <button
                               type="button"
                               onClick={() => handleDelete(track)}
-                              className="p-1.5 rounded-md text-zinc-400 hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
+                              className="p-2 rounded-xl text-gray-400 hover:text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer"
                               title="Delete track"
                             >
-                              <Trash2 className="h-3.5 w-3.5" />
+                              <Trash2 className="h-4 w-4" />
                             </button>
                           </div>
                         </td>
@@ -933,53 +1028,53 @@ export default function AdminTracksPage() {
         </div>
       </div>
 
-      {/* Upload Master Modal (Shadcn Dialog Style) */}
+      {/* Upload Master Modal */}
       {isUploadOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm overflow-y-auto">
-          <div className="relative w-full max-w-xl rounded-xl border border-zinc-800 bg-[#0c0d10] p-6 shadow-2xl space-y-5 my-8">
-            <div className="flex items-start justify-between pb-3 border-b border-zinc-800">
+          <div className="relative w-full max-w-xl rounded-2xl border border-white/[0.08] bg-[#12141c] p-6 shadow-2xl space-y-5 my-8">
+            <div className="flex items-start justify-between pb-3 border-b border-white/[0.06]">
               <div>
-                <h2 className="text-base font-bold text-white tracking-tight">
+                <h2 className="text-base font-extrabold text-white tracking-tight">
                   Upload Master Recording
                 </h2>
-                <p className="text-xs text-zinc-400 mt-0.5">
+                <p className="text-xs text-gray-400 mt-0.5">
                   Upload uncompressed audio to Cloudflare R2 and configure license pricing.
                 </p>
               </div>
               <button
                 type="button"
                 onClick={() => setIsUploadOpen(false)}
-                className="text-zinc-500 hover:text-white p-1"
+                className="text-gray-400 hover:text-white p-1 rounded-lg hover:bg-white/[0.04] transition-colors cursor-pointer"
               >
                 <X className="h-4 w-4" />
               </button>
             </div>
 
-            <form onSubmit={handleUploadSubmit} className="space-y-4 text-zinc-200">
+            <form onSubmit={handleUploadSubmit} className="space-y-4 text-gray-200">
               {uploadError && (
-                <div className="p-3 rounded-md bg-rose-500/15 border border-rose-500/30 text-rose-300 text-xs">
+                <div className="p-3 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-300 text-xs">
                   {uploadError}
                 </div>
               )}
 
               {uploadSuccess && (
-                <div className="p-3 rounded-md bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs flex items-center gap-2">
+                <div className="p-3 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs flex items-center gap-2">
                   <CheckCircle className="h-4 w-4" /> Track uploaded successfully to catalog!
                 </div>
               )}
 
               {uploading && (
-                <div className="p-3 rounded-lg border border-[#2dd4bf]/30 bg-[#2dd4bf]/10 space-y-2">
+                <div className="p-3 rounded-xl border border-[#e53935]/30 bg-[#e53935]/10 space-y-2">
                   <div className="flex items-center justify-between text-xs">
-                    <span className="font-medium text-[#2dd4bf] flex items-center gap-1.5">
+                    <span className="font-bold text-[#ff6b67] flex items-center gap-1.5">
                       <Loader2 className="h-3.5 w-3.5 animate-spin" />
                       {uploadStep || 'Uploading to Cloudflare R2...'}
                     </span>
-                    <span className="font-mono text-[#2dd4bf] font-semibold">{uploadProgress}%</span>
+                    <span className="font-mono text-[#ff6b67] font-bold">{uploadProgress}%</span>
                   </div>
-                  <div className="w-full bg-zinc-800 rounded-full h-1.5 overflow-hidden">
+                  <div className="w-full bg-white/[0.08] rounded-full h-1.5 overflow-hidden">
                     <div
-                      className="bg-[#2dd4bf] h-1.5 rounded-full transition-all duration-200"
+                      className="bg-[#e53935] h-1.5 rounded-full transition-all duration-200"
                       style={{ width: `${uploadProgress}%` }}
                     />
                   </div>
@@ -988,14 +1083,14 @@ export default function AdminTracksPage() {
 
               {/* Master Audio Upload Dropzone */}
               <div>
-                <label className="block text-xs font-semibold text-zinc-300 mb-1.5">
-                  1. Master Audio File <span className="text-rose-400">*</span>
+                <label className="block text-xs font-bold text-gray-300 mb-1.5">
+                  1. Master Audio File <span className="text-[#ff6b67]">*</span>
                 </label>
                 <label
                   htmlFor="master-audio-file"
-                  className={`border-2 border-dashed rounded-lg p-5 text-center cursor-pointer transition-all block ${audioFile
-                    ? 'border-[#2dd4bf] bg-[#2dd4bf]/5'
-                    : 'border-zinc-800 hover:border-zinc-700 bg-zinc-900/40'
+                  className={`border border-dashed rounded-xl p-5 text-center cursor-pointer transition-all block ${audioFile
+                    ? 'border-[#e53935] bg-[#e53935]/5'
+                    : 'border-white/[0.1] hover:border-white/[0.2] bg-white/[0.02]'
                     }`}
                 >
                   <input
@@ -1007,22 +1102,22 @@ export default function AdminTracksPage() {
                     disabled={uploading}
                   />
                   <FileAudio
-                    className={`h-7 w-7 mx-auto mb-1.5 ${audioFile ? 'text-[#2dd4bf]' : 'text-zinc-500'
+                    className={`h-7 w-7 mx-auto mb-1.5 ${audioFile ? 'text-[#ff6b67]' : 'text-gray-500'
                       }`}
                   />
                   {audioFile ? (
                     <div>
                       <span className="text-xs font-bold text-white block">{audioFile.name}</span>
-                      <span className="text-[10px] text-[#2dd4bf] font-mono mt-0.5 block">
+                      <span className="text-[10px] text-[#ff6b67] font-mono mt-0.5 block">
                         {(audioFile.size / (1024 * 1024)).toFixed(2)} MB • Duration: {formatDuration(durationSeconds)}
                       </span>
                     </div>
                   ) : (
                     <div>
-                      <span className="text-xs font-medium text-zinc-300 block">
+                      <span className="text-xs font-bold text-gray-300 block">
                         Click to select master audio (WAV, MP3, FLAC)
                       </span>
-                      <span className="text-[10px] text-zinc-500 mt-0.5 block">
+                      <span className="text-[10px] text-gray-500 mt-0.5 block">
                         Direct upload to Cloudflare R2
                       </span>
                     </div>
@@ -1034,14 +1129,14 @@ export default function AdminTracksPage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {/* Cover Art */}
                 <div>
-                  <label className="block text-xs font-semibold text-zinc-300 mb-1">
+                  <label className="block text-xs font-bold text-gray-300 mb-1">
                     2. Cover Artwork
                   </label>
                   <label
                     htmlFor="cover-artwork-file"
-                    className={`border border-dashed rounded-lg p-3 text-center cursor-pointer transition-all flex items-center gap-2.5 ${coverPreviewUrl
-                      ? 'border-[#2dd4bf]/60 bg-zinc-900'
-                      : 'border-zinc-800 hover:border-zinc-700 bg-zinc-900/40'
+                    className={`border border-dashed rounded-xl p-3 text-center cursor-pointer transition-all flex items-center gap-2.5 ${coverPreviewUrl
+                      ? 'border-[#e53935]/60 bg-white/[0.04]'
+                      : 'border-white/[0.1] hover:border-white/[0.2] bg-white/[0.02]'
                       }`}
                   >
                     <input
@@ -1056,32 +1151,32 @@ export default function AdminTracksPage() {
                       <img
                         src={coverPreviewUrl}
                         alt="Preview"
-                        className="h-10 w-10 rounded object-cover border border-zinc-700 shrink-0"
+                        className="h-10 w-10 rounded-lg object-cover border border-white/10 shrink-0"
                       />
                     ) : (
-                      <div className="h-10 w-10 rounded bg-zinc-800 flex items-center justify-center text-zinc-500 shrink-0">
+                      <div className="h-10 w-10 rounded-lg bg-white/[0.05] flex items-center justify-center text-gray-500 shrink-0">
                         <ImageIcon className="h-5 w-5" />
                       </div>
                     )}
                     <div className="text-left min-w-0">
-                      <span className="text-xs font-medium text-white block truncate">
+                      <span className="text-xs font-bold text-white block truncate">
                         {coverFile ? coverFile.name : 'Select Image'}
                       </span>
-                      <span className="text-[10px] text-zinc-500">JPG, PNG, WebP</span>
+                      <span className="text-[10px] text-gray-400 font-mono">JPG, PNG, WebP</span>
                     </div>
                   </label>
                 </div>
 
                 {/* Stems ZIP */}
                 <div>
-                  <label className="block text-xs font-semibold text-zinc-300 mb-1">
+                  <label className="block text-xs font-bold text-gray-300 mb-1">
                     3. Stems ZIP Archive (Optional)
                   </label>
                   <label
                     htmlFor="stems-archive-file"
-                    className={`border border-dashed rounded-lg p-3 text-center cursor-pointer transition-all flex items-center gap-2.5 ${stemsFile
-                      ? 'border-[#2dd4bf]/60 bg-zinc-900'
-                      : 'border-zinc-800 hover:border-zinc-700 bg-zinc-900/40'
+                    className={`border border-dashed rounded-xl p-3 text-center cursor-pointer transition-all flex items-center gap-2.5 ${stemsFile
+                      ? 'border-[#e53935]/60 bg-white/[0.04]'
+                      : 'border-white/[0.1] hover:border-white/[0.2] bg-white/[0.02]'
                       }`}
                   >
                     <input
@@ -1096,14 +1191,14 @@ export default function AdminTracksPage() {
                       }}
                       disabled={uploading}
                     />
-                    <div className="h-10 w-10 rounded bg-zinc-800 flex items-center justify-center text-zinc-500 shrink-0">
+                    <div className="h-10 w-10 rounded-lg bg-white/[0.05] flex items-center justify-center text-gray-500 shrink-0">
                       <Layers className="h-5 w-5" />
                     </div>
                     <div className="text-left min-w-0">
-                      <span className="text-xs font-medium text-white block truncate">
+                      <span className="text-xs font-bold text-white block truncate">
                         {stemsFile ? stemsFile.name : 'Select Stems'}
                       </span>
-                      <span className="text-[10px] text-zinc-500">ZIP archive</span>
+                      <span className="text-[10px] text-gray-400 font-mono">ZIP archive</span>
                     </div>
                   </label>
                 </div>
@@ -1112,8 +1207,8 @@ export default function AdminTracksPage() {
               {/* Title & Artist */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-medium text-zinc-300 mb-1">
-                    Track Title <span className="text-rose-400">*</span>
+                  <label className="block text-xs font-bold text-gray-300 mb-1">
+                    Track Title <span className="text-[#ff6b67]">*</span>
                   </label>
                   <input
                     type="text"
@@ -1121,12 +1216,12 @@ export default function AdminTracksPage() {
                     value={title}
                     onChange={(e) => setTitle(e.target.value)}
                     placeholder="e.g. Midnight Cyberpunk"
-                    className="w-full text-xs rounded-md border border-zinc-800 p-2 bg-zinc-900 text-white focus:outline-none focus:border-[#2dd4bf]"
+                    className="w-full text-xs rounded-xl border border-white/[0.06] p-2.5 bg-[#16181d] text-white focus:outline-none focus:border-[#e53935]/60"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-medium text-zinc-300 mb-1">
+                  <label className="block text-xs font-bold text-gray-300 mb-1">
                     Artist / Producer Name
                   </label>
                   <input
@@ -1134,7 +1229,7 @@ export default function AdminTracksPage() {
                     value={artist}
                     onChange={(e) => setArtist(e.target.value)}
                     placeholder="Caution Studio"
-                    className="w-full text-xs rounded-md border border-zinc-800 p-2 bg-zinc-900 text-white focus:outline-none focus:border-[#2dd4bf]"
+                    className="w-full text-xs rounded-xl border border-white/[0.06] p-2.5 bg-[#16181d] text-white focus:outline-none focus:border-[#e53935]/60"
                   />
                 </div>
               </div>
@@ -1142,11 +1237,11 @@ export default function AdminTracksPage() {
               {/* Genre, Mood, BPM, Key */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
                 <div>
-                  <label className="block text-[11px] font-medium text-zinc-400 mb-1">Genre</label>
+                  <label className="block text-[11px] font-bold text-gray-400 mb-1">Genre</label>
                   <select
                     value={genre}
                     onChange={(e) => setGenre(e.target.value)}
-                    className="w-full text-xs rounded-md border border-zinc-800 p-2 bg-zinc-900 text-white focus:outline-none focus:border-[#2dd4bf]"
+                    className="w-full text-xs rounded-xl border border-white/[0.06] p-2 bg-[#16181d] text-white focus:outline-none focus:border-[#e53935]/60"
                   >
                     {allGenres.map((g) => (
                       <option key={g} value={g}>
@@ -1157,11 +1252,11 @@ export default function AdminTracksPage() {
                 </div>
 
                 <div>
-                  <label className="block text-[11px] font-medium text-zinc-400 mb-1">Mood</label>
+                  <label className="block text-[11px] font-bold text-gray-400 mb-1">Mood</label>
                   <select
                     value={mood}
                     onChange={(e) => setMood(e.target.value)}
-                    className="w-full text-xs rounded-md border border-zinc-800 p-2 bg-zinc-900 text-white focus:outline-none focus:border-[#2dd4bf]"
+                    className="w-full text-xs rounded-xl border border-white/[0.06] p-2 bg-[#16181d] text-white focus:outline-none focus:border-[#e53935]/60"
                   >
                     <option value="Epic">Epic</option>
                     <option value="Uplifting">Uplifting</option>
@@ -1172,73 +1267,73 @@ export default function AdminTracksPage() {
                 </div>
 
                 <div>
-                  <label className="block text-[11px] font-medium text-zinc-400 mb-1">BPM</label>
+                  <label className="block text-[11px] font-bold text-gray-400 mb-1">BPM</label>
                   <input
                     type="number"
                     value={bpm}
                     onChange={(e) => setBpm(e.target.value === '' ? '' : Number(e.target.value))}
                     placeholder="120"
-                    className="w-full text-xs rounded-md border border-zinc-800 p-2 bg-zinc-900 text-white placeholder:text-zinc-600 focus:outline-none focus:border-[#2dd4bf]"
+                    className="w-full text-xs rounded-xl border border-white/[0.06] p-2 bg-[#16181d] text-white placeholder:text-gray-500 focus:outline-none focus:border-[#e53935]/60"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-[11px] font-medium text-zinc-400 mb-1">Key</label>
+                  <label className="block text-[11px] font-bold text-gray-400 mb-1">Key</label>
                   <input
                     type="text"
                     value={musicalKey}
                     onChange={(e) => setMusicalKey(e.target.value)}
                     placeholder="e.g. C Minor"
-                    className="w-full text-xs rounded-md border border-zinc-800 p-2 bg-zinc-900 text-white placeholder:text-zinc-600 focus:outline-none focus:border-[#2dd4bf]"
+                    className="w-full text-xs rounded-xl border border-white/[0.06] p-2 bg-[#16181d] text-white placeholder:text-gray-500 focus:outline-none focus:border-[#e53935]/60"
                   />
                 </div>
               </div>
 
               {/* License Pricing Grid */}
-              <div className="rounded-lg border border-zinc-800 p-3 bg-zinc-900/40 space-y-2">
-                <span className="text-[11px] font-semibold uppercase tracking-wider text-zinc-400 block">
+              <div className="rounded-2xl border border-white/[0.06] p-3.5 bg-white/[0.02] space-y-2">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-gray-400 block">
                   License Pricing (NGN ₦)
                 </span>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-[10px] text-zinc-500 mb-0.5">Premium (₦)</label>
+                    <label className="block text-[10px] text-gray-400 font-bold mb-0.5">Premium (₦)</label>
                     <input
                       type="number"
                       step="1000"
                       value={premiumPrice}
                       onChange={(e) => setPremiumPrice(e.target.value === '' ? '' : parseFloat(e.target.value))}
                       placeholder="50000"
-                      className="w-full text-xs rounded-md border border-zinc-800 p-1.5 bg-zinc-900 text-white placeholder:text-zinc-600 focus:outline-none focus:border-[#2dd4bf]"
+                      className="w-full text-xs rounded-xl border border-white/[0.06] p-2 bg-[#16181d] text-white font-mono placeholder:text-gray-500 focus:outline-none focus:border-[#e53935]/60"
                     />
                   </div>
                   <div>
-                    <label className="block text-[10px] text-zinc-500 mb-0.5">Exclusive (₦)</label>
+                    <label className="block text-[10px] text-gray-400 font-bold mb-0.5">Exclusive (₦)</label>
                     <input
                       type="number"
                       step="5000"
                       value={exclusivePrice}
                       onChange={(e) => setExclusivePrice(e.target.value === '' ? '' : parseFloat(e.target.value))}
                       placeholder="200000"
-                      className="w-full text-xs rounded-md border border-zinc-800 p-1.5 bg-zinc-900 text-white placeholder:text-zinc-600 focus:outline-none focus:border-[#2dd4bf]"
+                      className="w-full text-xs rounded-xl border border-white/[0.06] p-2 bg-[#16181d] text-white font-mono placeholder:text-gray-500 focus:outline-none focus:border-[#e53935]/60"
                     />
                   </div>
                 </div>
               </div>
 
               {/* Actions */}
-              <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-zinc-800">
+              <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-white/[0.06]">
                 <button
                   type="button"
                   disabled={uploading}
                   onClick={() => setIsUploadOpen(false)}
-                  className="px-3 py-1.5 rounded-md border border-zinc-800 bg-zinc-900 text-xs font-medium text-zinc-300 hover:bg-zinc-800"
+                  className="px-4 py-2 rounded-xl border border-white/[0.06] bg-white/[0.04] text-xs font-bold text-gray-300 hover:bg-white/[0.08] transition-colors cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={uploading}
-                  className="px-4 py-1.5 rounded-md bg-[#2dd4bf] hover:bg-[#20b8a4] text-zinc-950 text-xs font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                  className="px-5 py-2 rounded-xl bg-[#e53935] hover:bg-[#d32f2f] text-white text-xs font-bold disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-md shadow-[#e53935]/25 cursor-pointer"
                 >
                   {uploading ? (
                     <div className="flex items-center gap-1.5">
@@ -1258,39 +1353,39 @@ export default function AdminTracksPage() {
       {/* Edit Modal */}
       {editingTrack && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-          <div className="relative w-full max-w-lg rounded-xl border border-zinc-800 bg-[#0c0d10] p-6 shadow-2xl space-y-4">
-            <div className="flex items-start justify-between pb-3 border-b border-zinc-800">
-              <h2 className="text-base font-bold text-white tracking-tight">
+          <div className="relative w-full max-w-lg rounded-2xl border border-white/[0.08] bg-[#12141c] p-6 shadow-2xl space-y-4">
+            <div className="flex items-start justify-between pb-3 border-b border-white/[0.06]">
+              <h2 className="text-base font-extrabold text-white tracking-tight">
                 Edit: {editingTrack.title}
               </h2>
               <button
                 type="button"
                 onClick={() => setEditingTrack(null)}
-                className="text-zinc-500 hover:text-white p-1"
+                className="text-gray-400 hover:text-white p-1 rounded-lg hover:bg-white/[0.04] transition-colors cursor-pointer"
               >
                 <X className="h-4 w-4" />
               </button>
             </div>
 
-            <form onSubmit={handleEditSave} className="space-y-3 text-zinc-200">
+            <form onSubmit={handleEditSave} className="space-y-3.5 text-gray-200">
               <div>
-                <label className="block text-xs font-medium text-zinc-300 mb-1">Title</label>
+                <label className="block text-xs font-bold text-gray-300 mb-1">Title</label>
                 <input
                   type="text"
                   required
                   value={editingTrack.title}
                   onChange={(e) => setEditingTrack({ ...editingTrack, title: e.target.value })}
-                  className="w-full text-xs rounded-md border border-zinc-800 p-2 bg-zinc-900 text-white focus:outline-none focus:border-[#2dd4bf]"
+                  className="w-full text-xs rounded-xl border border-white/[0.06] p-2.5 bg-[#16181d] text-white focus:outline-none focus:border-[#e53935]/60"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-2.5">
                 <div>
-                  <label className="block text-xs font-medium text-zinc-300 mb-1">Genre</label>
+                  <label className="block text-xs font-bold text-gray-300 mb-1">Genre</label>
                   <select
                     value={editingTrack.genre}
                     onChange={(e) => setEditingTrack({ ...editingTrack, genre: e.target.value })}
-                    className="w-full text-xs rounded-md border border-zinc-800 p-2 bg-zinc-900 text-white focus:outline-none focus:border-[#2dd4bf]"
+                    className="w-full text-xs rounded-xl border border-white/[0.06] p-2 bg-[#16181d] text-white focus:outline-none focus:border-[#e53935]/60"
                   >
                     {allGenres.map((g) => (
                       <option key={g} value={g}>
@@ -1303,15 +1398,16 @@ export default function AdminTracksPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-zinc-300 mb-1">Status</label>
+                  <label className="block text-xs font-bold text-gray-300 mb-1">Status</label>
                   <select
                     value={editingTrack.status}
                     onChange={(e) => setEditingTrack({ ...editingTrack, status: e.target.value as any })}
-                    className="w-full text-xs rounded-md border border-zinc-800 p-2 bg-zinc-900 text-white focus:outline-none focus:border-[#2dd4bf]"
+                    className="w-full text-xs rounded-xl border border-white/[0.06] p-2 bg-[#16181d] text-white focus:outline-none focus:border-[#e53935]/60"
                   >
                     <option value="live">Live</option>
                     <option value="unlisted">Unlisted</option>
                     <option value="draft">Draft</option>
+                    <option value="sold">Sold</option>
                   </select>
                 </div>
               </div>
@@ -1319,35 +1415,35 @@ export default function AdminTracksPage() {
               {/* Editable License Prices */}
               <div className="grid grid-cols-2 gap-2.5">
                 <div>
-                  <label className="block text-xs font-medium text-zinc-300 mb-1">
+                  <label className="block text-xs font-bold text-gray-300 mb-1">
                     Premium Lease Price (₦)
                   </label>
                   <div className="relative">
-                    <span className="absolute left-2.5 top-2 text-xs font-mono text-zinc-500">₦</span>
+                    <span className="absolute left-3 top-2 text-xs font-mono text-gray-400">₦</span>
                     <input
                       type="number"
                       min="0"
                       step="1000"
                       value={editPremiumPriceNgn}
                       onChange={(e) => setEditPremiumPriceNgn(Number(e.target.value))}
-                      className="w-full text-xs rounded-md border border-zinc-800 pl-7 p-2 bg-zinc-900 text-white font-mono focus:outline-none focus:border-[#2dd4bf]"
+                      className="w-full text-xs rounded-xl border border-white/[0.06] pl-7 p-2 bg-[#16181d] text-white font-mono focus:outline-none focus:border-[#e53935]/60"
                       placeholder="50000"
                     />
                   </div>
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-zinc-300 mb-1">
+                  <label className="block text-xs font-bold text-gray-300 mb-1">
                     Exclusive Rights Price (₦)
                   </label>
                   <div className="relative">
-                    <span className="absolute left-2.5 top-2 text-xs font-mono text-zinc-500">₦</span>
+                    <span className="absolute left-3 top-2 text-xs font-mono text-gray-400">₦</span>
                     <input
                       type="number"
                       min="0"
                       step="5000"
                       value={editExclusivePriceNgn}
                       onChange={(e) => setEditExclusivePriceNgn(Number(e.target.value))}
-                      className="w-full text-xs rounded-md border border-zinc-800 pl-7 p-2 bg-zinc-900 text-white font-mono focus:outline-none focus:border-[#2dd4bf]"
+                      className="w-full text-xs rounded-xl border border-white/[0.06] pl-7 p-2 bg-[#16181d] text-white font-mono focus:outline-none focus:border-[#e53935]/60"
                       placeholder="200000"
                     />
                   </div>
@@ -1356,39 +1452,39 @@ export default function AdminTracksPage() {
 
               <div className="grid grid-cols-2 gap-2.5">
                 <div>
-                  <label className="block text-xs font-medium text-zinc-300 mb-1">BPM</label>
+                  <label className="block text-xs font-bold text-gray-300 mb-1">BPM</label>
                   <input
                     type="number"
                     value={editingTrack.bpm || ''}
                     onChange={(e) => setEditingTrack({ ...editingTrack, bpm: e.target.value === '' ? 0 : Number(e.target.value) })}
                     placeholder="120"
-                    className="w-full text-xs rounded-md border border-zinc-800 p-2 bg-zinc-900 text-white placeholder:text-zinc-600 focus:outline-none focus:border-[#2dd4bf]"
+                    className="w-full text-xs rounded-xl border border-white/[0.06] p-2 bg-[#16181d] text-white placeholder:text-gray-500 focus:outline-none focus:border-[#e53935]/60"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-zinc-300 mb-1">Key</label>
+                  <label className="block text-xs font-bold text-gray-300 mb-1">Key</label>
                   <input
                     type="text"
                     value={editingTrack.musical_key || ''}
                     onChange={(e) => setEditingTrack({ ...editingTrack, musical_key: e.target.value })}
                     placeholder="e.g. C Minor"
-                    className="w-full text-xs rounded-md border border-zinc-800 p-2 bg-zinc-900 text-white placeholder:text-zinc-600 focus:outline-none focus:border-[#2dd4bf]"
+                    className="w-full text-xs rounded-xl border border-white/[0.06] p-2 bg-[#16181d] text-white placeholder:text-gray-500 focus:outline-none focus:border-[#e53935]/60"
                   />
                 </div>
               </div>
 
-              <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-zinc-800">
+              <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-white/[0.06]">
                 <button
                   type="button"
                   onClick={() => setEditingTrack(null)}
-                  className="px-3 py-1.5 rounded-md border border-zinc-800 bg-zinc-900 text-xs font-medium text-zinc-300 hover:bg-zinc-800"
+                  className="px-4 py-2 rounded-xl border border-white/[0.06] bg-white/[0.04] text-xs font-bold text-gray-300 hover:bg-white/[0.08] transition-colors cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={editSaving}
-                  className="px-4 py-1.5 rounded-md bg-[#2dd4bf] hover:bg-[#20b8a4] text-zinc-950 text-xs font-semibold"
+                  className="px-5 py-2 rounded-xl bg-[#e53935] hover:bg-[#d32f2f] text-white text-xs font-bold shadow-md shadow-[#e53935]/25 transition-all cursor-pointer"
                 >
                   {editSaving ? 'Saving...' : 'Save Changes'}
                 </button>

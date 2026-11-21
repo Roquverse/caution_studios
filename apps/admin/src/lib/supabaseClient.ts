@@ -21,3 +21,27 @@ export function getServiceRoleClient() {
     }
   });
 }
+
+export async function getAdminAuthHeader(): Promise<Record<string, string>> {
+  if (typeof window === 'undefined') return {};
+  try {
+    let { data: { session } } = await supabase.auth.getSession();
+    if (!session && typeof document !== 'undefined') {
+      const matchToken = document.cookie.match(/(?:^|;\s*)sb-token=([^;]*)/);
+      const matchRefresh = document.cookie.match(/(?:^|;\s*)sb-refresh=([^;]*)/);
+      if (matchToken && matchRefresh) {
+        try {
+          const { data } = await supabase.auth.setSession({
+            access_token: decodeURIComponent(matchToken[1]),
+            refresh_token: decodeURIComponent(matchRefresh[1])
+          });
+          if (data?.session) session = data.session;
+        } catch (e) {}
+      }
+    }
+    return session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {};
+  } catch {
+    return {};
+  }
+}
+

@@ -9,25 +9,66 @@ export interface AdminAuthResult {
 
 export async function verifyAdminRequest(req: NextRequest): Promise<AdminAuthResult> {
   const authHeader = req.headers.get('authorization') || '';
-  const token = authHeader.replace(/^Bearer\s+/i, '').trim();
+  let token = authHeader.replace(/^Bearer\s+/i, '').trim();
+
+  // If no auth header, check query param (e.g. for direct download links)
+  if (!token) {
+    const url = new URL(req.url);
+    token = url.searchParams.get('token') || '';
+  }
 
   // Check for session cookie across common Supabase cookie names
   let sessionCookie = '';
-  for (const cookie of req.cookies.getAll()) {
-    if (cookie.name.includes('-auth-token') || cookie.name.includes('access-token') || cookie.name.includes('sb-')) {
-      try {
-        const parsed = JSON.parse(decodeURIComponent(cookie.value));
-        if (parsed?.access_token) {
-          sessionCookie = parsed.access_token;
-          break;
-        } else if (Array.isArray(parsed) && parsed[0]) {
-          sessionCookie = parsed[0];
-          break;
-        }
-      } catch (e) {
-        if (cookie.value.length > 50) {
-          sessionCookie = cookie.value;
-          break;
+  const allCookies = req.cookies.getAll();
+
+  // Handle potential chunked cookies (sb-*-auth-token.0, sb-*-auth-token.1)
+  const chunkedMap: Record<string, string[]> = {};
+  for (const cookie of allCookies) {
+    const match = cookie.name.match(/^(sb-[a-z0-9]+-auth-token)\.(\d+)$/);
+    if (match) {
+      const base = match[1];
+      const idx = parseInt(match[2], 10);
+      if (!chunkedMap[base]) chunkedMap[base] = [];
+      chunkedMap[base][idx] = cookie.value;
+    }
+  }
+
+  for (const base in chunkedMap) {
+    const combined = chunkedMap[base].join('');
+    try {
+      const parsed = JSON.parse(decodeURIComponent(combined));
+      if (parsed?.access_token) {
+        sessionCookie = parsed.access_token;
+        break;
+      } else if (Array.isArray(parsed) && parsed[0]) {
+        sessionCookie = parsed[0];
+        break;
+      }
+    } catch {}
+  }
+
+  if (!sessionCookie) {
+    for (const cookie of allCookies) {
+      if (
+        cookie.name.includes('-auth-token') ||
+        cookie.name.includes('access-token') ||
+        cookie.name.includes('sb-token') ||
+        cookie.name === 'sb-token'
+      ) {
+        try {
+          const parsed = JSON.parse(decodeURIComponent(cookie.value));
+          if (parsed?.access_token) {
+            sessionCookie = parsed.access_token;
+            break;
+          } else if (Array.isArray(parsed) && parsed[0]) {
+            sessionCookie = parsed[0];
+            break;
+          }
+        } catch (e) {
+          if (cookie.value.length > 40) {
+            sessionCookie = cookie.value;
+            break;
+          }
         }
       }
     }
@@ -68,6 +109,9 @@ export async function verifyAdminRequest(req: NextRequest): Promise<AdminAuthRes
     }
 
     const appMeta = user.app_metadata || {};
+    const userMeta = user.user_metadata || {};
+    const email = (user.email || '').toLowerCase().trim();
+
     let isDbAdmin = false;
     try {
       const { data: prof } = await adminClient
@@ -75,7 +119,19 @@ export async function verifyAdminRequest(req: NextRequest): Promise<AdminAuthRes
         .select('roles, handle')
         .eq('id', user.id)
         .maybeSingle();
-      if (prof?.roles?.includes('admin') || prof?.handle?.toLowerCase().includes('admin')) {
+
+      const userRoles = prof?.roles || [];
+      const handle = (prof?.handle || '').toLowerCase();
+
+      if (
+        userRoles.includes('admin') ||
+        userRoles.includes('superadmin') ||
+        userRoles.includes('producer') ||
+        handle.includes('admin') ||
+        handle === 'arakunrincole' ||
+        handle === 'olajide_samuel_ojo' ||
+        handle === 'jaiden'
+      ) {
         isDbAdmin = true;
       }
     } catch (e) {}
@@ -84,9 +140,18 @@ export async function verifyAdminRequest(req: NextRequest): Promise<AdminAuthRes
       appMeta.is_admin === true ||
       appMeta.role === 'admin' ||
       appMeta.role === 'superadmin' ||
-      user.email === 'admin@cautionstudioz.com' ||
-      user.email === 'admin@caution.studio' ||
-      user.email === 'damicoledj@gmail.com' ||
+      appMeta.role === 'producer' ||
+      userMeta.is_admin === true ||
+      userMeta.role === 'admin' ||
+      userMeta.primary_role === 'admin' ||
+      userMeta.primary_role === 'producer' ||
+      email === 'admin@cautionstudioz.com' ||
+      email === 'admin@caution.studio' ||
+      email === 'damicoledj@gmail.com' ||
+      email === 'jaidenolajide@gmail.com' ||
+      email === 'cautionstudioz@gmail.com' ||
+      email.endsWith('@cautionstudioz.com') ||
+      email.endsWith('@caution.studio') ||
       isDbAdmin;
 
     if (!isAdmin) {

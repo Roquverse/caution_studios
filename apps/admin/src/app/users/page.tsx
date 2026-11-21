@@ -293,17 +293,17 @@ export default function AdminUsersPage() {
       <div className="space-y-6">
         {/* Toast Alert */}
         {toastMessage && (
-          <div className="p-4 rounded-xl bg-[#04564f]/40 border border-[#2dd4bf]/50 text-white flex items-center justify-between gap-3 animate-in fade-in slide-in-from-top-2 shadow-lg">
+          <div className="p-4 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 text-white flex items-center justify-between gap-3 animate-in fade-in slide-in-from-top-2 shadow-lg">
             <div className="flex items-center gap-3">
-              <CheckCircle2 className="h-5 w-5 text-[#2dd4bf] shrink-0" />
-              <span className="text-xs font-semibold text-[#2dd4bf]">
+              <CheckCircle2 className="h-5 w-5 text-emerald-400 shrink-0" />
+              <span className="text-xs font-semibold text-emerald-300">
                 {toastMessage}
               </span>
             </div>
             <button
               type="button"
               onClick={() => setToastMessage(null)}
-              className="text-zinc-400 hover:text-white"
+              className="text-gray-400 hover:text-white cursor-pointer"
             >
               <X className="h-4 w-4" />
             </button>
@@ -313,10 +313,10 @@ export default function AdminUsersPage() {
         {/* Header Bar */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white">
+            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white">
               Subscribers & Users
             </h1>
-            <p className="text-xs sm:text-sm text-zinc-400 mt-0.5">
+            <p className="text-xs sm:text-sm text-gray-400 mt-0.5">
               Creator profiles, producers, passwords, membership status, and role assignments.
             </p>
           </div>
@@ -325,52 +325,52 @@ export default function AdminUsersPage() {
             <button
               type="button"
               onClick={fetchUsers}
-              className="p-1.5 rounded-md border border-zinc-800 bg-zinc-900/60 hover:bg-zinc-800 text-zinc-300 transition-colors cursor-pointer"
+              className="p-2 rounded-xl border border-white/[0.06] bg-[#121316] hover:bg-white/[0.04] text-gray-300 transition-colors cursor-pointer"
               title="Refresh User Registry"
             >
-              <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+              <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin text-[#e53935]' : ''}`} />
             </button>
           </div>
         </div>
 
         {/* Metric Cards */}
         <div className="grid gap-4 grid-cols-1 sm:grid-cols-4">
-          <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-5 shadow-xs">
-            <span className="text-xs font-medium text-zinc-400 block">Total Accounts</span>
-            <span className="text-2xl font-bold text-white tracking-tight mt-1 block">
+          <div className="rounded-2xl border border-white/[0.06] bg-[#12141c] p-5 shadow-sm hover:border-white/[0.12] transition-colors">
+            <span className="text-xs font-bold text-gray-400 uppercase tracking-wider block">Total Accounts</span>
+            <span className="text-2xl font-black text-white tracking-tight mt-1 block">
               {users.length}
             </span>
-            <span className="text-xs text-zinc-500 mt-1 block">All registered user profiles</span>
+            <span className="text-xs text-gray-400 mt-1 block">All registered user profiles</span>
           </div>
 
-          <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-5 shadow-xs">
-            <span className="text-xs font-medium text-amber-400 block flex items-center gap-1.5">
+          <div className="rounded-2xl border border-white/[0.06] bg-[#12141c] p-5 shadow-sm hover:border-white/[0.12] transition-colors">
+            <span className="text-xs font-bold text-amber-400 block flex items-center gap-1.5 uppercase tracking-wider">
               <Sliders className="h-3.5 w-3.5" /> Music Producers
             </span>
-            <span className="text-2xl font-bold text-white tracking-tight mt-1 block">
+            <span className="text-2xl font-black text-white tracking-tight mt-1 block">
               {producerCount}
             </span>
-            <span className="text-xs text-zinc-500 mt-1 block">Creator Studio access cleared</span>
+            <span className="text-xs text-gray-400 mt-1 block">Creator Studio access cleared</span>
           </div>
 
-          <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-5 shadow-xs">
-            <span className="text-xs font-medium text-sky-400 block flex items-center gap-1.5">
+          <div className="rounded-2xl border border-white/[0.06] bg-[#12141c] p-5 shadow-sm hover:border-white/[0.12] transition-colors">
+            <span className="text-xs font-bold text-sky-400 block flex items-center gap-1.5 uppercase tracking-wider">
               <Mic2 className="h-3.5 w-3.5" /> Recording Artists
             </span>
-            <span className="text-2xl font-bold text-white tracking-tight mt-1 block">
+            <span className="text-2xl font-black text-white tracking-tight mt-1 block">
               {artistCount}
             </span>
-            <span className="text-xs text-zinc-500 mt-1 block">Commercial buyers & listeners</span>
+            <span className="text-xs text-gray-400 mt-1 block">Commercial buyers & listeners</span>
           </div>
 
-          <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-5 shadow-xs">
-            <span className="text-xs font-medium text-[#2dd4bf] block flex items-center gap-1.5">
+          <div className="rounded-2xl border border-white/[0.06] bg-[#12141c] p-5 shadow-sm hover:border-white/[0.12] transition-colors">
+            <span className="text-xs font-bold text-[#ff6b67] block flex items-center gap-1.5 uppercase tracking-wider">
               <ShieldCheck className="h-3.5 w-3.5" /> Administrators
             </span>
-            <span className="text-2xl font-bold text-white tracking-tight mt-1 block">
+            <span className="text-2xl font-black text-white tracking-tight mt-1 block">
               {adminCount}
             </span>
-            <span className="text-xs text-zinc-500 mt-1 block">Executive dashboard access</span>
+            <span className="text-xs text-gray-400 mt-1 block">Executive dashboard access</span>
           </div>
         </div>
 

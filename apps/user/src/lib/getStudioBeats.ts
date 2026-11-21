@@ -69,12 +69,12 @@ export async function getStudioBeats(): Promise<{ beats: TrackItem[]; producers:
         .update({ status: 'sold', sold_at: new Date().toISOString() })
         .in('id', soldIds)
         .eq('status', 'live')
-        .then(() => {}, () => {});
+        .then(() => { }, () => { });
       supabase
         .from('beat_licenses')
         .update({ enabled: false })
         .in('beat_id', soldIds)
-        .then(() => {}, () => {});
+        .then(() => { }, () => { });
     }
 
     const purchaseCountMap: Record<string, number> = {};
