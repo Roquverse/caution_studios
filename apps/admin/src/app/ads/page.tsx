@@ -46,6 +46,10 @@ interface AdCampaign {
   appleMusicUrl: string;
   audiomackUrl: string;
   youtubeUrl: string;
+  startsAt?: string;
+  endsAt?: string;
+  daysRemaining: number;
+  isExpired: boolean;
 }
 
 export default function AdminAdsManagerPage() {
@@ -124,6 +128,13 @@ export default function AdminAdsManagerPage() {
             tierName = 'Studio Blast';
           }
 
+          const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
+          const startIso = c.starts_at || c.created_at;
+          const startTime = startIso ? new Date(startIso).getTime() : Date.now();
+          const endTime = c.ends_at ? new Date(c.ends_at).getTime() : startTime + THIRTY_DAYS_MS;
+          const daysLeft = Math.ceil((endTime - Date.now()) / (24 * 60 * 60 * 1000));
+          const isExpired = daysLeft <= 0 || c.status === 'completed';
+
           return {
             id: c.id,
             songTitle: c.song_title || 'Untitled Track',
@@ -137,12 +148,16 @@ export default function AdminAdsManagerPage() {
             impressionsDelivered: Number(c.delivered_plays) || 0,
             impressionsTarget: Number(c.target_plays) || 10000,
             clicksCount: Number(c.clicks_count) || 0,
-            status: c.status || 'active',
+            status: isExpired ? 'completed' : (c.status || 'active'),
             startDate: c.created_at ? new Date(c.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Recently',
             spotifyUrl: c.spotify_url || 'https://open.spotify.com',
             appleMusicUrl: c.apple_music_url || 'https://music.apple.com',
             audiomackUrl: c.audiomack_url || 'https://audiomack.com',
-            youtubeUrl: c.youtube_url || 'https://youtube.com'
+            youtubeUrl: c.youtube_url || 'https://youtube.com',
+            startsAt: c.starts_at || c.created_at,
+            endsAt: c.ends_at,
+            daysRemaining: Math.max(0, daysLeft),
+            isExpired
           };
         });
         setCampaigns(mapped);
@@ -151,6 +166,28 @@ export default function AdminAdsManagerPage() {
       console.error('Failed to fetch campaigns:', err);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleRenewCampaign = async (id: string) => {
+    try {
+      const res = await fetch(`/api/ads/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ renew: true })
+      });
+      if (res.ok) {
+        setSuccessMsg('Ad renewed for another 30-day monthly rotation!');
+        setTimeout(() => setSuccessMsg(''), 4000);
+        fetchCampaigns();
+      } else {
+        const d = await res.json();
+        setErrorMsg(d.error || 'Failed to renew ad campaign');
+        setTimeout(() => setErrorMsg(''), 4000);
+      }
+    } catch (e) {
+      setErrorMsg('Failed to renew ad campaign');
+      setTimeout(() => setErrorMsg(''), 4000);
     }
   };
 
@@ -703,9 +740,14 @@ export default function AdminAdsManagerPage() {
 
                     {/* Status */}
                     <td className="py-3 px-4">
-                      {camp.status === 'active' ? (
-                        <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                          Active (3-Song)
+                      {camp.isExpired ? (
+                        <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-rose-500/10 text-rose-300 border border-rose-500/20">
+                          Monthly Expired
+                        </span>
+                      ) : camp.status === 'active' ? (
+                        <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 inline-flex items-center gap-1 font-mono">
+                          <Clock className="h-2.5 w-2.5" />
+                          <span>Active · {camp.daysRemaining}d left</span>
                         </span>
                       ) : camp.status === 'paused' ? (
                         <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-amber-500/10 text-amber-300 border border-amber-500/20">
@@ -713,7 +755,7 @@ export default function AdminAdsManagerPage() {
                         </span>
                       ) : (
                         <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-zinc-800 text-zinc-400 border border-zinc-700">
-                          Fulfilled
+                          Completed
                         </span>
                       )}
                     </td>
@@ -721,6 +763,14 @@ export default function AdminAdsManagerPage() {
                     {/* Actions */}
                     <td className="py-3 px-4 text-right">
                       <div className="flex items-center justify-end gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => handleRenewCampaign(camp.id)}
+                          className="px-2 py-1 rounded bg-[#2dd4bf]/15 hover:bg-[#2dd4bf]/25 text-[#2dd4bf] text-[10px] font-bold border border-[#2dd4bf]/30 transition-colors cursor-pointer"
+                          title="Renew or extend ad for another 30-day month"
+                        >
+                          Renew (+30d)
+                        </button>
                         <button
                           type="button"
                           onClick={() => toggleCampaignStatus(camp.id)}

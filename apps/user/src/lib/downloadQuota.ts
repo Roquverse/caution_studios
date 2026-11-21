@@ -2,8 +2,10 @@
 
 import { useState, useEffect } from 'react';
 
-export const DAILY_BASE_DOWNLOAD_LIMIT = 2;
-export const DAILY_MAX_BONUS_DOWNLOADS = 2; // Restricted to 2 extra downloads per day via ads
+export const DAILY_FREE_BASE_DOWNLOAD_LIMIT = 2;
+export const DAILY_PRO_BASE_DOWNLOAD_LIMIT = 5;
+export const DAILY_FREE_MAX_BONUS_DOWNLOADS = 2; // Restricted to 2 extra downloads per day via ads for free tier
+export const DAILY_PRO_MAX_BONUS_DOWNLOADS = 20; // Pro subscribers can unlock additional beats via download ads
 
 export interface DailyDownloadQuotaState {
   used: number;
@@ -16,25 +18,34 @@ export interface DailyDownloadQuotaState {
   remaining: number;
   canDownload: boolean;
   todayDate: string;
+  isPro: boolean;
 }
 
 export function getTodayDateString(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
-export function getDailyDownloadState(): DailyDownloadQuotaState {
+export function getDailyDownloadState(isProUser?: boolean): DailyDownloadQuotaState {
+  const isPro = typeof isProUser === 'boolean'
+    ? isProUser
+    : (typeof window !== 'undefined' ? (localStorage.getItem('caution:user-plan') === 'pro') : false);
+
+  const baseLimit = isPro ? DAILY_PRO_BASE_DOWNLOAD_LIMIT : DAILY_FREE_BASE_DOWNLOAD_LIMIT;
+  const maxBonus = isPro ? DAILY_PRO_MAX_BONUS_DOWNLOADS : DAILY_FREE_MAX_BONUS_DOWNLOADS;
+
   if (typeof window === 'undefined') {
     return {
       used: 0,
       bonus: 0,
-      baseLimit: DAILY_BASE_DOWNLOAD_LIMIT,
-      maxBonus: DAILY_MAX_BONUS_DOWNLOADS,
-      bonusRemaining: DAILY_MAX_BONUS_DOWNLOADS,
+      baseLimit,
+      maxBonus,
+      bonusRemaining: maxBonus,
       canEarnBonus: true,
-      totalAllowed: DAILY_BASE_DOWNLOAD_LIMIT,
-      remaining: DAILY_BASE_DOWNLOAD_LIMIT,
+      totalAllowed: baseLimit,
+      remaining: baseLimit,
       canDownload: true,
-      todayDate: getTodayDateString()
+      todayDate: getTodayDateString(),
+      isPro
     };
   }
 
@@ -54,46 +65,47 @@ export function getDailyDownloadState(): DailyDownloadQuotaState {
     localStorage.setItem('caution_daily_bonus_downloads', '0');
   }
 
-  // Ensure bonus does not exceed the daily 2-extra-downloads maximum
-  const cappedBonus = Math.min(bonus, DAILY_MAX_BONUS_DOWNLOADS);
-  const bonusRemaining = Math.max(0, DAILY_MAX_BONUS_DOWNLOADS - cappedBonus);
+  // Ensure bonus does not exceed the allowed bonus ceiling
+  const cappedBonus = Math.min(bonus, maxBonus);
+  const bonusRemaining = Math.max(0, maxBonus - cappedBonus);
   const canEarnBonus = bonusRemaining > 0;
 
-  const totalAllowed = DAILY_BASE_DOWNLOAD_LIMIT + cappedBonus;
+  const totalAllowed = baseLimit + cappedBonus;
   const remaining = Math.max(0, totalAllowed - used);
   const canDownload = remaining > 0;
 
   return {
     used,
     bonus: cappedBonus,
-    baseLimit: DAILY_BASE_DOWNLOAD_LIMIT,
-    maxBonus: DAILY_MAX_BONUS_DOWNLOADS,
+    baseLimit,
+    maxBonus,
     bonusRemaining,
     canEarnBonus,
     totalAllowed,
     remaining,
     canDownload,
-    todayDate: today
+    todayDate: today,
+    isPro
   };
 }
 
-export function canEarnBonusDownload(): boolean {
-  const state = getDailyDownloadState();
+export function canEarnBonusDownload(isProUser?: boolean): boolean {
+  const state = getDailyDownloadState(isProUser);
   return state.canEarnBonus;
 }
 
-export function grantBonusDownload(count: number = 1): DailyDownloadQuotaState {
-  if (typeof window === 'undefined') return getDailyDownloadState();
+export function grantBonusDownload(count: number = 1, isProUser?: boolean): DailyDownloadQuotaState {
+  if (typeof window === 'undefined') return getDailyDownloadState(isProUser);
 
-  const state = getDailyDownloadState();
-  // Restrict bonus downloads to max 2 extra downloads per day
-  const allowedGrant = Math.min(count, Math.max(0, DAILY_MAX_BONUS_DOWNLOADS - state.bonus));
+  const state = getDailyDownloadState(isProUser);
+  // Restrict bonus downloads to max allowed bonus per tier
+  const allowedGrant = Math.min(count, Math.max(0, state.maxBonus - state.bonus));
   const newBonus = state.bonus + allowedGrant;
 
   localStorage.setItem('caution_daily_downloads_date', state.todayDate);
   localStorage.setItem('caution_daily_bonus_downloads', newBonus.toString());
 
-  const updatedState = getDailyDownloadState();
+  const updatedState = getDailyDownloadState(isProUser);
 
   window.dispatchEvent(
     new CustomEvent('caution:bonus-download-awarded', {
@@ -104,16 +116,16 @@ export function grantBonusDownload(count: number = 1): DailyDownloadQuotaState {
   return updatedState;
 }
 
-export function recordBeatDownload(beatId: string, title?: string): DailyDownloadQuotaState {
-  if (typeof window === 'undefined') return getDailyDownloadState();
+export function recordBeatDownload(beatId: string, title?: string, isProUser?: boolean): DailyDownloadQuotaState {
+  if (typeof window === 'undefined') return getDailyDownloadState(isProUser);
 
-  const state = getDailyDownloadState();
+  const state = getDailyDownloadState(isProUser);
   const newUsed = state.used + 1;
 
   localStorage.setItem('caution_daily_downloads_date', state.todayDate);
   localStorage.setItem('caution_daily_downloads_used', newUsed.toString());
 
-  const updatedState = getDailyDownloadState();
+  const updatedState = getDailyDownloadState(isProUser);
 
   window.dispatchEvent(
     new CustomEvent('caution:download-recorded', {
@@ -124,16 +136,17 @@ export function recordBeatDownload(beatId: string, title?: string): DailyDownloa
   return updatedState;
 }
 
-export function useDailyDownloadQuota(): DailyDownloadQuotaState {
-  const [quota, setQuota] = useState<DailyDownloadQuotaState>(getDailyDownloadState());
+export function useDailyDownloadQuota(isProUser?: boolean): DailyDownloadQuotaState {
+  const [quota, setQuota] = useState<DailyDownloadQuotaState>(getDailyDownloadState(isProUser));
 
   useEffect(() => {
     const handleSync = () => {
-      setQuota(getDailyDownloadState());
+      setQuota(getDailyDownloadState(isProUser));
     };
 
     window.addEventListener('caution:bonus-download-awarded', handleSync);
     window.addEventListener('caution:download-recorded', handleSync);
+    window.addEventListener('caution:plan-changed', handleSync);
     window.addEventListener('storage', handleSync);
 
     handleSync();
@@ -141,9 +154,10 @@ export function useDailyDownloadQuota(): DailyDownloadQuotaState {
     return () => {
       window.removeEventListener('caution:bonus-download-awarded', handleSync);
       window.removeEventListener('caution:download-recorded', handleSync);
+      window.removeEventListener('caution:plan-changed', handleSync);
       window.removeEventListener('storage', handleSync);
     };
-  }, []);
+  }, [isProUser]);
 
   return quota;
 }

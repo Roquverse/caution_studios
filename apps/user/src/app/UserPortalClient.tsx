@@ -24,6 +24,7 @@ import {
   X,
   Sparkles,
   Check,
+  CheckCircle2,
   Download,
   Star,
   Menu,
@@ -158,7 +159,7 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
   } | null>(null);
   const [producerUploads, setProducerUploads] = useState<TrackItem[]>([]);
   const [loadingProducerUploads, setLoadingProducerUploads] = useState(false);
-  const downloadQuota = useDailyDownloadQuota();
+  const downloadQuota = useDailyDownloadQuota(isPro);
   const router = useRouter();
 
   const handleSelectProducer = async (producer: {
@@ -992,9 +993,9 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
       return;
     }
 
-    // Check daily download allowance (base 2 + ad bonus); Caution Pro has unlimited downloads
-    const quotaState = getDailyDownloadState();
-    if (!isPro && !quotaState.canDownload) {
+    // Check daily download allowance (5 base for Pro subscribers, 2 base for Free tier + ad bonuses)
+    const quotaState = getDailyDownloadState(isPro);
+    if (!quotaState.canDownload) {
       pendingDownloadTrackRef.current = track;
       setIsDownloadLimitModalOpen(true);
       return;
@@ -1004,7 +1005,7 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
     setPlaylistRows((prev) =>
       prev.map((b) => (b.id === track.id ? { ...b, downloadCount: (b.downloadCount || 0) + 1 } : b))
     );
-    const newQuota = recordBeatDownload(track.id, track.title);
+    const newQuota = recordBeatDownload(track.id, track.title, isPro);
     setDownloadToast({
       title: track.title,
       artist: track.artist,
@@ -2984,25 +2985,47 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
             </div>
 
             <h3 className="text-xl font-black text-white tracking-tight">
-              {downloadQuota.canEarnBonus
-                ? 'Daily 2-Download Limit Reached'
-                : 'Daily Limit Reached (2 Free + 2 Ad Bonuses Used)'}
+              {isPro
+                ? downloadQuota.canEarnBonus
+                  ? 'Daily 5 Pro Downloads Used'
+                  : 'Daily Pro Download & Ad Limit Reached'
+                : downloadQuota.canEarnBonus
+                  ? 'Daily 2-Download Limit Reached'
+                  : 'Daily Limit Reached (2 Free + 2 Ad Bonuses Used)'}
             </h3>
             <p className="text-xs text-gray-300 mt-2 leading-relaxed">
-              {downloadQuota.canEarnBonus ? (
-                pendingDownloadTrackRef.current ? (
-                  <>
-                    You’ve used your 2 free downloads today. Stream a 15-second sponsored ad to unlock and download <strong className="text-teal-300">&ldquo;{pendingDownloadTrackRef.current.title}&rdquo;</strong> ({downloadQuota.bonusRemaining} of 2 bonus left today)!
-                  </>
+              {isPro ? (
+                downloadQuota.canEarnBonus ? (
+                  pendingDownloadTrackRef.current ? (
+                    <>
+                      You’ve used your 5 included Pro downloads today. Stream a sponsored ad to unlock and download <strong className="text-teal-300">&ldquo;{pendingDownloadTrackRef.current.title}&rdquo;</strong> (+1 bonus download)!
+                    </>
+                  ) : (
+                    <>
+                      You have used your 5 included Pro downloads for today. Stream a sponsored ad to earn <strong className="text-teal-300">+1 bonus download</strong>!
+                    </>
+                  )
                 ) : (
                   <>
-                    You have downloaded your quota for today. Stream a 15-second sponsored ad to earn <strong className="text-teal-300">+1 bonus download</strong> ({downloadQuota.bonusRemaining} of 2 bonus left today)!
+                    You have reached the maximum daily downloads limit for today. Your included 5 downloads reset tomorrow.
                   </>
                 )
               ) : (
-                <>
-                  You have used all 2 free daily downloads and both of your 2 bonus ad downloads for today (4 total). Free downloads reset after 24 hours.
-                </>
+                downloadQuota.canEarnBonus ? (
+                  pendingDownloadTrackRef.current ? (
+                    <>
+                      You’ve used your 2 free downloads today. Stream a 15-second sponsored ad to unlock and download <strong className="text-teal-300">&ldquo;{pendingDownloadTrackRef.current.title}&rdquo;</strong> ({downloadQuota.bonusRemaining} of 2 bonus left today)!
+                    </>
+                  ) : (
+                    <>
+                      You have downloaded your quota for today. Stream a 15-second sponsored ad to earn <strong className="text-teal-300">+1 bonus download</strong> ({downloadQuota.bonusRemaining} of 2 bonus left today)!
+                    </>
+                  )
+                ) : (
+                  <>
+                    You have used all 2 free daily downloads and both of your 2 bonus ad downloads for today (4 total). Free downloads reset after 24 hours.
+                  </>
+                )
               )}
             </p>
 
@@ -3020,27 +3043,34 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
                   <Sparkles className="h-4 w-4" />
                   <span>
                     {pendingDownloadTrackRef.current
-                      ? `Stream 15s Ad & Download Beat (${downloadQuota.bonusRemaining} of 2 bonus left)`
-                      : `Stream 15s Ad (+1 Download · ${downloadQuota.bonusRemaining} of 2 left)`}
+                      ? `Stream Sponsored Ad & Download Beat`
+                      : `Stream Sponsored Ad (+1 Download)`}
                   </span>
                 </button>
               ) : (
                 <div className="w-full py-2.5 rounded-xl bg-white/5 border border-white/10 text-gray-400 font-bold text-xs text-center">
-                  Daily Ad Bonus Limit Reached (2/2 Extra Used Today)
+                  Daily Download Limit Reached
                 </div>
               )}
 
-              <button
-                type="button"
-                onClick={() => {
-                  setIsDownloadLimitModalOpen(false);
-                  router.push('/subscriptions');
-                }}
-                className="w-full py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-white font-bold text-xs flex items-center justify-center gap-2 border border-white/10 transition-colors cursor-pointer"
-              >
-                <Sparkles className="h-3.5 w-3.5 text-[#2dd4bf]" />
-                <span>Upgrade to Caution Pro for Unlimited Downloads &amp; Studio</span>
-              </button>
+              {isPro ? (
+                <div className="w-full py-2 px-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-[11px] font-mono flex items-center justify-center gap-1.5">
+                  <CheckCircle2 className="h-3.5 w-3.5" />
+                  <span>Caution Pro Active: 5 beats included daily + ad unlocks extra beats</span>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsDownloadLimitModalOpen(false);
+                    router.push('/subscriptions');
+                  }}
+                  className="w-full py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-white font-bold text-xs flex items-center justify-center gap-2 border border-white/10 transition-colors cursor-pointer"
+                >
+                  <Sparkles className="h-3.5 w-3.5 text-[#2dd4bf]" />
+                  <span>Upgrade to Caution Pro for 5 Daily Downloads &amp; Studio</span>
+                </button>
+              )}
             </div>
           </div>
         </div>

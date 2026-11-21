@@ -17,7 +17,15 @@ export async function PATCH(
     const supabase = getServiceRoleClient();
 
     const allowedFields: Record<string, any> = {};
-    if (body.status !== undefined) allowedFields.status = body.status;
+    if (body.renew) {
+      allowedFields.status = 'active';
+      allowedFields.starts_at = new Date().toISOString();
+      allowedFields.ends_at = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+    } else {
+      if (body.status !== undefined) allowedFields.status = body.status;
+      if (body.starts_at !== undefined) allowedFields.starts_at = body.starts_at;
+      if (body.ends_at !== undefined) allowedFields.ends_at = body.ends_at;
+    }
     if (body.target_plays !== undefined) allowedFields.target_plays = Number(body.target_plays);
     if (body.price_ngn !== undefined) allowedFields.price_ngn = Number(body.price_ngn);
     if (body.campaign_name !== undefined) allowedFields.campaign_name = body.campaign_name;

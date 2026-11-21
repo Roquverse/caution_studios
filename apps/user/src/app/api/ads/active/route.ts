@@ -20,9 +20,50 @@ export async function GET(req: NextRequest) {
       console.warn('Error fetching active ad campaigns:', error.message);
     }
 
-    const validCampaigns = (campaigns || []).filter(
-      (c) => c.audio_url && c.audio_url.trim().length > 0 && (c.target_plays == null || (c.delivered_plays || 0) < c.target_plays)
-    );
+    const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
+    const now = Date.now();
+    const expiredCampaignIds: string[] = [];
+
+    const validCampaigns = (campaigns || []).filter((c) => {
+      // 1. Must have playable audio file
+      if (!c.audio_url || c.audio_url.trim().length === 0) return false;
+
+      // 2. Check if delivery target reached
+      if (c.target_plays != null && (c.delivered_plays || 0) >= c.target_plays) {
+        expiredCampaignIds.push(c.id);
+        return false;
+      }
+
+      // 3. Monthly Expiration: 30-day maximum lifecycle
+      const startIso = c.starts_at || c.created_at;
+      if (startIso) {
+        const startTime = new Date(startIso).getTime();
+        if (startTime + THIRTY_DAYS_MS < now) {
+          expiredCampaignIds.push(c.id);
+          return false;
+        }
+      }
+
+      // 4. Explicit ends_at timestamp check
+      if (c.ends_at) {
+        if (new Date(c.ends_at).getTime() < now) {
+          expiredCampaignIds.push(c.id);
+          return false;
+        }
+      }
+
+      return true;
+    });
+
+    // Proactively mark completed/expired 30-day ads in database
+    if (expiredCampaignIds.length > 0) {
+      Promise.resolve(
+        supabase
+          .from('ad_campaigns')
+          .update({ status: 'completed' })
+          .in('id', expiredCampaignIds)
+      ).catch((e: any) => console.warn('Could not auto-expire completed ad campaigns:', e));
+    }
 
     // Filter by requested ad type with strict separation between stream ads and download ads
     const isDownloadRequest = requestedType === 'download';

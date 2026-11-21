@@ -610,7 +610,7 @@ return (
                       <span>Stream Audio Ad</span>
                     </div>
                     <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-white/[0.06] text-gray-300">
-                      Rotation
+                      30-Day Monthly Rotation
                     </span>
                   </div>
 
@@ -619,13 +619,13 @@ return (
                   </div>
 
                   <p className="text-xs text-gray-400 leading-relaxed">
-                    Plays unskippable 15-second audio break during free beat audition streaming across all active listeners.
+                    Plays unskippable 15-second audio break during free beat audition streaming across all active listeners for 30 days.
                   </p>
                 </div>
 
                 <div className="mt-4 pt-3 border-t border-white/[0.06] flex items-center justify-between text-xs font-mono">
-                  <span className="text-gray-300 font-bold">~{pricing.stream_ad_plays.toLocaleString()} plays</span>
-                  <span className="text-emerald-400 font-semibold">Guaranteed</span>
+                  <span className="text-gray-300 font-bold">~{pricing.stream_ad_plays.toLocaleString()} plays / 30d</span>
+                  <span className="text-emerald-400 font-semibold">Monthly Basis</span>
                 </div>
               </button>
 
@@ -645,7 +645,7 @@ return (
                       <span>Download Unlock Ad</span>
                     </div>
                     <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-white/[0.06] text-gray-300">
-                      Rewarded
+                      30-Day Monthly Rotation
                     </span>
                   </div>
 
@@ -654,13 +654,13 @@ return (
                   </div>
 
                   <p className="text-xs text-gray-400 leading-relaxed">
-                    Rewarded audio/video ad shown when artists reach their 2-download limit to unlock free commercial licenses.
+                    Rewarded sponsored audio &amp; link visit shown when free and Pro listeners unlock additional beat downloads for 30 days.
                   </p>
                 </div>
 
                 <div className="mt-4 pt-3 border-t border-white/[0.06] flex items-center justify-between text-xs font-mono">
-                  <span className="text-gray-300 font-bold">~{pricing.download_ad_plays.toLocaleString()} plays</span>
-                  <span className="text-emerald-400 font-semibold">Guaranteed</span>
+                  <span className="text-gray-300 font-bold">~{pricing.download_ad_plays.toLocaleString()} plays / 30d</span>
+                  <span className="text-emerald-400 font-semibold">Monthly Basis</span>
                 </div>
               </button>
 
@@ -680,7 +680,7 @@ return (
                       <span>Both Placements</span>
                     </div>
                     <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-[#e53935]/20 text-[#e53935]">
-                      Bundle Savings
+                      30-Day Bundle Savings
                     </span>
                   </div>
 

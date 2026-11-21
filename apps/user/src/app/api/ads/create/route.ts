@@ -142,7 +142,8 @@ export async function POST(req: NextRequest) {
       youtube_url: bodyData.youtubeUrl || null,
       status: 'active',
       paystack_reference: paystackReference,
-      starts_at: new Date().toISOString()
+      starts_at: new Date().toISOString(),
+      ends_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
     };
 
     let { data: newCampaign, error: dbError } = await supabase

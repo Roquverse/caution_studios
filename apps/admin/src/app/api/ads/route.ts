@@ -78,7 +78,8 @@ export async function POST(req: NextRequest) {
       audiomack_url: audiomackUrl || null,
       youtube_url: youtubeUrl || null,
       status: status || 'active',
-      starts_at: new Date().toISOString()
+      starts_at: new Date().toISOString(),
+      ends_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
     };
 
     const supabase = getServiceRoleClient();
