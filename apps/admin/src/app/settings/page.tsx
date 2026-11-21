@@ -22,7 +22,8 @@ import {
   FileCheck,
   Server,
   Layers,
-  Sparkles
+  Sparkles,
+  X
 } from 'lucide-react';
 
 interface AdminMember {
@@ -266,57 +267,57 @@ export default function AdminSettingsPage() {
         )}
 
         {/* Tab Navigation */}
-        <div className="border-b border-zinc-800">
+        <div className="border-b border-white/[0.06]">
           <div className="flex items-center gap-6 text-xs font-medium overflow-x-auto">
             <button
               type="button"
               onClick={() => setActiveTab('general')}
-              className={`pb-3 -mb-px transition-colors border-b-2 flex items-center gap-2 whitespace-nowrap ${
+              className={`pb-3 -mb-px transition-colors border-b-2 flex items-center gap-2 whitespace-nowrap cursor-pointer ${
                 activeTab === 'general'
-                  ? 'border-[#2dd4bf] text-white font-semibold'
-                  : 'border-transparent text-zinc-400 hover:text-zinc-200'
+                  ? 'border-[#e53935] text-white font-bold'
+                  : 'border-transparent text-gray-400 hover:text-white'
               }`}
             >
-              <Sliders className="h-3.5 w-3.5" />
+              <Sliders className="h-3.5 w-3.5 text-[#ff6b67]" />
               <span>General & Economics</span>
             </button>
 
             <button
               type="button"
               onClick={() => setActiveTab('licensing')}
-              className={`pb-3 -mb-px transition-colors border-b-2 flex items-center gap-2 whitespace-nowrap ${
+              className={`pb-3 -mb-px transition-colors border-b-2 flex items-center gap-2 whitespace-nowrap cursor-pointer ${
                 activeTab === 'licensing'
-                  ? 'border-[#2dd4bf] text-white font-semibold'
-                  : 'border-transparent text-zinc-400 hover:text-zinc-200'
+                  ? 'border-[#e53935] text-white font-bold'
+                  : 'border-transparent text-gray-400 hover:text-white'
               }`}
             >
-              <DollarSign className="h-3.5 w-3.5" />
+              <DollarSign className="h-3.5 w-3.5 text-amber-400" />
               <span>Licensing & Audio Rules</span>
             </button>
 
             <button
               type="button"
               onClick={() => setActiveTab('security')}
-              className={`pb-3 -mb-px transition-colors border-b-2 flex items-center gap-2 whitespace-nowrap ${
+              className={`pb-3 -mb-px transition-colors border-b-2 flex items-center gap-2 whitespace-nowrap cursor-pointer ${
                 activeTab === 'security'
-                  ? 'border-[#2dd4bf] text-white font-semibold'
-                  : 'border-transparent text-zinc-400 hover:text-zinc-200'
+                  ? 'border-[#e53935] text-white font-bold'
+                  : 'border-transparent text-gray-400 hover:text-white'
               }`}
             >
-              <Shield className="h-3.5 w-3.5" />
+              <Shield className="h-3.5 w-3.5 text-sky-400" />
               <span>Admins & Security</span>
             </button>
 
             <button
               type="button"
               onClick={() => setActiveTab('infrastructure')}
-              className={`pb-3 -mb-px transition-colors border-b-2 flex items-center gap-2 whitespace-nowrap ${
+              className={`pb-3 -mb-px transition-colors border-b-2 flex items-center gap-2 whitespace-nowrap cursor-pointer ${
                 activeTab === 'infrastructure'
-                  ? 'border-[#2dd4bf] text-white font-semibold'
-                  : 'border-transparent text-zinc-400 hover:text-zinc-200'
+                  ? 'border-[#e53935] text-white font-bold'
+                  : 'border-transparent text-gray-400 hover:text-white'
               }`}
             >
-              <Server className="h-3.5 w-3.5" />
+              <Server className="h-3.5 w-3.5 text-emerald-400" />
               <span>Cloud & Storage</span>
             </button>
           </div>
@@ -325,49 +326,49 @@ export default function AdminSettingsPage() {
         {/* TAB 1: General & Economics */}
         {activeTab === 'general' && (
           <form onSubmit={handleSaveConfig} className="space-y-6">
-            <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-5 shadow-xs space-y-4">
-              <div className="pb-3 border-b border-zinc-800">
-                <h3 className="text-sm font-semibold text-white">Platform Identity & Contact</h3>
-                <p className="text-xs text-zinc-400 mt-0.5">Global branding and administrative communication channels</p>
+            <div className="rounded-2xl border border-white/[0.06] bg-[#12141c] p-6 shadow-sm hover:border-white/[0.12] transition-colors space-y-5">
+              <div className="pb-3 border-b border-white/[0.06]">
+                <h3 className="text-base font-extrabold text-white tracking-tight">Platform Identity & Contact</h3>
+                <p className="text-xs text-gray-400 mt-1">Global branding and administrative communication channels</p>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                 <div>
-                  <label className="block text-xs font-medium text-zinc-300 mb-1.5">
+                  <label className="block text-xs font-bold text-gray-300 uppercase tracking-wider mb-2">
                     Platform Name
                   </label>
                   <input
                     type="text"
                     value={config.platformName}
                     onChange={(e) => setConfig({ ...config, platformName: e.target.value })}
-                    className="w-full h-9 px-3 rounded-md bg-zinc-900/90 border border-zinc-800 text-xs text-white focus:outline-none focus:border-[#2dd4bf] transition-colors"
+                    className="w-full h-10 px-3.5 rounded-xl bg-[#0d0e12] border border-white/[0.08] text-xs text-white placeholder:text-gray-500 focus:outline-none focus:border-[#e53935] focus:ring-1 focus:ring-[#e53935]/40 transition-colors"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-medium text-zinc-300 mb-1.5">
+                  <label className="block text-xs font-bold text-gray-300 uppercase tracking-wider mb-2">
                     Executive Support Email
                   </label>
                   <input
                     type="email"
                     value={config.supportEmail}
                     onChange={(e) => setConfig({ ...config, supportEmail: e.target.value })}
-                    className="w-full h-9 px-3 rounded-md bg-zinc-900/90 border border-zinc-800 text-xs text-white focus:outline-none focus:border-[#2dd4bf] transition-colors"
+                    className="w-full h-10 px-3.5 rounded-xl bg-[#0d0e12] border border-white/[0.08] text-xs text-white placeholder:text-gray-500 focus:outline-none focus:border-[#e53935] focus:ring-1 focus:ring-[#e53935]/40 transition-colors"
                   />
                 </div>
               </div>
             </div>
 
             {/* Platform Economics */}
-            <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-5 shadow-xs space-y-4">
-              <div className="pb-3 border-b border-zinc-800">
-                <h3 className="text-sm font-semibold text-white">Marketplace Economics</h3>
-                <p className="text-xs text-zinc-400 mt-0.5">Platform split and revenue distributions across licenses</p>
+            <div className="rounded-2xl border border-white/[0.06] bg-[#12141c] p-6 shadow-sm hover:border-white/[0.12] transition-colors space-y-5">
+              <div className="pb-3 border-b border-white/[0.06]">
+                <h3 className="text-base font-extrabold text-white tracking-tight">Marketplace Economics</h3>
+                <p className="text-xs text-gray-400 mt-1">Platform split and revenue distributions across licenses</p>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
                 <div>
-                  <label className="block text-xs font-medium text-zinc-300 mb-1.5">
+                  <label className="block text-xs font-bold text-gray-300 uppercase tracking-wider mb-2">
                     Platform Commission (%)
                   </label>
                   <input
@@ -383,37 +384,37 @@ export default function AdminSettingsPage() {
                         producerFeePct: 100 - fee
                       });
                     }}
-                    className="w-full h-9 px-3 rounded-md bg-zinc-900/90 border border-zinc-800 text-xs text-white font-mono focus:outline-none focus:border-[#2dd4bf] transition-colors"
+                    className="w-full h-10 px-3.5 rounded-xl bg-[#0d0e12] border border-white/[0.08] text-xs text-white font-mono focus:outline-none focus:border-[#e53935] focus:ring-1 focus:ring-[#e53935]/40 transition-colors"
                   />
-                  <span className="text-[10px] text-zinc-500 mt-1 block">Caution Studio fee (default: 20%)</span>
+                  <span className="text-[11px] text-gray-500 mt-1.5 block">Caution Studio fee (default: 20%)</span>
                 </div>
 
                 <div>
-                  <label className="block text-xs font-medium text-zinc-300 mb-1.5">
+                  <label className="block text-xs font-bold text-gray-300 uppercase tracking-wider mb-2">
                     Producer Royalty Split (%)
                   </label>
                   <input
                     type="number"
                     readOnly
                     value={config.producerFeePct}
-                    className="w-full h-9 px-3 rounded-md bg-zinc-900/40 border border-zinc-800 text-xs text-zinc-400 font-mono"
+                    className="w-full h-10 px-3.5 rounded-xl bg-[#0d0e12]/50 border border-white/[0.05] text-xs text-gray-400 font-mono"
                   />
-                  <span className="text-[10px] text-zinc-500 mt-1 block">Disbursed to beat producers (80%)</span>
+                  <span className="text-[11px] text-gray-500 mt-1.5 block">Disbursed to beat producers (80%)</span>
                 </div>
 
                 <div>
-                  <label className="block text-xs font-medium text-zinc-300 mb-1.5">
+                  <label className="block text-xs font-bold text-gray-300 uppercase tracking-wider mb-2">
                     Primary Currency
                   </label>
                   <select
                     value={config.currency}
                     onChange={(e) => setConfig({ ...config, currency: e.target.value })}
-                    className="w-full h-9 px-3 rounded-md bg-zinc-900/90 border border-zinc-800 text-xs text-white focus:outline-none focus:border-[#2dd4bf] transition-colors"
+                    className="w-full h-10 px-3.5 rounded-xl bg-[#0d0e12] border border-white/[0.08] text-xs text-white focus:outline-none focus:border-[#e53935] focus:ring-1 focus:ring-[#e53935]/40 transition-colors"
                   >
                     <option value="NGN">Nigerian Naira (NGN ₦)</option>
                     <option value="USD">United States Dollar (USD $)</option>
                   </select>
-                  <span className="text-[10px] text-zinc-500 mt-1 block">Base gateway settlement currency</span>
+                  <span className="text-[11px] text-gray-500 mt-1.5 block">Base gateway settlement currency</span>
                 </div>
               </div>
             </div>
@@ -422,10 +423,10 @@ export default function AdminSettingsPage() {
               <button
                 type="submit"
                 disabled={saving}
-                className="inline-flex items-center gap-2 bg-[#2dd4bf] hover:bg-[#20b8a4] text-zinc-950 font-semibold text-xs px-4 py-2 rounded-md transition-colors shadow-sm disabled:opacity-50"
+                className="inline-flex items-center gap-2 bg-[#e53935] hover:bg-[#d32f2f] text-white font-bold text-xs px-5 py-2.5 rounded-xl shadow-lg shadow-red-950/20 transition-all cursor-pointer disabled:opacity-50"
               >
-                <Save className="h-3.5 w-3.5" />
-                <span>{saving ? 'Saving...' : 'Save Settings'}</span>
+                <Save className="h-4 w-4" />
+                <span>{saving ? 'Saving Settings...' : 'Save Settings'}</span>
               </button>
             </div>
           </form>
@@ -434,85 +435,85 @@ export default function AdminSettingsPage() {
         {/* TAB 2: Licensing & Audio Rules */}
         {activeTab === 'licensing' && (
           <form onSubmit={handleSaveConfig} className="space-y-6">
-            <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-5 shadow-xs space-y-4">
-              <div className="pb-3 border-b border-zinc-800">
-                <h3 className="text-sm font-semibold text-white">Default License Price Presets</h3>
-                <p className="text-xs text-zinc-400 mt-0.5">Standard license pricing applied during producer uploads</p>
+            <div className="rounded-2xl border border-white/[0.06] bg-[#12141c] p-6 shadow-sm hover:border-white/[0.12] transition-colors space-y-5">
+              <div className="pb-3 border-b border-white/[0.06]">
+                <h3 className="text-base font-extrabold text-white tracking-tight">Default License Price Presets</h3>
+                <p className="text-xs text-gray-400 mt-1">Standard license pricing applied during producer uploads</p>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
                 <div>
-                  <label className="block text-xs font-medium text-zinc-300 mb-1.5">
+                  <label className="block text-xs font-bold text-gray-300 uppercase tracking-wider mb-2">
                     Basic Lease (₦)
                   </label>
                   <input
                     type="number"
                     value={config.basicLeasePrice}
                     onChange={(e) => setConfig({ ...config, basicLeasePrice: Number(e.target.value) })}
-                    className="w-full h-9 px-3 rounded-md bg-zinc-900/90 border border-zinc-800 text-xs text-white font-mono focus:outline-none focus:border-[#2dd4bf] transition-colors"
+                    className="w-full h-10 px-3.5 rounded-xl bg-[#0d0e12] border border-white/[0.08] text-xs text-white font-mono focus:outline-none focus:border-[#e53935] focus:ring-1 focus:ring-[#e53935]/40 transition-colors"
                   />
-                  <span className="text-[10px] text-zinc-500 mt-1 block">Standard MP3 streaming rights</span>
+                  <span className="text-[11px] text-gray-500 mt-1.5 block">Standard MP3 streaming rights</span>
                 </div>
 
                 <div>
-                  <label className="block text-xs font-medium text-zinc-300 mb-1.5">
+                  <label className="block text-xs font-bold text-gray-300 uppercase tracking-wider mb-2">
                     Premium Lease (₦)
                   </label>
                   <input
                     type="number"
                     value={config.premiumLeasePrice}
                     onChange={(e) => setConfig({ ...config, premiumLeasePrice: Number(e.target.value) })}
-                    className="w-full h-9 px-3 rounded-md bg-zinc-900/90 border border-zinc-800 text-xs text-white font-mono focus:outline-none focus:border-[#2dd4bf] transition-colors"
+                    className="w-full h-10 px-3.5 rounded-xl bg-[#0d0e12] border border-white/[0.08] text-xs text-white font-mono focus:outline-none focus:border-[#e53935] focus:ring-1 focus:ring-[#e53935]/40 transition-colors"
                   />
-                  <span className="text-[10px] text-zinc-500 mt-1 block">WAV master + track stems</span>
+                  <span className="text-[11px] text-gray-500 mt-1.5 block">WAV master + track stems</span>
                 </div>
 
                 <div>
-                  <label className="block text-xs font-medium text-zinc-300 mb-1.5">
+                  <label className="block text-xs font-bold text-gray-300 uppercase tracking-wider mb-2">
                     Exclusive Buyout (₦)
                   </label>
                   <input
                     type="number"
                     value={config.exclusivePrice}
                     onChange={(e) => setConfig({ ...config, exclusivePrice: Number(e.target.value) })}
-                    className="w-full h-9 px-3 rounded-md bg-zinc-900/90 border border-zinc-800 text-xs text-white font-mono focus:outline-none focus:border-[#2dd4bf] transition-colors"
+                    className="w-full h-10 px-3.5 rounded-xl bg-[#0d0e12] border border-white/[0.08] text-xs text-white font-mono focus:outline-none focus:border-[#e53935] focus:ring-1 focus:ring-[#e53935]/40 transition-colors"
                   />
-                  <span className="text-[10px] text-zinc-500 mt-1 block">Full copyright & Content ID transfer</span>
+                  <span className="text-[11px] text-gray-500 mt-1.5 block">Full copyright & Content ID transfer</span>
                 </div>
               </div>
             </div>
 
-            <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-5 shadow-xs space-y-4">
-              <div className="pb-3 border-b border-zinc-800">
-                <h3 className="text-sm font-semibold text-white">Audio Playback & Teaser Protection</h3>
-                <p className="text-xs text-zinc-400 mt-0.5">Enforce preview limits for guest visitors and watermark cadence</p>
+            <div className="rounded-2xl border border-white/[0.06] bg-[#12141c] p-6 shadow-sm hover:border-white/[0.12] transition-colors space-y-5">
+              <div className="pb-3 border-b border-white/[0.06]">
+                <h3 className="text-base font-extrabold text-white tracking-tight">Audio Playback & Teaser Protection</h3>
+                <p className="text-xs text-gray-400 mt-1">Enforce preview limits for guest visitors and watermark cadence</p>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                 <div>
-                  <label className="block text-xs font-medium text-zinc-300 mb-1.5">
+                  <label className="block text-xs font-bold text-gray-300 uppercase tracking-wider mb-2">
                     Guest Teaser Duration (Seconds)
                   </label>
                   <input
                     type="number"
                     value={config.previewCutoffSeconds}
                     onChange={(e) => setConfig({ ...config, previewCutoffSeconds: Number(e.target.value) })}
-                    className="w-full h-9 px-3 rounded-md bg-zinc-900/90 border border-zinc-800 text-xs text-white font-mono focus:outline-none focus:border-[#2dd4bf] transition-colors"
+                    className="w-full h-10 px-3.5 rounded-xl bg-[#0d0e12] border border-white/[0.08] text-xs text-white font-mono focus:outline-none focus:border-[#e53935] focus:ring-1 focus:ring-[#e53935]/40 transition-colors"
                   />
-                  <span className="text-[10px] text-zinc-500 mt-1 block">Enforces 15s cutoff before sign-up prompt</span>
+                  <span className="text-[11px] text-gray-500 mt-1.5 block">Enforces 15s cutoff before sign-up prompt</span>
                 </div>
 
                 <div>
-                  <label className="block text-xs font-medium text-zinc-300 mb-1.5">
+                  <label className="block text-xs font-bold text-gray-300 uppercase tracking-wider mb-2">
                     Producer Tag Watermark Interval (Seconds)
                   </label>
                   <input
                     type="number"
                     value={config.watermarkIntervalSeconds}
                     onChange={(e) => setConfig({ ...config, watermarkIntervalSeconds: Number(e.target.value) })}
-                    className="w-full h-9 px-3 rounded-md bg-zinc-900/90 border border-zinc-800 text-xs text-white font-mono focus:outline-none focus:border-[#2dd4bf] transition-colors"
+                    className="w-full h-10 px-3.5 rounded-xl bg-[#0d0e12] border border-white/[0.08] text-xs text-white font-mono focus:outline-none focus:border-[#e53935] focus:ring-1 focus:ring-[#e53935]/40 transition-colors"
                   />
-                  <span className="text-[10px] text-zinc-500 mt-1 block">Repeats audio voice protection tag</span>
+                  <span className="text-[11px] text-gray-500 mt-1.5 block">Repeats audio voice protection tag</span>
                 </div>
               </div>
             </div>
@@ -521,10 +522,10 @@ export default function AdminSettingsPage() {
               <button
                 type="submit"
                 disabled={saving}
-                className="inline-flex items-center gap-2 bg-[#2dd4bf] hover:bg-[#20b8a4] text-zinc-950 font-semibold text-xs px-4 py-2 rounded-md transition-colors shadow-sm disabled:opacity-50"
+                className="inline-flex items-center gap-2 bg-[#e53935] hover:bg-[#d32f2f] text-white font-bold text-xs px-5 py-2.5 rounded-xl shadow-lg shadow-red-950/20 transition-all cursor-pointer disabled:opacity-50"
               >
-                <Save className="h-3.5 w-3.5" />
-                <span>{saving ? 'Saving...' : 'Save Settings'}</span>
+                <Save className="h-4 w-4" />
+                <span>{saving ? 'Saving Settings...' : 'Save Settings'}</span>
               </button>
             </div>
           </form>
@@ -534,18 +535,18 @@ export default function AdminSettingsPage() {
         {activeTab === 'security' && (
           <div className="space-y-6">
             {/* Active Administrators Directory */}
-            <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-5 shadow-xs space-y-4">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-zinc-800">
+            <div className="rounded-2xl border border-white/[0.06] bg-[#12141c] p-6 shadow-sm hover:border-white/[0.12] transition-colors space-y-5">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-white/[0.06]">
                 <div>
-                  <h3 className="text-sm font-semibold text-white">Authorized Administrators</h3>
-                  <p className="text-xs text-zinc-400 mt-0.5">Staff members with executive clearance to administrative controls</p>
+                  <h3 className="text-base font-extrabold text-white tracking-tight">Authorized Administrators</h3>
+                  <p className="text-xs text-gray-400 mt-1">Staff members with executive clearance to administrative controls</p>
                 </div>
                 <button
                   type="button"
                   onClick={() => setShowAddModal(true)}
-                  className="inline-flex items-center gap-1.5 bg-[#2dd4bf] hover:bg-[#20b8a4] text-zinc-950 font-semibold text-xs px-3 py-1.5 rounded-md transition-colors"
+                  className="inline-flex items-center gap-2 bg-[#e53935] hover:bg-[#d32f2f] text-white font-bold text-xs px-4 py-2 rounded-xl transition-all shadow-md cursor-pointer"
                 >
-                  <Plus className="h-3.5 w-3.5 stroke-[2.5]" />
+                  <Plus className="h-4 w-4 stroke-[2.5]" />
                   <span>Authorize Admin</span>
                 </button>
               </div>
@@ -553,39 +554,39 @@ export default function AdminSettingsPage() {
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs">
                   <thead>
-                    <tr className="border-b border-zinc-800 text-zinc-500 uppercase tracking-wider text-[10px] font-semibold">
-                      <th className="pb-2.5 px-3">Administrator</th>
-                      <th className="pb-2.5 px-3">Role</th>
-                      <th className="pb-2.5 px-3">Status</th>
-                      <th className="pb-2.5 px-3">Authorized On</th>
+                    <tr className="border-b border-white/[0.06] text-gray-400 uppercase tracking-wider text-[10px] font-semibold">
+                      <th className="pb-3 px-3">Administrator</th>
+                      <th className="pb-3 px-3">Role</th>
+                      <th className="pb-3 px-3">Status</th>
+                      <th className="pb-3 px-3">Authorized On</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-zinc-800/60">
+                  <tbody className="divide-y divide-white/[0.04]">
                     {admins.map((admin) => (
-                      <tr key={admin.id} className="hover:bg-zinc-800/30 transition-colors">
+                      <tr key={admin.id} className="hover:bg-white/[0.02] transition-colors">
                         <td className="py-3 px-3">
-                          <div className="flex items-center gap-2">
-                            <div className="h-7 w-7 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center font-bold text-white text-[10px]">
+                          <div className="flex items-center gap-3">
+                            <div className="h-8 w-8 rounded-full bg-[#0d0e12] border border-white/[0.08] flex items-center justify-center font-bold text-white text-[11px]">
                               {admin.email.substring(0, 2).toUpperCase()}
                             </div>
                             <div>
-                              <span className="font-medium text-white block">{admin.email}</span>
-                              <span className="text-[10px] text-zinc-500 font-mono">{admin.user_id.substring(0, 8)}...</span>
+                              <span className="font-semibold text-white block">{admin.email}</span>
+                              <span className="text-[10px] text-gray-500 font-mono">{admin.user_id.substring(0, 8)}...</span>
                             </div>
                           </div>
                         </td>
                         <td className="py-3 px-3 font-mono">
-                          <span className="bg-zinc-800 text-zinc-300 border border-zinc-700 text-[10px] px-2 py-0.5 rounded font-semibold">
+                          <span className="bg-[#e53935]/15 text-[#ff6b67] border border-[#e53935]/30 text-[10px] px-2.5 py-0.5 rounded-md font-bold">
                             {admin.role.toUpperCase()}
                           </span>
                         </td>
                         <td className="py-3 px-3">
-                          <span className="inline-flex items-center gap-1 text-[10px] text-emerald-400 font-medium">
-                            <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                          <span className="inline-flex items-center gap-1.5 text-[11px] text-emerald-400 font-semibold">
+                            <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
                             Active
                           </span>
                         </td>
-                        <td className="py-3 px-3 text-zinc-400 text-[11px] font-mono">
+                        <td className="py-3 px-3 text-gray-400 text-[11px] font-mono">
                           {new Date(admin.created_at).toLocaleDateString('en-GB', {
                             day: 'numeric',
                             month: 'short',
@@ -600,21 +601,21 @@ export default function AdminSettingsPage() {
             </div>
 
             {/* Change Password Form */}
-            <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-5 shadow-xs space-y-4">
-              <div className="pb-3 border-b border-zinc-800">
-                <h3 className="text-sm font-semibold text-white">Change Admin Password</h3>
-                <p className="text-xs text-zinc-400 mt-0.5">Directly update security credentials for any executive administrator</p>
+            <div className="rounded-2xl border border-white/[0.06] bg-[#12141c] p-6 shadow-sm hover:border-white/[0.12] transition-colors space-y-5">
+              <div className="pb-3 border-b border-white/[0.06]">
+                <h3 className="text-base font-extrabold text-white tracking-tight">Change Admin Password</h3>
+                <p className="text-xs text-gray-400 mt-1">Directly update security credentials for any executive administrator</p>
               </div>
 
               <form onSubmit={handleChangePassword} className="space-y-4 max-w-lg">
                 <div>
-                  <label className="block text-xs font-medium text-zinc-300 mb-1.5">
+                  <label className="block text-xs font-bold text-gray-300 uppercase tracking-wider mb-2">
                     Select Administrator Email
                   </label>
                   <select
                     value={targetAdminEmail}
                     onChange={(e) => setTargetAdminEmail(e.target.value)}
-                    className="w-full h-9 px-3 rounded-md bg-zinc-900/90 border border-zinc-800 text-xs text-white focus:outline-none focus:border-[#2dd4bf] transition-colors"
+                    className="w-full h-10 px-3.5 rounded-xl bg-[#0d0e12] border border-white/[0.08] text-xs text-white focus:outline-none focus:border-[#e53935] focus:ring-1 focus:ring-[#e53935]/40 transition-colors"
                   >
                     {admins.map((adm) => (
                       <option key={adm.id} value={adm.email}>
@@ -625,7 +626,7 @@ export default function AdminSettingsPage() {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-medium text-zinc-300 mb-1.5">
+                  <label className="block text-xs font-bold text-gray-300 uppercase tracking-wider mb-2">
                     New Secure Password
                   </label>
                   <input
@@ -634,12 +635,12 @@ export default function AdminSettingsPage() {
                     placeholder="Minimum 8 characters"
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
-                    className="w-full h-9 px-3 rounded-md bg-zinc-900/90 border border-zinc-800 text-xs text-white focus:outline-none focus:border-[#2dd4bf] transition-colors font-mono"
+                    className="w-full h-10 px-3.5 rounded-xl bg-[#0d0e12] border border-white/[0.08] text-xs text-white focus:outline-none focus:border-[#e53935] focus:ring-1 focus:ring-[#e53935]/40 transition-colors font-mono"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-medium text-zinc-300 mb-1.5">
+                  <label className="block text-xs font-bold text-gray-300 uppercase tracking-wider mb-2">
                     Confirm New Password
                   </label>
                   <input
@@ -648,7 +649,7 @@ export default function AdminSettingsPage() {
                     placeholder="Re-enter new password"
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
-                    className="w-full h-9 px-3 rounded-md bg-zinc-900/90 border border-zinc-800 text-xs text-white focus:outline-none focus:border-[#2dd4bf] transition-colors font-mono"
+                    className="w-full h-10 px-3.5 rounded-xl bg-[#0d0e12] border border-white/[0.08] text-xs text-white focus:outline-none focus:border-[#e53935] focus:ring-1 focus:ring-[#e53935]/40 transition-colors font-mono"
                   />
                 </div>
 
@@ -656,9 +657,9 @@ export default function AdminSettingsPage() {
                   <button
                     type="submit"
                     disabled={passwordUpdating}
-                    className="inline-flex items-center gap-2 bg-[#2dd4bf] hover:bg-[#20b8a4] text-zinc-950 font-semibold text-xs px-4 py-2 rounded-md transition-colors shadow-sm disabled:opacity-50"
+                    className="inline-flex items-center gap-2 bg-[#e53935] hover:bg-[#d32f2f] text-white font-bold text-xs px-5 py-2.5 rounded-xl transition-all shadow-md cursor-pointer disabled:opacity-50"
                   >
-                    <Key className="h-3.5 w-3.5" />
+                    <Key className="h-4 w-4" />
                     <span>{passwordUpdating ? 'Updating Password...' : 'Update Password'}</span>
                   </button>
                 </div>
@@ -670,83 +671,83 @@ export default function AdminSettingsPage() {
         {/* TAB 4: Cloud & Storage */}
         {activeTab === 'infrastructure' && (
           <div className="space-y-6">
-            <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-5 shadow-xs space-y-4">
-              <div className="pb-3 border-b border-zinc-800">
-                <h3 className="text-sm font-semibold text-white">Storage & Compute Infrastructure</h3>
-                <p className="text-xs text-zinc-400 mt-0.5">Live connectivity to R2 master storage, database, and gateways</p>
+            <div className="rounded-2xl border border-white/[0.06] bg-[#12141c] p-6 shadow-sm hover:border-white/[0.12] transition-colors space-y-5">
+              <div className="pb-3 border-b border-white/[0.06]">
+                <h3 className="text-base font-extrabold text-white tracking-tight">Storage & Compute Infrastructure</h3>
+                <p className="text-xs text-gray-400 mt-1">Live connectivity to R2 master storage, database, and gateways</p>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
                 {/* Cloudflare R2 */}
-                <div className="p-4 rounded-lg bg-zinc-900/60 border border-zinc-800 space-y-2">
+                <div className="p-4 rounded-xl bg-[#0d0e12] border border-white/[0.06] space-y-2">
                   <div className="flex items-center justify-between">
-                    <span className="font-semibold text-white flex items-center gap-2">
-                      <Database className="h-4 w-4 text-[#2dd4bf]" />
+                    <span className="font-bold text-white flex items-center gap-2">
+                      <Database className="h-4 w-4 text-[#ff6b67]" />
                       Cloudflare R2 Bucket
                     </span>
-                    <span className="inline-flex items-center gap-1.5 text-[10px] text-emerald-400 font-medium">
-                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                    <span className="inline-flex items-center gap-1.5 text-[11px] text-emerald-400 font-semibold">
+                      <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
                       Active
                     </span>
                   </div>
-                  <p className="text-[11px] text-zinc-400">
-                    Bucket Name: <span className="font-mono text-zinc-200">caution-studio-audio</span>
+                  <p className="text-[11px] text-gray-400">
+                    Bucket Name: <span className="font-mono text-white">caution-studio-audio</span>
                   </p>
-                  <p className="text-[11px] text-zinc-500">
+                  <p className="text-[11px] text-gray-500">
                     Stores master 24-bit WAVs, track stems, 320kbps MP3s, and artwork.
                   </p>
                 </div>
 
                 {/* Supabase */}
-                <div className="p-4 rounded-lg bg-zinc-900/60 border border-zinc-800 space-y-2">
+                <div className="p-4 rounded-xl bg-[#0d0e12] border border-white/[0.06] space-y-2">
                   <div className="flex items-center justify-between">
-                    <span className="font-semibold text-white flex items-center gap-2">
+                    <span className="font-bold text-white flex items-center gap-2">
                       <Server className="h-4 w-4 text-emerald-400" />
                       Supabase PostgreSQL
                     </span>
-                    <span className="inline-flex items-center gap-1.5 text-[10px] text-emerald-400 font-medium">
-                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                    <span className="inline-flex items-center gap-1.5 text-[11px] text-emerald-400 font-semibold">
+                      <span className="h-2 w-2 rounded-full bg-emerald-400" />
                       Connected
                     </span>
                   </div>
-                  <p className="text-[11px] text-zinc-400">
-                    Host: <span className="font-mono text-zinc-200">yvsoqighrijqqnojelgp.supabase.co</span>
+                  <p className="text-[11px] text-gray-400">
+                    Host: <span className="font-mono text-white">yvsoqighrijqqnojelgp.supabase.co</span>
                   </p>
-                  <p className="text-[11px] text-zinc-500">
+                  <p className="text-[11px] text-gray-500">
                     Row Level Security (RLS) active • Realtime replication enabled.
                   </p>
                 </div>
 
                 {/* Paystack Gateway */}
-                <div className="p-4 rounded-lg bg-zinc-900/60 border border-zinc-800 space-y-2">
+                <div className="p-4 rounded-xl bg-[#0d0e12] border border-white/[0.06] space-y-2">
                   <div className="flex items-center justify-between">
-                    <span className="font-semibold text-white flex items-center gap-2">
+                    <span className="font-bold text-white flex items-center gap-2">
                       <DollarSign className="h-4 w-4 text-amber-400" />
                       Paystack Gateway (NGN)
                     </span>
-                    <span className="inline-flex items-center gap-1.5 text-[10px] text-emerald-400 font-medium">
-                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                    <span className="inline-flex items-center gap-1.5 text-[11px] text-emerald-400 font-semibold">
+                      <span className="h-2 w-2 rounded-full bg-emerald-400" />
                       Operational
                     </span>
                   </div>
-                  <p className="text-[11px] text-zinc-400">
+                  <p className="text-[11px] text-gray-400">
                     Direct local payments in Naira • Split disbursements to Nigerian bank accounts.
                   </p>
                 </div>
 
                 {/* Stripe Connect */}
-                <div className="p-4 rounded-lg bg-zinc-900/60 border border-zinc-800 space-y-2">
+                <div className="p-4 rounded-xl bg-[#0d0e12] border border-white/[0.06] space-y-2">
                   <div className="flex items-center justify-between">
-                    <span className="font-semibold text-white flex items-center gap-2">
+                    <span className="font-bold text-white flex items-center gap-2">
                       <Layers className="h-4 w-4 text-indigo-400" />
                       Stripe Connect (USD)
                     </span>
-                    <span className="inline-flex items-center gap-1.5 text-[10px] text-emerald-400 font-medium">
-                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                    <span className="inline-flex items-center gap-1.5 text-[11px] text-emerald-400 font-semibold">
+                      <span className="h-2 w-2 rounded-full bg-emerald-400" />
                       Operational
                     </span>
                   </div>
-                  <p className="text-[11px] text-zinc-400">
+                  <p className="text-[11px] text-gray-400">
                     Global card processing • Automatic international producer payouts.
                   </p>
                 </div>
@@ -757,25 +758,25 @@ export default function AdminSettingsPage() {
 
         {/* Modal: Authorize New Admin */}
         {showAddModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-            <div className="w-full max-w-md rounded-xl border border-zinc-800 bg-[#0c0d10] p-6 shadow-xl space-y-4">
-              <div className="flex items-center justify-between pb-3 border-b border-zinc-800">
-                <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                  <Shield className="h-4 w-4 text-[#2dd4bf]" />
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-150">
+            <div className="w-full max-w-md rounded-2xl border border-white/[0.08] bg-[#12141c] p-6 shadow-2xl space-y-5 animate-in zoom-in-95 duration-150">
+              <div className="flex items-center justify-between pb-3 border-b border-white/[0.06]">
+                <h3 className="text-base font-extrabold text-white flex items-center gap-2">
+                  <Shield className="h-4 w-4 text-[#ff6b67]" />
                   <span>Authorize New Administrator</span>
                 </h3>
                 <button
                   type="button"
                   onClick={() => setShowAddModal(false)}
-                  className="text-zinc-400 hover:text-white"
+                  className="p-1 rounded-full text-gray-400 hover:text-white hover:bg-white/[0.06] transition-colors"
                 >
-                  ✕
+                  <X className="h-4 w-4" />
                 </button>
               </div>
 
               <form onSubmit={handleAddAdmin} className="space-y-4">
                 <div>
-                  <label className="block text-xs font-medium text-zinc-300 mb-1.5">
+                  <label className="block text-xs font-bold text-gray-300 uppercase tracking-wider mb-2">
                     Admin Email Address
                   </label>
                   <input
@@ -784,12 +785,12 @@ export default function AdminSettingsPage() {
                     placeholder="e.g. ops@cautionstudioz.com"
                     value={newAdminEmail}
                     onChange={(e) => setNewAdminEmail(e.target.value)}
-                    className="w-full h-9 px-3 rounded-md bg-zinc-900 border border-zinc-800 text-xs text-white focus:outline-none focus:border-[#2dd4bf] transition-colors"
+                    className="w-full h-10 px-3.5 rounded-xl bg-[#0d0e12] border border-white/[0.08] text-xs text-white placeholder:text-gray-500 focus:outline-none focus:border-[#e53935] focus:ring-1 focus:ring-[#e53935]/40 transition-colors"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-medium text-zinc-300 mb-1.5">
+                  <label className="block text-xs font-bold text-gray-300 uppercase tracking-wider mb-2">
                     Temporary / Initial Password
                   </label>
                   <input
@@ -798,18 +799,18 @@ export default function AdminSettingsPage() {
                     placeholder="Minimum 8 characters"
                     value={newAdminPassword}
                     onChange={(e) => setNewAdminPassword(e.target.value)}
-                    className="w-full h-9 px-3 rounded-md bg-zinc-900 border border-zinc-800 text-xs text-white font-mono focus:outline-none focus:border-[#2dd4bf] transition-colors"
+                    className="w-full h-10 px-3.5 rounded-xl bg-[#0d0e12] border border-white/[0.08] text-xs text-white font-mono focus:outline-none focus:border-[#e53935] focus:ring-1 focus:ring-[#e53935]/40 transition-colors"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-medium text-zinc-300 mb-1.5">
+                  <label className="block text-xs font-bold text-gray-300 uppercase tracking-wider mb-2">
                     Administrative Role
                   </label>
                   <select
                     value={newAdminRole}
                     onChange={(e) => setNewAdminRole(e.target.value)}
-                    className="w-full h-9 px-3 rounded-md bg-zinc-900 border border-zinc-800 text-xs text-white focus:outline-none focus:border-[#2dd4bf] transition-colors"
+                    className="w-full h-10 px-3.5 rounded-xl bg-[#0d0e12] border border-white/[0.08] text-xs text-white focus:outline-none focus:border-[#e53935] focus:ring-1 focus:ring-[#e53935]/40 transition-colors"
                   >
                     <option value="superadmin">Superadmin (Full Access)</option>
                     <option value="manager">Catalog & Licensing Manager</option>
@@ -817,20 +818,20 @@ export default function AdminSettingsPage() {
                   </select>
                 </div>
 
-                <div className="flex items-center justify-end gap-2 pt-2 border-t border-zinc-800">
+                <div className="flex items-center justify-end gap-3 pt-3 border-t border-white/[0.06]">
                   <button
                     type="button"
                     onClick={() => setShowAddModal(false)}
-                    className="px-3 py-1.5 rounded-md border border-zinc-800 text-xs font-medium text-zinc-400 hover:text-white transition-colors"
+                    className="px-4 py-2 rounded-xl text-xs font-semibold text-gray-400 hover:text-white transition-colors cursor-pointer"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
                     disabled={addingAdmin}
-                    className="inline-flex items-center gap-1.5 bg-[#2dd4bf] hover:bg-[#20b8a4] text-zinc-950 font-semibold text-xs px-3.5 py-1.5 rounded-md transition-colors shadow-sm disabled:opacity-50"
+                    className="inline-flex items-center gap-2 bg-[#e53935] hover:bg-[#d32f2f] text-white font-bold text-xs px-5 py-2.5 rounded-xl transition-all shadow-md cursor-pointer disabled:opacity-50"
                   >
-                    <Plus className="h-3.5 w-3.5" />
+                    <Plus className="h-4 w-4" />
                     <span>{addingAdmin ? 'Authorizing...' : 'Confirm Clearance'}</span>
                   </button>
                 </div>

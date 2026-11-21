@@ -89,32 +89,39 @@ export async function getStudioBeats(): Promise<{ beats: TrackItem[]; producers:
 
     if (availableDbBeats && availableDbBeats.length > 0) {
       const r2Cdn = process.env.NEXT_PUBLIC_R2_PUBLIC_URL?.replace(/\/$/, '') || 'https://media.cautionstudioz.com';
-      const resolveAudioKey = (key?: string) => {
-        if (!key) return undefined;
-        if (key.startsWith('http') || key.startsWith('/')) return key;
-        return `${r2Cdn}/${key}`;
+
+      const formatMediaUrl = (urlOrKey?: string | null): string => {
+        if (!urlOrKey) return '';
+        const clean = String(urlOrKey).trim();
+        if (!clean) return '';
+        if (clean.startsWith('/api/media/')) {
+          const rawKey = clean.replace('/api/media/', '').split('?')[0];
+          return `${r2Cdn}/${encodeURI(decodeURIComponent(rawKey))}`;
+        }
+        if (clean.startsWith('http://') || clean.startsWith('https://')) {
+          if (clean.includes('/api/media/')) {
+            const rawKey = clean.split('/api/media/')[1]?.split('?')[0];
+            return `${r2Cdn}/${encodeURI(decodeURIComponent(rawKey))}`;
+          }
+          return encodeURI(decodeURI(clean));
+        }
+        if (clean.startsWith('/images/')) return clean;
+        return `${r2Cdn}/${encodeURI(decodeURIComponent(clean.replace(/^\//, '')))}`;
       };
 
       const allMapped: TrackItem[] = availableDbBeats.map((b) => {
-        const masterUrl = resolveAudioKey(b.master_wav_key);
-        const previewCleanUrl = resolveAudioKey(b.preview_clean_key);
-        const previewTaggedUrl = resolveAudioKey(b.preview_tagged_key);
+        const masterUrl = formatMediaUrl(b.master_wav_key);
+        const previewCleanUrl = formatMediaUrl(b.preview_clean_key);
+        const previewTaggedUrl = formatMediaUrl(b.preview_tagged_key);
 
         const audioKey = b.preview_clean_key || b.preview_tagged_key || b.master_wav_key;
-        let audioUrl = '';
-        if (audioKey) {
-          if (audioKey.startsWith('http') || audioKey.startsWith('/')) {
-            audioUrl = audioKey;
-          } else if (r2Cdn) {
-            audioUrl = `${r2Cdn}/${audioKey}`;
-          } else {
-            audioUrl = `/api/media/${audioKey}`;
-          }
-        } else {
-          audioUrl = r2Cdn
-            ? `${r2Cdn}/masters/alex-morgan-afrobeat-instrumental-summer-groove-573648-hubz_1791151613114.mp3`
-            : '/api/media/masters/alex-morgan-afrobeat-instrumental-summer-groove-573648-hubz_1791151613114.mp3';
+        let audioUrl = formatMediaUrl(audioKey);
+        if (!audioUrl) {
+          audioUrl = `${r2Cdn}/masters/alex-morgan-afrobeat-instrumental-summer-groove-573648-hubz_1791151613114.mp3`;
         }
+
+        let coverUrl = formatMediaUrl(b.cover_url);
+        if (!coverUrl) coverUrl = '/images/album_neon_dj.jpg';
         const licenses = Array.isArray(b.licenses) ? b.licenses : [];
         const basicLic = licenses.find((l: any) => l.type === 'basic');
         const premiumLic = licenses.find((l: any) => l.type === 'premium');

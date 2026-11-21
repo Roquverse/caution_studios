@@ -1,9 +1,33 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Play, Pause, Heart, ShoppingBag, Download, Lock } from 'lucide-react';
 import { TrackItem } from '../types/tracks';
 import { isFreeBeat } from './UserMarketplaceView';
+
+const R2_PUBLIC_CDN = 'https://media.cautionstudioz.com';
+
+export function resolveBeatCoverUrl(url?: string | null): string {
+  if (!url) return '/images/album_neon_dj.jpg';
+  const clean = String(url).trim();
+  if (!clean) return '/images/album_neon_dj.jpg';
+
+  if (clean.startsWith('/api/media/')) {
+    const rawKey = clean.replace('/api/media/', '').split('?')[0];
+    return `${R2_PUBLIC_CDN}/${encodeURI(decodeURIComponent(rawKey))}`;
+  }
+  if (clean.startsWith('http://') || clean.startsWith('https://')) {
+    if (clean.includes('/api/media/')) {
+      const rawKey = clean.split('/api/media/')[1]?.split('?')[0];
+      return `${R2_PUBLIC_CDN}/${encodeURI(decodeURIComponent(rawKey))}`;
+    }
+    return encodeURI(decodeURI(clean));
+  }
+  if (clean.startsWith('/images/')) {
+    return clean;
+  }
+  return `${R2_PUBLIC_CDN}/${encodeURI(decodeURIComponent(clean.replace(/^\//, '')))}`;
+}
 
 interface MarketplaceBeatCardProps {
   track: TrackItem;
@@ -26,6 +50,7 @@ export function MarketplaceBeatCard({
   onLicenseClick,
   onDownloadClick
 }: MarketplaceBeatCardProps) {
+  const [imgSrc, setImgSrc] = useState<string>(() => resolveBeatCoverUrl(track.coverUrl));
   const isPlayingThis = isCurrent && isPlaying;
   const isFree = isFreeBeat(track);
 
@@ -48,8 +73,13 @@ export function MarketplaceBeatCard({
         {/* Large Artwork with Play Button Overlay */}
         <div className="relative aspect-[16/10] sm:aspect-[16/10] w-full rounded-xl overflow-hidden bg-black/60 mb-3 border border-white/[0.06]">
           <img
-            src={track.coverUrl || '/images/album_neon_dj.jpg'}
+            src={imgSrc}
             alt={track.title}
+            onError={() => {
+              if (imgSrc !== '/images/album_neon_dj.jpg') {
+                setImgSrc('/images/album_neon_dj.jpg');
+              }
+            }}
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ease-out"
           />
           <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-60 group-hover:opacity-40 transition-opacity" />

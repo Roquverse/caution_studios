@@ -199,7 +199,19 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     // Determine audio URL from storage or beat properties (prioritize preview keys over heavy master WAV)
     const audioKey = beat.preview_clean_key || beat.preview_tagged_key || beat.audio_url || beat.master_wav_key;
     const r2Cdn = process.env.NEXT_PUBLIC_R2_PUBLIC_URL?.replace(/\/$/, '') || 'https://media.cautionstudioz.com';
-    const resolvedUrl = audioKey ? (audioKey.startsWith('/') || audioKey.startsWith('http') ? audioKey : `${r2Cdn}/${audioKey}`) : null;
+    let resolvedUrl: string | null = null;
+    if (audioKey) {
+      if (audioKey.startsWith('/api/media/')) {
+        const rawKey = audioKey.replace('/api/media/', '').split('?')[0];
+        resolvedUrl = `${r2Cdn}/${encodeURI(decodeURIComponent(rawKey))}`;
+      } else if (audioKey.startsWith('http://') || audioKey.startsWith('https://')) {
+        resolvedUrl = encodeURI(decodeURI(audioKey));
+      } else if (audioKey.startsWith('/')) {
+        resolvedUrl = audioKey;
+      } else {
+        resolvedUrl = `${r2Cdn}/${encodeURI(decodeURIComponent(audioKey))}`;
+      }
+    }
 
     if (resolvedUrl && audioRef.current) {
       if (audioRef.current.src !== resolvedUrl && !audioRef.current.src.endsWith(resolvedUrl)) {

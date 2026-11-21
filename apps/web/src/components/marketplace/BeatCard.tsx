@@ -9,6 +9,27 @@ import { PriceTag } from './PriceTag';
 import { SoldOverlay } from './SoldOverlay';
 import { Heart, ShoppingBag } from 'lucide-react';
 
+const R2_PUBLIC_CDN = 'https://media.cautionstudioz.com';
+
+function resolveBeatCoverUrl(url?: string | null): string {
+  if (!url) return '/images/album_neon_dj.jpg';
+  const clean = String(url).trim();
+  if (!clean) return '/images/album_neon_dj.jpg';
+  if (clean.startsWith('/api/media/')) {
+    const rawKey = clean.replace('/api/media/', '').split('?')[0];
+    return `${R2_PUBLIC_CDN}/${encodeURI(decodeURIComponent(rawKey))}`;
+  }
+  if (clean.startsWith('http://') || clean.startsWith('https://')) {
+    if (clean.includes('/api/media/')) {
+      const rawKey = clean.split('/api/media/')[1]?.split('?')[0];
+      return `${R2_PUBLIC_CDN}/${encodeURI(decodeURIComponent(rawKey))}`;
+    }
+    return encodeURI(decodeURI(clean));
+  }
+  if (clean.startsWith('/images/')) return clean;
+  return `${R2_PUBLIC_CDN}/${encodeURI(decodeURIComponent(clean.replace(/^\//, '')))}`;
+}
+
 interface BeatCardProps {
   beat: Beat;
   onOpenLicenseSelector?: (beat: Beat) => void;
@@ -16,6 +37,7 @@ interface BeatCardProps {
 
 export const BeatCard: React.FC<BeatCardProps> = ({ beat, onOpenLicenseSelector }) => {
   const { currentBeat, isPlaying, togglePlay, likes, toggleLike, addToCart } = useAudio();
+  const [imgSrc, setImgSrc] = React.useState<string>(() => resolveBeatCoverUrl(beat.cover_url));
 
   const isCurrent = currentBeat?.id === beat.id;
   const isThisPlaying = isCurrent && isPlaying;
@@ -26,13 +48,16 @@ export const BeatCard: React.FC<BeatCardProps> = ({ beat, onOpenLicenseSelector 
     <div className="group relative flex flex-col p-3 rounded-sm bg-surface border border-border hover:border-text-faint transition-colors duration-150">
       {/* Artwork container */}
       <div className="relative aspect-square w-full rounded-sm overflow-hidden bg-surface-2 border border-border">
-        {beat.cover_url && (
-          <img
-            src={beat.cover_url}
-            alt={beat.title}
-            className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-          />
-        )}
+        <img
+          src={imgSrc}
+          alt={beat.title}
+          onError={() => {
+            if (imgSrc !== '/images/album_neon_dj.jpg') {
+              setImgSrc('/images/album_neon_dj.jpg');
+            }
+          }}
+          className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+        />
 
         {isSold && <SoldOverlay label="Sold Exclusively" />}
 

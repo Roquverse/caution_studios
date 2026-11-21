@@ -578,22 +578,40 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
           const localCounts: Record<string, number> = savedCounts ? JSON.parse(savedCounts) : {};
 
           const r2Cdn = process.env.NEXT_PUBLIC_R2_PUBLIC_URL?.replace(/\/$/, '') || 'https://media.cautionstudioz.com';
+
+          const formatMediaUrl = (urlOrKey?: string | null): string => {
+            if (!urlOrKey) return '';
+            const clean = String(urlOrKey).trim();
+            if (!clean) return '';
+            if (clean.startsWith('/api/media/')) {
+              const rawKey = clean.replace('/api/media/', '').split('?')[0];
+              return `${r2Cdn}/${encodeURI(decodeURIComponent(rawKey))}`;
+            }
+            if (clean.startsWith('http://') || clean.startsWith('https://')) {
+              if (clean.includes('/api/media/')) {
+                const rawKey = clean.split('/api/media/')[1]?.split('?')[0];
+                return `${r2Cdn}/${encodeURI(decodeURIComponent(rawKey))}`;
+              }
+              return encodeURI(decodeURI(clean));
+            }
+            if (clean.startsWith('/images/')) return clean;
+            return `${r2Cdn}/${encodeURI(decodeURIComponent(clean.replace(/^\//, '')))}`;
+          };
+
           const mapped: TrackItem[] = dbBeats.map((b) => {
             const audioKey = b.preview_clean_key || b.preview_tagged_key || b.master_wav_key;
-            let audioUrl = '';
-            if (audioKey) {
-              if (audioKey.startsWith('http') || audioKey.startsWith('/')) {
-                audioUrl = audioKey;
-              } else if (r2Cdn) {
-                audioUrl = `${r2Cdn}/${audioKey}`;
-              } else {
-                audioUrl = `/api/media/${audioKey}`;
-              }
-            } else {
-              audioUrl = r2Cdn
-                ? `${r2Cdn}/masters/alex-morgan-afrobeat-instrumental-summer-groove-573648-hubz_1791151613114.mp3`
-                : '/api/media/masters/alex-morgan-afrobeat-instrumental-summer-groove-573648-hubz_1791151613114.mp3';
+            let audioUrl = formatMediaUrl(audioKey);
+            if (!audioUrl) {
+              audioUrl = `${r2Cdn}/masters/alex-morgan-afrobeat-instrumental-summer-groove-573648-hubz_1791151613114.mp3`;
             }
+
+            const previewCleanUrl = formatMediaUrl(b.preview_clean_key) || audioUrl;
+            const previewTaggedUrl = formatMediaUrl(b.preview_tagged_key) || audioUrl;
+            const masterUrl = formatMediaUrl(b.master_wav_key) || audioUrl;
+
+            let coverUrl = formatMediaUrl(b.cover_url);
+            if (!coverUrl) coverUrl = '/images/album_neon_dj.jpg';
+
             const basicLic = b.licenses?.find((l: any) => l.type === 'basic') || b.beat_licenses?.find((l: any) => l.type === 'basic');
             const premiumLic = b.licenses?.find((l: any) => l.type === 'premium') || b.beat_licenses?.find((l: any) => l.type === 'premium');
             const exclusiveLic = b.licenses?.find((l: any) => l.type === 'exclusive') || b.beat_licenses?.find((l: any) => l.type === 'exclusive');
@@ -636,9 +654,12 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
               date: new Date(b.created_at).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' }),
               duration: `${mins}:${secs.toString().padStart(2, '0')}`,
               durationSeconds: durationSec,
-              coverUrl: b.cover_url || '/images/album_neon_dj.jpg',
+              coverUrl,
               category: isFreeBeatItem ? 'free' : 'playlists',
               audioUrl,
+              previewCleanUrl,
+              previewTaggedUrl,
+              masterUrl,
               bpm: b.bpm || 120,
               genre: b.genre || 'Electronic',
               musicalKey: b.musical_key || 'C Minor',
@@ -770,33 +791,25 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
     if (audioRef.current) {
       if (targetAudioSrc) {
         audioRef.current.src = targetAudioSrc;
-        if (settings.crossfadeSeconds > 0 && !isMuted) {
-          audioRef.current.volume = 0;
-          audioRef.current.load();
-          audioRef.current.play().then(() => {
-            const steps = 10;
-            const durationMs = Math.max(500, settings.crossfadeSeconds * 1000);
-            let step = 0;
-            const timer = setInterval(() => {
-              step++;
-              if (audioRef.current && !isMuted) {
-                audioRef.current.volume = Math.min(targetVol, (targetVol * step) / steps);
+        audioRef.current.volume = targetVol;
+        audioRef.current.load();
+
+        const playPromise = audioRef.current.play();
+        if (playPromise !== undefined) {
+          playPromise.catch((err) => {
+            if (err.name !== 'AbortError') {
+              console.warn('Audio playback error on primary source, attempting fallback:', err);
+              // Fallback to proxy route if CDN was blocked or had network error
+              if (audioRef.current && track.audioUrl && !audioRef.current.src.includes('/api/media/')) {
+                const audioKey = track.audioUrl.split('.com/')[1] || track.audioUrl;
+                audioRef.current.src = `/api/media/${audioKey}`;
+                audioRef.current.load();
+                audioRef.current.play().catch(() => {
+                  audioSynth.playTrack(track.id, () => {});
+                });
+              } else {
+                audioSynth.playTrack(track.id, () => {});
               }
-              if (step >= steps) clearInterval(timer);
-            }, durationMs / steps);
-          }).catch((err) => {
-            if (err.name !== 'AbortError') {
-              console.warn('Audio playback error:', err);
-              audioSynth.playTrack(track.id, () => {});
-            }
-          });
-        } else {
-          audioRef.current.volume = targetVol;
-          audioRef.current.load();
-          audioRef.current.play().catch((err) => {
-            if (err.name !== 'AbortError') {
-              console.warn('Audio playback error:', err);
-              audioSynth.playTrack(track.id, () => {});
             }
           });
         }
@@ -821,7 +834,8 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
         const isNewAudition = activeListenSessionRef.current !== track.id;
 
         // Spotify-style audio ad check: triggers after playing 2 beats or more (pro tier is 100% ad-free)
-        if (!isPro && isNewAudition && songsPlayedSinceLastAd >= nextAdTriggerRef.current) {
+        // Ensure user's very first song of a visit is never blocked by an ad
+        if (!isPro && songsPlayedCount > 0 && isNewAudition && songsPlayedSinceLastAd >= nextAdTriggerRef.current) {
           setSongsPlayedSinceLastAd(0);
           try { sessionStorage.setItem('caution:beats-played-since-ad', '0'); } catch (e) {}
           nextAdTriggerRef.current = Math.random() < 0.5 ? 2 : 3;
@@ -856,12 +870,15 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
             audioRef.current.load();
           }
           audioRef.current.volume = targetVol;
-          audioRef.current.play().catch((err) => {
-            if (err.name !== 'AbortError') {
-              console.warn('Audio playback error:', err);
-              audioSynth.playTrack(track.id, () => {});
-            }
-          });
+          const playPromise = audioRef.current.play();
+          if (playPromise !== undefined) {
+            playPromise.catch((err) => {
+              if (err.name !== 'AbortError') {
+                console.warn('Audio playback error on resume:', err);
+                audioSynth.playTrack(track.id, () => {});
+              }
+            });
+          }
         } else {
           audioSynth.playTrack(track.id, () => {});
         }
@@ -874,7 +891,8 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
       audioSynth.stop();
 
       // Spotify-style audio ad: first 15 seconds unskippable, triggers randomly after playing 2 beats or more (pro is 100% ad-free)
-      if (!isPro && songsPlayedSinceLastAd >= nextAdTriggerRef.current) {
+      // Never block on the first song audition of a visit
+      if (!isPro && songsPlayedCount > 0 && songsPlayedSinceLastAd >= nextAdTriggerRef.current) {
         // Reset count and choose a new random interval (2 or 3 songs) for the next ad
         setSongsPlayedSinceLastAd(0);
         try { sessionStorage.setItem('caution:beats-played-since-ad', '0'); } catch (e) {}

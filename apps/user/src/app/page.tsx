@@ -93,22 +93,40 @@ export default async function UserPortalPage() {
 
     if (availableDbBeats.length > 0) {
       const r2Cdn = process.env.NEXT_PUBLIC_R2_PUBLIC_URL?.replace(/\/$/, '') || 'https://media.cautionstudioz.com';
+
+      const formatMediaUrl = (urlOrKey?: string | null): string => {
+        if (!urlOrKey) return '';
+        const clean = String(urlOrKey).trim();
+        if (!clean) return '';
+        if (clean.startsWith('/api/media/')) {
+          const rawKey = clean.replace('/api/media/', '').split('?')[0];
+          return `${r2Cdn}/${encodeURI(decodeURIComponent(rawKey))}`;
+        }
+        if (clean.startsWith('http://') || clean.startsWith('https://')) {
+          if (clean.includes('/api/media/')) {
+            const rawKey = clean.split('/api/media/')[1]?.split('?')[0];
+            return `${r2Cdn}/${encodeURI(decodeURIComponent(rawKey))}`;
+          }
+          return encodeURI(decodeURI(clean));
+        }
+        if (clean.startsWith('/images/')) return clean;
+        return `${r2Cdn}/${encodeURI(decodeURIComponent(clean.replace(/^\//, '')))}`;
+      };
+
       initialBeats = availableDbBeats.map((b) => {
         const audioKey = b.preview_clean_key || b.preview_tagged_key || b.master_wav_key;
-        let audioUrl = '';
-        if (audioKey) {
-          if (audioKey.startsWith('http') || audioKey.startsWith('/')) {
-            audioUrl = audioKey;
-          } else if (r2Cdn) {
-            audioUrl = `${r2Cdn}/${audioKey}`;
-          } else {
-            audioUrl = `/api/media/${audioKey}`;
-          }
-        } else {
-          audioUrl = r2Cdn
-            ? `${r2Cdn}/masters/alex-morgan-afrobeat-instrumental-summer-groove-573648-hubz_1791151613114.mp3`
-            : '/api/media/masters/alex-morgan-afrobeat-instrumental-summer-groove-573648-hubz_1791151613114.mp3';
+        let audioUrl = formatMediaUrl(audioKey);
+        if (!audioUrl) {
+          audioUrl = `${r2Cdn}/masters/alex-morgan-afrobeat-instrumental-summer-groove-573648-hubz_1791151613114.mp3`;
         }
+
+        const previewCleanUrl = formatMediaUrl(b.preview_clean_key) || audioUrl;
+        const previewTaggedUrl = formatMediaUrl(b.preview_tagged_key) || audioUrl;
+        const masterUrl = formatMediaUrl(b.master_wav_key) || audioUrl;
+
+        let coverUrl = formatMediaUrl(b.cover_url);
+        if (!coverUrl) coverUrl = '/images/album_neon_dj.jpg';
+
         const basicLic = b.licenses?.find((l: any) => l.type === 'basic') || b.beat_licenses?.find((l: any) => l.type === 'basic');
         const premiumLic = b.licenses?.find((l: any) => l.type === 'premium') || b.beat_licenses?.find((l: any) => l.type === 'premium');
         const exclusiveLic = b.licenses?.find((l: any) => l.type === 'exclusive') || b.beat_licenses?.find((l: any) => l.type === 'exclusive');
@@ -149,9 +167,12 @@ export default async function UserPortalPage() {
           date: new Date(b.created_at).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' }),
           duration: `${mins}:${secs.toString().padStart(2, '0')}`,
           durationSeconds: durationSec,
-          coverUrl: b.cover_url || '/images/album_neon_dj.jpg',
+          coverUrl,
           category: isFree ? 'free' : 'playlists',
           audioUrl,
+          previewCleanUrl,
+          previewTaggedUrl,
+          masterUrl,
           bpm: b.bpm || 120,
           genre: b.genre || 'Electronic',
           musicalKey: b.musical_key || 'C Minor',
