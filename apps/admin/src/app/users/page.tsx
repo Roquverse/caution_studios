@@ -24,7 +24,12 @@ import {
   Wand2,
   Copy,
   Check,
-  AlertCircle
+  AlertCircle,
+  Trash2,
+  UserX,
+  UserCheck,
+  RotateCcw,
+  AlertTriangle
 } from 'lucide-react';
 
 export interface UserProfile {
@@ -38,6 +43,7 @@ export interface UserProfile {
   plan: 'free' | 'plus' | 'pro';
   email: string;
   created_at: string;
+  is_deactivated?: boolean;
 }
 
 export default function AdminUsersPage() {
@@ -46,7 +52,12 @@ export default function AdminUsersPage() {
   const [search, setSearch] = useState('');
   const [planFilter, setPlanFilter] = useState<'all' | 'free' | 'plus' | 'pro'>('all');
   const [roleFilter, setRoleFilter] = useState<'all' | 'artist' | 'producer' | 'admin'>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'deactivated'>('all');
   const [updatingId, setUpdatingId] = useState<string | null>(null);
+
+  // Deactivate Modal State
+  const [deactivateModalUser, setDeactivateModalUser] = useState<UserProfile | null>(null);
+  const [deactivating, setDeactivating] = useState(false);
 
   // Password Update Modal State
   const [passwordModalUser, setPasswordModalUser] = useState<UserProfile | null>(null);
@@ -258,6 +269,78 @@ export default function AdminUsersPage() {
     }
   };
 
+  const handleOpenDeactivateModal = (user: UserProfile) => {
+    setDeactivateModalUser(user);
+  };
+
+  const handleCloseDeactivateModal = () => {
+    if (deactivating) return;
+    setDeactivateModalUser(null);
+  };
+
+  const handleConfirmDeactivate = async () => {
+    if (!deactivateModalUser) return;
+    try {
+      setDeactivating(true);
+      const { data: { session } } = await supabase.auth.getSession();
+      const headers: Record<string, string> = {};
+      if (session?.access_token) {
+        headers['Authorization'] = `Bearer ${session.access_token}`;
+      }
+
+      const res = await fetch(`/api/users/${deactivateModalUser.id}`, {
+        method: 'DELETE',
+        headers
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Failed to deactivate user');
+      }
+
+      setUsers((prev) =>
+        prev.map((u) => (u.id === deactivateModalUser.id ? { ...u, is_deactivated: true } : u))
+      );
+      showToast(`User @${deactivateModalUser.handle} deactivated. Database records are fully preserved.`);
+      handleCloseDeactivateModal();
+    } catch (err: any) {
+      alert(err.message || 'Error deactivating user');
+    } finally {
+      setDeactivating(false);
+    }
+  };
+
+  const handleReactivateUser = async (user: UserProfile) => {
+    try {
+      setUpdatingId(user.id);
+      const { data: { session } } = await supabase.auth.getSession();
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (session?.access_token) {
+        headers['Authorization'] = `Bearer ${session.access_token}`;
+      }
+
+      const res = await fetch(`/api/users/${user.id}`, {
+        method: 'PATCH',
+        headers,
+        body: JSON.stringify({ is_deactivated: false })
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Failed to reactivate user');
+      }
+
+      setUsers((prev) =>
+        prev.map((u) => (u.id === user.id ? { ...u, is_deactivated: false } : u))
+      );
+      showToast(`User @${user.handle} reactivated successfully!`);
+    } catch (err: any) {
+      alert(err.message || 'Error reactivating user');
+    } finally {
+      setUpdatingId(null);
+    }
+  };
+
   const getEffectiveRole = (u: UserProfile): 'admin' | 'producer' | 'artist' => {
     if (u.primary_role === 'admin' || (u.roles && u.roles.includes('admin'))) return 'admin';
     if (u.primary_role === 'producer' || (u.roles && u.roles.includes('producer'))) return 'producer';
@@ -277,10 +360,15 @@ export default function AdminUsersPage() {
       planFilter === 'all' ||
       (planFilter === 'free' ? !u.plan || u.plan === 'free' : u.plan === planFilter);
     const matchesRole = roleFilter === 'all' || effectiveRole === roleFilter;
+    const matchesStatus =
+      statusFilter === 'all' ||
+      (statusFilter === 'active' ? !u.is_deactivated : Boolean(u.is_deactivated));
 
-    return matchesSearch && matchesPlan && matchesRole;
+    return matchesSearch && matchesPlan && matchesRole && matchesStatus;
   });
 
+  const activeCount = users.filter((u) => !u.is_deactivated).length;
+  const deactivatedCount = users.filter((u) => u.is_deactivated).length;
   const proCount = users.filter((u) => u.plan === 'pro').length;
   const plusCount = users.filter((u) => u.plan === 'plus').length;
   const freeCount = users.filter((u) => !u.plan || u.plan === 'free').length;
@@ -334,43 +422,53 @@ export default function AdminUsersPage() {
         </div>
 
         {/* Metric Cards */}
-        <div className="grid gap-4 grid-cols-1 sm:grid-cols-4">
-          <div className="rounded-2xl border border-white/[0.06] bg-[#12141c] p-5 shadow-sm hover:border-white/[0.12] transition-colors">
-            <span className="text-xs font-bold text-gray-400 uppercase tracking-wider block">Total Accounts</span>
+        <div className="grid gap-4 grid-cols-2 sm:grid-cols-5">
+          <div className="rounded-2xl border border-white/[0.06] bg-[#12141c] p-4 sm:p-5 shadow-sm hover:border-white/[0.12] transition-colors">
+            <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider block">Total Accounts</span>
             <span className="text-2xl font-black text-white tracking-tight mt-1 block">
               {users.length}
             </span>
-            <span className="text-xs text-gray-400 mt-1 block">All registered user profiles</span>
+            <span className="text-[11px] text-gray-500 mt-1 block">Registered profiles</span>
           </div>
 
-          <div className="rounded-2xl border border-white/[0.06] bg-[#12141c] p-5 shadow-sm hover:border-white/[0.12] transition-colors">
-            <span className="text-xs font-bold text-amber-400 block flex items-center gap-1.5 uppercase tracking-wider">
-              <Sliders className="h-3.5 w-3.5" /> Music Producers
+          <div className="rounded-2xl border border-emerald-500/20 bg-emerald-950/10 p-4 sm:p-5 shadow-sm hover:border-emerald-500/30 transition-colors">
+            <span className="text-[11px] font-bold text-emerald-400 uppercase tracking-wider block flex items-center gap-1.5">
+              <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" /> Active Users
+            </span>
+            <span className="text-2xl font-black text-emerald-300 tracking-tight mt-1 block">
+              {activeCount}
+            </span>
+            <span className="text-[11px] text-emerald-500/70 mt-1 block">Full access enabled</span>
+          </div>
+
+          <div className="rounded-2xl border border-red-500/20 bg-red-950/10 p-4 sm:p-5 shadow-sm hover:border-red-500/30 transition-colors">
+            <span className="text-[11px] font-bold text-red-400 uppercase tracking-wider block flex items-center gap-1.5">
+              <UserX className="h-3.5 w-3.5 text-red-400" /> Deactivated
+            </span>
+            <span className="text-2xl font-black text-red-300 tracking-tight mt-1 block">
+              {deactivatedCount}
+            </span>
+            <span className="text-[11px] text-red-400/60 mt-1 block">Soft-deleted / suspended</span>
+          </div>
+
+          <div className="rounded-2xl border border-white/[0.06] bg-[#12141c] p-4 sm:p-5 shadow-sm hover:border-white/[0.12] transition-colors">
+            <span className="text-[11px] font-bold text-amber-400 block flex items-center gap-1.5 uppercase tracking-wider">
+              <Sliders className="h-3.5 w-3.5" /> Producers
             </span>
             <span className="text-2xl font-black text-white tracking-tight mt-1 block">
               {producerCount}
             </span>
-            <span className="text-xs text-gray-400 mt-1 block">Creator Studio access cleared</span>
+            <span className="text-[11px] text-gray-500 mt-1 block">Creator studio cleared</span>
           </div>
 
-          <div className="rounded-2xl border border-white/[0.06] bg-[#12141c] p-5 shadow-sm hover:border-white/[0.12] transition-colors">
-            <span className="text-xs font-bold text-sky-400 block flex items-center gap-1.5 uppercase tracking-wider">
-              <Mic2 className="h-3.5 w-3.5" /> Recording Artists
+          <div className="rounded-2xl border border-white/[0.06] bg-[#12141c] p-4 sm:p-5 shadow-sm hover:border-white/[0.12] transition-colors col-span-2 sm:col-span-1">
+            <span className="text-[11px] font-bold text-sky-400 block flex items-center gap-1.5 uppercase tracking-wider">
+              <Mic2 className="h-3.5 w-3.5" /> Artists
             </span>
             <span className="text-2xl font-black text-white tracking-tight mt-1 block">
               {artistCount}
             </span>
-            <span className="text-xs text-gray-400 mt-1 block">Commercial buyers & listeners</span>
-          </div>
-
-          <div className="rounded-2xl border border-white/[0.06] bg-[#12141c] p-5 shadow-sm hover:border-white/[0.12] transition-colors">
-            <span className="text-xs font-bold text-[#ff6b67] block flex items-center gap-1.5 uppercase tracking-wider">
-              <ShieldCheck className="h-3.5 w-3.5" /> Administrators
-            </span>
-            <span className="text-2xl font-black text-white tracking-tight mt-1 block">
-              {adminCount}
-            </span>
-            <span className="text-xs text-gray-400 mt-1 block">Executive dashboard access</span>
+            <span className="text-[11px] text-gray-500 mt-1 block">Buyers & listeners</span>
           </div>
         </div>
 
@@ -398,6 +496,44 @@ export default function AdminUsersPage() {
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
+            {/* Status Filter Chips */}
+            <div className="flex items-center gap-1 border-r border-zinc-800 pr-2 mr-1">
+              <span className="text-[10px] uppercase font-mono text-zinc-500 mr-1 hidden sm:inline">Status:</span>
+              <button
+                type="button"
+                onClick={() => setStatusFilter('all')}
+                className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
+                  statusFilter === 'all'
+                    ? 'bg-zinc-800 text-white font-semibold'
+                    : 'text-zinc-400 hover:text-zinc-200'
+                }`}
+              >
+                All ({users.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setStatusFilter('active')}
+                className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
+                  statusFilter === 'active'
+                    ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 font-semibold'
+                    : 'text-zinc-400 hover:text-zinc-200'
+                }`}
+              >
+                Active ({activeCount})
+              </button>
+              <button
+                type="button"
+                onClick={() => setStatusFilter('deactivated')}
+                className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
+                  statusFilter === 'deactivated'
+                    ? 'bg-red-500/20 text-red-300 border border-red-500/40 font-semibold'
+                    : 'text-zinc-400 hover:text-zinc-200'
+                }`}
+              >
+                Deactivated ({deactivatedCount})
+              </button>
+            </div>
+
             {/* Role Filter Chips */}
             <div className="flex items-center gap-1 border-r border-zinc-800 pr-2 mr-1">
               <span className="text-[10px] uppercase font-mono text-zinc-500 mr-1 hidden sm:inline">Role:</span>
@@ -535,24 +671,50 @@ export default function AdminUsersPage() {
                     const effectiveRole = getEffectiveRole(u);
 
                     return (
-                      <tr key={u.id} className="hover:bg-zinc-800/30 transition-colors">
+                      <tr
+                        key={u.id}
+                        className={`transition-colors ${
+                          u.is_deactivated
+                            ? 'bg-red-950/15 hover:bg-red-950/25 border-l-2 border-red-500/60'
+                            : 'hover:bg-zinc-800/30'
+                        }`}
+                      >
                         <td className="py-3 px-4">
                           <div className="flex items-center gap-3">
-                            <div className="h-8 w-8 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center text-xs font-bold text-white shrink-0 overflow-hidden">
+                            <div
+                              className={`h-8 w-8 rounded-full border flex items-center justify-center text-xs font-bold text-white shrink-0 overflow-hidden ${
+                                u.is_deactivated
+                                  ? 'bg-zinc-900 border-red-500/40 text-red-300'
+                                  : 'bg-zinc-800 border-zinc-700'
+                              }`}
+                            >
                               {u.avatar_url ? (
                                 <img
                                   src={u.avatar_url}
                                   alt={u.display_name}
-                                  className="h-full w-full object-cover"
+                                  className={`h-full w-full object-cover ${
+                                    u.is_deactivated ? 'grayscale opacity-60' : ''
+                                  }`}
                                 />
                               ) : (
                                 u.display_name.charAt(0).toUpperCase()
                               )}
                             </div>
                             <div className="min-w-0">
-                              <span className="font-semibold text-white block truncate">
-                                {u.display_name}
-                              </span>
+                              <div className="flex items-center gap-2">
+                                <span
+                                  className={`font-semibold block truncate ${
+                                    u.is_deactivated ? 'text-zinc-400 line-through' : 'text-white'
+                                  }`}
+                                >
+                                  {u.display_name}
+                                </span>
+                                {u.is_deactivated && (
+                                  <span className="inline-flex items-center gap-1 text-[9px] font-bold uppercase tracking-wider text-red-300 bg-red-500/20 px-1.5 py-0.5 rounded border border-red-500/30">
+                                    Deactivated
+                                  </span>
+                                )}
+                              </div>
                               <span className="text-[10px] text-zinc-500 font-mono block truncate">
                                 @{u.handle} • {u.email}
                               </span>
@@ -627,7 +789,7 @@ export default function AdminUsersPage() {
                             : 'N/A'}
                         </td>
 
-                        {/* Actions: Update Password + Plan Selector */}
+                        {/* Actions: Update Password + Plan Selector + Deactivate / Reactivate */}
                         <td className="py-3 px-4 text-right">
                           <div className="flex items-center justify-end gap-2">
                             {/* Update Password Button */}
@@ -644,7 +806,7 @@ export default function AdminUsersPage() {
                             {/* Plan Selection Dropdown */}
                             <div className="relative inline-block">
                               <select
-                                disabled={isUpdating}
+                                disabled={isUpdating || u.is_deactivated}
                                 value={u.plan || 'free'}
                                 onChange={(e) =>
                                   handleUpdatePlan(u, e.target.value as 'free' | 'plus' | 'pro')
@@ -658,6 +820,31 @@ export default function AdminUsersPage() {
                               </select>
                               <ChevronDown className="h-3.5 w-3.5 text-zinc-400 absolute right-2 top-2 pointer-events-none" />
                             </div>
+
+                            {/* Deactivate / Reactivate Button */}
+                            {u.is_deactivated ? (
+                              <button
+                                type="button"
+                                disabled={isUpdating}
+                                onClick={() => handleReactivateUser(u)}
+                                className="text-xs font-semibold px-2.5 py-1.5 rounded-md border border-emerald-500/40 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 hover:text-emerald-200 transition-all cursor-pointer flex items-center gap-1.5 shadow-xs disabled:opacity-50"
+                                title={`Reactivate account for ${u.display_name}`}
+                              >
+                                <UserCheck className="h-3.5 w-3.5 text-emerald-400" />
+                                <span>Reactivate</span>
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                disabled={isUpdating}
+                                onClick={() => handleOpenDeactivateModal(u)}
+                                className="text-xs font-semibold px-2.5 py-1.5 rounded-md border border-red-500/30 bg-red-500/10 hover:bg-red-500/20 text-red-400 hover:text-red-300 transition-all cursor-pointer flex items-center gap-1.5 shadow-xs disabled:opacity-50"
+                                title={`Deactivate / Soft-Delete user ${u.display_name}`}
+                              >
+                                <Trash2 className="h-3.5 w-3.5 text-red-400" />
+                                <span>Delete</span>
+                              </button>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -847,6 +1034,97 @@ export default function AdminUsersPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* DEACTIVATE CONFIRMATION MODAL (Soft-Delete) */}
+      {deactivateModalUser && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-150">
+          <div className="relative w-full max-w-md rounded-2xl bg-[#121316] border border-red-500/30 p-6 shadow-2xl text-white space-y-5 animate-in zoom-in-95 duration-150">
+            {/* Close Button */}
+            <button
+              type="button"
+              onClick={handleCloseDeactivateModal}
+              disabled={deactivating}
+              className="absolute top-4 right-4 p-1.5 text-zinc-400 hover:text-white rounded-full bg-zinc-800/60 hover:bg-zinc-800 transition-colors disabled:opacity-50"
+              aria-label="Close modal"
+            >
+              <X className="h-4 w-4" />
+            </button>
+
+            {/* Modal Header */}
+            <div className="flex items-start gap-3">
+              <div className="h-10 w-10 rounded-xl bg-red-500/15 border border-red-500/30 flex items-center justify-center text-red-400 shrink-0">
+                <AlertTriangle className="h-5 w-5" />
+              </div>
+              <div className="min-w-0 flex-1 pr-6">
+                <h3 className="text-base font-bold text-white tracking-tight">
+                  Deactivate User Account
+                </h3>
+                <p className="text-xs text-zinc-400 mt-0.5">
+                  Soft-delete user without deleting database records
+                </p>
+              </div>
+            </div>
+
+            {/* Target User Info */}
+            <div className="p-3.5 rounded-xl bg-zinc-900/80 border border-zinc-800 space-y-2">
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="text-sm font-bold text-white block">
+                    {deactivateModalUser.display_name}
+                  </span>
+                  <span className="text-xs text-zinc-400 font-mono block">
+                    @{deactivateModalUser.handle}
+                  </span>
+                </div>
+                <span className="text-xs text-zinc-300 font-mono">
+                  {deactivateModalUser.email}
+                </span>
+              </div>
+            </div>
+
+            {/* Safety Explainer Banner */}
+            <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/25 text-amber-200 text-xs space-y-1.5">
+              <div className="font-semibold flex items-center gap-1.5 text-amber-300">
+                <Shield className="h-4 w-4 shrink-0 text-amber-400" />
+                <span>Safe Soft-Delete (No Data Loss)</span>
+              </div>
+              <p className="text-[11px] text-amber-300/80 leading-relaxed">
+                This user will be immediately suspended and prevented from logging in. Their profile, uploaded beats, licenses, purchase history, and analytics will <strong>NOT</strong> be deleted from the database. You can reactivate this account at any time.
+              </p>
+            </div>
+
+            {/* Actions */}
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                type="button"
+                onClick={handleCloseDeactivateModal}
+                disabled={deactivating}
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-zinc-400 hover:text-white bg-zinc-800 hover:bg-zinc-700 transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDeactivate}
+                disabled={deactivating}
+                className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-red-600 hover:bg-red-500 transition-colors flex items-center gap-2 shadow-lg shadow-red-900/20 cursor-pointer disabled:opacity-50"
+              >
+                {deactivating ? (
+                  <>
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    <span>Deactivating...</span>
+                  </>
+                ) : (
+                  <>
+                    <UserX className="h-3.5 w-3.5" />
+                    <span>Deactivate Account</span>
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       )}

@@ -18,6 +18,51 @@ export async function PATCH(
     const supabase = getServiceRoleClient();
     const body = await req.json();
 
+    // 0. Soft-delete / Deactivate or Reactivate action if requested
+    if (body.is_deactivated !== undefined || body.action === 'deactivate' || body.action === 'reactivate') {
+      const deactivate = body.is_deactivated === true || body.action === 'deactivate';
+
+      const { data: authData } = await supabase.auth.admin.getUserById(params.id);
+      const existingMeta = authData?.user?.user_metadata || {};
+      const existingAppMeta = authData?.user?.app_metadata || {};
+
+      const { error: authUpdateErr } = await supabase.auth.admin.updateUserById(params.id, {
+        ban_duration: deactivate ? '876000h' : 'none',
+        user_metadata: {
+          ...existingMeta,
+          is_deactivated: deactivate,
+          deactivated_at: deactivate ? new Date().toISOString() : null
+        },
+        app_metadata: {
+          ...existingAppMeta,
+          is_deactivated: deactivate
+        }
+      });
+
+      if (authUpdateErr) {
+        return NextResponse.json({ error: authUpdateErr.message }, { status: 500 });
+      }
+
+      // Best effort update in profiles table if column exists
+      try {
+        await supabase
+          .from('profiles')
+          .update({ is_deactivated: deactivate })
+          .eq('id', params.id);
+      } catch (e) {}
+
+      // If deactivated, revoke admin clearance
+      if (deactivate) {
+        await supabase.from('admin_users').delete().eq('user_id', params.id);
+      }
+
+      return NextResponse.json({
+        success: true,
+        message: deactivate ? 'User account deactivated successfully' : 'User account reactivated successfully',
+        is_deactivated: deactivate
+      });
+    }
+
     // 1. Password update if requested by admin
     let passwordUpdated = false;
     if (body.password !== undefined && body.password !== null) {
@@ -189,4 +234,69 @@ export async function PATCH(
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }
+
+// DELETE /api/users/[id] - Soft-delete / deactivate user (Admin Only)
+// Preserves all user rows and relations in the database, only suspending access
+export async function DELETE(
+  req: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const authCheck = await verifyAdminRequest(req);
+    if (!authCheck.isAdmin) {
+      return authCheck.errorResponse!;
+    }
+
+    const supabase = getServiceRoleClient();
+    const userId = params.id;
+
+    // Fetch existing user to preserve metadata
+    const { data: authData } = await supabase.auth.admin.getUserById(userId);
+    const existingMeta = authData?.user?.user_metadata || {};
+    const existingAppMeta = authData?.user?.app_metadata || {};
+
+    // 1. Soft-ban in Supabase Auth (blocks login, revokes active sessions)
+    const { error: banErr } = await supabase.auth.admin.updateUserById(userId, {
+      ban_duration: '876000h', // 100 years
+      user_metadata: {
+        ...existingMeta,
+        is_deactivated: true,
+        deactivated_at: new Date().toISOString()
+      },
+      app_metadata: {
+        ...existingAppMeta,
+        is_deactivated: true
+      }
+    });
+
+    if (banErr) {
+      return NextResponse.json({ error: banErr.message }, { status: 500 });
+    }
+
+    // 2. Best-effort update to profiles table if column exists
+    try {
+      await supabase
+        .from('profiles')
+        .update({ is_deactivated: true })
+        .eq('id', userId);
+    } catch (e) {
+      // Profiles schema might not have is_deactivated column yet
+    }
+
+    // 3. Remove from admin_users if present
+    await supabase.from('admin_users').delete().eq('user_id', userId);
+
+    return NextResponse.json({
+      success: true,
+      message: 'User account deactivated successfully (all database records preserved)',
+      is_deactivated: true
+    });
+  } catch (err: any) {
+    return NextResponse.json(
+      { error: err.message || 'Failed to deactivate user' },
+      { status: 500 }
+    );
+  }
+}
+
 
