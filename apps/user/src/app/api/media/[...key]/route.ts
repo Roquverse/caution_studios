@@ -16,6 +16,14 @@ export async function GET(
       return NextResponse.json({ error: 'Invalid path' }, { status: 400 });
     }
 
+    // Confidential stems protection: Stems ZIP archives require commercial license order clearance
+    if (fullKey.startsWith('stems/')) {
+      return NextResponse.json(
+        { error: 'Forbidden: Confidential trackout stems require verified commercial license' },
+        { status: 403 }
+      );
+    }
+
     const isDownload = req.nextUrl.searchParams.get('download') === '1' || req.nextUrl.searchParams.get('download') === 'true';
     const customFilename = req.nextUrl.searchParams.get('filename') || fullKey.split('/').pop() || 'caution-track.mp3';
 

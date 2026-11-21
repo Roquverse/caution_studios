@@ -25,11 +25,11 @@ export async function POST(req: NextRequest) {
     }
 
     const data = paystackRes.data || {};
+    const isProd = process.env.NODE_ENV === 'production';
+    const isDevMockAllowed = !isProd && !process.env.PAYSTACK_SECRET_KEY;
     const isSuccess =
       data.status === 'success' ||
-      !process.env.PAYSTACK_SECRET_KEY ||
-      reference.startsWith('demo_ref_') ||
-      reference.startsWith('test_');
+      (isDevMockAllowed && (reference.startsWith('demo_ref_') || reference.startsWith('test_')));
 
     if (!isSuccess) {
       return NextResponse.json(

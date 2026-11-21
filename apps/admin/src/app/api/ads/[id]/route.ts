@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServiceRoleClient } from '../../../../lib/supabaseClient';
+import { verifyAdminRequest } from '../../../../lib/adminAuth';
 
 export const dynamic = 'force-dynamic';
 
@@ -8,6 +9,11 @@ export async function PATCH(
   { params }: { params: { id: string } }
 ) {
   try {
+    const authCheck = await verifyAdminRequest(req);
+    if (!authCheck.isAdmin) {
+      return authCheck.errorResponse!;
+    }
+
     const id = params.id;
     if (!id) {
       return NextResponse.json({ error: 'Missing campaign id' }, { status: 400 });
@@ -58,6 +64,11 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   try {
+    const authCheck = await verifyAdminRequest(req);
+    if (!authCheck.isAdmin) {
+      return authCheck.errorResponse!;
+    }
+
     const id = params.id;
     if (!id) {
       return NextResponse.json({ error: 'Missing campaign id' }, { status: 400 });

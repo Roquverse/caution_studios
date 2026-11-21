@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
 import { getServiceRoleClient } from '../../../lib/supabaseClient';
+import { verifyAdminRequest } from '../../../lib/adminAuth';
 
 export const dynamic = 'force-dynamic';
 
@@ -111,6 +112,11 @@ export async function GET() {
 // POST /api/genres - Add a new genre
 export async function POST(req: NextRequest) {
   try {
+    const authCheck = await verifyAdminRequest(req);
+    if (!authCheck.isAdmin) {
+      return authCheck.errorResponse!;
+    }
+
     const body = await req.json();
     const name = body.name?.trim();
     const description = body.description?.trim() || '';
@@ -150,6 +156,11 @@ export async function POST(req: NextRequest) {
 // PATCH /api/genres - Rename or update genre
 export async function PATCH(req: NextRequest) {
   try {
+    const authCheck = await verifyAdminRequest(req);
+    if (!authCheck.isAdmin) {
+      return authCheck.errorResponse!;
+    }
+
     const body = await req.json();
     const { oldName, name, description } = body;
 
@@ -192,6 +203,11 @@ export async function PATCH(req: NextRequest) {
 // DELETE /api/genres - Delete a genre
 export async function DELETE(req: NextRequest) {
   try {
+    const authCheck = await verifyAdminRequest(req);
+    if (!authCheck.isAdmin) {
+      return authCheck.errorResponse!;
+    }
+
     const { searchParams } = new URL(req.url);
     const name = searchParams.get('name');
 

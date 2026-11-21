@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServiceRoleClient } from '../../../../lib/supabaseClient';
 import { deleteFromR2 } from '../../../../lib/r2Server';
+import { verifyAdminRequest } from '../../../../lib/adminAuth';
 
 // GET /api/tracks/[id]
 export async function GET(
@@ -8,6 +9,11 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
+    const authCheck = await verifyAdminRequest(req);
+    if (!authCheck.isAdmin) {
+      return authCheck.errorResponse!;
+    }
+
     const supabase = getServiceRoleClient();
     const { data: beat, error } = await supabase
       .from('beats')
@@ -31,6 +37,11 @@ export async function PATCH(
   { params }: { params: { id: string } }
 ) {
   try {
+    const authCheck = await verifyAdminRequest(req);
+    if (!authCheck.isAdmin) {
+      return authCheck.errorResponse!;
+    }
+
     const supabase = getServiceRoleClient();
     const body = await req.json();
 
@@ -106,6 +117,11 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   try {
+    const authCheck = await verifyAdminRequest(req);
+    if (!authCheck.isAdmin) {
+      return authCheck.errorResponse!;
+    }
+
     const supabase = getServiceRoleClient();
 
     // 1. Fetch keys to clean up storage

@@ -1,11 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServiceRoleClient } from '../../../lib/supabaseClient';
 import { sendAdminNotification } from '../../../lib/emailNotifier';
+import { verifyAdminRequest } from '../../../lib/adminAuth';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(req: NextRequest) {
   try {
+    const authCheck = await verifyAdminRequest(req);
+    if (!authCheck.isAdmin) {
+      return authCheck.errorResponse!;
+    }
+
     const supabase = getServiceRoleClient();
     const searchParams = req.nextUrl.searchParams;
     const status = searchParams.get('status');
@@ -35,6 +41,11 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
+    const authCheck = await verifyAdminRequest(req);
+    if (!authCheck.isAdmin) {
+      return authCheck.errorResponse!;
+    }
+
     const body = await req.json();
     const {
       songTitle,

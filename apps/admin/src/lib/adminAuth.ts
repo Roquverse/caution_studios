@@ -126,7 +126,6 @@ export async function verifyAdminRequest(req: NextRequest): Promise<AdminAuthRes
       if (
         userRoles.includes('admin') ||
         userRoles.includes('superadmin') ||
-        userRoles.includes('producer') ||
         handle.includes('admin') ||
         handle === 'arakunrincole' ||
         handle === 'olajide_samuel_ojo' ||
@@ -140,11 +139,9 @@ export async function verifyAdminRequest(req: NextRequest): Promise<AdminAuthRes
       appMeta.is_admin === true ||
       appMeta.role === 'admin' ||
       appMeta.role === 'superadmin' ||
-      appMeta.role === 'producer' ||
       userMeta.is_admin === true ||
       userMeta.role === 'admin' ||
       userMeta.primary_role === 'admin' ||
-      userMeta.primary_role === 'producer' ||
       email === 'admin@cautionstudioz.com' ||
       email === 'admin@caution.studio' ||
       email === 'damicoledj@gmail.com' ||

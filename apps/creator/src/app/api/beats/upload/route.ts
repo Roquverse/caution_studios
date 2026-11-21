@@ -64,31 +64,30 @@ export async function POST(req: NextRequest) {
 
     const supabase = getServiceRoleClient();
 
-    // 1. Resolve Producer ID
-    let producerId = bodyData.producerId;
-
-    if (!producerId) {
-      // Try to read auth token from header or cookie
-      const authHeader = req.headers.get('authorization');
-      if (authHeader) {
-        const token = authHeader.replace(/^Bearer\s+/i, '');
-        const { data: { user } } = await publicSupabase.auth.getUser(token);
-        if (user) producerId = user.id;
-      }
+    // 1. Resolve Producer ID strictly from authenticated session
+    let authenticatedUserId: string | null = null;
+    const authHeader = req.headers.get('authorization');
+    if (authHeader) {
+      const token = authHeader.replace(/^Bearer\s+/i, '');
+      const { data: { user } } = await publicSupabase.auth.getUser(token);
+      if (user) authenticatedUserId = user.id;
     }
 
-    if (!producerId) {
+    if (!authenticatedUserId) {
       const cookieHeader = req.headers.get('cookie') || '';
       const match = cookieHeader.match(/sb-token=([^;]+)/);
       if (match) {
         const { data: { user } } = await publicSupabase.auth.getUser(match[1]);
-        if (user) producerId = user.id;
+        if (user) authenticatedUserId = user.id;
       }
     }
 
+    // Always prioritize verified authenticated user id to prevent spoofing
+    const producerId = authenticatedUserId || (process.env.NODE_ENV !== 'production' ? bodyData.producerId : null);
+
     if (!producerId) {
       return NextResponse.json(
-        { error: 'Unauthorized: Producer ID is required to upload beats' },
+        { error: 'Unauthorized: Producer authentication required to upload beats' },
         { status: 401 }
       );
     }

@@ -16,6 +16,14 @@ export async function GET(
       return NextResponse.json({ error: 'Invalid path' }, { status: 400 });
     }
 
+    // Confidential stems protection: Stems ZIP archives require commercial license order clearance
+    if (cleanKey.startsWith('stems/')) {
+      return NextResponse.json(
+        { error: 'Forbidden: Confidential trackout stems require verified commercial license' },
+        { status: 403 }
+      );
+    }
+
     // If an R2 public CDN / custom domain is configured, redirect directly to Cloudflare
     // to bypass Vercel Fast Origin Transfer completely (0 Vercel bandwidth used).
     const publicR2 = process.env.NEXT_PUBLIC_R2_PUBLIC_URL || process.env.R2_PUBLIC_URL || 'https://media.cautionstudioz.com';

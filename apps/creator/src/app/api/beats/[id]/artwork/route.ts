@@ -34,6 +34,13 @@ export async function POST(
       }
     }
 
+    if (!producerId) {
+      return NextResponse.json(
+        { error: 'Unauthorized: Authentication required to update beat artwork' },
+        { status: 401 }
+      );
+    }
+
     // 2. Fetch the target beat
     const { data: beat, error: beatFetchErr } = await supabase
       .from('beats')
@@ -45,10 +52,10 @@ export async function POST(
       return NextResponse.json({ error: 'Beat not found' }, { status: 404 });
     }
 
-    // 3. Verify ownership (if user authenticated)
-    if (producerId && beat.producer_id && beat.producer_id !== producerId) {
+    // 3. Verify ownership (strictly enforce creator match)
+    if (beat.producer_id && beat.producer_id !== producerId) {
       return NextResponse.json(
-        { error: 'Unauthorized: You can only update artwork for your own beats' },
+        { error: 'Forbidden: You can only update artwork for your own beats' },
         { status: 403 }
       );
     }

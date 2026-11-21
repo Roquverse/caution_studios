@@ -87,8 +87,7 @@ export async function POST(req: NextRequest) {
         details: {
           email,
           requestedAt: new Date().toISOString(),
-          resetCode: otpCode || 'N/A',
-          redirectTarget: resetUrl
+          resetCode: '[REDACTED FOR SECURITY]'
         }
       }).catch(() => {});
     } else {
