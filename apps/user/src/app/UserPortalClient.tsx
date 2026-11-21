@@ -3051,17 +3051,19 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
         isOpen={isAdModalOpen}
         adType={adModalType}
         pendingDownloadTitle={adModalType === 'download' ? (pendingDownloadTrackRef.current?.title || null) : null}
-        onClose={() => {
+        onClose={(unlocked) => {
           setIsAdModalOpen(false);
           // 1. If ad was listened to in order to download a beat:
           if (adModalType === 'download' && pendingDownloadTrackRef.current) {
             const trackToDownload = pendingDownloadTrackRef.current;
             pendingDownloadTrackRef.current = null;
-            setRewardNotification(
-              `🎉 15s ad completed! +1 bonus download unlocked. Downloading "${trackToDownload.title}" now!`
-            );
-            handleDownload(trackToDownload);
-            setTimeout(() => setRewardNotification(null), 6000);
+            if (unlocked) {
+              setRewardNotification(
+                `🎉 Sponsor visit & ad verified! +1 bonus download unlocked. Downloading "${trackToDownload.title}" now!`
+              );
+              handleDownload(trackToDownload);
+              setTimeout(() => setRewardNotification(null), 6000);
+            }
           }
           // 2. If ad was triggered by playing a song:
           else if (pendingTrackRef.current) {
