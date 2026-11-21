@@ -11,7 +11,7 @@ export async function GET(
       return NextResponse.json({ error: 'Missing object key' }, { status: 400 });
     }
 
-    const fullKey = rawKey.replace(/\\/g, '/');
+    const fullKey = decodeURIComponent(rawKey.replace(/\\/g, '/'));
     if (fullKey.includes('..') || fullKey.startsWith('/')) {
       return NextResponse.json({ error: 'Invalid path' }, { status: 400 });
     }

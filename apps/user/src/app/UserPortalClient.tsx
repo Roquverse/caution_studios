@@ -1025,30 +1025,22 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
         mediaKey = sourceUrl || `masters/${track.id}.${ext}`;
       }
 
-      const downloadEndpoint = `/api/media/${mediaKey}?download=1&filename=${encodeURIComponent(filename)}`;
+      // Ensure media key is properly encoded for spaces and special characters
+      const encodedMediaKey = mediaKey.split('/').map(encodeURIComponent).join('/');
+      const downloadEndpoint = `/api/media/${encodedMediaKey}?download=1&filename=${encodeURIComponent(filename)}`;
 
-      // 1. Try client-side Blob download first (guarantees exact filename on desktop and mobile)
-      let blobSucceeded = false;
-      try {
-        const response = await fetch(downloadEndpoint);
-        if (response.ok) {
-          const blob = await response.blob();
-          const blobUrl = window.URL.createObjectURL(blob);
-          const link = document.createElement('a');
-          link.href = blobUrl;
-          link.download = filename;
-          document.body.appendChild(link);
-          link.click();
-          document.body.removeChild(link);
-          setTimeout(() => window.URL.revokeObjectURL(blobUrl), 30000);
-          blobSucceeded = true;
-        }
-      } catch (blobErr) {
-        console.warn('Direct blob download failed, falling back to presigned stream:', blobErr);
-      }
+      // Detect iOS Safari / WebKit: blob: URLs cannot be loaded by iOS AVPlayer in standalone tabs
+      // which results in the crossed-out play icon if the user clicks "View".
+      // Navigating directly to downloadEndpoint allows iOS Safari to either save to Files or
+      // view/stream with native QuickTime/AVPlayer support.
+      const isIOS = typeof navigator !== 'undefined' && (
+        /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+        (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+      );
 
-      // 2. Fallback: Direct click to /api/media which sends R2 presigned URL with ResponseContentDisposition
-      if (!blobSucceeded) {
+      if (isIOS) {
+        window.location.href = downloadEndpoint;
+      } else {
         const link = document.createElement('a');
         link.href = downloadEndpoint;
         link.download = filename;

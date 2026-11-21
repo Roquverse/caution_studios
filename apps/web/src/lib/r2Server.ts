@@ -37,10 +37,13 @@ export async function getPresignedDownloadUrl(key: string, filename?: string, ex
     .replace(/[/\\?%*:|"<>#]/g, '')
     .trim();
 
+  const asciiFilename = safeFilename.replace(/[^\x20-\x7E]/g, '_').replace(/"/g, '');
+  const encodedFilename = encodeURIComponent(safeFilename);
+
   const command = new GetObjectCommand({
     Bucket: R2_BUCKET,
     Key: key,
-    ResponseContentDisposition: `attachment; filename="${safeFilename}"; filename*=UTF-8''${encodeURIComponent(safeFilename)}"`
+    ResponseContentDisposition: `attachment; filename="${asciiFilename}"; filename*=UTF-8''${encodedFilename}`
   });
   return await getSignedUrl(r2, command, { expiresIn });
 }
