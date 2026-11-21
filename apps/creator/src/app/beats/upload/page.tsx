@@ -17,7 +17,8 @@ import {
   Loader2,
   Sliders,
   Sparkles,
-  Info
+  Info,
+  ShieldCheck
 } from 'lucide-react';
 
 export default function BeatUploadPage() {
@@ -157,8 +158,8 @@ export default function BeatUploadPage() {
         masterAudioKey = await uploadFileDirectly(audioFileObj, 'audio', title.trim(), session?.access_token);
       }
 
-      // 2. Upload Stems directly to R2 if selected
-      if (stemsFileObj) {
+      // 2. Upload Stems directly to R2 if selected (Only for Paid beats)
+      if (!isFreeBeat && stemsFileObj) {
         setUploadStep(`Uploading stems archive (${(stemsFileObj.size / (1024 * 1024)).toFixed(1)} MB)...`);
         stemsKey = await uploadFileDirectly(stemsFileObj, 'stems', title.trim(), session?.access_token);
       }
@@ -326,46 +327,58 @@ export default function BeatUploadPage() {
               </label>
             </div>
 
-            {/* Trackout Stems ZIP */}
-            <div>
-              <label className="text-xs font-medium text-zinc-300 mb-1.5 block">
-                Trackout Stems Archive (.zip) (Required for Premium & Exclusive)
-              </label>
-              <label
-                htmlFor="stems-zip-input"
-                className="flex flex-col items-center border border-dashed border-zinc-700 hover:border-[#e53935] active:border-[#e53935] rounded-lg p-5 text-center cursor-pointer transition-colors bg-zinc-950/60 select-none"
-              >
-                <FileArchive className="h-6 w-6 text-zinc-500 mb-2" />
-                <span className="text-xs font-medium text-zinc-200 block">
-                  {stemsFileObj ? stemsFileObj.name : 'Tap or click to upload stems archive'}
-                </span>
-                {stemsFileObj && (
-                  <span className="text-[10px] text-[#e53935] block mt-1 font-mono">
-                    {(stemsFileObj.size / (1024 * 1024)).toFixed(1)} MB selected ✓
+            {/* Trackout Stems ZIP — ONLY shown for Paid Beats; hidden for Free Beats so producers don't post zip files for free */}
+            {!isFreeBeat ? (
+              <div className="animate-in fade-in duration-200">
+                <label className="text-xs font-medium text-zinc-300 mb-1.5 block">
+                  Trackout Stems Archive (.zip) (Required for Premium &amp; Exclusive)
+                </label>
+                <label
+                  htmlFor="stems-zip-input"
+                  className="flex flex-col items-center border border-dashed border-zinc-700 hover:border-[#e53935] active:border-[#e53935] rounded-lg p-5 text-center cursor-pointer transition-colors bg-zinc-950/60 select-none"
+                >
+                  <FileArchive className="h-6 w-6 text-zinc-500 mb-2" />
+                  <span className="text-xs font-medium text-zinc-200 block">
+                    {stemsFileObj ? stemsFileObj.name : 'Tap or click to upload stems archive'}
                   </span>
-                )}
-                <span className="text-[10px] text-zinc-500 block mt-1">
-                  Kick, Snare, Hi-Hats, Bass, Melodies (.zip up to 1GB)
-                </span>
-                <input
-                  type="file"
-                  accept=".zip,.rar,.tar,application/zip,application/x-zip-compressed,multipart/x-zip,application/octet-stream"
-                  onChange={(e) => {
-                    const f = e.target.files?.[0];
-                    if (f && f.size > 1024 * 1024 * 1024) {
-                      alert('Stems archive exceeds maximum allowed size of 1GB.');
-                      return;
-                    }
-                    setStemsFileObj(f || null);
-                  }}
-                  className="sr-only"
-                  id="stems-zip-input"
-                />
-                <span className="mt-3 inline-block px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-xs font-medium text-zinc-200 rounded pointer-events-none">
-                  Choose ZIP Archive
-                </span>
-              </label>
-            </div>
+                  {stemsFileObj && (
+                    <span className="text-[10px] text-[#e53935] block mt-1 font-mono">
+                      {(stemsFileObj.size / (1024 * 1024)).toFixed(1)} MB selected ✓
+                    </span>
+                  )}
+                  <span className="text-[10px] text-zinc-500 block mt-1">
+                    Kick, Snare, Hi-Hats, Bass, Melodies (.zip up to 1GB)
+                  </span>
+                  <input
+                    type="file"
+                    accept=".zip,.rar,.tar,application/zip,application/x-zip-compressed,multipart/x-zip,application/octet-stream"
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      if (f && f.size > 1024 * 1024 * 1024) {
+                        alert('Stems archive exceeds maximum allowed size of 1GB.');
+                        return;
+                      }
+                      setStemsFileObj(f || null);
+                    }}
+                    className="sr-only"
+                    id="stems-zip-input"
+                  />
+                  <span className="mt-3 inline-block px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-xs font-medium text-zinc-200 rounded pointer-events-none">
+                    Choose ZIP Archive
+                  </span>
+                </label>
+              </div>
+            ) : (
+              <div className="p-3.5 rounded-xl bg-emerald-500/5 border border-emerald-500/20 flex items-start gap-2.5 text-left animate-in fade-in duration-200">
+                <ShieldCheck className="h-4 w-4 text-emerald-400 shrink-0 mt-0.5" />
+                <div>
+                  <span className="text-xs font-bold text-emerald-300 block">Stems Archive (.zip) Protected</span>
+                  <p className="text-[11px] text-zinc-400 mt-0.5 leading-relaxed">
+                    Stems ZIP upload is disabled for Free Beats. Only the audio master is distributed so your project trackouts remain 100% confidential.
+                  </p>
+                </div>
+              </div>
+            )}
 
             {/* Cover Artwork */}
             <div className="pt-2 border-t border-zinc-800/80">
@@ -489,7 +502,10 @@ export default function BeatUploadPage() {
 
               <button
                 type="button"
-                onClick={() => setIsFreeBeat(true)}
+                onClick={() => {
+                  setIsFreeBeat(true);
+                  setStemsFileObj(null);
+                }}
                 className={`py-2 px-3 rounded-md text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
                   isFreeBeat
                     ? 'bg-emerald-500 text-zinc-950 shadow-sm'

@@ -654,7 +654,7 @@ export default function AdminUsersPage() {
                               >
                                 <option value="free">Plan: Free</option>
                                 <option value="plus">Plan: Caution Plus (₦3k)</option>
-                                <option value="pro">Plan: Caution Pro (₦30k)</option>
+                                <option value="pro">Plan: Caution Pro (₦10k)</option>
                               </select>
                               <ChevronDown className="h-3.5 w-3.5 text-zinc-400 absolute right-2 top-2 pointer-events-none" />
                             </div>

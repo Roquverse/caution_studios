@@ -149,6 +149,7 @@ export default function AdminTracksPage() {
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [coverPreviewUrl, setCoverPreviewUrl] = useState<string | null>(null);
   const [stemsFile, setStemsFile] = useState<File | null>(null);
+  const [isFreeTrack, setIsFreeTrack] = useState(false);
 
   // Edit Modal & Price Editing
   const [editingTrack, setEditingTrack] = useState<BeatTrack | null>(null);
@@ -355,9 +356,9 @@ export default function AdminTracksPage() {
       setUploadProgress(0);
       const masterAudioKey = await uploadFileDirectly(audioFile, 'audio', title.trim(), authToken);
 
-      // 2. Upload Stems ZIP directly to R2 if selected
+      // 2. Upload Stems ZIP directly to R2 if selected (Only for paid tracks)
       let stemsKey: string | null = null;
-      if (stemsFile) {
+      if (!isFreeTrack && stemsFile) {
         const stemsSizeMb = (stemsFile.size / (1024 * 1024)).toFixed(1);
         setUploadStep(`Uploading stems ZIP archive (${stemsSizeMb} MB)...`);
         setUploadProgress(0);
@@ -377,8 +378,8 @@ export default function AdminTracksPage() {
       setUploadStep('Publishing track to master catalog...');
       setUploadProgress(100);
 
-      const finalPremium = typeof premiumPrice === 'number' && premiumPrice > 0 ? premiumPrice : 50000;
-      const finalExclusive = typeof exclusivePrice === 'number' && exclusivePrice > 0 ? exclusivePrice : 200000;
+      const finalPremium = isFreeTrack ? 0 : (typeof premiumPrice === 'number' && premiumPrice > 0 ? premiumPrice : 50000);
+      const finalExclusive = isFreeTrack ? 0 : (typeof exclusivePrice === 'number' && exclusivePrice > 0 ? exclusivePrice : 200000);
 
       const payload = {
         title: title.trim(),
@@ -1167,41 +1168,58 @@ export default function AdminTracksPage() {
                   </label>
                 </div>
 
-                {/* Stems ZIP */}
-                <div>
-                  <label className="block text-xs font-bold text-gray-300 mb-1">
-                    3. Stems ZIP Archive (Optional)
-                  </label>
-                  <label
-                    htmlFor="stems-archive-file"
-                    className={`border border-dashed rounded-xl p-3 text-center cursor-pointer transition-all flex items-center gap-2.5 ${stemsFile
-                      ? 'border-[#e53935]/60 bg-white/[0.04]'
-                      : 'border-white/[0.1] hover:border-white/[0.2] bg-white/[0.02]'
-                      }`}
-                  >
-                    <input
-                      id="stems-archive-file"
-                      type="file"
-                      accept=".zip,.rar"
-                      className="hidden"
-                      onChange={(e) => {
-                        if (e.target.files && e.target.files[0]) {
-                          setStemsFile(e.target.files[0]);
-                        }
-                      }}
-                      disabled={uploading}
-                    />
-                    <div className="h-10 w-10 rounded-lg bg-white/[0.05] flex items-center justify-center text-gray-500 shrink-0">
-                      <Layers className="h-5 w-5" />
+                {/* Stems ZIP - Only shown for paid tracks; hidden for free download */}
+                {!isFreeTrack ? (
+                  <div>
+                    <label className="block text-xs font-bold text-gray-300 mb-1">
+                      3. Stems ZIP Archive (Optional)
+                    </label>
+                    <label
+                      htmlFor="stems-archive-file"
+                      className={`border border-dashed rounded-xl p-3 text-center cursor-pointer transition-all flex items-center gap-2.5 ${stemsFile
+                        ? 'border-[#e53935]/60 bg-white/[0.04]'
+                        : 'border-white/[0.1] hover:border-white/[0.2] bg-white/[0.02]'
+                        }`}
+                    >
+                      <input
+                        id="stems-archive-file"
+                        type="file"
+                        accept=".zip,.rar"
+                        className="hidden"
+                        onChange={(e) => {
+                          if (e.target.files && e.target.files[0]) {
+                            setStemsFile(e.target.files[0]);
+                          }
+                        }}
+                        disabled={uploading}
+                      />
+                      <div className="h-10 w-10 rounded-lg bg-white/[0.05] flex items-center justify-center text-gray-500 shrink-0">
+                        <Layers className="h-5 w-5" />
+                      </div>
+                      <div className="text-left min-w-0">
+                        <span className="text-xs font-bold text-white block truncate">
+                          {stemsFile ? stemsFile.name : 'Select Stems'}
+                        </span>
+                        <span className="text-[10px] text-gray-400 font-mono">ZIP archive</span>
+                      </div>
+                    </label>
+                  </div>
+                ) : (
+                  <div>
+                    <label className="block text-xs font-bold text-gray-400 mb-1">
+                      3. Stems ZIP Archive
+                    </label>
+                    <div className="border border-emerald-500/20 bg-emerald-500/5 rounded-xl p-3 flex items-center gap-2.5">
+                      <div className="h-10 w-10 rounded-lg bg-emerald-500/10 flex items-center justify-center text-emerald-400 shrink-0">
+                        <CheckCircle className="h-5 w-5" />
+                      </div>
+                      <div className="text-left min-w-0">
+                        <span className="text-xs font-bold text-emerald-300 block">Stems ZIP Disabled</span>
+                        <span className="text-[10px] text-gray-400 font-mono">Free Download (stems protected)</span>
+                      </div>
                     </div>
-                    <div className="text-left min-w-0">
-                      <span className="text-xs font-bold text-white block truncate">
-                        {stemsFile ? stemsFile.name : 'Select Stems'}
-                      </span>
-                      <span className="text-[10px] text-gray-400 font-mono">ZIP archive</span>
-                    </div>
-                  </label>
-                </div>
+                  </div>
+                )}
               </div>
 
               {/* Title & Artist */}
@@ -1289,36 +1307,77 @@ export default function AdminTracksPage() {
                 </div>
               </div>
 
-              {/* License Pricing Grid */}
-              <div className="rounded-2xl border border-white/[0.06] p-3.5 bg-white/[0.02] space-y-2">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-gray-400 block">
-                  License Pricing (NGN ₦)
-                </span>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-[10px] text-gray-400 font-bold mb-0.5">Premium (₦)</label>
-                    <input
-                      type="number"
-                      step="1000"
-                      value={premiumPrice}
-                      onChange={(e) => setPremiumPrice(e.target.value === '' ? '' : parseFloat(e.target.value))}
-                      placeholder="50000"
-                      className="w-full text-xs rounded-xl border border-white/[0.06] p-2 bg-[#16181d] text-white font-mono placeholder:text-gray-500 focus:outline-none focus:border-[#e53935]/60"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] text-gray-400 font-bold mb-0.5">Exclusive (₦)</label>
-                    <input
-                      type="number"
-                      step="5000"
-                      value={exclusivePrice}
-                      onChange={(e) => setExclusivePrice(e.target.value === '' ? '' : parseFloat(e.target.value))}
-                      placeholder="200000"
-                      className="w-full text-xs rounded-xl border border-white/[0.06] p-2 bg-[#16181d] text-white font-mono placeholder:text-gray-500 focus:outline-none focus:border-[#e53935]/60"
-                    />
-                  </div>
+              {/* Distribution Model: Paid vs Free Download */}
+              <div className="flex items-center justify-between p-3 rounded-xl bg-white/[0.02] border border-white/[0.06]">
+                <div>
+                  <span className="text-xs font-bold text-white block">Distribution Model</span>
+                  <span className="text-[10px] text-gray-400">Choose between Free Download or Commercial Licensing</span>
+                </div>
+                <div className="flex items-center gap-1.5 p-1 rounded-lg bg-[#16181d] border border-white/[0.06]">
+                  <button
+                    type="button"
+                    onClick={() => setIsFreeTrack(false)}
+                    className={`px-3 py-1 rounded-md text-xs font-bold transition-all cursor-pointer ${!isFreeTrack ? 'bg-[#e53935] text-white shadow-sm' : 'text-gray-400 hover:text-white'
+                      }`}
+                  >
+                    Paid Beat
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsFreeTrack(true);
+                      setStemsFile(null);
+                      setPremiumPrice('');
+                      setExclusivePrice('');
+                    }}
+                    className={`px-3 py-1 rounded-md text-xs font-bold transition-all cursor-pointer ${isFreeTrack ? 'bg-emerald-500 text-black shadow-sm' : 'text-gray-400 hover:text-white'
+                      }`}
+                  >
+                    Free Download
+                  </button>
                 </div>
               </div>
+
+              {/* License Pricing Grid - Only shown for Paid beats */}
+              {!isFreeTrack ? (
+                <div className="rounded-2xl border border-white/[0.06] p-3.5 bg-white/[0.02] space-y-2 animate-in fade-in duration-200">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-gray-400 block">
+                    License Pricing (NGN ₦)
+                  </span>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[10px] text-gray-400 font-bold mb-0.5">Premium (₦)</label>
+                      <input
+                        type="number"
+                        step="1000"
+                        value={premiumPrice}
+                        onChange={(e) => setPremiumPrice(e.target.value === '' ? '' : parseFloat(e.target.value))}
+                        placeholder="50000"
+                        className="w-full text-xs rounded-xl border border-white/[0.06] p-2 bg-[#16181d] text-white font-mono placeholder:text-gray-500 focus:outline-none focus:border-[#e53935]/60"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] text-gray-400 font-bold mb-0.5">Exclusive (₦)</label>
+                      <input
+                        type="number"
+                        step="5000"
+                        value={exclusivePrice}
+                        onChange={(e) => setExclusivePrice(e.target.value === '' ? '' : parseFloat(e.target.value))}
+                        placeholder="200000"
+                        className="w-full text-xs rounded-xl border border-white/[0.06] p-2 bg-[#16181d] text-white font-mono placeholder:text-gray-500 focus:outline-none focus:border-[#e53935]/60"
+                      />
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="p-3 rounded-xl bg-emerald-500/5 border border-emerald-500/20 flex items-center justify-between text-left">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="h-4 w-4 text-emerald-400 shrink-0" />
+                    <span className="text-xs font-bold text-emerald-300">100% Free Download Enabled</span>
+                  </div>
+                  <span className="text-[10px] font-mono text-gray-400">Zero cost to listeners</span>
+                </div>
+              )}
 
               {/* Actions */}
               <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-white/[0.06]">
