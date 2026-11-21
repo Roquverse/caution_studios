@@ -66,8 +66,13 @@ export async function GET(req: NextRequest) {
         totalSalesNgn: 0,
         totalPlaysCount,
         totalDownloadsCount,
+        monthlyDownloadsCount: 0,
+        monthlyDownloadThreshold: 10000,
+        monthlyThresholdPct: 0,
+        monthlyDownloadsRemaining: 10000,
+        currentMonthPeriod: new Date().toISOString().slice(0, 7) + '-01',
         downloadRewardNgn: 0,
-        thresholdRemaining: Math.max(0, 10000 - (totalPlaysCount + totalDownloadsCount)),
+        thresholdRemaining: 10000,
         trialDaysRemaining: 85,
         beats,
         purchases: []
@@ -131,32 +136,45 @@ export async function GET(req: NextRequest) {
 
     const beats = dbBeats || [];
 
-    // 3. Calculate Plays, Downloads & Pay Threshold Metrics
+    // 3. Calculate Plays, Downloads & Monthly Incentive Metrics (Collective across all uploads)
     const totalPlaysCount = beats.reduce((acc, b) => acc + (Number(b.play_count) || 0), 0);
-    let totalDownloadsCount = beats.reduce(
+    const totalDownloadsCount = beats.reduce(
       (acc, b) => acc + (Number(b.free_commercial_downloads_count || b.download_count) || 0),
       0
     );
 
+    const currentMonthPeriod = new Date().toISOString().slice(0, 7) + '-01'; // e.g. "2026-11-01"
+
     const { data: incentiveRows } = await supabase
       .from('producer_download_incentives')
-      .select('reward_amount_ngn, qualifying_downloads')
-      .eq('producer_id', userId);
+      .select('*')
+      .eq('producer_id', userId)
+      .order('month_period', { ascending: false });
 
-    const incReward = (incentiveRows || []).reduce((acc, r) => acc + Number(r.reward_amount_ngn || 0), 0);
-    const incDownloads = (incentiveRows || []).reduce((acc, r) => acc + Number(r.qualifying_downloads || 0), 0);
-    if (incDownloads > totalDownloadsCount) {
-      totalDownloadsCount = incDownloads;
-    }
+    // Find current month incentive tracking record
+    const currentMonthRecord = (incentiveRows || []).find(
+      (r: any) => r.month_period && r.month_period.startsWith(currentMonthPeriod.slice(0, 7))
+    );
 
+    // Monthly downloads count resets to 0 every month
+    const monthlyDownloadsCount = currentMonthRecord
+      ? Number(currentMonthRecord.qualifying_downloads || 0)
+      : 0;
+
+    const monthlyDownloadThreshold = 10000;
+    const monthlyThresholdPct = Math.min(
+      100,
+      Number(((monthlyDownloadsCount / monthlyDownloadThreshold) * 100).toFixed(2))
+    );
+    const monthlyDownloadsRemaining = Math.max(0, monthlyDownloadThreshold - monthlyDownloadsCount);
+
+    // Total incentive rewards across all monthly cycles
+    const totalIncentiveRewardsNgn = (incentiveRows || []).reduce(
+      (acc: number, r: any) => acc + Number(r.reward_amount_ngn || 0),
+      0
+    );
+    const downloadRewardNgn = totalIncentiveRewardsNgn;
     const combinedActivityCount = totalPlaysCount + totalDownloadsCount;
-    const payThreshold = 10000;
-    const playsThresholdPct = Math.min(100, Number(((totalPlaysCount / payThreshold) * 100).toFixed(2)));
-    const downloadsThresholdPct = Math.min(100, Number(((totalDownloadsCount / payThreshold) * 100).toFixed(2)));
-    const combinedThresholdPct = Math.min(100, Number(((combinedActivityCount / payThreshold) * 100).toFixed(2)));
-    // Pay threshold rewards: Both plays AND downloads count towards the ₦30,000 / 10k threshold
-    const computedReward = Math.floor(combinedActivityCount / payThreshold) * 30000;
-    const downloadRewardNgn = Math.max(computedReward, incReward);
 
     // 4. Fetch Order Items & Sales (via Service Role so RLS on orders never blocks producer visibility)
     let orderQuery = supabase
@@ -300,11 +318,13 @@ export async function GET(req: NextRequest) {
       beats: enrichedBeats,
       totalPlaysCount,
       totalDownloadsCount,
+      monthlyDownloadsCount,
+      monthlyDownloadThreshold,
+      monthlyThresholdPct,
+      monthlyDownloadsRemaining,
+      currentMonthPeriod,
       combinedActivityCount,
-      payThreshold,
-      playsThresholdPct,
-      downloadsThresholdPct,
-      combinedThresholdPct,
+      payThreshold: 10000,
       downloadRewardNgn,
       totalSalesEarningsNgn,
       totalEarningsNgn,

@@ -43,6 +43,7 @@ export default function PayoutsPage() {
   const [totalPaidOutNgn, setTotalPaidOutNgn] = useState(0);
   const [totalPlaysCount, setTotalPlaysCount] = useState(0);
   const [totalDownloadsCount, setTotalDownloadsCount] = useState(0);
+  const [monthlyDownloadsCount, setMonthlyDownloadsCount] = useState(0);
   const [payoutHistory, setPayoutHistory] = useState<PayoutRecord[]>([]);
 
   useEffect(() => {
@@ -95,6 +96,7 @@ export default function PayoutsPage() {
 
             setTotalPlaysCount(Number(payload.totalPlaysCount || 0));
             setTotalDownloadsCount(Number(payload.totalDownloadsCount || 0));
+            setMonthlyDownloadsCount(Number(payload.monthlyDownloadsCount || 0));
 
             const payouts = Array.isArray(payload.payouts) ? payload.payouts : [];
             const completedTotal = payouts
@@ -381,14 +383,14 @@ export default function PayoutsPage() {
             </div>
 
             <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-5 shadow-sm">
-              <span className="text-xs font-medium text-zinc-400 block">Plays &amp; Downloads Threshold</span>
+              <span className="text-xs font-medium text-zinc-400 block">Monthly Downloads Incentive</span>
               <div className="mt-2">
-                <span className="text-2xl font-bold font-mono text-[#e53935]">
-                  {(totalPlaysCount + totalDownloadsCount).toLocaleString()} / 10k
+                <span className="text-2xl font-bold font-mono text-emerald-400">
+                  {monthlyDownloadsCount.toLocaleString()} / 10k
                 </span>
               </div>
               <p className="text-[11px] text-amber-300 mt-1 font-mono">
-                {totalPlaysCount.toLocaleString()} plays · {totalDownloadsCount.toLocaleString()} downloads (₦30k / 10k)
+                {monthlyDownloadsCount.toLocaleString()} downloads this month (Collective across catalog · ₦30k reward)
               </p>
             </div>
 

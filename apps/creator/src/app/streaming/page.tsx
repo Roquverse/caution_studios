@@ -27,30 +27,21 @@ interface DownloadTrackRow {
   genre: string;
   plays: number;
   downloads: number;
-  combinedActivity: number;
-  progressPct: number;
-  earnedNgn: number;
+  sharePct: number;
 }
 
 export default function StreamingRoyaltiesPage() {
   const [loading, setLoading] = useState(true);
   const [totalPlaysCount, setTotalPlaysCount] = useState(0);
   const [totalDownloadsCount, setTotalDownloadsCount] = useState(0);
+  const [monthlyDownloadsCount, setMonthlyDownloadsCount] = useState(0);
+  const [monthlyThresholdPct, setMonthlyThresholdPct] = useState(0);
+  const [monthlyDownloadsRemaining, setMonthlyDownloadsRemaining] = useState(10000);
   const [rewardAmountNgn, setRewardAmountNgn] = useState(0);
   const [isVerified, setIsVerified] = useState(false);
   const [downloadTracks, setDownloadTracks] = useState<DownloadTrackRow[]>([]);
 
   const downloadThreshold = 10000;
-  const combinedActivityCount = Math.max(
-    totalPlaysCount,
-    totalDownloadsCount,
-    totalPlaysCount + totalDownloadsCount
-  );
-  const downloadProgressPct = Math.min(
-    100,
-    Math.round((combinedActivityCount / downloadThreshold) * 100)
-  );
-  const remainingActivity = Math.max(0, downloadThreshold - combinedActivityCount);
 
   useEffect(() => {
     let isMounted = true;
@@ -92,24 +83,25 @@ export default function StreamingRoyaltiesPage() {
             const totalDownloads = Number(payload.totalDownloadsCount || 0);
             setTotalPlaysCount(totalPlays);
             setTotalDownloadsCount(totalDownloads);
+            setMonthlyDownloadsCount(Number(payload.monthlyDownloadsCount || 0));
+            setMonthlyThresholdPct(Number(payload.monthlyThresholdPct || 0));
+            setMonthlyDownloadsRemaining(
+              Number(payload.monthlyDownloadsRemaining ?? Math.max(0, 10000 - Number(payload.monthlyDownloadsCount || 0)))
+            );
             setRewardAmountNgn(Number(payload.downloadRewardNgn || 0));
 
             if (Array.isArray(payload.beats)) {
               const mappedTracks: DownloadTrackRow[] = payload.beats.map((b: any) => {
                 const plays = Number(b.play_count || 0);
                 const dl = Number(b.free_commercial_downloads_count || b.download_count || 0);
-                const combined = plays + dl;
-                const progress = Math.min(100, Math.round((combined / 10000) * 100));
-                const earned = Math.floor(combined / 10000) * 30000;
+                const share = totalDownloads > 0 ? Math.round((dl / totalDownloads) * 100) : 0;
                 return {
                   id: b.id,
                   title: b.title,
                   genre: b.genre || 'Afrobeats',
                   plays,
                   downloads: dl,
-                  combinedActivity: combined,
-                  progressPct: progress,
-                  earnedNgn: earned
+                  sharePct: share
                 };
               });
               setDownloadTracks(mappedTracks);
@@ -154,18 +146,14 @@ export default function StreamingRoyaltiesPage() {
           const mappedTracks: DownloadTrackRow[] = userBeats.map((b) => {
             const plays = Number(b.play_count || 0);
             const dl = Number(b.free_commercial_downloads_count || b.download_count || 0);
-            const combined = plays + dl;
-            const progress = Math.min(100, Math.round((combined / 10000) * 100));
-            const earned = Math.floor(combined / 10000) * 30000;
+            const share = totalDownloads > 0 ? Math.round((dl / totalDownloads) * 100) : 0;
             return {
               id: b.id,
               title: b.title,
               genre: b.genre || 'Afrobeats',
               plays,
               downloads: dl,
-              combinedActivity: combined,
-              progressPct: progress,
-              earnedNgn: earned
+              sharePct: share
             };
           });
 
@@ -218,7 +206,7 @@ export default function StreamingRoyaltiesPage() {
               <div>
                 <div className="flex items-center gap-2">
                   <span className="text-xs font-mono uppercase tracking-wider text-zinc-400">
-                    Partner Pay Threshold
+                    Partner Monthly Incentive
                   </span>
                   {isVerified ? (
                     <span className="px-2.5 py-0.5 rounded-full bg-[#e53935]/20 border border-[#e53935]/40 text-xs font-bold text-[#e53935] flex items-center gap-1">
@@ -228,15 +216,15 @@ export default function StreamingRoyaltiesPage() {
                   ) : (
                     <span className="px-2.5 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/30 text-xs font-bold text-amber-300 flex items-center gap-1">
                       <Sparkles className="h-3.5 w-3.5" />
-                      <span>Pay Threshold Progress ({downloadProgressPct}%)</span>
+                      <span>Monthly Downloads Progress ({monthlyThresholdPct}%)</span>
                     </span>
                   )}
                 </div>
                 <h2 className="text-xl font-bold text-white mt-1.5">
-                  {isVerified ? 'You Are a Caution Verified Producer!' : '10,000 Plays & Downloads Pay Threshold'}
+                  {isVerified ? 'You Are a Caution Verified Producer!' : '10,000 Monthly Downloads Incentive'}
                 </h2>
                 <p className="text-xs text-zinc-400 mt-1 max-w-2xl leading-relaxed">
-                  Earn <strong>₦30,000 in royalties per 10,000 qualifying plays &amp; downloads</strong>. Once you reach the 10,000 threshold, you unlock the ₦30,000 reward, the official <strong>Verified Producer Badge</strong>, priority placement in the beat store, and direct studio messaging with recording artists.
+                  Earn <strong>₦30,000 in royalties per 10,000 collective downloads across all your uploads each month</strong>. Downloads count collectively from your entire catalog and reset to zero at the beginning of each calendar month. Initial lifetime plays and downloads are permanently preserved.
                 </p>
               </div>
 
@@ -246,7 +234,7 @@ export default function StreamingRoyaltiesPage() {
                   <span className="text-2xl font-bold font-mono text-[#e53935] block mt-0.5">
                     {totalPlaysCount.toLocaleString()}
                   </span>
-                  <span className="text-[11px] text-zinc-500 block">Live Streams</span>
+                  <span className="text-[11px] text-zinc-500 block">Lifetime Streams</span>
                 </div>
                 <div>
                   <span className="text-xs font-mono text-zinc-400 block">Total Downloads</span>
@@ -254,7 +242,16 @@ export default function StreamingRoyaltiesPage() {
                     {totalDownloadsCount.toLocaleString()}
                   </span>
                   <span className="text-[11px] text-zinc-500 block">
-                    Goal: {downloadThreshold.toLocaleString()}
+                    Lifetime Downloads
+                  </span>
+                </div>
+                <div>
+                  <span className="text-xs font-mono text-zinc-400 block">This Month</span>
+                  <span className="text-2xl font-bold font-mono text-white block mt-0.5">
+                    {monthlyDownloadsCount.toLocaleString()}
+                  </span>
+                  <span className="text-[11px] text-amber-300 block">
+                    / 10,000 monthly
                   </span>
                 </div>
               </div>
@@ -264,17 +261,17 @@ export default function StreamingRoyaltiesPage() {
             <div className="mt-5 space-y-2">
               <div className="flex justify-between items-center text-xs font-mono">
                 <span className="text-zinc-300">
-                  {isVerified || combinedActivityCount >= downloadThreshold
-                    ? '10,000 Pay Threshold Milestone Reached (100%)'
-                    : `${combinedActivityCount.toLocaleString()} / 10,000 (${totalPlaysCount.toLocaleString()} plays · ${totalDownloadsCount.toLocaleString()} downloads) — ${remainingActivity.toLocaleString()} remaining to unlock ₦30,000`}
+                  {isVerified || monthlyDownloadsCount >= downloadThreshold
+                    ? '10,000 Monthly Downloads Milestone Reached (100%)'
+                    : `${monthlyDownloadsCount.toLocaleString()} / 10,000 monthly downloads (Collective across all uploads) — ${monthlyDownloadsRemaining.toLocaleString()} remaining this month to unlock ₦30,000`}
                 </span>
-                <span className="text-white font-bold">{downloadProgressPct}%</span>
+                <span className="text-white font-bold">{monthlyThresholdPct}%</span>
               </div>
 
               <div className="w-full h-3 rounded-full bg-zinc-800 overflow-hidden">
                 <div
                   className="h-full bg-gradient-to-r from-[#e53935] to-emerald-400 transition-all duration-700 rounded-full"
-                  style={{ width: `${downloadProgressPct}%` }}
+                  style={{ width: `${Math.max(monthlyThresholdPct, monthlyDownloadsCount > 0 ? 2 : 0)}%` }}
                 />
               </div>
 
@@ -282,8 +279,8 @@ export default function StreamingRoyaltiesPage() {
                 <div className="flex items-center gap-2 p-2.5 rounded-md bg-zinc-950/60 border border-zinc-800/80">
                   <CheckCircle2 className="h-4 w-4 text-[#e53935] shrink-0" />
                   <div className="text-xs">
-                    <span className="font-semibold text-zinc-200 block">₦30,000 Cash Reward</span>
-                    <span className="text-zinc-500 text-[10px]">Paid on every 10k threshold</span>
+                    <span className="font-semibold text-zinc-200 block">₦30,000 Monthly Cash Reward</span>
+                    <span className="text-zinc-500 text-[10px]">Paid on 10k monthly collective downloads</span>
                   </div>
                 </div>
 
@@ -332,14 +329,14 @@ export default function StreamingRoyaltiesPage() {
 
             <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-4 shadow-sm">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-medium text-zinc-400">Pay Threshold Progress</span>
+                <span className="text-xs font-medium text-zinc-400">Monthly Incentive Progress</span>
                 <Award className="h-4 w-4 text-emerald-400" />
               </div>
               <div className="mt-2">
-                <span className="text-2xl font-bold font-mono text-white">{downloadProgressPct}%</span>
+                <span className="text-2xl font-bold font-mono text-white">{monthlyThresholdPct}%</span>
               </div>
               <p className="text-[11px] text-amber-300 mt-1">
-                {combinedActivityCount.toLocaleString()} / 10,000 threshold
+                {monthlyDownloadsCount.toLocaleString()} / 10,000 monthly downloads
               </p>
             </div>
 
@@ -378,10 +375,10 @@ export default function StreamingRoyaltiesPage() {
                     <tr>
                       <th className="py-2.5 px-3">Track Title</th>
                       <th className="py-2.5 px-3">Genre</th>
-                      <th className="py-2.5 px-3 text-center">Plays</th>
-                      <th className="py-2.5 px-3 text-center">Downloads</th>
-                      <th className="py-2.5 px-3 text-center">Pay Threshold (/ 10,000)</th>
-                      <th className="py-2.5 px-3 text-right">Incentive Reward</th>
+                      <th className="py-2.5 px-3 text-center">Lifetime Plays</th>
+                      <th className="py-2.5 px-3 text-center">Lifetime Downloads</th>
+                      <th className="py-2.5 px-3 text-center">Catalog Share</th>
+                      <th className="py-2.5 px-3 text-right">Incentive Eligibility</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-zinc-800/60 font-mono text-[11px]">
@@ -395,13 +392,11 @@ export default function StreamingRoyaltiesPage() {
                         <td className="py-3 px-3 text-center text-emerald-400 font-semibold">
                           {row.downloads.toLocaleString()}
                         </td>
-                        <td className="py-3 px-3 text-center">
-                          <span className="text-amber-300 font-semibold">
-                            {row.combinedActivity.toLocaleString()} / 10,000 ({row.progressPct}%)
-                          </span>
+                        <td className="py-3 px-3 text-center text-zinc-300 font-medium">
+                          {row.sharePct}% of catalog
                         </td>
-                        <td className="py-3 px-3 text-right font-bold text-emerald-400">
-                          ₦{row.earnedNgn.toLocaleString()}
+                        <td className="py-3 px-3 text-right font-medium text-amber-300">
+                          Collective Count Active
                         </td>
                       </tr>
                     ))}

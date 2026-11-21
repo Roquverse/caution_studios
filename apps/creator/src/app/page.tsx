@@ -118,11 +118,10 @@ export default function CreatorDashboardPage() {
   const [withdrawError, setWithdrawError] = useState('');
 
   const downloadThreshold = 10000;
+  const [monthlyDownloadsCount, setMonthlyDownloadsCount] = useState(0);
+  const [monthlyThresholdPct, setMonthlyThresholdPct] = useState(0);
+  const [monthlyDownloadsRemaining, setMonthlyDownloadsRemaining] = useState(10000);
   const combinedActivityCount = totalPlaysCount + totalDownloadsCount;
-  const downloadProgressPct = Math.min(
-    100,
-    Number(((combinedActivityCount / downloadThreshold) * 100).toFixed(2))
-  );
 
   useEffect(() => {
     let isMounted = true;
@@ -180,6 +179,11 @@ export default function CreatorDashboardPage() {
 
           setTotalPlaysCount(Number(data.totalPlaysCount) || 0);
           setTotalDownloadsCount(Number(data.totalDownloadsCount) || 0);
+          setMonthlyDownloadsCount(Number(data.monthlyDownloadsCount) || 0);
+          setMonthlyThresholdPct(Number(data.monthlyThresholdPct) || 0);
+          setMonthlyDownloadsRemaining(
+            Number(data.monthlyDownloadsRemaining ?? Math.max(0, 10000 - Number(data.monthlyDownloadsCount || 0)))
+          );
           setDownloadRewardNgn(Number(data.downloadRewardNgn) || 0);
 
           const topBeats: TopBeatItem[] = dbBeats.slice(0, 6).map((b: any) => {
@@ -193,7 +197,7 @@ export default function CreatorDashboardPage() {
               genre: b.genre || 'Afrobeats',
               plays: playsCount,
               downloads: dlCount,
-              earnedNgn: Math.floor((playsCount + dlCount) / 10000) * 30000,
+              earnedNgn: 0,
               coverUrl: b.cover_url || '/images/studio_mixing_console.jpg',
               audioUrl: audioKey ? (audioKey.startsWith('http') || audioKey.startsWith('/') ? audioKey : `/api/media/${audioKey}`) : ''
             };
@@ -494,13 +498,13 @@ export default function CreatorDashboardPage() {
               </div>
             </div>
 
-            {/* Plays & Downloads Pay Threshold Progress */}
+            {/* Monthly Downloads Incentive & Pay Threshold Progress */}
             <div className="lg:col-span-2 rounded-lg border border-zinc-800 bg-zinc-900/50 p-4 shadow-sm flex flex-col justify-between">
               <div>
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-zinc-800/80">
                   <div className="flex items-center gap-2">
                     <span className="text-xs font-mono uppercase tracking-wider text-zinc-400">
-                      Pay Threshold &amp; Partner Verification
+                      Monthly Download Incentive &amp; Partner Verification
                     </span>
                     {isVerified ? (
                       <span className="px-2 py-0.5 rounded-full bg-[#e53935]/20 border border-[#e53935]/40 text-[10px] font-bold text-[#e53935] flex items-center gap-1">
@@ -510,47 +514,47 @@ export default function CreatorDashboardPage() {
                     ) : (
                       <span className="px-2 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/30 text-[10px] font-bold text-amber-300 flex items-center gap-1">
                         <Sparkles className="h-3 w-3" />
-                        <span>Threshold Tracking Active</span>
+                        <span>Monthly Incentive Active</span>
                       </span>
                     )}
                   </div>
                   <div className="flex flex-wrap items-center gap-3 text-xs font-mono">
                     <span className="text-zinc-300">
-                      Plays: <strong className="text-[#e53935]">{totalPlaysCount.toLocaleString()}</strong>
+                      Lifetime Plays: <strong className="text-[#e53935]">{totalPlaysCount.toLocaleString()}</strong>
                     </span>
                     <span className="text-zinc-600">•</span>
                     <span className="text-zinc-300">
-                      Downloads: <strong className="text-amber-300">{totalDownloadsCount.toLocaleString()}</strong>
+                      Lifetime Downloads: <strong className="text-emerald-400">{totalDownloadsCount.toLocaleString()}</strong>
                     </span>
                     <span className="text-zinc-600">•</span>
                     <span className="text-zinc-400">
-                      Total: <strong className="text-white">{combinedActivityCount.toLocaleString()} / {downloadThreshold.toLocaleString()}</strong>
+                      This Month: <strong className="text-white">{monthlyDownloadsCount.toLocaleString()} / 10,000</strong>
                     </span>
                   </div>
                 </div>
 
                 <p className="text-xs text-zinc-400 mt-2 leading-relaxed">
-                  Every play and download across your catalog counts towards your <strong className="text-zinc-200">10,000 Pay Threshold (₦30,000 royalty payout)</strong>, the <strong className="text-zinc-200">Verified Producer</strong> checkmark, and direct artist recording chat.
+                  All downloads across your catalog count collectively towards your <strong className="text-zinc-200">10,000 Monthly Download Incentive (₦30,000 royalty payout)</strong> and the <strong className="text-zinc-200">Verified Producer</strong> checkmark. The monthly incentive count resets to zero at the start of each month; your lifetime plays and downloads are permanently preserved.
                 </p>
               </div>
 
               <div className="mt-4 space-y-2">
                 <div className="flex justify-between text-xs font-mono">
                   <span className="text-zinc-400">
-                    Pay Threshold Progress ({combinedActivityCount.toLocaleString()} / 10,000)
+                    Monthly Downloads Progress ({monthlyDownloadsCount.toLocaleString()} / 10,000 downloads)
                   </span>
-                  <span className="text-white font-bold">{downloadProgressPct}% Completed</span>
+                  <span className="text-white font-bold">{monthlyThresholdPct}% Completed</span>
                 </div>
                 <div className="w-full h-2.5 rounded-full bg-zinc-800 overflow-hidden">
                   <div
                     className="h-full bg-gradient-to-r from-[#e53935] to-emerald-400 transition-all duration-500 rounded-full"
-                    style={{ width: `${Math.max(downloadProgressPct, combinedActivityCount > 0 ? 2 : 0)}%` }}
+                    style={{ width: `${Math.max(monthlyThresholdPct, monthlyDownloadsCount > 0 ? 2 : 0)}%` }}
                   />
                 </div>
                 <div className="flex items-center justify-between text-[11px] text-zinc-500 pt-1">
-                  <span>Goal: 10,000 plays &amp; downloads threshold (₦30,000 payout)</span>
+                  <span>Goal: 10,000 downloads / month across all uploads (₦30,000 payout · Resets monthly)</span>
                   <Link href="/streaming" className="text-[#e53935] hover:underline flex items-center gap-1">
-                    <span>View Full Plays &amp; Downloads Telemetry</span>
+                    <span>View Monthly Incentive Telemetry</span>
                     <ArrowRight className="h-3 w-3" />
                   </Link>
                 </div>

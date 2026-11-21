@@ -80,6 +80,8 @@ export default function BeatsCatalogPage() {
   const [beatsList, setBeatsList] = useState<any[]>([]);
   const [totalPlays, setTotalPlays] = useState(0);
   const [totalDownloads, setTotalDownloads] = useState(0);
+  const [monthlyDownloadsCount, setMonthlyDownloadsCount] = useState(0);
+  const [monthlyThresholdPct, setMonthlyThresholdPct] = useState(0);
   const [totalEarningsNgn, setTotalEarningsNgn] = useState(0);
   const [availableBalanceNgn, setAvailableBalanceNgn] = useState(0);
   const [totalSalesEarningsNgn, setTotalSalesEarningsNgn] = useState(0);
@@ -123,6 +125,8 @@ export default function BeatsCatalogPage() {
           if (isMounted) {
             setTotalPlays(Number(payload.totalPlaysCount || 0));
             setTotalDownloads(Number(payload.totalDownloadsCount || 0));
+            setMonthlyDownloadsCount(Number(payload.monthlyDownloadsCount || 0));
+            setMonthlyThresholdPct(Number(payload.monthlyThresholdPct || 0));
             setTotalEarningsNgn(Number(payload.totalEarningsNgn || 0));
             setAvailableBalanceNgn(Number(payload.availableBalanceNgn || 0));
             setTotalSalesEarningsNgn(Number(payload.totalSalesEarningsNgn || 0));
@@ -407,24 +411,24 @@ export default function BeatsCatalogPage() {
           </div>
         </div>
 
-        {/* Card 4: 10,000 Pay Threshold */}
+        {/* Card 4: 10,000 Monthly Downloads Incentive */}
         <div className="relative rounded-2xl border border-white/[0.06] bg-[#13151b] p-5 shadow-lg flex flex-col justify-between overflow-hidden group hover:border-white/[0.12] transition-colors">
           <div>
             <div className="flex items-center justify-between gap-2">
               <div className="flex items-center gap-1.5 text-xs text-amber-400 font-bold">
                 <Crown className="h-4 w-4 fill-amber-400/20" />
-                <span>10,000 Pay Threshold</span>
+                <span>10,000 Monthly Downloads Goal</span>
               </div>
               <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-300 font-mono">
-                {thresholdPct}% to 10k
+                {monthlyThresholdPct}% to 10k
               </span>
             </div>
             <div className="mt-2 flex items-baseline gap-1.5">
               <span className="text-2xl font-black font-mono text-white">
-                {combinedActivity.toLocaleString()}
+                {monthlyDownloadsCount.toLocaleString()}
               </span>
               <span className="text-xs font-mono text-gray-500">
-                / 10,000 plays &amp; dls
+                / 10,000 monthly downloads
               </span>
             </div>
           </div>
@@ -434,12 +438,12 @@ export default function BeatsCatalogPage() {
             <div className="w-full h-2 rounded-full bg-white/[0.06] overflow-hidden">
               <div
                 className="h-full rounded-full bg-gradient-to-r from-[#e53935] to-amber-400 transition-all duration-500 shadow-sm shadow-[#e53935]/50"
-                style={{ width: `${Math.max(thresholdPct, combinedActivity > 0 ? 3 : 0)}%` }}
+                style={{ width: `${Math.max(monthlyThresholdPct, monthlyDownloadsCount > 0 ? 3 : 0)}%` }}
               />
             </div>
             <div className="flex items-center justify-between text-[10px] text-gray-400 font-mono">
-              <span>Pay Threshold Goal</span>
-              <span className="text-amber-300 font-semibold">₦30,000 payout</span>
+              <span>Collective across all uploads</span>
+              <span className="text-amber-300 font-semibold">₦30,000 (Resets monthly)</span>
             </div>
           </div>
         </div>
@@ -503,10 +507,6 @@ export default function BeatsCatalogPage() {
                   <th className="py-3.5 px-4 font-bold">License Pricing</th>
                   <th className="py-3.5 px-4 font-bold text-center">Plays</th>
                   <th className="py-3.5 px-4 font-bold text-center">Downloads</th>
-                  <th className="py-3.5 px-4 font-bold text-center">
-                    <div>Pay Threshold</div>
-                    <div className="text-[9px] font-normal text-zinc-400 font-mono tracking-tight">Plays + Downloads</div>
-                  </th>
                   <th className="py-3.5 px-4 font-bold text-center">Sales</th>
                   <th className="py-3.5 px-4 font-bold">Status</th>
                   <th className="py-3.5 px-4 font-bold text-right">Actions</th>
@@ -591,22 +591,13 @@ export default function BeatsCatalogPage() {
                     </td>
 
                     {/* Plays */}
-                    <td className="py-3.5 px-4 text-center font-mono font-bold text-white">
+                    <td className="py-3.5 px-4 text-center font-mono font-bold text-[#e53935]">
                       {(beat.streamsCount || 0).toLocaleString()}
                     </td>
 
                     {/* Downloads */}
-                    <td className="py-3.5 px-4 text-center font-mono font-bold text-gray-300">
+                    <td className="py-3.5 px-4 text-center font-mono font-bold text-emerald-400">
                       {(beat.downloadsCount || 0).toLocaleString()}
-                    </td>
-
-                    {/* Pay Threshold Progress */}
-                    <td className="py-3.5 px-4 text-center font-mono text-[11px]">
-                      <div className="text-white font-bold">{(beat.combinedActivity || 0).toLocaleString()} / 10k</div>
-                      <div className="text-[10px] text-zinc-400 font-medium mt-0.5 whitespace-nowrap">
-                        {beat.streamsCount} plays + {beat.downloadsCount} dls
-                      </div>
-                      <div className="text-[10px] text-amber-400 font-semibold mt-0.5">{beat.thresholdPct || 0}%</div>
                     </td>
 
                     {/* Sales */}

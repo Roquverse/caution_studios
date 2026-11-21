@@ -41,6 +41,65 @@ export async function POST(req: NextRequest) {
         .update({ free_commercial_downloads_count: newDownloadCount })
         .eq('id', beatId);
 
+      // Record monthly download incentive for creator (resets monthly to 0, collective across uploads)
+      if (beat.producer_id) {
+        try {
+          const currentMonthPeriod = new Date().toISOString().slice(0, 7) + '-01';
+          const { data: monthRow } = await supabase
+            .from('producer_download_incentives')
+            .select('*')
+            .eq('producer_id', beat.producer_id)
+            .eq('month_period', currentMonthPeriod)
+            .maybeSingle();
+
+          if (monthRow) {
+            const newQualifying = (Number(monthRow.qualifying_downloads) || 0) + 1;
+            const currentMilestones = Number(monthRow.milestones_reached) || 0;
+            const newMilestones = Math.floor(newQualifying / 10000);
+            const newReward = newMilestones * 30000;
+
+            await supabase
+              .from('producer_download_incentives')
+              .update({
+                qualifying_downloads: newQualifying,
+                milestones_reached: newMilestones,
+                reward_amount_ngn: newReward
+              })
+              .eq('id', monthRow.id);
+
+            if (newMilestones > currentMilestones) {
+              const addedReward = (newMilestones - currentMilestones) * 30000;
+              const { data: prodProfile } = await supabase
+                .from('profiles')
+                .select('available_balance_ngn')
+                .eq('id', beat.producer_id)
+                .maybeSingle();
+
+              await supabase
+                .from('profiles')
+                .update({
+                  is_verified: true,
+                  available_balance_ngn: (Number(prodProfile?.available_balance_ngn) || 0) + addedReward
+                })
+                .eq('id', beat.producer_id);
+            }
+          } else {
+            await supabase
+              .from('producer_download_incentives')
+              .insert({
+                producer_id: beat.producer_id,
+                month_period: currentMonthPeriod,
+                qualifying_downloads: 1,
+                milestones_reached: 0,
+                reward_amount_ngn: 0,
+                payout_status: 'pending'
+              });
+          }
+        } catch (e) {
+          console.warn('Error recording web monthly download incentive:', e);
+        }
+      }
+
       return NextResponse.json({
         success: true,
         beatId,
