@@ -40,7 +40,7 @@ interface InvoiceRecord {
 
 export default function SubscriptionsPage() {
   const [profile, setProfile] = useState<UserProfileData | null>(null);
-  const [currentPlan, setCurrentPlan] = useState<'free' | 'plus' | 'pro'>('free');
+  const [currentPlan, setCurrentPlan] = useState<'free' | 'plus' | 'pro' | 'unsubscribed'>('unsubscribed');
   const [isLoading, setIsLoading] = useState(false);
   const [notification, setNotification] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');

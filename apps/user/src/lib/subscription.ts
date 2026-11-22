@@ -8,13 +8,24 @@ export const FREE_PREVIEW_LIMIT_SECONDS = 30;
 export function isPlanSubscribed(plan?: string | null): boolean {
   if (!plan) return false;
   const normalized = plan.toLowerCase().trim();
+  if (normalized === 'free' || normalized === 'expired' || normalized === 'unsubscribed' || normalized === 'none') {
+    return false;
+  }
   return normalized === 'plus' || normalized === 'pro' || normalized === 'creator' || normalized === 'label';
 }
 
 export function resolveEffectivePlan(
-  profile?: { plan?: string | null; stripe_customer_id?: string | null } | null,
+  profile?: { plan?: string | null; stripe_customer_id?: string | null; subscription_expires_at?: string | null } | null,
   userMetadata?: Record<string, any> | null
-): 'free' | 'plus' | 'pro' {
+): 'unsubscribed' | 'plus' | 'pro' {
+  // If subscription has expired, it is no longer active
+  if (profile?.subscription_expires_at) {
+    const expiresAt = new Date(profile.subscription_expires_at).getTime();
+    if (!isNaN(expiresAt) && expiresAt < Date.now()) {
+      return 'unsubscribed';
+    }
+  }
+
   if (
     profile?.plan === 'pro' ||
     profile?.stripe_customer_id === 'plan:pro' ||
@@ -29,28 +40,31 @@ export function resolveEffectivePlan(
   ) {
     return 'plus';
   }
-  return 'free';
+  return 'unsubscribed';
 }
 
 export function getCachedUserPlan(): string {
-  if (typeof window === 'undefined') return 'free';
-  return localStorage.getItem('caution:user-plan') || 'free';
+  if (typeof window === 'undefined') return 'unsubscribed';
+  const cached = localStorage.getItem('caution:user-plan');
+  if (!cached || cached === 'free') return 'unsubscribed';
+  return cached;
 }
 
 export function setCachedUserPlan(plan: string) {
   if (typeof window === 'undefined') return;
-  localStorage.setItem('caution:user-plan', plan);
-  window.dispatchEvent(new CustomEvent('caution:plan-changed', { detail: { plan } }));
+  const normalized = (!plan || plan === 'free') ? 'unsubscribed' : plan;
+  localStorage.setItem('caution:user-plan', normalized);
+  window.dispatchEvent(new CustomEvent('caution:plan-changed', { detail: { plan: normalized } }));
 }
 
 export function useUserSubscription() {
-  const [plan, setPlan] = useState<string>('free');
+  const [plan, setPlan] = useState<string>('unsubscribed');
   const [isSubscribed, setIsSubscribed] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
   useEffect(() => {
     let isMounted = true;
-    const cachedPlan = typeof window !== 'undefined' ? localStorage.getItem('caution:user-plan') || 'free' : 'free';
+    const cachedPlan = typeof window !== 'undefined' ? getCachedUserPlan() : 'unsubscribed';
     setPlan(cachedPlan);
     setIsSubscribed(isPlanSubscribed(cachedPlan));
 
@@ -82,10 +96,10 @@ export function useUserSubscription() {
 
         if (!session?.user) {
           if (isMounted) {
-            setPlan('free');
+            setPlan('unsubscribed');
             setIsSubscribed(false);
             if (typeof window !== 'undefined') {
-              localStorage.setItem('caution:user-plan', 'free');
+              localStorage.setItem('caution:user-plan', 'unsubscribed');
             }
             setIsLoading(false);
           }
@@ -102,7 +116,7 @@ export function useUserSubscription() {
 
         const { data: profile } = await supabase
           .from('profiles')
-          .select('plan, stripe_customer_id')
+          .select('plan, stripe_customer_id, subscription_expires_at')
           .eq('id', session.user.id)
           .maybeSingle();
 
@@ -124,7 +138,7 @@ export function useUserSubscription() {
     checkSubscription();
 
     const handlePlanChanged = (e: any) => {
-      const newPlan = e.detail?.plan || 'free';
+      const newPlan = e.detail?.plan || 'unsubscribed';
       setPlan(newPlan);
       setIsSubscribed(isPlanSubscribed(newPlan));
     };
@@ -135,10 +149,10 @@ export function useUserSubscription() {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (!session) {
-        setPlan('free');
+        setPlan('unsubscribed');
         setIsSubscribed(false);
         if (typeof window !== 'undefined') {
-          localStorage.setItem('caution:user-plan', 'free');
+          localStorage.setItem('caution:user-plan', 'unsubscribed');
         }
       } else {
         checkSubscription();

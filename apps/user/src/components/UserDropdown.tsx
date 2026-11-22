@@ -13,7 +13,7 @@ export interface UserProfileData {
   display_name: string;
   avatar_url?: string | null;
   bio?: string | null;
-  plan: 'free' | 'plus' | string;
+  plan: 'free' | 'plus' | 'pro' | 'unsubscribed' | string;
   roles?: string[];
 }
 
@@ -211,12 +211,12 @@ export function UserDropdown() {
         document.cookie = `sb-token=; path=/; max-age=0${domainStr}`;
         document.cookie = `sb-refresh=; path=/; max-age=0${domainStr}`;
       }
-      setCachedUserPlan('free');
+      setCachedUserPlan('unsubscribed');
       // Redirect to the auth app login page (not an internal /login route)
       window.location.href = getAuthLoginUrl();
     } catch (err) {
       console.error('Sign out error:', err);
-      setCachedUserPlan('free');
+      setCachedUserPlan('unsubscribed');
       window.location.href = getAuthLoginUrl();
     }
   };
@@ -275,8 +275,8 @@ export function UserDropdown() {
                       PLUS
                     </span>
                   ) : (
-                    <span className="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-zinc-800 text-zinc-400 border border-zinc-700">
-                      FREE
+                    <span className="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-amber-500/10 text-amber-300 border border-amber-500/30">
+                      UNSUBSCRIBED
                     </span>
                   )}
                 </div>

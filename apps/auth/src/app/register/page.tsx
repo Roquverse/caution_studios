@@ -57,7 +57,7 @@ export default function RegisterPage() {
       ? new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString()
       : null;
     const promoCode = isProducer ? 'producer_3mo_free_launch' : null;
-    const initialPlan = isProducer ? 'plus' : 'free';
+    const initialPlan = isProducer ? 'plus' : 'unsubscribed';
 
     try {
       const { data, error } = await supabase.auth.signUp({
@@ -96,7 +96,7 @@ export default function RegisterPage() {
 
       let destinationUrl = isProducer
         ? `${CREATOR_PORTAL_URL}/login?registered=true&email=${encodeURIComponent(email)}`
-        : USER_PORTAL_URL;
+        : `${USER_PORTAL_URL}/subscriptions?onboarding=true`;
 
       if (data?.session) {
         const session = data.session;
@@ -244,7 +244,7 @@ export default function RegisterPage() {
       const isProducer = primaryRole === 'producer';
       let destinationUrl = isProducer
         ? `${CREATOR_PORTAL_URL}/login?registered=true&email=${encodeURIComponent(email)}`
-        : USER_PORTAL_URL;
+        : `${USER_PORTAL_URL}/subscriptions?onboarding=true`;
 
       if (data?.session) {
         const session = data.session;

@@ -98,6 +98,39 @@ export async function POST(req: NextRequest) {
     };
 
     if (action === 'download') {
+      // Enforce active subscription check if auth token is present
+      const authHeader = req.headers.get('authorization');
+      const cookieHeader = req.headers.get('cookie') || '';
+      const matchToken = cookieHeader.match(/(?:^|;\s*)sb-token=([^;]*)/);
+      const token = authHeader?.startsWith('Bearer ')
+        ? authHeader.replace('Bearer ', '')
+        : matchToken ? decodeURIComponent(matchToken[1]) : null;
+
+      if (token) {
+        try {
+          const { data: { user } } = await supabase.auth.getUser(token);
+          if (user) {
+            const { data: profile } = await supabase
+              .from('profiles')
+              .select('plan, subscription_expires_at')
+              .eq('id', user.id)
+              .maybeSingle();
+
+            const plan = (profile?.plan || '').toLowerCase();
+            const isSub = plan === 'plus' || plan === 'pro';
+            const isExpired = profile?.subscription_expires_at && new Date(profile.subscription_expires_at).getTime() < Date.now();
+            if (!isSub || isExpired) {
+              return NextResponse.json(
+                { success: false, error: 'SUBSCRIPTION_REQUIRED', message: 'Active Caution Plus or Pro subscription required' },
+                { status: 403 }
+              );
+            }
+          }
+        } catch (e) {
+          console.warn('Subscription check error on download action:', e);
+        }
+      }
+
       const newDownloadCount = (beat.free_commercial_downloads_count || 0) + 1;
 
       const { error: updateError } = await supabase

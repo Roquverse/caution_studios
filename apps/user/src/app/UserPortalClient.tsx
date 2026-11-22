@@ -366,6 +366,13 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [showUpgradeModal]);
 
+  // Global listener for subscription modal requests
+  useEffect(() => {
+    const handleOpenSubModal = () => setShowUpgradeModal(true);
+    window.addEventListener('caution:open-subscription-modal', handleOpenSubModal);
+    return () => window.removeEventListener('caution:open-subscription-modal', handleOpenSubModal);
+  }, []);
+
   const [invoices, setInvoices] = useState<any[]>([]);
   const [loadingInvoices, setLoadingInvoices] = useState(false);
 
@@ -827,6 +834,14 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
     // 1. Immediately stop any active synth
     audioSynth.stop();
 
+    // Active subscription check: users must have an active subscription (Caution Plus ₦3k or Pro ₦10k) to play beats
+    if (!isSubscribed) {
+      if (audioRef.current) audioRef.current.pause();
+      setIsPlaying(false);
+      setShowUpgradeModal(true);
+      return;
+    }
+
     if (currentTrack.id === track.id) {
       if (isPlaying) {
         if (audioRef.current) audioRef.current.pause();
@@ -985,7 +1000,13 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
     if (e) e.stopPropagation();
     if (!track) return;
 
-    // Check if beat is paid (locked behind payment)
+    // Active subscription check: users must have an active subscription (Caution Plus ₦3k or Pro ₦10k) to download beats
+    if (!isSubscribed) {
+      setShowUpgradeModal(true);
+      return;
+    }
+
+    // Check if beat is paid (locked behind individual purchase)
     const isPaid = !isFreeBeat(track);
     if (isPaid && !isSubscribed) {
       setPaidBeatPurchaseTrack(track);
@@ -2854,16 +2875,21 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
       {showUpgradeModal && (
         <div 
           onClick={handleCloseUpgradeModal}
-          className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 cursor-pointer"
+          className="fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex items-center justify-center p-4 cursor-pointer"
         >
           <div 
             onClick={(e) => e.stopPropagation()}
-            className="max-w-md w-full bg-[#121316] border border-white/10 rounded-2xl p-6 space-y-5 cursor-default shadow-2xl"
+            className="max-w-xl w-full bg-[#121316] border border-white/10 rounded-2xl p-6 sm:p-7 space-y-5 cursor-default shadow-2xl animate-in zoom-in-95 duration-200"
           >
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Sparkles className="h-5 w-5 text-[#2dd4bf]" />
-                <h3 className="text-lg font-black text-white">Upgrade to Caution Plus</h3>
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-[#e53935]/15 border border-[#e53935]/30 flex items-center justify-center text-[#e53935]">
+                  <Sparkles className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-black text-white">Active Subscription Required</h3>
+                  <p className="text-[11px] text-gray-400">Choose a plan to unlock instant beat streaming, downloads & recording</p>
+                </div>
               </div>
               <button
                 type="button"
@@ -2875,37 +2901,80 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
               </button>
             </div>
 
-            <p className="text-xs text-gray-400 leading-relaxed">
-              Unlock unlimited 24-bit lossless streaming, stem downloads, multi-track separation, and automated synchronization clearance for commercial releases.
+            <p className="text-xs text-gray-300 leading-relaxed">
+              Caution Studio is a curated membership platform for artists. An active <strong>Caution Plus (₦3,000/mo)</strong> or <strong>Caution Pro (₦10,000/mo)</strong> subscription is required to play and download beats.
             </p>
 
-            <div className="p-4 rounded-xl bg-white/[0.03] border border-white/[0.06] space-y-2.5 text-xs text-gray-300">
-              <div className="flex items-center gap-2">
-                <Check className="h-4 w-4 text-[#2dd4bf]" />
-                <span>Unlimited high-fidelity streaming & downloads</span>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Caution Plus */}
+              <div className="p-4 rounded-xl bg-white/[0.03] border border-white/[0.08] flex flex-col justify-between space-y-4">
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-mono font-bold text-gray-300 uppercase tracking-wider">Caution Plus</span>
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-white/5 text-gray-400 border border-white/10">Standard</span>
+                  </div>
+                  <div>
+                    <span className="text-2xl font-black text-white">₦3,000</span>
+                    <span className="text-xs text-gray-400"> / month</span>
+                  </div>
+                  <ul className="space-y-2 text-xs text-gray-300">
+                    <li className="flex items-center gap-2">
+                      <Check className="h-3.5 w-3.5 text-[#2dd4bf] shrink-0" />
+                      <span>Full catalog playback</span>
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <Check className="h-3.5 w-3.5 text-[#2dd4bf] shrink-0" />
+                      <span>62 beat downloads / month</span>
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <Check className="h-3.5 w-3.5 text-[#2dd4bf] shrink-0" />
+                      <span>Commercial release rights</span>
+                    </li>
+                  </ul>
+                </div>
+                <Link
+                  href="/subscriptions"
+                  onClick={handleCloseUpgradeModal}
+                  className="w-full py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-xs font-bold text-white text-center transition-colors block border border-white/10"
+                >
+                  Get Plus (₦3,000)
+                </Link>
               </div>
-              <div className="flex items-center gap-2">
-                <Check className="h-4 w-4 text-[#2dd4bf]" />
-                <span>WAV trackout stems (.ZIP) for every track</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Check className="h-4 w-4 text-[#2dd4bf]" />
-                <span>Commercial synchronization rights for YouTube, TikTok & DSPs</span>
-              </div>
-            </div>
 
-            <div className="pt-2 flex items-center justify-between">
-              <div>
-                <span className="text-2xl font-black text-white">₦3,000</span>
-                <span className="text-xs text-gray-400"> / month</span>
+              {/* Caution Pro */}
+              <div className="p-4 rounded-xl bg-[#e53935]/10 border border-[#e53935]/30 flex flex-col justify-between space-y-4 relative overflow-hidden">
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-mono font-bold text-[#e53935] uppercase tracking-wider">Caution Pro</span>
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-[#e53935] text-white font-black">POPULAR</span>
+                  </div>
+                  <div>
+                    <span className="text-2xl font-black text-white">₦10,000</span>
+                    <span className="text-xs text-gray-400"> / month</span>
+                  </div>
+                  <ul className="space-y-2 text-xs text-gray-300">
+                    <li className="flex items-center gap-2">
+                      <Check className="h-3.5 w-3.5 text-[#e53935] shrink-0" />
+                      <span><strong>Unlimited downloads & streaming</strong></span>
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <Check className="h-3.5 w-3.5 text-[#e53935] shrink-0" />
+                      <span><strong>100% Ad-Free experience</strong></span>
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <Check className="h-3.5 w-3.5 text-[#e53935] shrink-0" />
+                      <span>In-browser Studio Suite (/studio)</span>
+                    </li>
+                  </ul>
+                </div>
+                <Link
+                  href="/subscriptions"
+                  onClick={handleCloseUpgradeModal}
+                  className="w-full py-2.5 rounded-xl bg-[#e53935] hover:bg-[#d32f2f] text-xs font-bold text-white text-center transition-all block shadow-lg shadow-red-500/20"
+                >
+                  Get Pro (₦10,000)
+                </Link>
               </div>
-              <Link
-                href="/subscriptions"
-                onClick={handleCloseUpgradeModal}
-                className="px-5 py-2.5 rounded-full bg-[#04564f] hover:bg-[#03453f] text-xs font-bold text-white uppercase tracking-wider transition-colors inline-block text-center cursor-pointer"
-              >
-                Upgrade to Plus
-              </Link>
             </div>
           </div>
         </div>

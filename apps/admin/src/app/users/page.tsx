@@ -40,7 +40,7 @@ export interface UserProfile {
   bio?: string;
   roles: string[];
   primary_role?: string;
-  plan: 'free' | 'plus' | 'pro';
+  plan: 'expired' | 'plus' | 'pro' | 'free';
   email: string;
   created_at: string;
   is_deactivated?: boolean;
@@ -50,7 +50,7 @@ export default function AdminUsersPage() {
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [planFilter, setPlanFilter] = useState<'all' | 'free' | 'plus' | 'pro'>('all');
+  const [planFilter, setPlanFilter] = useState<'all' | 'unsubscribed' | 'plus' | 'pro'>('all');
   const [roleFilter, setRoleFilter] = useState<'all' | 'artist' | 'producer' | 'admin'>('all');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'deactivated'>('all');
   const [updatingId, setUpdatingId] = useState<string | null>(null);
@@ -94,7 +94,7 @@ export default function AdminUsersPage() {
     }
   };
 
-  const handleUpdatePlan = async (user: UserProfile, nextPlan: 'free' | 'plus' | 'pro') => {
+  const handleUpdatePlan = async (user: UserProfile, nextPlan: 'expired' | 'plus' | 'pro') => {
     try {
       setUpdatingId(user.id);
       const { data: { session } } = await supabase.auth.getSession();
@@ -113,7 +113,7 @@ export default function AdminUsersPage() {
         setUsers(
           users.map((u) => (u.id === user.id ? { ...u, plan: nextPlan } : u))
         );
-        const planLabel = nextPlan === 'pro' ? 'Caution Pro' : nextPlan === 'plus' ? 'Caution Plus' : 'Free';
+        const planLabel = nextPlan === 'pro' ? 'Caution Pro (₦10k)' : nextPlan === 'plus' ? 'Caution Plus (₦3k)' : 'Unsubscribed/Expired';
         showToast(`Plan updated to ${planLabel} for ${user.display_name}`);
       } else {
         const err = await res.json();
@@ -358,7 +358,9 @@ export default function AdminUsersPage() {
 
     const matchesPlan =
       planFilter === 'all' ||
-      (planFilter === 'free' ? !u.plan || u.plan === 'free' : u.plan === planFilter);
+      (planFilter === 'unsubscribed'
+        ? !u.plan || u.plan === 'expired' || u.plan === 'free'
+        : u.plan === planFilter);
     const matchesRole = roleFilter === 'all' || effectiveRole === roleFilter;
     const matchesStatus =
       statusFilter === 'all' ||
@@ -371,7 +373,7 @@ export default function AdminUsersPage() {
   const deactivatedCount = users.filter((u) => u.is_deactivated).length;
   const proCount = users.filter((u) => u.plan === 'pro').length;
   const plusCount = users.filter((u) => u.plan === 'plus').length;
-  const freeCount = users.filter((u) => !u.plan || u.plan === 'free').length;
+  const unsubscribedCount = users.filter((u) => !u.plan || u.plan === 'expired' || u.plan === 'free').length;
   const producerCount = users.filter((u) => getEffectiveRole(u) === 'producer').length;
   const artistCount = users.filter((u) => getEffectiveRole(u) === 'artist').length;
   const adminCount = users.filter((u) => getEffectiveRole(u) === 'admin').length;
@@ -620,14 +622,14 @@ export default function AdminUsersPage() {
               </button>
               <button
                 type="button"
-                onClick={() => setPlanFilter('free')}
+                onClick={() => setPlanFilter('unsubscribed')}
                 className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
-                  planFilter === 'free'
-                    ? 'bg-zinc-800 text-white font-semibold'
+                  planFilter === 'unsubscribed'
+                    ? 'bg-red-500/20 text-red-300 border border-red-500/30 font-semibold'
                     : 'text-zinc-400 hover:text-zinc-200'
                 }`}
               >
-                Free ({freeCount})
+                Expired / Unsubscribed ({unsubscribedCount})
               </button>
             </div>
           </div>
@@ -766,15 +768,15 @@ export default function AdminUsersPage() {
                         <td className="py-3 px-4">
                           {isPro ? (
                             <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-teal-300 bg-teal-500/15 px-2.5 py-0.5 rounded-full border border-teal-500/40 shadow-xs">
-                              <Crown className="h-3 w-3 text-teal-300" /> Caution Pro
+                              <Crown className="h-3 w-3 text-teal-300" /> Caution Pro (₦10k)
                             </span>
                           ) : isPlus ? (
                             <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-[#2dd4bf] bg-[#2dd4bf]/10 px-2.5 py-0.5 rounded-full border border-[#2dd4bf]/30">
-                              <Crown className="h-3 w-3" /> Caution Plus
+                              <Crown className="h-3 w-3" /> Caution Plus (₦3k)
                             </span>
                           ) : (
-                            <span className="inline-flex items-center gap-1 text-[11px] font-medium text-zinc-400 bg-zinc-800/60 px-2.5 py-0.5 rounded-full border border-zinc-700/50">
-                              Free
+                            <span className="inline-flex items-center gap-1 text-[11px] font-medium text-red-400 bg-red-500/10 px-2.5 py-0.5 rounded-full border border-red-500/30">
+                              Expired / Unsubscribed
                             </span>
                           )}
                         </td>
@@ -807,14 +809,14 @@ export default function AdminUsersPage() {
                             <div className="relative inline-block">
                               <select
                                 disabled={isUpdating || u.is_deactivated}
-                                value={u.plan || 'free'}
+                                value={u.plan === 'pro' ? 'pro' : u.plan === 'plus' ? 'plus' : 'expired'}
                                 onChange={(e) =>
-                                  handleUpdatePlan(u, e.target.value as 'free' | 'plus' | 'pro')
+                                  handleUpdatePlan(u, e.target.value as 'expired' | 'plus' | 'pro')
                                 }
                                 className="bg-zinc-800 hover:bg-zinc-750 text-zinc-200 border border-zinc-700 text-xs font-medium rounded-md px-2.5 py-1.5 pr-7 cursor-pointer focus:outline-none focus:border-[#2dd4bf] appearance-none disabled:opacity-50"
                                 title="Change user subscription tier"
                               >
-                                <option value="free">Plan: Free</option>
+                                <option value="expired">Expired / Unsubscribed</option>
                                 <option value="plus">Plan: Caution Plus (₦3k)</option>
                                 <option value="pro">Plan: Caution Pro (₦10k)</option>
                               </select>

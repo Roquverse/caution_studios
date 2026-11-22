@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { TrackItem } from '../types/tracks';
+import { isPlanSubscribed, getCachedUserPlan } from '../lib/subscription';
 
 export const DEFAULT_PLAYER_TRACK: TrackItem = {
   id: 'holy-default-track',
@@ -89,6 +90,18 @@ export function AudioPlayerProvider({ children }: { children: React.ReactNode })
   }, [volume, isMuted]);
 
   const playTrack = (track: TrackItem) => {
+    const currentPlan = getCachedUserPlan();
+    if (!isPlanSubscribed(currentPlan)) {
+      if (audioRef.current) {
+        audioRef.current.pause();
+      }
+      setIsPlaying(false);
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('caution:open-subscription-modal'));
+      }
+      return;
+    }
+
     setCurrentTrack(track);
     setCurrentTime(0);
     setDuration(track.durationSeconds || 180);
@@ -127,6 +140,16 @@ export function AudioPlayerProvider({ children }: { children: React.ReactNode })
       audioRef.current.pause();
       setIsPlaying(false);
     } else {
+      const currentPlan = getCachedUserPlan();
+      if (!isPlanSubscribed(currentPlan)) {
+        audioRef.current.pause();
+        setIsPlaying(false);
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('caution:open-subscription-modal'));
+        }
+        return;
+      }
+
       const targetSrc = currentTrack.audioUrl || currentTrack.masterUrl || currentTrack.previewCleanUrl || '';
       if (targetSrc && (!audioRef.current.src || !audioRef.current.src.includes(targetSrc))) {
         audioRef.current.src = targetSrc;
