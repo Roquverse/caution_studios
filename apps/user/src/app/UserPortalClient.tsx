@@ -1137,61 +1137,58 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
     return tracks.sort((a, b) => (b.playCount || 0) - (a.playCount || 0)).slice(0, 5);
   }, [allKnownTracks]);
 
-  // Redesign Right Sidebar: Real Top Producers from live database beats and creator profiles
+  // Top Producers: ONLY producers who have beats in the catalog, ranked descending by beat count
   const topProducersList = useMemo(() => {
     const realProducersMap = new Map<
       string,
       { name: string; beatsCount: string; coverUrl: string; handle: string; count: number }
     >();
 
-    // 1. Group from loaded playlistRows (real database beats)
+    // 1. Group strictly from loaded playlistRows (real catalog beats)
     playlistRows.forEach((b) => {
       const artistName = (b.artist || '').trim();
-      if (artistName && artistName.toLowerCase() !== 'caution studio') {
-        const key = artistName.toLowerCase();
-        const existing = realProducersMap.get(key);
-        if (existing) {
-          existing.count += 1;
-          existing.beatsCount = `${existing.count} ${existing.count === 1 ? 'beat' : 'beats'}`;
-        } else {
-          realProducersMap.set(key, {
-            name: artistName,
-            beatsCount: '1 beat',
-            coverUrl: b.coverUrl || '/images/african_producer_beats.jpg',
-            handle: b.subscribers?.replace(/^@/, '') || artistName.toLowerCase().replace(/\s+/g, ''),
-            count: 1
-          });
-        }
+      if (!artistName) return;
+
+      const key = artistName.toLowerCase();
+      const existing = realProducersMap.get(key);
+      if (existing) {
+        existing.count += 1;
+        existing.beatsCount = `${existing.count} ${existing.count === 1 ? 'beat' : 'beats'}`;
+      } else {
+        // Find matching profile from producers array if available for avatar and handle
+        const matchedProfile = (producers || []).find((p) => {
+          const pName = (p.name || '').trim().toLowerCase();
+          const pHandle = (p.handle || '').trim().toLowerCase();
+          return pName === key || pHandle === key || (b.subscribers && b.subscribers.toLowerCase().includes(pHandle));
+        });
+
+        realProducersMap.set(key, {
+          name: matchedProfile?.name || artistName,
+          beatsCount: '1 beat',
+          coverUrl: matchedProfile?.coverUrl || b.coverUrl || '/images/african_producer_beats.jpg',
+          handle: matchedProfile?.handle || b.subscribers?.replace(/^@/, '') || artistName.toLowerCase().replace(/\s+/g, ''),
+          count: 1
+        });
       }
     });
 
-    // 2. Merge with server-provided producer profiles
+    // 2. Enhance existing entries with profile details if available (DO NOT create new entries for 0 beats)
     (producers || []).forEach((p) => {
-      const pName = (p.name || '').trim();
-      if (pName && !pName.toLowerCase().includes('admin') && pName.toLowerCase() !== 'caution producer') {
-        const key = pName.toLowerCase();
-        const count = playlistRows.filter((b) => b.artist?.toLowerCase() === key).length;
-        const existing = realProducersMap.get(key);
-        if (existing) {
-          if (p.coverUrl && !p.coverUrl.includes('placeholder')) existing.coverUrl = p.coverUrl;
-          if (p.handle) existing.handle = p.handle;
-          if (count > existing.count) {
-            existing.count = count;
-            existing.beatsCount = `${count} ${count === 1 ? 'beat' : 'beats'}`;
-          }
-        } else {
-          realProducersMap.set(key, {
-            name: pName,
-            beatsCount: `${count > 0 ? count : 1} ${count === 1 ? 'beat' : 'beats'}`,
-            coverUrl: p.coverUrl || '/images/african_producer_beats.jpg',
-            handle: p.handle || pName.toLowerCase().replace(/\s+/g, ''),
-            count: count > 0 ? count : 1
-          });
-        }
+      const pName = (p.name || '').trim().toLowerCase();
+      const pHandle = (p.handle || '').trim().toLowerCase();
+      const existing = realProducersMap.get(pName) || (pHandle ? realProducersMap.get(pHandle) : undefined);
+      if (existing) {
+        if (p.coverUrl && !p.coverUrl.includes('placeholder')) existing.coverUrl = p.coverUrl;
+        if (p.handle) existing.handle = p.handle;
+        if (p.name) existing.name = p.name;
       }
     });
 
-    const list = Array.from(realProducersMap.values()).sort((a, b) => b.count - a.count);
+    // 3. ONLY return producers who have at least 1 beat, sorted in descending order (most beats topping)
+    const list = Array.from(realProducersMap.values())
+      .filter((p) => p.count > 0)
+      .sort((a, b) => b.count - a.count);
+
     return list;
   }, [producers, playlistRows]);
 
@@ -2317,39 +2314,41 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
               </div>
 
               {/* 4. FEATURED PRODUCERS */}
-              <div className="space-y-4 pt-2">
-                <div className="flex items-center justify-between">
-                  <h2 className="text-xl font-bold text-white tracking-tight">Featured producers</h2>
-                  <button
-                    type="button"
-                    onClick={() => setActiveNav('browse')}
-                    className="text-xs font-semibold text-[#e53935] hover:underline flex items-center gap-1 cursor-pointer"
-                  >
-                    <span>See all</span>
-                    <ArrowRight className="h-3 w-3" />
-                  </button>
-                </div>
-
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
-                  {topProducersList.map((producer) => (
-                    <div
-                      key={producer.handle || producer.name}
-                      onClick={() => handleSelectProducer(producer)}
-                      className="p-3 rounded-2xl bg-[#121316] border border-white/[0.04] hover:border-white/15 transition-all text-center cursor-pointer group"
+              {topProducersList.length > 0 && (
+                <div className="space-y-4 pt-2">
+                  <div className="flex items-center justify-between">
+                    <h2 className="text-xl font-bold text-white tracking-tight">Featured producers</h2>
+                    <button
+                      type="button"
+                      onClick={() => setActiveNav('browse')}
+                      className="text-xs font-semibold text-[#e53935] hover:underline flex items-center gap-1 cursor-pointer"
                     >
-                      <div className="w-16 h-16 rounded-full overflow-hidden bg-black/40 border border-white/10 mx-auto mb-2.5 relative">
-                        <img
-                          src={producer.coverUrl}
-                          alt={producer.name}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-                        />
+                      <span>See all</span>
+                      <ArrowRight className="h-3 w-3" />
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                    {topProducersList.map((producer) => (
+                      <div
+                        key={producer.handle || producer.name}
+                        onClick={() => handleSelectProducer(producer)}
+                        className="p-3 rounded-2xl bg-[#121316] border border-white/[0.04] hover:border-white/15 transition-all text-center cursor-pointer group"
+                      >
+                        <div className="w-16 h-16 rounded-full overflow-hidden bg-black/40 border border-white/10 mx-auto mb-2.5 relative">
+                          <img
+                            src={producer.coverUrl}
+                            alt={producer.name}
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                          />
+                        </div>
+                        <p className="text-xs font-bold text-white truncate">{producer.name}</p>
+                        <p className="text-[10px] text-gray-500 font-mono mt-0.5">{producer.beatsCount}</p>
                       </div>
-                      <p className="text-xs font-bold text-white truncate">{producer.name}</p>
-                      <p className="text-[10px] text-gray-500 font-mono mt-0.5">{producer.beatsCount}</p>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
-              </div>
+              )}
             </>
           )}
         </main>
@@ -2371,25 +2370,31 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
             </div>
 
             <div className="space-y-3">
-              {topProducersList.slice(0, 4).map((producer) => (
-                <div
-                  key={producer.handle || producer.name}
-                  onClick={() => handleSelectProducer(producer)}
-                  className="flex items-center gap-3 p-2 rounded-xl hover:bg-white/[0.04] transition-colors cursor-pointer group"
-                >
-                  <div className="w-10 h-10 rounded-full overflow-hidden bg-black/40 border border-white/10 shrink-0">
-                    <img
-                      src={producer.coverUrl}
-                      alt={producer.name}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-                    />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-xs font-bold text-white truncate">{producer.name}</p>
-                    <p className="text-[11px] text-gray-500 font-mono">{producer.beatsCount}</p>
-                  </div>
+              {topProducersList.length === 0 ? (
+                <div className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.05] text-center text-xs text-gray-500 font-mono">
+                  No producer beats published yet
                 </div>
-              ))}
+              ) : (
+                topProducersList.slice(0, 5).map((producer) => (
+                  <div
+                    key={producer.handle || producer.name}
+                    onClick={() => handleSelectProducer(producer)}
+                    className="flex items-center gap-3 p-2 rounded-xl hover:bg-white/[0.04] transition-colors cursor-pointer group"
+                  >
+                    <div className="w-10 h-10 rounded-full overflow-hidden bg-black/40 border border-white/10 shrink-0">
+                      <img
+                        src={producer.coverUrl}
+                        alt={producer.name}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                      />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-xs font-bold text-white truncate">{producer.name}</p>
+                      <p className="text-[11px] text-gray-500 font-mono">{producer.beatsCount}</p>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           </div>
 
