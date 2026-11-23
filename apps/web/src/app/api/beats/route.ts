@@ -40,12 +40,10 @@ export async function GET(req: NextRequest) {
     const formattedRealBeats: Beat[] = (dbBeats || []).map((b: any) => {
       const rawLicenses = b.licenses || [];
       const beatTags: string[] = Array.isArray(b.tags) ? b.tags : [];
-      const isFree =
-        b.is_free_stream_enabled === true ||
-        rawLicenses.some((l: any) => l.price_cents <= 1) ||
-        beatTags.some((t: string) => t.toLowerCase() === 'free' || t.toLowerCase() === 'free download') ||
-        b.title?.toLowerCase().includes('(free)') ||
-        b.title?.toLowerCase().includes('[free]');
+      const hasPaidPremium = rawLicenses.some((l: any) => l.type === 'premium' && l.enabled !== false && Number(l.price_cents) > 100);
+      const hasPaidExclusive = rawLicenses.some((l: any) => l.type === 'exclusive' && l.enabled !== false && Number(l.price_cents) > 100);
+      const isPaidBeat = hasPaidPremium || hasPaidExclusive;
+      const isFree = !isPaidBeat;
 
       let fullLicenses = [...rawLicenses];
 

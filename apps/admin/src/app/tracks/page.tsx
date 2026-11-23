@@ -616,11 +616,11 @@ export default function AdminTracksPage() {
   };
 
   const isTrackFree = (track: BeatTrack) => {
-    return Boolean(
-      track.is_free_stream_enabled === true ||
-      (track.tags || []).some((t) => t.toLowerCase() === 'free' || t.toLowerCase() === 'free download') ||
-      !track.licenses?.some((l) => (l.type === 'premium' || l.type === 'exclusive') && l.enabled && Number(l.price_cents) > 100)
+    const hasPaidLicense = (track.licenses || []).some(
+      (l) => (l.type === 'premium' || l.type === 'exclusive') && l.enabled && Number(l.price_cents) > 100
     );
+    if (hasPaidLicense) return false;
+    return true;
   };
 
   const getLicensePricing = (track: BeatTrack) => {
