@@ -29,7 +29,8 @@ import {
   UserX,
   UserCheck,
   RotateCcw,
-  AlertTriangle
+  AlertTriangle,
+  Clock
 } from 'lucide-react';
 
 export interface UserProfile {
@@ -44,6 +45,7 @@ export interface UserProfile {
   email: string;
   created_at: string;
   is_deactivated?: boolean;
+  period_resets_at?: string;
 }
 
 export default function AdminUsersPage() {
@@ -779,6 +781,22 @@ export default function AdminUsersPage() {
                               Expired / Unsubscribed
                             </span>
                           )}
+
+                          {(isPro || isPlus) && (() => {
+                            const resetTime = u.period_resets_at
+                              ? new Date(u.period_resets_at).getTime()
+                              : u.created_at
+                              ? new Date(u.created_at).getTime() + 30 * 24 * 60 * 60 * 1000
+                              : Date.now() + 30 * 24 * 60 * 60 * 1000;
+                            const days = Math.max(0, Math.ceil((resetTime - Date.now()) / (1000 * 60 * 60 * 24)));
+                            const resetDate = new Date(resetTime).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                            return (
+                              <div className="text-[10px] text-zinc-400 font-mono mt-1 flex items-center gap-1">
+                                <Clock className="h-2.5 w-2.5 text-emerald-400 shrink-0" />
+                                <span>{days}d left (resets {resetDate})</span>
+                              </div>
+                            );
+                          })()}
                         </td>
 
                         <td className="py-3 px-4 text-zinc-400 font-mono text-[11px]">

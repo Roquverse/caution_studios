@@ -14,13 +14,74 @@ export function isPlanSubscribed(plan?: string | null): boolean {
   return normalized === 'plus' || normalized === 'pro' || normalized === 'creator' || normalized === 'label';
 }
 
+export interface SubscriptionCountdown {
+  daysRemaining: number;
+  totalDays: number;
+  percentRemaining: number;
+  formattedResetDate: string;
+  isExpired: boolean;
+  isExpiringSoon: boolean;
+}
+
+export function getSubscriptionDaysRemaining(
+  profile?: { period_resets_at?: string | null; subscription_expires_at?: string | null; created_at?: string | null; plan?: string | null } | null
+): SubscriptionCountdown {
+  const plan = profile?.plan?.toLowerCase().trim() || '';
+  if (!plan || plan === 'free' || plan === 'expired' || plan === 'unsubscribed') {
+    return {
+      daysRemaining: 0,
+      totalDays: 30,
+      percentRemaining: 0,
+      formattedResetDate: 'N/A',
+      isExpired: true,
+      isExpiringSoon: false
+    };
+  }
+
+  const now = Date.now();
+  let resetTime: number;
+
+  const expiryTimestamp = profile?.period_resets_at || profile?.subscription_expires_at;
+  if (expiryTimestamp) {
+    resetTime = new Date(expiryTimestamp).getTime();
+  } else if (profile?.created_at) {
+    resetTime = new Date(profile.created_at).getTime() + 30 * 24 * 60 * 60 * 1000;
+  } else {
+    resetTime = now + 30 * 24 * 60 * 60 * 1000;
+  }
+
+  const diffMs = resetTime - now;
+  const daysRemaining = Math.max(0, Math.ceil(diffMs / (1000 * 60 * 60 * 24)));
+  const totalDays = 30;
+  const percentRemaining = Math.min(100, Math.max(0, Math.round((daysRemaining / totalDays) * 100)));
+  const isExpired = daysRemaining <= 0;
+  const isExpiringSoon = !isExpired && daysRemaining <= 3;
+
+  const resetDate = new Date(resetTime);
+  const formattedResetDate = resetDate.toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric'
+  });
+
+  return {
+    daysRemaining,
+    totalDays,
+    percentRemaining,
+    formattedResetDate,
+    isExpired,
+    isExpiringSoon
+  };
+}
+
 export function resolveEffectivePlan(
-  profile?: { plan?: string | null; stripe_customer_id?: string | null; subscription_expires_at?: string | null } | null,
+  profile?: { plan?: string | null; stripe_customer_id?: string | null; subscription_expires_at?: string | null; period_resets_at?: string | null } | null,
   userMetadata?: Record<string, any> | null
 ): 'unsubscribed' | 'plus' | 'pro' {
   // If subscription has expired, it is no longer active
-  if (profile?.subscription_expires_at) {
-    const expiresAt = new Date(profile.subscription_expires_at).getTime();
+  const expiryTimestamp = profile?.period_resets_at || profile?.subscription_expires_at;
+  if (expiryTimestamp) {
+    const expiresAt = new Date(expiryTimestamp).getTime();
     if (!isNaN(expiresAt) && expiresAt < Date.now()) {
       return 'unsubscribed';
     }
@@ -61,6 +122,14 @@ export function useUserSubscription() {
   const [plan, setPlan] = useState<string>('unsubscribed');
   const [isSubscribed, setIsSubscribed] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [countdown, setCountdown] = useState<SubscriptionCountdown>({
+    daysRemaining: 0,
+    totalDays: 30,
+    percentRemaining: 0,
+    formattedResetDate: 'N/A',
+    isExpired: true,
+    isExpiringSoon: false
+  });
 
   useEffect(() => {
     let isMounted = true;
@@ -98,6 +167,14 @@ export function useUserSubscription() {
           if (isMounted) {
             setPlan('unsubscribed');
             setIsSubscribed(false);
+            setCountdown({
+              daysRemaining: 0,
+              totalDays: 30,
+              percentRemaining: 0,
+              formattedResetDate: 'N/A',
+              isExpired: true,
+              isExpiringSoon: false
+            });
             if (typeof window !== 'undefined') {
               localStorage.setItem('caution:user-plan', 'unsubscribed');
             }
@@ -116,14 +193,17 @@ export function useUserSubscription() {
 
         const { data: profile } = await supabase
           .from('profiles')
-          .select('plan, stripe_customer_id, subscription_expires_at')
+          .select('plan, stripe_customer_id, subscription_expires_at, period_resets_at, created_at')
           .eq('id', session.user.id)
           .maybeSingle();
 
         const currentPlan = resolveEffectivePlan(profile, session.user.user_metadata);
+        const cd = getSubscriptionDaysRemaining(profile);
+
         if (isMounted) {
           setPlan(currentPlan);
           setIsSubscribed(isPlanSubscribed(currentPlan));
+          setCountdown(cd);
           if (typeof window !== 'undefined') {
             localStorage.setItem('caution:user-plan', currentPlan);
           }
@@ -172,6 +252,11 @@ export function useUserSubscription() {
     plan,
     isSubscribed,
     isLoading,
-    previewLimitSeconds: FREE_PREVIEW_LIMIT_SECONDS
+    previewLimitSeconds: FREE_PREVIEW_LIMIT_SECONDS,
+    countdown,
+    daysRemaining: countdown.daysRemaining,
+    formattedResetDate: countdown.formattedResetDate,
+    percentRemaining: countdown.percentRemaining,
+    isExpiringSoon: countdown.isExpiringSoon
   };
 }

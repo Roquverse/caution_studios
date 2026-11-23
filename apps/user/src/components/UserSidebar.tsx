@@ -41,12 +41,17 @@ export function UserSidebar({
 }: UserSidebarProps) {
   const router = useRouter();
   const pathname = usePathname() || '/';
-  const [internalProfile, setInternalProfile] = useState<{ name: string; avatar: string }>({
+  const [internalProfile, setInternalProfile] = useState<{
+    name: string;
+    avatar: string;
+    subLabel?: string;
+  }>({
     name: 'Holy',
-    avatar: '/images/artist_studio_mic.jpg'
+    avatar: '/images/artist_studio_mic.jpg',
+    subLabel: 'Creator Account'
   });
 
-  const effectiveProfile = propUserProfile || internalProfile;
+  const effectiveProfile = propUserProfile ? { ...propUserProfile, subLabel: 'Creator Account' } : internalProfile;
 
   useEffect(() => {
     if (propUserProfile) return;
@@ -56,14 +61,26 @@ export function UserSidebar({
         if (session?.user) {
           const { data: p } = await supabase
             .from('profiles')
-            .select('display_name, handle, avatar_url')
+            .select('display_name, handle, avatar_url, plan, period_resets_at, created_at')
             .eq('id', session.user.id)
             .maybeSingle();
 
           if (p) {
+            let subLabel = 'Creator Account';
+            const plan = p.plan?.toLowerCase() || '';
+            if (plan === 'plus' || plan === 'pro') {
+              const resetTime = p.period_resets_at
+                ? new Date(p.period_resets_at).getTime()
+                : new Date(p.created_at).getTime() + 30 * 24 * 60 * 60 * 1000;
+              const days = Math.max(0, Math.ceil((resetTime - Date.now()) / (1000 * 60 * 60 * 24)));
+              const tierName = plan === 'pro' ? 'Caution Pro' : 'Caution Plus';
+              subLabel = `${tierName} • ${days}d left`;
+            }
+
             setInternalProfile({
               name: p.display_name || p.handle || session.user.email?.split('@')[0] || 'Holy',
-              avatar: p.avatar_url || '/images/artist_studio_mic.jpg'
+              avatar: p.avatar_url || '/images/artist_studio_mic.jpg',
+              subLabel
             });
           }
         }
@@ -262,7 +279,7 @@ export function UserSidebar({
             </div>
             <div className="min-w-0">
               <p className="text-xs font-bold text-white truncate">{effectiveProfile.name}</p>
-              <p className="text-[10px] text-gray-500 truncate">Creator Account</p>
+              <p className="text-[10px] text-gray-400 font-mono truncate">{effectiveProfile.subLabel || 'Creator Account'}</p>
             </div>
           </div>
           <ChevronDown className="h-4 w-4 text-gray-500" />

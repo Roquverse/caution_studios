@@ -19,12 +19,14 @@ import {
   X,
   Loader2,
   Sliders,
-  ChevronRight
+  ChevronRight,
+  Clock,
+  Calendar
 } from 'lucide-react';
 import { supabase } from '../../lib/supabaseClient';
 import { UserProfileData } from '../../components/UserDropdown';
 import { UserShell } from '../../components/UserShell';
-import { setCachedUserPlan, resolveEffectivePlan } from '../../lib/subscription';
+import { setCachedUserPlan, resolveEffectivePlan, getSubscriptionDaysRemaining } from '../../lib/subscription';
 
 interface InvoiceRecord {
   id: string;
@@ -358,6 +360,7 @@ export default function SubscriptionsPage() {
   const isPlus = currentPlan === 'plus';
   const isPro = currentPlan === 'pro';
   const isSubscribed = isPlus || isPro;
+  const countdown = getSubscriptionDaysRemaining(profile);
 
   return (
     <UserShell activePath="/subscriptions">
@@ -420,6 +423,45 @@ export default function SubscriptionsPage() {
                 ? 'Your Caution Plus plan includes 62 beats per month (2 daily free downloads + 2 ad bonus downloads) and commercial release rights. Upgrade to Caution Pro to unlock the in-browser Recording Studio and unlimited ad-free downloads.'
                 : 'Caution Studio requires an active membership. Choose Caution Plus (₦3,000/mo) or Caution Pro (₦10,000/mo) below to get full access, downloads, and commercial licensing.'}
             </p>
+
+            {/* Days Remaining Countdown Tracker */}
+            {isSubscribed && (
+              <div className="mt-4 p-4 rounded-xl bg-white/[0.03] border border-white/[0.08] space-y-2.5 max-w-xl">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="relative flex h-2.5 w-2.5">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+                    </span>
+                    <span className="text-xs font-bold text-white tracking-wide flex items-center gap-1.5">
+                      <Clock className="h-3.5 w-3.5 text-emerald-400" />
+                      <span>{countdown.daysRemaining} {countdown.daysRemaining === 1 ? 'Day' : 'Days'} Remaining</span>
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-[11px] font-mono text-zinc-400">
+                    <Calendar className="h-3 w-3 text-zinc-500" />
+                    <span>Cycle resets {countdown.formattedResetDate}</span>
+                  </div>
+                </div>
+
+                {/* Progress bar showing elapsed/remaining days in 30-day billing cycle */}
+                <div className="w-full h-2 rounded-full bg-white/[0.08] overflow-hidden">
+                  <div
+                    className={`h-full rounded-full transition-all duration-500 ${
+                      countdown.daysRemaining <= 3
+                        ? 'bg-amber-500 shadow-sm shadow-amber-500/50'
+                        : 'bg-gradient-to-r from-emerald-500 to-teal-400 shadow-sm shadow-emerald-500/50'
+                    }`}
+                    style={{ width: `${Math.max(4, countdown.percentRemaining)}%` }}
+                  />
+                </div>
+
+                <div className="flex items-center justify-between text-[10px] text-zinc-500 font-mono">
+                  <span>Day {Math.max(1, 30 - countdown.daysRemaining)} of 30</span>
+                  <span>{countdown.percentRemaining}% remaining this cycle</span>
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="shrink-0 flex items-center gap-3">

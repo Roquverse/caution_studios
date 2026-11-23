@@ -3,9 +3,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { User, Settings, CreditCard, LogOut, ChevronRight, Sparkles, Megaphone, Music2 } from 'lucide-react';
+import { User, Settings, CreditCard, LogOut, ChevronRight, Sparkles, Megaphone, Music2, Clock } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
-import { setCachedUserPlan, resolveEffectivePlan } from '../lib/subscription';
+import { setCachedUserPlan, resolveEffectivePlan, getSubscriptionDaysRemaining } from '../lib/subscription';
 
 export interface UserProfileData {
   id: string;
@@ -15,6 +15,8 @@ export interface UserProfileData {
   bio?: string | null;
   plan: 'free' | 'plus' | 'pro' | 'unsubscribed' | string;
   roles?: string[];
+  period_resets_at?: string | null;
+  created_at?: string | null;
 }
 
 export function UserDropdown() {
@@ -287,6 +289,14 @@ export function UserDropdown() {
                   <p className="text-[10px] text-gray-500 truncate mt-0.5 font-mono">
                     {email}
                   </p>
+                )}
+                {(isPro || isPlus) && (
+                  <div className="flex items-center gap-1.5 mt-2 pt-2 border-t border-white/[0.08] text-[10px] text-emerald-400 font-mono">
+                    <Clock className="h-3 w-3 shrink-0" />
+                    <span>
+                      {getSubscriptionDaysRemaining(profile).daysRemaining}d remaining • Resets {getSubscriptionDaysRemaining(profile).formattedResetDate}
+                    </span>
+                  </div>
                 )}
               </div>
             </div>

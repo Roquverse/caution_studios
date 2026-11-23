@@ -142,11 +142,13 @@ export async function POST(req: NextRequest) {
       }
 
       if (targetUserId) {
+        const periodResetsAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
         const { error: directErr } = await supabase
           .from('profiles')
           .update({
             plan: targetPlan as any,
-            stripe_customer_id: `plan:${targetPlan}`
+            stripe_customer_id: `plan:${targetPlan}`,
+            period_resets_at: periodResetsAt
           })
           .eq('id', targetUserId);
 
@@ -156,14 +158,15 @@ export async function POST(req: NextRequest) {
             .from('profiles')
             .update({
               plan: targetPlan === 'pro' ? 'plus' : targetPlan,
-              stripe_customer_id: `plan:${targetPlan}`
+              stripe_customer_id: `plan:${targetPlan}`,
+              period_resets_at: periodResetsAt
             })
             .eq('id', targetUserId);
         }
 
         try {
           await supabase.auth.admin.updateUserById(targetUserId, {
-            user_metadata: { plan: targetPlan }
+            user_metadata: { plan: targetPlan, period_resets_at: periodResetsAt }
           });
         } catch (e) {}
       } else {
