@@ -43,6 +43,7 @@ export interface BeatTrack {
   duration_seconds?: number;
   play_count?: number;
   free_commercial_downloads_count?: number;
+  is_free_stream_enabled?: boolean;
   status: 'draft' | 'live' | 'unlisted' | 'archived' | 'sold';
   created_at: string;
   producer?: {
@@ -64,6 +65,7 @@ export default function AdminTracksPage() {
   const [search, setSearch] = useState('');
   const [genreFilter, setGenreFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [modelFilter, setModelFilter] = useState<'all' | 'free' | 'paid'>('all');
 
   // Audio Playback
   const [playingTrackId, setPlayingTrackId] = useState<string | null>(null);
@@ -153,6 +155,8 @@ export default function AdminTracksPage() {
 
   // Edit Modal & Price Editing
   const [editingTrack, setEditingTrack] = useState<BeatTrack | null>(null);
+  const [editProducerName, setEditProducerName] = useState<string>('');
+  const [editIsFreeTrack, setEditIsFreeTrack] = useState<boolean>(false);
   const [editPremiumPriceNgn, setEditPremiumPriceNgn] = useState<number>(50000);
   const [editExclusivePriceNgn, setEditExclusivePriceNgn] = useState<number>(200000);
   const [editSaving, setEditSaving] = useState(false);
@@ -381,9 +385,17 @@ export default function AdminTracksPage() {
       const finalPremium = isFreeTrack ? 0 : (typeof premiumPrice === 'number' && premiumPrice > 0 ? premiumPrice : 50000);
       const finalExclusive = isFreeTrack ? 0 : (typeof exclusivePrice === 'number' && exclusivePrice > 0 ? exclusivePrice : 200000);
 
+      const tagsList = tags.trim() ? tags.split(',').map((t) => t.trim()).filter(Boolean) : ['Instrumental'];
+      if (isFreeTrack) {
+        if (!tagsList.includes('Free')) tagsList.push('Free');
+        if (!tagsList.includes('Free Download')) tagsList.push('Free Download');
+      }
+
       const payload = {
         title: title.trim(),
         artist: artist.trim() || 'Caution Studio',
+        isFreeTrack: Boolean(isFreeTrack),
+        isFreeBeat: Boolean(isFreeTrack),
         genre,
         bpm: bpm ? bpm : 120,
         musicalKey: musicalKey.trim() || 'C Minor',
@@ -391,7 +403,7 @@ export default function AdminTracksPage() {
         description: description.trim(),
         status,
         moods: [mood],
-        tags: tags.trim() ? tags.split(',').map((t) => t.trim()).filter(Boolean) : ['Instrumental'],
+        tags: tagsList,
         premiumPrice: Math.round(finalPremium * 100),
         exclusivePrice: Math.round(finalExclusive * 100),
         masterAudioKey,
@@ -535,14 +547,18 @@ export default function AdminTracksPage() {
 
     try {
       setEditSaving(true);
-      const premiumPriceCents = Math.round(Number(editPremiumPriceNgn) * 100);
-      const exclusivePriceCents = Math.round(Number(editExclusivePriceNgn) * 100);
+      const premiumPriceCents = editIsFreeTrack ? 0 : Math.round(Number(editPremiumPriceNgn) * 100);
+      const exclusivePriceCents = editIsFreeTrack ? 0 : Math.round(Number(editExclusivePriceNgn) * 100);
 
       const res = await fetch(`/api/tracks/${editingTrack.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           title: editingTrack.title,
+          artist: editProducerName.trim(),
+          producerName: editProducerName.trim(),
+          isFree: editIsFreeTrack,
+          isFreeTrack: editIsFreeTrack,
           genre: editingTrack.genre,
           bpm: editingTrack.bpm,
           musical_key: editingTrack.musical_key,
@@ -569,10 +585,17 @@ export default function AdminTracksPage() {
             ? {
               ...t,
               ...editingTrack,
-              licenses: updatedBeat?.licenses || [
-                { id: 'premium', beat_id: editingTrack.id, type: 'premium', price_cents: premiumPriceCents, enabled: true },
-                { id: 'exclusive', beat_id: editingTrack.id, type: 'exclusive', price_cents: exclusivePriceCents, enabled: true }
-              ]
+              is_free_stream_enabled: editIsFreeTrack,
+              producer: updatedBeat?.producer || (editProducerName ? { display_name: editProducerName.trim() } : t.producer),
+              licenses: updatedBeat?.licenses || (editIsFreeTrack ? [
+                { type: 'basic', price_cents: 1, enabled: true },
+                { type: 'premium', price_cents: 1, enabled: false },
+                { type: 'exclusive', price_cents: 1, enabled: false }
+              ] : [
+                { type: 'basic', price_cents: 1, enabled: false },
+                { type: 'premium', price_cents: premiumPriceCents, enabled: true },
+                { type: 'exclusive', price_cents: exclusivePriceCents, enabled: true }
+              ])
             }
             : t
         )
@@ -592,7 +615,24 @@ export default function AdminTracksPage() {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
+  const isTrackFree = (track: BeatTrack) => {
+    return Boolean(
+      track.is_free_stream_enabled === true ||
+      (track.tags || []).some((t) => t.toLowerCase() === 'free' || t.toLowerCase() === 'free download') ||
+      !track.licenses?.some((l) => (l.type === 'premium' || l.type === 'exclusive') && l.enabled && Number(l.price_cents) > 100)
+    );
+  };
+
   const getLicensePricing = (track: BeatTrack) => {
+    if (isTrackFree(track)) {
+      return (
+        <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 text-[10px] font-bold">
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+          <span>Free Download</span>
+        </div>
+      );
+    }
+
     const prem = track.licenses?.find((l) => l.type === 'premium');
     const excl = track.licenses?.find((l) => l.type === 'exclusive');
     const premStr = prem?.price_cents ? `₦${(prem.price_cents / 100).toLocaleString('en-NG')}` : '₦50,000';
@@ -617,12 +657,19 @@ export default function AdminTracksPage() {
       t.title.toLowerCase().includes(search.toLowerCase()) ||
       t.genre.toLowerCase().includes(search.toLowerCase()) ||
       (t.musical_key || '').toLowerCase().includes(search.toLowerCase()) ||
-      (t.tags || []).some((tag) => tag.toLowerCase().includes(search.toLowerCase()));
+      (t.tags || []).some((tag) => tag.toLowerCase().includes(search.toLowerCase())) ||
+      (t.producer?.display_name || '').toLowerCase().includes(search.toLowerCase());
 
     const matchesGenre = genreFilter === 'all' || t.genre.toLowerCase() === genreFilter.toLowerCase();
     const matchesStatus = statusFilter === 'all' || t.status === statusFilter;
+    const matchesModel =
+      modelFilter === 'all'
+        ? true
+        : modelFilter === 'free'
+        ? isTrackFree(t)
+        : !isTrackFree(t);
 
-    return matchesSearch && matchesGenre && matchesStatus;
+    return matchesSearch && matchesGenre && matchesStatus && matchesModel;
   });
 
   const totalCatalogPlays = tracks.reduce((acc, t) => acc + (t.play_count || 0), 0);
@@ -782,6 +829,17 @@ export default function AdminTracksPage() {
               <option value="unlisted">Unlisted / Hidden</option>
               <option value="draft">Draft</option>
               <option value="sold">Sold Exclusive</option>
+            </select>
+
+            {/* Distribution Model Select */}
+            <select
+              value={modelFilter}
+              onChange={(e) => setModelFilter(e.target.value as any)}
+              className="bg-[#16181d] border border-white/[0.06] text-xs font-semibold text-gray-300 rounded-xl py-2 px-3 focus:outline-none focus:border-[#e53935]/50"
+            >
+              <option value="all">All Models (Free &amp; Paid)</option>
+              <option value="free">Free Beats Only</option>
+              <option value="paid">Paid Beats Only</option>
             </select>
           </div>
 
@@ -999,10 +1057,13 @@ export default function AdminTracksPage() {
                               type="button"
                               onClick={() => {
                                 setEditingTrack(track);
+                                setEditProducerName(track.producer?.display_name || '');
+                                const isFree = isTrackFree(track);
+                                setEditIsFreeTrack(isFree);
                                 const premLic = track.licenses?.find((l) => l.type === 'premium');
                                 const exclLic = track.licenses?.find((l) => l.type === 'exclusive');
-                                setEditPremiumPriceNgn(premLic?.price_cents ? premLic.price_cents / 100 : 50000);
-                                setEditExclusivePriceNgn(exclLic?.price_cents ? exclLic.price_cents / 100 : 200000);
+                                setEditPremiumPriceNgn(premLic?.price_cents && !isFree ? premLic.price_cents / 100 : 50000);
+                                setEditExclusivePriceNgn(exclLic?.price_cents && !isFree ? exclLic.price_cents / 100 : 200000);
                               }}
                               className="p-2 rounded-xl text-gray-400 hover:text-white hover:bg-white/[0.06] transition-colors cursor-pointer"
                               title="Edit track"
@@ -1427,15 +1488,55 @@ export default function AdminTracksPage() {
             </div>
 
             <form onSubmit={handleEditSave} className="space-y-3.5 text-gray-200">
-              <div>
-                <label className="block text-xs font-bold text-gray-300 mb-1">Title</label>
-                <input
-                  type="text"
-                  required
-                  value={editingTrack.title}
-                  onChange={(e) => setEditingTrack({ ...editingTrack, title: e.target.value })}
-                  className="w-full text-xs rounded-xl border border-white/[0.06] p-2.5 bg-[#16181d] text-white focus:outline-none focus:border-[#e53935]/60"
-                />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                <div>
+                  <label className="block text-xs font-bold text-gray-300 mb-1">Title</label>
+                  <input
+                    type="text"
+                    required
+                    value={editingTrack.title}
+                    onChange={(e) => setEditingTrack({ ...editingTrack, title: e.target.value })}
+                    className="w-full text-xs rounded-xl border border-white/[0.06] p-2.5 bg-[#16181d] text-white focus:outline-none focus:border-[#e53935]/60"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-300 mb-1">Artist / Producer Name</label>
+                  <input
+                    type="text"
+                    value={editProducerName}
+                    onChange={(e) => setEditProducerName(e.target.value)}
+                    placeholder="Caution Studio"
+                    className="w-full text-xs rounded-xl border border-white/[0.06] p-2.5 bg-[#16181d] text-white focus:outline-none focus:border-[#e53935]/60"
+                  />
+                </div>
+              </div>
+
+              {/* Distribution Model Toggle */}
+              <div className="flex items-center justify-between p-3 rounded-xl bg-white/[0.02] border border-white/[0.06]">
+                <div>
+                  <span className="text-xs font-bold text-white block">Distribution Model</span>
+                  <span className="text-[10px] text-gray-400">Choose Free Download or Commercial Licensing</span>
+                </div>
+                <div className="flex items-center gap-1.5 p-1 rounded-lg bg-[#16181d] border border-white/[0.06]">
+                  <button
+                    type="button"
+                    onClick={() => setEditIsFreeTrack(false)}
+                    className={`px-3 py-1 rounded-md text-xs font-bold transition-all cursor-pointer ${
+                      !editIsFreeTrack ? 'bg-[#e53935] text-white shadow-sm' : 'text-gray-400 hover:text-white'
+                    }`}
+                  >
+                    Paid Beat
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEditIsFreeTrack(true)}
+                    className={`px-3 py-1 rounded-md text-xs font-bold transition-all cursor-pointer ${
+                      editIsFreeTrack ? 'bg-emerald-500 text-black shadow-sm' : 'text-gray-400 hover:text-white'
+                    }`}
+                  >
+                    Free Download
+                  </button>
+                </div>
               </div>
 
               <div className="grid grid-cols-2 gap-2.5">
@@ -1471,43 +1572,50 @@ export default function AdminTracksPage() {
                 </div>
               </div>
 
-              {/* Editable License Prices */}
-              <div className="grid grid-cols-2 gap-2.5">
-                <div>
-                  <label className="block text-xs font-bold text-gray-300 mb-1">
-                    Premium Lease Price (₦)
-                  </label>
-                  <div className="relative">
-                    <span className="absolute left-3 top-2 text-xs font-mono text-gray-400">₦</span>
-                    <input
-                      type="number"
-                      min="0"
-                      step="1000"
-                      value={editPremiumPriceNgn}
-                      onChange={(e) => setEditPremiumPriceNgn(Number(e.target.value))}
-                      className="w-full text-xs rounded-xl border border-white/[0.06] pl-7 p-2 bg-[#16181d] text-white font-mono focus:outline-none focus:border-[#e53935]/60"
-                      placeholder="50000"
-                    />
+              {/* Editable License Prices (Only for paid tracks) */}
+              {!editIsFreeTrack ? (
+                <div className="grid grid-cols-2 gap-2.5">
+                  <div>
+                    <label className="block text-xs font-bold text-gray-300 mb-1">
+                      Premium Lease Price (₦)
+                    </label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-2 text-xs font-mono text-gray-400">₦</span>
+                      <input
+                        type="number"
+                        min="0"
+                        step="1000"
+                        value={editPremiumPriceNgn}
+                        onChange={(e) => setEditPremiumPriceNgn(Number(e.target.value))}
+                        className="w-full text-xs rounded-xl border border-white/[0.06] pl-7 p-2 bg-[#16181d] text-white font-mono focus:outline-none focus:border-[#e53935]/60"
+                        placeholder="50000"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-300 mb-1">
+                      Exclusive Rights Price (₦)
+                    </label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-2 text-xs font-mono text-gray-400">₦</span>
+                      <input
+                        type="number"
+                        min="0"
+                        step="5000"
+                        value={editExclusivePriceNgn}
+                        onChange={(e) => setEditExclusivePriceNgn(Number(e.target.value))}
+                        className="w-full text-xs rounded-xl border border-white/[0.06] pl-7 p-2 bg-[#16181d] text-white font-mono focus:outline-none focus:border-[#e53935]/60"
+                        placeholder="200000"
+                      />
+                    </div>
                   </div>
                 </div>
-                <div>
-                  <label className="block text-xs font-bold text-gray-300 mb-1">
-                    Exclusive Rights Price (₦)
-                  </label>
-                  <div className="relative">
-                    <span className="absolute left-3 top-2 text-xs font-mono text-gray-400">₦</span>
-                    <input
-                      type="number"
-                      min="0"
-                      step="5000"
-                      value={editExclusivePriceNgn}
-                      onChange={(e) => setEditExclusivePriceNgn(Number(e.target.value))}
-                      className="w-full text-xs rounded-xl border border-white/[0.06] pl-7 p-2 bg-[#16181d] text-white font-mono focus:outline-none focus:border-[#e53935]/60"
-                      placeholder="200000"
-                    />
-                  </div>
+              ) : (
+                <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-semibold flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
+                  <span>100% Free Beat: Available for community stream and free download.</span>
                 </div>
-              </div>
+              )}
 
               <div className="grid grid-cols-2 gap-2.5">
                 <div>

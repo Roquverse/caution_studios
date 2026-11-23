@@ -107,7 +107,7 @@ export async function POST(req: NextRequest) {
     }
 
     const title = (bodyData.title as string) || '';
-    const artistName = (bodyData.artist as string) || 'Caution Studio';
+    const artistName = (bodyData.artist as string || bodyData.producerName as string || '').trim() || 'Caution Studio';
     const genre = (bodyData.genre as string) || 'Cinematic';
     const bpm = parseInt(bodyData.bpm as string, 10) || 120;
     const musicalKey = (bodyData.musicalKey as string) || 'C Minor';
@@ -115,9 +115,16 @@ export async function POST(req: NextRequest) {
     const description = (bodyData.description as string) || '';
     const status = (bodyData.status as string) || 'live';
 
-    // Pricing (in kobo / cents: ₦15,000 = 1500000, ₦45,000 = 4500000, ₦250,000 = 25000000)
-    const premiumPrice = parseInt(bodyData.premiumPrice as string, 10) || 5000000;
-    const exclusivePrice = parseInt(bodyData.exclusivePrice as string, 10) || 20000000;
+    // Free Beat / Distribution Model flag
+    const isFreeBeat =
+      bodyData.isFreeTrack === true ||
+      bodyData.isFreeTrack === 'true' ||
+      bodyData.isFreeBeat === true ||
+      bodyData.isFreeBeat === 'true';
+
+    // Pricing (in kobo / cents: ₦15,000 = 1500000, ₦50,000 = 5000000, ₦200,000 = 20000000)
+    const premiumPrice = isFreeBeat ? 0 : (parseInt(bodyData.premiumPrice as string, 10) || 5000000);
+    const exclusivePrice = isFreeBeat ? 0 : (parseInt(bodyData.exclusivePrice as string, 10) || 20000000);
 
     // Moods and Tags
     const moods = Array.isArray(bodyData.moods)
@@ -127,36 +134,83 @@ export async function POST(req: NextRequest) {
         : ['Epic'];
 
     const tags = Array.isArray(bodyData.tags)
-      ? bodyData.tags
+      ? [...bodyData.tags]
       : typeof bodyData.tags === 'string' && bodyData.tags.trim()
         ? bodyData.tags.split(',').map((t: string) => t.trim()).filter(Boolean)
         : ['Instrumental'];
+
+    if (isFreeBeat) {
+      if (!tags.includes('Free')) tags.push('Free');
+      if (!tags.includes('Free Download')) tags.push('Free Download');
+    }
 
     if (!title.trim()) {
       return NextResponse.json({ error: 'Title is required' }, { status: 400 });
     }
 
-    // 1. Resolve Producer Profile
+    // 1. Resolve Producer Profile matching entered artistName
     let producerId: string | null = null;
-    const { data: profiles } = await supabase.from('profiles').select('id, handle, display_name').limit(1);
-    if (profiles && profiles.length > 0) {
-      producerId = profiles[0].id;
-    } else {
-      // Create admin default profile if none exists
-      const { data: newProfile, error: pErr } = await supabase
-        .from('profiles')
-        .insert({
-          id: '64d47dcb-3d1f-41dd-8400-46f39c5b0750',
-          handle: 'caution_admin',
-          display_name: 'Caution Studio',
-          roles: ['producer', 'artist'],
-          plan: 'plus'
-        })
-        .select()
-        .single();
+    const safeArtist = artistName.trim();
+    const handleCandidate =
+      safeArtist
+        .toLowerCase()
+        .replace(/[^a-z0-9_]/g, '_')
+        .replace(/_+/g, '_')
+        .slice(0, 30) || 'producer';
 
-      if (newProfile) {
-        producerId = newProfile.id;
+    // Check if an existing profile matches this producer name or handle
+    const { data: matchedProfiles } = await supabase
+      .from('profiles')
+      .select('id, display_name, handle')
+      .or(`display_name.ilike.%${safeArtist}%,handle.ilike.%${handleCandidate}%`)
+      .limit(1);
+
+    if (matchedProfiles && matchedProfiles.length > 0) {
+      producerId = matchedProfiles[0].id;
+    } else {
+      // Create a dedicated producer account & profile so producer name is preserved across all apps
+      try {
+        const uniqueSuffix = Date.now().toString(36) + Math.random().toString(36).substring(2, 5);
+        const email = `producer_${handleCandidate}_${uniqueSuffix}@cautionstudioz.com`;
+        const { data: newUser } = await supabase.auth.admin.createUser({
+          email,
+          email_confirm: true,
+          user_metadata: {
+            full_name: safeArtist,
+            display_name: safeArtist,
+            handle: handleCandidate,
+            primary_role: 'producer',
+            roles: ['producer']
+          }
+        });
+
+        if (newUser?.user) {
+          const { data: newProf } = await supabase
+            .from('profiles')
+            .upsert({
+              id: newUser.user.id,
+              display_name: safeArtist,
+              handle: handleCandidate,
+              roles: ['producer'],
+              plan: 'plus'
+            })
+            .select('id')
+            .single();
+
+          if (newProf?.id) {
+            producerId = newProf.id;
+          }
+        }
+      } catch (err) {
+        console.warn('Could not auto-create producer profile:', err);
+      }
+    }
+
+    // Fallback: If still not resolved, query first available profile (admin)
+    if (!producerId) {
+      const { data: fallbackProfiles } = await supabase.from('profiles').select('id').limit(1);
+      if (fallbackProfiles && fallbackProfiles.length > 0) {
+        producerId = fallbackProfiles[0].id;
       }
     }
 
@@ -219,6 +273,8 @@ export async function POST(req: NextRequest) {
         musical_key: musicalKey,
         cover_url: coverUrl,
         status: status as any,
+        is_free_stream_enabled: isFreeBeat ? true : false,
+        producer_tag_free: true,
         master_wav_key: masterAudioKey,
         preview_clean_key: masterAudioKey,
         preview_tagged_key: masterAudioKey,
@@ -226,7 +282,15 @@ export async function POST(req: NextRequest) {
         duration_seconds: durationSeconds,
         published_at: status === 'live' ? new Date().toISOString() : null
       })
-      .select()
+      .select(`
+        *,
+        producer:producer_id (
+          id,
+          display_name,
+          handle,
+          avatar_url
+        )
+      `)
       .single();
 
     if (beatErr) {
@@ -234,12 +298,21 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: beatErr.message }, { status: 500 });
     }
 
-    // 6. Insert License Tiers into `beat_licenses` (Basic disabled, Premium & Exclusive active)
-    const licensesToInsert = [
-      { beat_id: newBeat.id, type: 'basic', price_cents: 1, enabled: false },
-      { beat_id: newBeat.id, type: 'premium', price_cents: premiumPrice, enabled: true },
-      { beat_id: newBeat.id, type: 'exclusive', price_cents: exclusivePrice, enabled: true }
-    ];
+    // 6. Insert License Tiers into `beat_licenses`
+    let licensesToInsert: Array<{ beat_id: string; type: string; price_cents: number; enabled: boolean }>;
+    if (isFreeBeat) {
+      licensesToInsert = [
+        { beat_id: newBeat.id, type: 'basic', price_cents: 1, enabled: true },
+        { beat_id: newBeat.id, type: 'premium', price_cents: 1, enabled: false },
+        { beat_id: newBeat.id, type: 'exclusive', price_cents: 1, enabled: false }
+      ];
+    } else {
+      licensesToInsert = [
+        { beat_id: newBeat.id, type: 'basic', price_cents: 1, enabled: false },
+        { beat_id: newBeat.id, type: 'premium', price_cents: premiumPrice, enabled: true },
+        { beat_id: newBeat.id, type: 'exclusive', price_cents: exclusivePrice, enabled: true }
+      ];
+    }
 
     const { error: licErr } = await supabase.from('beat_licenses').insert(licensesToInsert);
     if (licErr) {
@@ -262,10 +335,11 @@ export async function POST(req: NextRequest) {
         'Genre': genre,
         'BPM': bpm,
         'Musical Key': musicalKey,
+        'Distribution': isFreeBeat ? 'Free Download (100% Free)' : 'Paid Commercial Release',
         'Master Audio Key': masterAudioKey || 'None',
         'Stems ZIP Key': stemsKey || 'None',
-        'Premium License': `₦${(premiumPrice / 100).toLocaleString('en-NG')}`,
-        'Exclusive License': `₦${(exclusivePrice / 100).toLocaleString('en-NG')}`
+        'Premium License': isFreeBeat ? 'Free' : `₦${(premiumPrice / 100).toLocaleString('en-NG')}`,
+        'Exclusive License': isFreeBeat ? 'Free' : `₦${(exclusivePrice / 100).toLocaleString('en-NG')}`
       },
       ctaUrl: `https://admin.cautionstudioz.com/tracks`,
       ctaText: 'View in Admin Catalog'
@@ -275,7 +349,7 @@ export async function POST(req: NextRequest) {
       success: true,
       beat: {
         ...newBeat,
-        producer: { display_name: artistName },
+        producer: newBeat.producer || { display_name: artistName },
         licenses: licensesToInsert
       }
     });

@@ -56,19 +56,109 @@ export async function PATCH(
     if (body.moods !== undefined) updateFields.moods = body.moods;
     if (body.tags !== undefined) updateFields.tags = body.tags;
 
+    // 1. Resolve & update Producer Name if changed
+    const targetArtist = (body.artist || body.producerName || '').trim();
+    if (targetArtist) {
+      const handleCandidate = targetArtist.toLowerCase().replace(/[^a-z0-9_]/g, '_').replace(/_+/g, '_').slice(0, 30) || 'producer';
+      const { data: matched } = await supabase
+        .from('profiles')
+        .select('id')
+        .or(`display_name.ilike.%${targetArtist}%,handle.ilike.%${handleCandidate}%`)
+        .limit(1);
+
+      if (matched && matched.length > 0) {
+        updateFields.producer_id = matched[0].id;
+      } else {
+        try {
+          const uniqueSuffix = Date.now().toString(36) + Math.random().toString(36).substring(2, 5);
+          const email = `producer_${handleCandidate}_${uniqueSuffix}@cautionstudioz.com`;
+          const { data: newUser } = await supabase.auth.admin.createUser({
+            email,
+            email_confirm: true,
+            user_metadata: {
+              full_name: targetArtist,
+              display_name: targetArtist,
+              handle: handleCandidate,
+              primary_role: 'producer',
+              roles: ['producer']
+            }
+          });
+
+          if (newUser?.user) {
+            const { data: newProf } = await supabase
+              .from('profiles')
+              .upsert({
+                id: newUser.user.id,
+                display_name: targetArtist,
+                handle: handleCandidate,
+                roles: ['producer'],
+                plan: 'plus'
+              })
+              .select('id')
+              .single();
+
+            if (newProf?.id) {
+              updateFields.producer_id = newProf.id;
+            }
+          }
+        } catch (e) {
+          console.warn('Could not auto-create producer profile on edit:', e);
+        }
+      }
+    }
+
+    // 2. Free vs Paid Beat distribution flag
+    const hasFreeFlag = body.isFree !== undefined || body.isFreeTrack !== undefined;
+    const isFree = Boolean(body.isFree !== undefined ? body.isFree : body.isFreeTrack);
+    if (hasFreeFlag) {
+      updateFields.is_free_stream_enabled = isFree;
+      if (isFree) {
+        const currentTags = Array.isArray(updateFields.tags)
+          ? updateFields.tags
+          : Array.isArray(body.tags)
+            ? body.tags
+            : [];
+        if (!currentTags.includes('Free')) currentTags.push('Free');
+        if (!currentTags.includes('Free Download')) currentTags.push('Free Download');
+        updateFields.tags = currentTags;
+      }
+    }
+
     const { data: updated, error } = await supabase
       .from('beats')
       .update(updateFields)
       .eq('id', params.id)
-      .select()
+      .select(`
+        *,
+        producer:producer_id (
+          id,
+          display_name,
+          handle,
+          avatar_url
+        )
+      `)
       .single();
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    // Update licenses if provided
-    if (body.premiumPrice || body.exclusivePrice) {
+    // 3. Update licenses according to Free vs Paid status
+    if (hasFreeFlag && isFree) {
+      await supabase.from('beat_licenses').upsert([
+        { beat_id: params.id, type: 'basic', price_cents: 1, enabled: true },
+        { beat_id: params.id, type: 'premium', price_cents: 1, enabled: false },
+        { beat_id: params.id, type: 'exclusive', price_cents: 1, enabled: false }
+      ], { onConflict: 'beat_id,type' });
+    } else if (hasFreeFlag && !isFree) {
+      const premPrice = Number(body.premiumPrice) || 5000000;
+      const exclPrice = Number(body.exclusivePrice) || 20000000;
+      await supabase.from('beat_licenses').upsert([
+        { beat_id: params.id, type: 'basic', price_cents: 1, enabled: false },
+        { beat_id: params.id, type: 'premium', price_cents: premPrice, enabled: true },
+        { beat_id: params.id, type: 'exclusive', price_cents: exclPrice, enabled: true }
+      ], { onConflict: 'beat_id,type' });
+    } else if (body.premiumPrice || body.exclusivePrice) {
       if (body.premiumPrice) {
         await supabase
           .from('beat_licenses')
@@ -85,7 +175,7 @@ export async function PATCH(
             { onConflict: 'beat_id,type' }
           );
       }
-      // Keep basic disabled
+      // Keep basic disabled for paid beats
       await supabase
         .from('beat_licenses')
         .upsert(
