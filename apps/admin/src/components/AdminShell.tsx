@@ -25,7 +25,8 @@ import {
   Tag,
   Megaphone,
   ArrowRight,
-  Crown
+  Crown,
+  DollarSign
 } from 'lucide-react';
 
 interface AdminShellProps {
@@ -247,6 +248,12 @@ export function AdminShell({ children, activePath, onOpenUpload }: AdminShellPro
 
   const navManagement = [
     {
+      label: 'Payouts & Revenue',
+      href: '/payouts',
+      icon: DollarSign,
+      badge: 'Ledger'
+    },
+    {
       label: 'Subscribers & Users',
       href: '/users',
       icon: Users,
@@ -273,6 +280,7 @@ export function AdminShell({ children, activePath, onOpenUpload }: AdminShellPro
   ];
 
   const getBreadcrumbTitle = () => {
+    if (pathname === '/payouts') return 'Payouts & Revenue Ledger';
     if (pathname === '/tracks') return 'Master Catalog';
     if (pathname === '/genres') return 'Genre Management';
     if (pathname === '/users') return 'Subscribers & Users';

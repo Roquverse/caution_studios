@@ -734,21 +734,50 @@ export default function AdminDashboardPage() {
 
         {/* Tab 3: Reports & Audit */}
         {activeTab === 'reports' && (
-          <div className="rounded-2xl border border-white/[0.06] bg-[#12141c] p-6 shadow-sm space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-white/[0.06]">
-              <div>
-                <h3 className="text-sm font-bold text-white">Financial & Order Audit Log</h3>
-                <p className="text-xs text-gray-400 mt-0.5">Real-time ledger of recorded payments and license purchases</p>
+          <div className="space-y-6">
+            {/* Executive Payouts & Revenue Quick Banner */}
+            <div className="p-5 rounded-2xl bg-gradient-to-r from-[#12141c] via-[#1a1520] to-[#12141c] border border-white/[0.08] flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <span className="px-2 py-0.5 rounded text-[10px] font-bold font-mono uppercase bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                    Revenue & Royalties Split
+                  </span>
+                  <span className="text-xs text-gray-400 font-mono">
+                    80% Producer / 20% Platform
+                  </span>
+                </div>
+                <h3 className="text-base font-bold text-white">
+                  Monthly Balance of Products Sold & Producer Royalties
+                </h3>
+                <p className="text-xs text-gray-400 max-w-xl">
+                  Inspect the complete balance sheet of beat licenses sold, subscription revenue, producer balances owed, and pending creator withdrawal requests.
+                </p>
               </div>
-              <button
-                type="button"
-                onClick={handleExportCSV}
-                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-white/[0.08] bg-white/[0.04] hover:bg-white/[0.08] text-xs font-bold text-white transition-colors cursor-pointer"
+
+              <Link
+                href="/payouts"
+                className="px-4 py-2.5 rounded-xl bg-[#e53935] hover:bg-[#d32f2f] text-white text-xs font-bold transition-all shadow-lg shadow-[#e53935]/25 flex items-center gap-2 shrink-0 self-start md:self-auto cursor-pointer"
               >
-                <Download className="h-3.5 w-3.5 text-gray-400" />
-                <span>Export CSV Ledger</span>
-              </button>
+                <span>Open Full Payouts & Revenue Ledger</span>
+                <ArrowRight className="h-4 w-4" />
+              </Link>
             </div>
+
+            <div className="rounded-2xl border border-white/[0.06] bg-[#12141c] p-6 shadow-sm space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-white/[0.06]">
+                <div>
+                  <h3 className="text-sm font-bold text-white">Financial & Order Audit Log</h3>
+                  <p className="text-xs text-gray-400 mt-0.5">Real-time ledger of recorded payments and license purchases</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleExportCSV}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-white/[0.08] bg-white/[0.04] hover:bg-white/[0.08] text-xs font-bold text-white transition-colors cursor-pointer"
+                >
+                  <Download className="h-3.5 w-3.5 text-gray-400" />
+                  <span>Export CSV Ledger</span>
+                </button>
+              </div>
 
             {stats.recentOrders.length === 0 ? (
               <div className="py-12 text-center text-gray-500 text-xs font-mono">
@@ -812,6 +841,7 @@ export default function AdminDashboardPage() {
               </div>
             )}
           </div>
+        </div>
         )}
       </div>
     </AdminShell>
