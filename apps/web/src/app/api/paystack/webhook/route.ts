@@ -8,7 +8,7 @@ export async function POST(req: NextRequest) {
   try {
     const rawBody = await req.text();
     const signature = req.headers.get('x-paystack-signature');
-    const secret = process.env.PAYSTACK_SECRET_KEY;
+    const secret = process.env.PAYSTACK_WEBHOOK_SECRET || process.env.PAYSTACK_SECRET_KEY;
 
     // Fail-secure: If in production or live key exists, signature is strictly required
     const isProd = process.env.NODE_ENV === 'production';
@@ -30,7 +30,20 @@ export async function POST(req: NextRequest) {
         hashBuffer.length !== signatureBuffer.length ||
         !crypto.timingSafeEqual(hashBuffer, signatureBuffer)
       ) {
-        return NextResponse.json({ error: 'Invalid webhook signature' }, { status: 401 });
+        // Fallback: Check if PAYSTACK_SECRET_KEY was used if PAYSTACK_WEBHOOK_SECRET is different
+        const altSecret = process.env.PAYSTACK_SECRET_KEY;
+        let altValid = false;
+        if (altSecret && altSecret !== secret) {
+          const altHash = crypto.createHmac('sha512', altSecret).update(rawBody).digest('hex');
+          const altHashBuf = Buffer.from(altHash, 'hex');
+          if (altHashBuf.length === signatureBuffer.length && crypto.timingSafeEqual(altHashBuf, signatureBuffer)) {
+            altValid = true;
+          }
+        }
+
+        if (!altValid) {
+          return NextResponse.json({ error: 'Invalid webhook signature' }, { status: 401 });
+        }
       }
     } else if (isProd) {
       // In production without a secret key configured, reject webhook
@@ -67,14 +80,39 @@ export async function POST(req: NextRequest) {
             ? 'pro'
             : 'plus';
 
-        if (metadata.user_id) {
+        let targetUserId = metadata.user_id;
+        const customerEmail = (data.customer?.email || metadata.email || '').toLowerCase().trim();
+
+        if (!targetUserId && customerEmail) {
+          try {
+            const { data: matchedProfile } = await supabase
+              .from('profiles')
+              .select('id')
+              .ilike('email', customerEmail)
+              .maybeSingle();
+
+            if (matchedProfile?.id) {
+              targetUserId = matchedProfile.id;
+            } else {
+              const { data: authList } = await supabase.auth.admin.listUsers({ perPage: 100 });
+              const matchedUser = authList?.users?.find(
+                (u) => u.email?.toLowerCase().trim() === customerEmail
+              );
+              if (matchedUser?.id) targetUserId = matchedUser.id;
+            }
+          } catch (e) {
+            console.warn('Error matching customer by email in web webhook:', e);
+          }
+        }
+
+        if (targetUserId) {
           const { error: directErr } = await supabase
             .from('profiles')
             .update({
               plan: targetPlan as any,
               stripe_customer_id: `plan:${targetPlan}`
             })
-            .eq('id', metadata.user_id);
+            .eq('id', targetUserId);
 
           if (directErr) {
             await supabase
@@ -83,11 +121,11 @@ export async function POST(req: NextRequest) {
                 plan: targetPlan === 'pro' ? 'plus' : targetPlan,
                 stripe_customer_id: `plan:${targetPlan}`
               })
-              .eq('id', metadata.user_id);
+              .eq('id', targetUserId);
           }
 
           try {
-            await supabase.auth.admin.updateUserById(metadata.user_id, {
+            await supabase.auth.admin.updateUserById(targetUserId, {
               user_metadata: { plan: targetPlan }
             });
           } catch (e) {}

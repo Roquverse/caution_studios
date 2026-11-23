@@ -41,7 +41,24 @@ export async function POST(req: NextRequest) {
     const metadata = data.metadata || {};
     const supabase = getServiceRoleClient();
 
-    // 1. Handle Subscription Verification (Caution Plus @ 3k or Caution Pro @ 30k)
+    // 0. Extract user from Authorization Bearer token if provided
+    let authHeaderUserId: string | null = null;
+    let authHeaderEmail: string | null = null;
+    const authHeader = req.headers.get('authorization');
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      try {
+        const token = authHeader.replace('Bearer ', '').trim();
+        const { data: authUserData } = await supabase.auth.getUser(token);
+        if (authUserData?.user) {
+          authHeaderUserId = authUserData.user.id;
+          authHeaderEmail = authUserData.user.email || null;
+        }
+      } catch (authErr) {
+        console.warn('Could not verify bearer token in paystack verify:', authErr);
+      }
+    }
+
+    // 1. Handle Subscription Verification (Caution Plus @ 3k or Caution Pro @ 10k/30k)
     const isSubscription =
       metadata.type === 'subscription' ||
       metadata.plan === 'plus' ||
@@ -65,30 +82,63 @@ export async function POST(req: NextRequest) {
           ? 'pro'
           : 'plus';
 
-      let targetUserId = metadata.user_id || bodyUserId;
+      let targetUserId =
+        bodyUserId ||
+        authHeaderUserId ||
+        metadata.user_id ||
+        metadata.userId;
 
-      // If user ID was not passed, find the user by email via auth.admin
-      if (!targetUserId) {
-        const customerEmail = (data.customer?.email || bodyEmail || '').toLowerCase().trim();
-        if (customerEmail) {
-          try {
-            const { data: authList } = await supabase.auth.admin.listUsers();
-            const matchedUser = authList?.users?.find(
-              (u) => u.email?.toLowerCase().trim() === customerEmail
-            );
-            if (matchedUser?.id) targetUserId = matchedUser.id;
-          } catch (e) {}
+      const customerEmail = (
+        data.customer?.email ||
+        bodyEmail ||
+        authHeaderEmail ||
+        metadata.email ||
+        metadata.user_email ||
+        ''
+      ).toLowerCase().trim();
+
+      // If user ID was not passed, resolve user by email via profiles or auth.admin
+      if (!targetUserId && customerEmail) {
+        try {
+          // Check profiles table first (direct lookup)
+          const { data: matchedProfile } = await supabase
+            .from('profiles')
+            .select('id')
+            .ilike('email', customerEmail)
+            .maybeSingle();
+
+          if (matchedProfile?.id) {
+            targetUserId = matchedProfile.id;
+          } else {
+            // Paginated auth users lookup
+            let page = 1;
+            let hasMore = true;
+            while (hasMore && !targetUserId) {
+              const { data: authList, error: authErr } = await supabase.auth.admin.listUsers({
+                page,
+                perPage: 100
+              });
+              if (authErr || !authList?.users || authList.users.length === 0) {
+                hasMore = false;
+                break;
+              }
+              const matchedUser = authList.users.find(
+                (u) => u.email?.toLowerCase().trim() === customerEmail
+              );
+              if (matchedUser?.id) {
+                targetUserId = matchedUser.id;
+                break;
+              }
+              if (authList.users.length < 100) {
+                hasMore = false;
+              } else {
+                page++;
+              }
+            }
+          }
+        } catch (e) {
+          console.warn('Error matching customer by email in verify:', e);
         }
-      }
-
-      // If still not identified, fallback to the first profile or caller
-      if (!targetUserId) {
-        const { data: firstProf } = await supabase
-          .from('profiles')
-          .select('id')
-          .limit(1)
-          .maybeSingle();
-        targetUserId = firstProf?.id || null;
       }
 
       if (targetUserId) {
@@ -116,6 +166,12 @@ export async function POST(req: NextRequest) {
             user_metadata: { plan: targetPlan }
           });
         } catch (e) {}
+      } else {
+        console.warn('Could not associate subscription transaction with a specific user:', {
+          reference,
+          customerEmail,
+          metadata
+        });
       }
 
       // Check if order already recorded

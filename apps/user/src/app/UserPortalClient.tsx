@@ -508,13 +508,28 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
     const allRefs = urlParams.getAll('reference');
     const paystackRef = allRefs.find((r) => r.startsWith('CS_')) || allRefs[allRefs.length - 1] || urlParams.get('trxref') || urlParams.get('reference');
     if (paystackRef) {
-      fetch('/api/paystack/verify', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ reference: paystackRef })
-      })
-        .then((res) => res.json())
-        .then((data) => {
+      (async () => {
+        try {
+          const sessionRes = await supabase.auth.getSession();
+          const session = sessionRes.data.session;
+          const currentUserId = session?.user?.id || null;
+          const currentUserEmail = session?.user?.email || null;
+          const authToken = session?.access_token;
+
+          const res = await fetch('/api/paystack/verify', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              ...(authToken ? { Authorization: `Bearer ${authToken}` } : {})
+            },
+            body: JSON.stringify({
+              reference: paystackRef,
+              userId: currentUserId,
+              email: currentUserEmail
+            })
+          });
+
+          const data = await res.json();
           if (data.verified || data.status) {
             const planTier = data.plan === 'pro' ? 'pro' : (data.plan === 'plus' || data.type === 'subscription' ? 'plus' : null);
             if (planTier === 'pro') {
@@ -537,10 +552,10 @@ export function UserPortalClient({ initialBeats, initialProducers }: UserPortalC
             }
             window.history.replaceState({}, document.title, window.location.pathname);
           }
-        })
-        .catch((err) => {
+        } catch (err) {
           console.error('Paystack verification error:', err);
-        });
+        }
+      })();
     }
   }, []);
 

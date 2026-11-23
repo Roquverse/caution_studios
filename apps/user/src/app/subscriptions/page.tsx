@@ -148,31 +148,45 @@ export default function SubscriptionsPage() {
 
       if (paystackRef) {
         setIsLoading(true);
-        fetch('/api/paystack/verify', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            reference: paystackRef,
-            order_id: orderId,
-            plan: orderId?.includes('pro') || paystackRef.includes('pro') ? 'pro' : 'plus'
-          })
-        })
-          .then((r) => r.json())
-          .then(async (data) => {
+        (async () => {
+          try {
+            const { data: { session } } = await supabase.auth.getSession();
+            const currentUserId = session?.user?.id || profile?.id;
+            const currentUserEmail = session?.user?.email || (profile as any)?.email;
+            const authToken = session?.access_token;
+
+            const r = await fetch('/api/paystack/verify', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                ...(authToken ? { Authorization: `Bearer ${authToken}` } : {})
+              },
+              body: JSON.stringify({
+                reference: paystackRef,
+                order_id: orderId,
+                plan: orderId?.includes('pro') || paystackRef.includes('pro') ? 'pro' : 'plus',
+                userId: currentUserId,
+                email: currentUserEmail
+              })
+            });
+
+            const data = await r.json();
             if (data.verified || data.status) {
               const targetPlan = data.plan === 'pro' ? 'pro' : 'plus';
               setCurrentPlan(targetPlan);
               setCachedUserPlan(targetPlan);
-              const { data: { session } } = await supabase.auth.getSession();
-              await loadBillingInvoices(session?.user?.id || profile?.id, targetPlan);
+              await loadBillingInvoices(currentUserId, targetPlan);
               setNotification(
                 `🎉 Payment verified via Paystack! Caution ${targetPlan === 'pro' ? 'Pro' : 'Plus'} membership is active.`
               );
               window.history.replaceState({}, document.title, window.location.pathname);
             }
-          })
-          .catch((e) => console.error('Paystack verification error:', e))
-          .finally(() => setIsLoading(false));
+          } catch (e) {
+            console.error('Paystack verification error:', e);
+          } finally {
+            setIsLoading(false);
+          }
+        })();
       }
     }
   }, []);
