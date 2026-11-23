@@ -1,4 +1,4 @@
-import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
+import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand, HeadObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
 const accountId = process.env.R2_ACCOUNT_ID || 'f36f0330e251899bfc0d1eff48a006b6';
@@ -57,4 +57,16 @@ export async function getPresignedDownloadUrl(key: string, filename?: string, ex
     ResponseContentDisposition: `attachment; filename="${asciiFilename}"; filename*=UTF-8''${encodedFilename}`
   });
   return await getSignedUrl(r2, command, { expiresIn });
+}
+
+export async function checkObjectExistsInR2(key: string): Promise<boolean> {
+  try {
+    await r2.send(new HeadObjectCommand({
+      Bucket: R2_BUCKET,
+      Key: key
+    }));
+    return true;
+  } catch (err: any) {
+    return false;
+  }
 }

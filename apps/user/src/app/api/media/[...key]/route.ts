@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getFromR2, getPresignedDownloadUrl } from '../../../../lib/r2Server';
+import { getFromR2, getPresignedDownloadUrl, checkObjectExistsInR2 } from '../../../../lib/r2Server';
 
 export async function GET(
   req: NextRequest,
@@ -27,11 +27,20 @@ export async function GET(
     const isDownload = req.nextUrl.searchParams.get('download') === '1' || req.nextUrl.searchParams.get('download') === 'true';
     const customFilename = req.nextUrl.searchParams.get('filename') || fullKey.split('/').pop() || 'caution-track.mp3';
 
-    // If downloading, generate a presigned R2 URL with ResponseContentDisposition
-    // so Cloudflare R2 serves the exact header: Content-Disposition: attachment; filename="[Title] - [Producer].mp3"
+    // If downloading, check that object exists in storage and generate a presigned R2 URL
+    // with ResponseContentDisposition so Cloudflare R2 serves the exact header:
+    // Content-Disposition: attachment; filename="[Title] - [Producer].mp3"
     // This ensures all browsers (iOS Safari, Android, Chrome) save the file with the clean title & creator name.
     if (isDownload) {
       try {
+        const exists = await checkObjectExistsInR2(fullKey);
+        if (!exists) {
+          return NextResponse.json(
+            { error: 'This audio file is still uploading or processing in storage. Please wait a few moments and try again.' },
+            { status: 404 }
+          );
+        }
+
         const presignedDownloadUrl = await getPresignedDownloadUrl(fullKey, customFilename);
         return NextResponse.redirect(presignedDownloadUrl, { status: 307 });
       } catch (presignErr) {

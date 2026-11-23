@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getPresignedDownloadUrl } from '../../../../lib/r2Server';
+import { getPresignedDownloadUrl, checkObjectExistsInR2 } from '../../../../lib/r2Server';
 import { verifyAdminRequest } from '../../../../lib/adminAuth';
 import { getServiceRoleClient } from '../../../../lib/supabaseClient';
 
@@ -64,6 +64,14 @@ export async function POST(req: NextRequest) {
       } catch (countErr) {
         console.warn('Could not increment download count on admin download:', countErr);
       }
+    }
+
+    const exists = await checkObjectExistsInR2(targetKey);
+    if (!exists) {
+      return NextResponse.json(
+        { error: 'Asset not found in storage. It may still be uploading or was removed.' },
+        { status: 404 }
+      );
     }
 
     try {
