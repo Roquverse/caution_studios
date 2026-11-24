@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getFromR2, getPresignedDownloadUrl, checkObjectExistsInR2 } from '../../../../lib/r2Server';
+import { getServiceRoleClient } from '../../../../lib/supabaseClient';
 
 export async function GET(
   req: NextRequest,
@@ -32,6 +33,93 @@ export async function GET(
     // Content-Disposition: attachment; filename="[Title] - [Producer].mp3"
     // This ensures all browsers (iOS Safari, Android, Chrome) save the file with the clean title & creator name.
     if (isDownload) {
+      // Record commercial download telemetry and creator download incentives in Supabase
+      try {
+        const supabase = getServiceRoleClient();
+        let { data: matchedBeat } = await supabase
+          .from('beats')
+          .select('id, producer_id, free_commercial_downloads_count')
+          .or(`master_wav_key.eq.${fullKey},preview_clean_key.eq.${fullKey},preview_tagged_key.eq.${fullKey},stems_zip_key.eq.${fullKey}`)
+          .limit(1)
+          .maybeSingle();
+
+        if (!matchedBeat) {
+          const stripped = fullKey.replace(/^(masters|stems|previews|audio)\//, '');
+          const { data: fallbackBeat } = await supabase
+            .from('beats')
+            .select('id, producer_id, free_commercial_downloads_count')
+            .or(`master_wav_key.ilike.%${stripped}%,preview_clean_key.ilike.%${stripped}%`)
+            .limit(1)
+            .maybeSingle();
+          matchedBeat = fallbackBeat;
+        }
+
+        if (matchedBeat) {
+          const newCount = (matchedBeat.free_commercial_downloads_count || 0) + 1;
+          await supabase
+            .from('beats')
+            .update({ free_commercial_downloads_count: newCount })
+            .eq('id', matchedBeat.id);
+
+          // Update producer monthly download incentive tracker if producer_id exists
+          if (matchedBeat.producer_id) {
+            const currentMonthPeriod = new Date().toISOString().slice(0, 7) + '-01';
+            const { data: monthRow } = await supabase
+              .from('producer_download_incentives')
+              .select('*')
+              .eq('producer_id', matchedBeat.producer_id)
+              .eq('month_period', currentMonthPeriod)
+              .maybeSingle();
+
+            if (monthRow) {
+              const newQualifying = (Number(monthRow.qualifying_downloads) || 0) + 1;
+              const currentMilestones = Number(monthRow.milestones_reached) || 0;
+              const newMilestones = Math.floor(newQualifying / 10000);
+              const newReward = newMilestones * 30000;
+
+              await supabase
+                .from('producer_download_incentives')
+                .update({
+                  qualifying_downloads: newQualifying,
+                  milestones_reached: newMilestones,
+                  reward_amount_ngn: newReward
+                })
+                .eq('id', monthRow.id);
+
+              if (newMilestones > currentMilestones) {
+                const addedReward = (newMilestones - currentMilestones) * 30000;
+                const { data: prodProfile } = await supabase
+                  .from('profiles')
+                  .select('available_balance_ngn')
+                  .eq('id', matchedBeat.producer_id)
+                  .maybeSingle();
+
+                await supabase
+                  .from('profiles')
+                  .update({
+                    is_verified: true,
+                    available_balance_ngn: (Number(prodProfile?.available_balance_ngn) || 0) + addedReward
+                  })
+                  .eq('id', matchedBeat.producer_id);
+              }
+            } else {
+              await supabase
+                .from('producer_download_incentives')
+                .insert({
+                  producer_id: matchedBeat.producer_id,
+                  month_period: currentMonthPeriod,
+                  qualifying_downloads: 1,
+                  milestones_reached: 0,
+                  reward_amount_ngn: 0,
+                  payout_status: 'pending'
+                });
+            }
+          }
+        }
+      } catch (dlTelemetryErr) {
+        console.warn('Error recording download telemetry in media route:', dlTelemetryErr);
+      }
+
       try {
         const exists = await checkObjectExistsInR2(fullKey);
         if (!exists) {

@@ -43,6 +43,7 @@ export interface BeatTrack {
   duration_seconds?: number;
   play_count?: number;
   free_commercial_downloads_count?: number;
+  download_count?: number;
   is_free_stream_enabled?: boolean;
   status: 'draft' | 'live' | 'unlisted' | 'archived' | 'sold';
   created_at: string;
@@ -107,6 +108,21 @@ export default function AdminTracksPage() {
         throw new Error(data.error || 'Failed to generate download URL');
       }
 
+      // Optimistically increment download count in tracks state
+      setTracks((prev) =>
+        prev.map((t) =>
+          t.id === track.id
+            ? {
+                ...t,
+                free_commercial_downloads_count:
+                  typeof data.downloadCount === 'number'
+                    ? data.downloadCount
+                    : (t.free_commercial_downloads_count || 0) + 1
+              }
+            : t
+        )
+      );
+
       // Trigger instant browser download
       const a = document.createElement('a');
       a.href = data.downloadUrl;
@@ -115,6 +131,11 @@ export default function AdminTracksPage() {
       a.click();
       document.body.removeChild(a);
       setOpenDownloadMenuId(null);
+
+      // Re-fetch tracks in background to sync any other telemetry
+      setTimeout(() => {
+        fetchTracks();
+      }, 1200);
     } catch (err: any) {
       alert(err.message || 'Error downloading beat asset');
     } finally {
@@ -673,7 +694,7 @@ export default function AdminTracksPage() {
   });
 
   const totalCatalogPlays = tracks.reduce((acc, t) => acc + (t.play_count || 0), 0);
-  const totalCatalogDownloads = tracks.reduce((acc, t) => acc + (t.free_commercial_downloads_count || 0), 0);
+  const totalCatalogDownloads = tracks.reduce((acc, t) => acc + Number(t.free_commercial_downloads_count || (t as any).download_count || 0), 0);
   const liveTracksCount = tracks.filter((t) => t.status === 'live').length;
   const soldTracksCount = tracks.filter((t) => t.status === 'sold').length;
 
@@ -969,7 +990,7 @@ export default function AdminTracksPage() {
                             {(track.play_count || 0).toLocaleString()} plays
                           </div>
                           <div className="text-gray-400 text-[10px]">
-                            {(track.free_commercial_downloads_count || 0).toLocaleString()} dl
+                            {Number(track.free_commercial_downloads_count || (track as any).download_count || 0).toLocaleString()} dl
                           </div>
                         </td>
 

@@ -29,19 +29,62 @@ const DEFAULT_GENRES: GenreItem[] = [
   { id: 'rock', name: 'Rock', slug: 'rock', description: 'Electric guitars, live acoustic drums, alternative and indie energies.' }
 ];
 
-function readGenres(): GenreItem[] {
+async function getStoredGenres(supabase: any): Promise<GenreItem[]> {
+  // 1. Primary source: Supabase platform_settings table
+  try {
+    const { data, error } = await supabase
+      .from('platform_settings')
+      .select('value')
+      .eq('key', 'catalog_genres')
+      .maybeSingle();
+
+    if (!error && data?.value && Array.isArray(data.value) && data.value.length > 0) {
+      return data.value;
+    }
+  } catch (err) {
+    console.warn('Error reading catalog_genres from platform_settings:', err);
+  }
+
+  // 2. Fallback to local genres.json if present
   try {
     if (fs.existsSync(GENRES_FILE_PATH)) {
       const data = fs.readFileSync(GENRES_FILE_PATH, 'utf8');
-      return JSON.parse(data);
+      const parsed = JSON.parse(data);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed;
+      }
     }
   } catch (err) {
-    console.error('Error reading genres.json:', err);
+    console.warn('Error reading fallback genres.json:', err);
   }
+
   return DEFAULT_GENRES;
 }
 
-function writeGenres(genres: GenreItem[]) {
+async function persistGenres(supabase: any, genres: GenreItem[]): Promise<void> {
+  // 1. Primary persistent storage: Supabase platform_settings table
+  try {
+    const { error } = await supabase
+      .from('platform_settings')
+      .upsert(
+        {
+          key: 'catalog_genres',
+          value: genres,
+          updated_at: new Date().toISOString()
+        },
+        { onConflict: 'key' }
+      );
+
+    if (error) {
+      console.error('Failed to upsert platform_settings catalog_genres:', error);
+      throw new Error(`Database error saving genres: ${error.message}`);
+    }
+  } catch (err: any) {
+    console.error('Error persisting genres to platform_settings:', err);
+    throw err;
+  }
+
+  // 2. Best-effort write to local file (keeps local repo in sync; silently ignored on read-only serverless)
   try {
     const dir = path.dirname(GENRES_FILE_PATH);
     if (!fs.existsSync(dir)) {
@@ -49,15 +92,15 @@ function writeGenres(genres: GenreItem[]) {
     }
     fs.writeFileSync(GENRES_FILE_PATH, JSON.stringify(genres, null, 2), 'utf8');
   } catch (err) {
-    console.error('Error writing genres.json:', err);
+    // Expected in Vercel serverless environment (read-only filesystem)
   }
 }
 
 // GET /api/genres - Return all genres with track counts
 export async function GET() {
   try {
-    const storedGenres = readGenres();
     const supabase = getServiceRoleClient();
+    const storedGenres = await getStoredGenres(supabase);
 
     // Query all beats to compute live track counts per genre
     const { data: beats, error } = await supabase
@@ -74,12 +117,13 @@ export async function GET() {
       }
     }
 
-    // Merge any genres in DB that aren't yet in genres.json
+    // Merge any genres in DB that aren't yet in the genre list
     const genreMap = new Map<string, GenreItem>();
     for (const g of storedGenres) {
-      genreMap.set(g.name.trim().toLowerCase(), {
+      const key = g.name.trim().toLowerCase();
+      genreMap.set(key, {
         ...g,
-        trackCount: counts[g.name.trim().toLowerCase()] || 0
+        trackCount: counts[key] || 0
       });
     }
 
@@ -125,7 +169,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Genre name is required' }, { status: 400 });
     }
 
-    const currentGenres = readGenres();
+    const supabase = getServiceRoleClient();
+    const currentGenres = await getStoredGenres(supabase);
     const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
 
     const existing = currentGenres.find(
@@ -137,15 +182,15 @@ export async function POST(req: NextRequest) {
     }
 
     const newGenre: GenreItem = {
-      id: slug,
+      id: slug || `genre-${Date.now()}`,
       name,
-      slug,
+      slug: slug || `genre-${Date.now()}`,
       description: description || `Studio catalog beats categorized under ${name}`,
       trackCount: 0
     };
 
     currentGenres.push(newGenre);
-    writeGenres(currentGenres);
+    await persistGenres(supabase, currentGenres);
 
     return NextResponse.json({ success: true, genre: newGenre });
   } catch (err: any) {
@@ -168,7 +213,8 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ error: 'oldName and new name are required' }, { status: 400 });
     }
 
-    const currentGenres = readGenres();
+    const supabase = getServiceRoleClient();
+    const currentGenres = await getStoredGenres(supabase);
     const index = currentGenres.findIndex((g) => g.name.toLowerCase() === oldName.trim().toLowerCase());
 
     if (index === -1) {
@@ -183,11 +229,10 @@ export async function PATCH(req: NextRequest) {
       description: description !== undefined ? description : currentGenres[index].description
     };
 
-    writeGenres(currentGenres);
+    await persistGenres(supabase, currentGenres);
 
     // If the genre name changed, update existing beats in Supabase
     if (oldName.trim().toLowerCase() !== name.trim().toLowerCase()) {
-      const supabase = getServiceRoleClient();
       await supabase
         .from('beats')
         .update({ genre: name.trim() })
@@ -215,14 +260,15 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ error: 'Genre name parameter is required' }, { status: 400 });
     }
 
-    const currentGenres = readGenres();
+    const supabase = getServiceRoleClient();
+    const currentGenres = await getStoredGenres(supabase);
     const filtered = currentGenres.filter((g) => g.name.toLowerCase() !== name.trim().toLowerCase());
 
     if (filtered.length === currentGenres.length) {
       return NextResponse.json({ error: 'Genre not found' }, { status: 404 });
     }
 
-    writeGenres(filtered);
+    await persistGenres(supabase, filtered);
 
     return NextResponse.json({ success: true });
   } catch (err: any) {

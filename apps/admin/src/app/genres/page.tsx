@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { AdminShell } from '../../components/AdminShell';
+import { supabase } from '../../lib/supabaseClient';
 import {
   Tag,
   Plus,
@@ -48,6 +49,28 @@ export default function AdminGenresPage() {
     fetchGenres();
   }, []);
 
+  const getAuthToken = async (): Promise<string | undefined> => {
+    try {
+      let { data: { session } } = await supabase.auth.getSession();
+      if (!session && typeof document !== 'undefined') {
+        const matchToken = document.cookie.match(/(?:^|;\s*)sb-token=([^;]*)/);
+        const matchRefresh = document.cookie.match(/(?:^|;\s*)sb-refresh=([^;]*)/);
+        if (matchToken && matchRefresh) {
+          try {
+            const { data } = await supabase.auth.setSession({
+              access_token: decodeURIComponent(matchToken[1]),
+              refresh_token: decodeURIComponent(matchRefresh[1])
+            });
+            if (data?.session) session = data.session;
+          } catch (e) {}
+        }
+      }
+      return session?.access_token;
+    } catch (e) {
+      return undefined;
+    }
+  };
+
   const fetchGenres = async () => {
     try {
       setLoading(true);
@@ -71,9 +94,14 @@ export default function AdminGenresPage() {
       setSubmitting(true);
       setErrorMsg('');
 
+      const token = await getAuthToken();
       const res = await fetch('/api/genres', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
+        credentials: 'include',
         body: JSON.stringify({
           name: newGenreName.trim(),
           description: newGenreDesc.trim()
@@ -105,9 +133,14 @@ export default function AdminGenresPage() {
       setSubmitting(true);
       setErrorMsg('');
 
+      const token = await getAuthToken();
       const res = await fetch('/api/genres', {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
+        credentials: 'include',
         body: JSON.stringify({
           oldName: editingGenre.name,
           name: editName.trim(),
@@ -137,8 +170,13 @@ export default function AdminGenresPage() {
     if (!confirmDelete) return;
 
     try {
+      const token = await getAuthToken();
       const res = await fetch(`/api/genres?name=${encodeURIComponent(genre.name)}`, {
-        method: 'DELETE'
+        method: 'DELETE',
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
+        credentials: 'include'
       });
       if (res.ok) {
         fetchGenres();

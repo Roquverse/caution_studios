@@ -55,15 +55,35 @@ export async function POST(req: NextRequest) {
     const safeFilename = targetFilename || targetKey.split('/').pop() || 'caution-beat-asset';
 
     // Increment download count for creator statistics and threshold tracking
-    if (beatId) {
-      try {
-        const supabase = getServiceRoleClient();
-        const { data: b } = await supabase.from('beats').select('free_commercial_downloads_count').eq('id', beatId).maybeSingle();
-        const currentCount = b?.free_commercial_downloads_count || 0;
-        await supabase.from('beats').update({ free_commercial_downloads_count: currentCount + 1 }).eq('id', beatId);
-      } catch (countErr) {
-        console.warn('Could not increment download count on admin download:', countErr);
+    let updatedDownloadCount: number | undefined;
+    try {
+      const supabase = getServiceRoleClient();
+      let targetBeatId = beatId;
+      if (!targetBeatId && targetKey) {
+        const { data: found } = await supabase
+          .from('beats')
+          .select('id')
+          .or(`master_wav_key.eq.${targetKey},preview_clean_key.eq.${targetKey},stems_zip_key.eq.${targetKey}`)
+          .limit(1)
+          .maybeSingle();
+        if (found?.id) targetBeatId = found.id;
       }
+
+      if (targetBeatId) {
+        const { data: b } = await supabase
+          .from('beats')
+          .select('free_commercial_downloads_count')
+          .eq('id', targetBeatId)
+          .maybeSingle();
+        const currentCount = b?.free_commercial_downloads_count || 0;
+        updatedDownloadCount = currentCount + 1;
+        await supabase
+          .from('beats')
+          .update({ free_commercial_downloads_count: updatedDownloadCount })
+          .eq('id', targetBeatId);
+      }
+    } catch (countErr) {
+      console.warn('Could not increment download count on admin download:', countErr);
     }
 
     const exists = await checkObjectExistsInR2(targetKey);
@@ -80,7 +100,8 @@ export async function POST(req: NextRequest) {
         success: true,
         downloadUrl,
         key: targetKey,
-        filename: safeFilename
+        filename: safeFilename,
+        downloadCount: updatedDownloadCount
       });
     } catch (e) {
       // Fallback to local streaming proxy if presigning fails
@@ -89,7 +110,8 @@ export async function POST(req: NextRequest) {
         success: true,
         downloadUrl: fallbackUrl,
         key: targetKey,
-        filename: safeFilename
+        filename: safeFilename,
+        downloadCount: updatedDownloadCount
       });
     }
   } catch (err: any) {
