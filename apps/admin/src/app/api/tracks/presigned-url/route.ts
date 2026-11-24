@@ -43,16 +43,25 @@ export async function POST(req: NextRequest) {
     } else if (type === 'cover') {
       key = `covers/${actualName} - Artwork.${ext}`;
       if (!finalContentType) finalContentType = 'image/jpeg';
+    } else if (type === 'ad-audio' || type === 'ad') {
+      key = `ads/${actualName}_${Date.now()}.${ext}`;
+      if (!finalContentType) finalContentType = ext === 'wav' ? 'audio/wav' : 'audio/mpeg';
+    } else if (type === 'ad-cover') {
+      key = `covers/${actualName}_${Date.now()}.${ext}`;
+      if (!finalContentType) finalContentType = 'image/jpeg';
     } else {
       key = `uploads/${actualName}.${ext}`;
       if (!finalContentType) finalContentType = 'application/octet-stream';
     }
 
     const uploadUrl = await getPresignedUploadUrl(key, finalContentType);
+    const publicR2 = process.env.NEXT_PUBLIC_R2_PUBLIC_URL || process.env.R2_PUBLIC_URL || 'https://media.cautionstudioz.com';
+    const publicUrl = `${publicR2.replace(/\/$/, '')}/${key}`;
 
     return NextResponse.json({
       uploadUrl,
-      key
+      key,
+      publicUrl
     });
   } catch (err: any) {
     console.error('Error generating admin presigned upload URL:', err);

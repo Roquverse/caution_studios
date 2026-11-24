@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { AdminShell } from '../../components/AdminShell';
+import { supabase } from '../../lib/supabaseClient';
 import {
   Megaphone,
   Plus,
@@ -24,7 +25,11 @@ import {
   CreditCard,
   Trash2,
   RefreshCw,
-  Headphones
+  Headphones,
+  Music,
+  Image as ImageIcon,
+  Loader2,
+  FileAudio
 } from 'lucide-react';
 
 interface AdCampaign {
@@ -210,6 +215,221 @@ export default function AdminAdsManagerPage() {
   const [formYouTube, setFormYouTube] = useState('https://youtube.com');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Media Upload States
+  const [audioFile, setAudioFile] = useState<File | null>(null);
+  const [audioPreviewUrl, setAudioPreviewUrl] = useState<string | null>(null);
+  const [isUploadingAudio, setIsUploadingAudio] = useState(false);
+  const [audioUploadProgress, setAudioUploadProgress] = useState(0);
+  const [isPlayingFormAudio, setIsPlayingFormAudio] = useState(false);
+  const formAudioRef = useRef<HTMLAudioElement | null>(null);
+
+  const [coverFile, setCoverFile] = useState<File | null>(null);
+  const [coverPreviewUrl, setCoverPreviewUrl] = useState<string | null>(null);
+  const [isUploadingCover, setIsUploadingCover] = useState(false);
+  const [coverUploadProgress, setCoverUploadProgress] = useState(0);
+
+  const getAuthToken = async (): Promise<string | undefined> => {
+    try {
+      let { data: { session } } = await supabase.auth.getSession();
+      if (!session && typeof document !== 'undefined') {
+        const matchToken = document.cookie.match(/(?:^|;\s*)sb-token=([^;]*)/);
+        const matchRefresh = document.cookie.match(/(?:^|;\s*)sb-refresh=([^;]*)/);
+        if (matchToken && matchRefresh) {
+          try {
+            const { data } = await supabase.auth.setSession({
+              access_token: decodeURIComponent(matchToken[1]),
+              refresh_token: decodeURIComponent(matchRefresh[1])
+            });
+            if (data?.session) session = data.session;
+          } catch (e) {}
+        }
+      }
+      return session?.access_token;
+    } catch (e) {
+      return undefined;
+    }
+  };
+
+  const uploadMediaDirectly = async (
+    file: File,
+    type: 'audio' | 'cover',
+    titleStr: string,
+    onProgress: (pct: number) => void
+  ): Promise<string> => {
+    let targetContentType = file.type;
+    if (!targetContentType || targetContentType === 'application/octet-stream') {
+      if (type === 'audio') {
+        const ext = file.name.split('.').pop()?.toLowerCase();
+        targetContentType = ext === 'wav' ? 'audio/wav' : 'audio/mpeg';
+      } else {
+        targetContentType = 'image/jpeg';
+      }
+    }
+
+    const token = await getAuthToken();
+
+    // 1. Try presigned URL first for direct Cloudflare R2 upload (supports large files, no serverless timeout)
+    try {
+      const presignRes = await fetch('/api/tracks/presigned-url', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          filename: file.name,
+          contentType: targetContentType,
+          type: type === 'audio' ? 'ad-audio' : 'ad-cover',
+          title: titleStr || 'ad'
+        })
+      });
+
+      if (presignRes.ok) {
+        const presignData = await presignRes.json();
+        if (presignData.uploadUrl && presignData.key) {
+          await new Promise<void>((resolve, reject) => {
+            const xhr = new XMLHttpRequest();
+            xhr.open('PUT', presignData.uploadUrl, true);
+            xhr.setRequestHeader('Content-Type', targetContentType);
+
+            xhr.upload.onprogress = (evt) => {
+              if (evt.lengthComputable) {
+                const percent = Math.round((evt.loaded / evt.total) * 100);
+                onProgress(percent);
+              }
+            };
+
+            xhr.onload = () => {
+              if (xhr.status >= 200 && xhr.status < 300) {
+                resolve();
+              } else {
+                reject(new Error(`Storage PUT failed with status ${xhr.status}`));
+              }
+            };
+
+            xhr.onerror = () => {
+              reject(new Error('Network error uploading to storage'));
+            };
+
+            xhr.send(file);
+          });
+
+          const publicR2 = process.env.NEXT_PUBLIC_R2_PUBLIC_URL || 'https://media.cautionstudioz.com';
+          return presignData.publicUrl || `${publicR2.replace(/\/$/, '')}/${presignData.key}`;
+        }
+      }
+    } catch (presignErr) {
+      console.warn('Presigned upload failed, falling back to direct multipart upload:', presignErr);
+    }
+
+    // 2. Fallback to multipart /api/ads/upload
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('type', type);
+    formData.append('title', titleStr || 'ad');
+
+    const res = await fetch('/api/ads/upload', {
+      method: 'POST',
+      headers: {
+        ...(token ? { Authorization: `Bearer ${token}` } : {})
+      },
+      credentials: 'include',
+      body: formData
+    });
+
+    const data = await res.json();
+    if (!res.ok || !data.url) {
+      throw new Error(data.error || 'Failed to upload ad media');
+    }
+    onProgress(100);
+    return data.url;
+  };
+
+  const handleAudioFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      setAudioFile(file);
+
+      if (!formSongTitle) {
+        const cleanName = file.name.replace(/\.[^/.]+$/, '').replace(/[_-]/g, ' ');
+        setFormSongTitle(cleanName.charAt(0).toUpperCase() + cleanName.slice(1));
+      }
+
+      const localBlob = URL.createObjectURL(file);
+      setAudioPreviewUrl(localBlob);
+
+      try {
+        setIsUploadingAudio(true);
+        setAudioUploadProgress(10);
+        const uploadedUrl = await uploadMediaDirectly(
+          file,
+          'audio',
+          formSongTitle || file.name,
+          (pct) => setAudioUploadProgress(pct)
+        );
+        setFormAudioUrl(uploadedUrl);
+      } catch (err: any) {
+        console.error('Audio upload error:', err);
+        setErrorMsg(err.message || 'Failed to upload audio file');
+      } finally {
+        setIsUploadingAudio(false);
+      }
+    }
+  };
+
+  const handleCoverFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      setCoverFile(file);
+
+      const localBlob = URL.createObjectURL(file);
+      setCoverPreviewUrl(localBlob);
+
+      try {
+        setIsUploadingCover(true);
+        setCoverUploadProgress(10);
+        const uploadedUrl = await uploadMediaDirectly(
+          file,
+          'cover',
+          formSongTitle || 'artwork',
+          (pct) => setCoverUploadProgress(pct)
+        );
+        setFormCoverUrl(uploadedUrl);
+      } catch (err: any) {
+        console.error('Cover upload error:', err);
+        setErrorMsg(err.message || 'Failed to upload artwork image');
+      } finally {
+        setIsUploadingCover(false);
+      }
+    }
+  };
+
+  const toggleFormAudioPreview = () => {
+    const targetUrl = audioPreviewUrl || formAudioUrl;
+    if (!targetUrl) return;
+
+    if (isPlayingFormAudio && formAudioRef.current) {
+      formAudioRef.current.pause();
+      setIsPlayingFormAudio(false);
+      return;
+    }
+
+    if (!formAudioRef.current) {
+      formAudioRef.current = new Audio(targetUrl);
+      formAudioRef.current.onended = () => setIsPlayingFormAudio(false);
+    } else {
+      if (formAudioRef.current.src !== targetUrl) {
+        formAudioRef.current.src = targetUrl;
+      }
+    }
+
+    formAudioRef.current
+      .play()
+      .then(() => setIsPlayingFormAudio(true))
+      .catch((e) => console.warn('Form audio play failed:', e));
+  };
+
   const totalRevenueNgn = campaigns.reduce((acc, c) => acc + c.amountPaidNgn, 0);
   const totalDelivered = campaigns.reduce((acc, c) => acc + c.impressionsDelivered, 0);
   const activeCount = campaigns.filter((c) => c.status === 'active').length;
@@ -300,6 +520,14 @@ export default function AdminAdsManagerPage() {
       setFormArtistHandle('');
       setFormAudioUrl('');
       setFormCoverUrl('');
+      setAudioFile(null);
+      setAudioPreviewUrl(null);
+      setCoverFile(null);
+      setCoverPreviewUrl(null);
+      if (formAudioRef.current) {
+        formAudioRef.current.pause();
+        setIsPlayingFormAudio(false);
+      }
 
       // Refresh list
       fetchCampaigns();
@@ -799,7 +1027,7 @@ export default function AdminAdsManagerPage() {
       {/* Book & Pay for Campaign Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#0c0d10] border border-zinc-800 rounded-lg max-w-lg w-full p-6 text-zinc-100 shadow-xl space-y-4 max-h-[90vh] overflow-y-auto">
+          <div className="bg-[#0c0d10] border border-zinc-800 rounded-xl max-w-2xl w-full p-6 text-zinc-100 shadow-2xl space-y-4 max-h-[92vh] overflow-y-auto">
             <div className="flex items-center justify-between pb-3 border-b border-zinc-800">
               <div className="flex items-center gap-2">
                 <Megaphone className="h-5 w-5 text-[#2dd4bf]" />
@@ -809,7 +1037,13 @@ export default function AdminAdsManagerPage() {
               </div>
               <button
                 type="button"
-                onClick={() => setIsModalOpen(false)}
+                onClick={() => {
+                  if (formAudioRef.current) {
+                    formAudioRef.current.pause();
+                    setIsPlayingFormAudio(false);
+                  }
+                  setIsModalOpen(false);
+                }}
                 className="text-zinc-400 hover:text-white p-1"
               >
                 <X className="h-4 w-4" />
@@ -885,27 +1119,241 @@ export default function AdminAdsManagerPage() {
                 </div>
               </div>
 
-              {/* Audio URL & Artwork */}
-              <div className="grid grid-cols-2 gap-3 pt-2 border-t border-zinc-800">
-                <div className="space-y-1">
-                  <label className="text-xs font-medium text-zinc-300">Audio URL (R2 / CDN / MP3)</label>
-                  <input
-                    type="url"
-                    value={formAudioUrl}
-                    onChange={(e) => setFormAudioUrl(e.target.value)}
-                    placeholder="https://media.cautionstudioz.com/..."
-                    className="w-full bg-zinc-950 border border-zinc-800 rounded-md py-1.5 px-3 text-xs text-zinc-100 font-mono focus:outline-none focus:border-zinc-700"
-                  />
+              {/* Audio & Artwork Media Upload Options */}
+              <div className="pt-3 border-t border-zinc-800 space-y-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-white tracking-wide uppercase">
+                    Campaign Media Assets
+                  </span>
+                  <span className="text-[10px] text-zinc-400">
+                    Direct Cloudflare R2 Upload
+                  </span>
                 </div>
-                <div className="space-y-1">
-                  <label className="text-xs font-medium text-zinc-300">Artwork / Cover Image URL</label>
-                  <input
-                    type="url"
-                    value={formCoverUrl}
-                    onChange={(e) => setFormCoverUrl(e.target.value)}
-                    placeholder="/images/... or https://..."
-                    className="w-full bg-zinc-950 border border-zinc-800 rounded-md py-1.5 px-3 text-xs text-zinc-100 font-mono focus:outline-none focus:border-zinc-700"
-                  />
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* 1. Audio Media Upload */}
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-medium text-zinc-300 flex items-center gap-1.5">
+                        <Music className="h-3.5 w-3.5 text-[#2dd4bf]" />
+                        <span>Audio File (MP3 / WAV) *</span>
+                      </label>
+                      {formAudioUrl && (
+                        <span className="text-[10px] text-emerald-400 font-medium flex items-center gap-1">
+                          <CheckCircle2 className="h-3 w-3" /> Ready
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Drag-and-drop / Click file upload dropzone */}
+                    <div
+                      className={`relative border border-dashed rounded-lg p-3 text-center transition-all ${
+                        audioFile || formAudioUrl
+                          ? 'border-[#2dd4bf]/40 bg-[#2dd4bf]/5'
+                          : 'border-zinc-800 bg-zinc-950/60 hover:border-zinc-700'
+                      }`}
+                    >
+                      <input
+                        type="file"
+                        accept="audio/mp3,audio/wav,audio/mpeg,audio/flac,audio/ogg,audio/*,.mp3,.wav"
+                        onChange={handleAudioFileChange}
+                        disabled={isUploadingAudio}
+                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                      />
+                      {isUploadingAudio ? (
+                        <div className="space-y-1.5 py-1">
+                          <div className="flex items-center justify-center gap-2 text-xs text-[#2dd4bf] font-medium">
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                            <span>Uploading audio to storage... {audioUploadProgress}%</span>
+                          </div>
+                          <div className="w-full bg-zinc-900 rounded-full h-1.5 overflow-hidden">
+                            <div
+                              className="bg-[#2dd4bf] h-full transition-all duration-300 rounded-full"
+                              style={{ width: `${audioUploadProgress}%` }}
+                            />
+                          </div>
+                        </div>
+                      ) : audioFile || formAudioUrl ? (
+                        <div className="flex items-center justify-between gap-2 py-0.5">
+                          <div className="flex items-center gap-2 min-w-0 text-left">
+                            <div className="h-8 w-8 rounded-lg bg-[#2dd4bf]/20 text-[#2dd4bf] flex items-center justify-center shrink-0">
+                              <Music className="h-4 w-4" />
+                            </div>
+                            <div className="min-w-0">
+                              <p className="text-xs font-semibold text-white truncate max-w-[150px]">
+                                {audioFile ? audioFile.name : formAudioUrl.split('/').pop() || 'Audio Track'}
+                              </p>
+                              <p className="text-[10px] text-zinc-400">
+                                {audioFile
+                                  ? `${(audioFile.size / (1024 * 1024)).toFixed(1)} MB • R2 Connected`
+                                  : 'Connected URL'}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-1.5 shrink-0 z-20">
+                            {(formAudioUrl || audioPreviewUrl) && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  toggleFormAudioPreview();
+                                }}
+                                className="p-1.5 rounded-md bg-zinc-800 hover:bg-zinc-700 text-[#2dd4bf] transition-colors"
+                                title={isPlayingFormAudio ? 'Pause Preview' : 'Play Preview'}
+                              >
+                                {isPlayingFormAudio ? (
+                                  <Pause className="h-3.5 w-3.5" />
+                                ) : (
+                                  <Play className="h-3.5 w-3.5 fill-current" />
+                                )}
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (formAudioRef.current) {
+                                  formAudioRef.current.pause();
+                                  setIsPlayingFormAudio(false);
+                                }
+                                setAudioFile(null);
+                                setFormAudioUrl('');
+                                setAudioPreviewUrl(null);
+                              }}
+                              className="p-1.5 rounded-md bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-red-400 transition-colors"
+                              title="Remove Audio"
+                            >
+                              <X className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="py-2 space-y-1">
+                          <Upload className="h-5 w-5 mx-auto text-zinc-500" />
+                          <p className="text-xs text-zinc-300 font-medium">
+                            Choose audio file (<span className="text-[#2dd4bf]">MP3 / WAV</span>)
+                          </p>
+                          <p className="text-[10px] text-zinc-500">Up to 100MB • Auto-uploads to Cloudflare R2</p>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Direct URL input fallback */}
+                    <div className="pt-0.5">
+                      <input
+                        type="url"
+                        value={formAudioUrl}
+                        onChange={(e) => {
+                          setFormAudioUrl(e.target.value);
+                          if (e.target.value) setAudioPreviewUrl(e.target.value);
+                        }}
+                        placeholder="Or paste direct Audio URL (https://...)"
+                        className="w-full bg-zinc-950 border border-zinc-800 rounded-md py-1 px-2.5 text-[11px] text-zinc-200 font-mono focus:outline-none focus:border-zinc-700 placeholder:text-zinc-600"
+                      />
+                    </div>
+                  </div>
+
+                  {/* 2. Artwork / Cover Media Upload */}
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-medium text-zinc-300 flex items-center gap-1.5">
+                        <ImageIcon className="h-3.5 w-3.5 text-[#2dd4bf]" />
+                        <span>Artwork / Cover Image *</span>
+                      </label>
+                      {formCoverUrl && (
+                        <span className="text-[10px] text-emerald-400 font-medium flex items-center gap-1">
+                          <CheckCircle2 className="h-3 w-3" /> Ready
+                        </span>
+                      )}
+                    </div>
+
+                    <div
+                      className={`relative border border-dashed rounded-lg p-3 text-center transition-all ${
+                        coverFile || formCoverUrl
+                          ? 'border-[#2dd4bf]/40 bg-[#2dd4bf]/5'
+                          : 'border-zinc-800 bg-zinc-950/60 hover:border-zinc-700'
+                      }`}
+                    >
+                      <input
+                        type="file"
+                        accept="image/png,image/jpeg,image/jpg,image/webp,image/*"
+                        onChange={handleCoverFileChange}
+                        disabled={isUploadingCover}
+                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                      />
+                      {isUploadingCover ? (
+                        <div className="space-y-1.5 py-1">
+                          <div className="flex items-center justify-center gap-2 text-xs text-[#2dd4bf] font-medium">
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                            <span>Uploading artwork... {coverUploadProgress}%</span>
+                          </div>
+                          <div className="w-full bg-zinc-900 rounded-full h-1.5 overflow-hidden">
+                            <div
+                              className="bg-[#2dd4bf] h-full transition-all duration-300 rounded-full"
+                              style={{ width: `${coverUploadProgress}%` }}
+                            />
+                          </div>
+                        </div>
+                      ) : coverPreviewUrl || formCoverUrl ? (
+                        <div className="flex items-center justify-between gap-2 py-0.5">
+                          <div className="flex items-center gap-2.5 min-w-0 text-left">
+                            <img
+                              src={coverPreviewUrl || formCoverUrl}
+                              alt="Ad Artwork Preview"
+                              className="h-10 w-10 rounded-md object-cover border border-white/10 shrink-0"
+                              onError={(e) => {
+                                (e.target as HTMLElement).style.display = 'none';
+                              }}
+                            />
+                            <div className="min-w-0">
+                              <p className="text-xs font-semibold text-white truncate max-w-[150px]">
+                                {coverFile ? coverFile.name : formCoverUrl.split('/').pop() || 'Ad Artwork'}
+                              </p>
+                              <p className="text-[10px] text-zinc-400">
+                                {coverFile
+                                  ? `${(coverFile.size / 1024).toFixed(0)} KB • R2 Connected`
+                                  : 'Connected Artwork'}
+                              </p>
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setCoverFile(null);
+                              setCoverPreviewUrl(null);
+                              setFormCoverUrl('');
+                            }}
+                            className="p-1.5 rounded-md bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-red-400 transition-colors z-20"
+                            title="Remove Artwork"
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="py-2 space-y-1">
+                          <Upload className="h-5 w-5 mx-auto text-zinc-500" />
+                          <p className="text-xs text-zinc-300 font-medium">
+                            Choose artwork (<span className="text-[#2dd4bf]">JPG / PNG / WEBP</span>)
+                          </p>
+                          <p className="text-[10px] text-zinc-500">Square 1:1 ratio • Auto-uploads to R2</p>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="pt-0.5">
+                      <input
+                        type="url"
+                        value={formCoverUrl}
+                        onChange={(e) => {
+                          setFormCoverUrl(e.target.value);
+                          if (e.target.value) setCoverPreviewUrl(e.target.value);
+                        }}
+                        placeholder="Or paste direct Artwork URL (https://...)"
+                        className="w-full bg-zinc-950 border border-zinc-800 rounded-md py-1 px-2.5 text-[11px] text-zinc-200 font-mono focus:outline-none focus:border-zinc-700 placeholder:text-zinc-600"
+                      />
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -966,16 +1414,24 @@ export default function AdminAdsManagerPage() {
               <div className="flex items-center justify-end gap-2 pt-2">
                 <button
                   type="button"
-                  onClick={() => setIsModalOpen(false)}
+                  onClick={() => {
+                    if (formAudioRef.current) {
+                      formAudioRef.current.pause();
+                      setIsPlayingFormAudio(false);
+                    }
+                    setIsModalOpen(false);
+                  }}
                   className="px-3 py-1.5 rounded-md border border-zinc-800 text-xs text-zinc-400 hover:text-white"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-1.5 rounded-md bg-[#2dd4bf] hover:bg-[#20b8a4] text-zinc-950 font-bold text-xs transition-colors cursor-pointer"
+                  disabled={isUploadingAudio || isUploadingCover || isSubmitting}
+                  className="px-4 py-1.5 rounded-md bg-[#2dd4bf] hover:bg-[#20b8a4] disabled:opacity-50 text-zinc-950 font-bold text-xs transition-colors cursor-pointer flex items-center gap-1.5"
                 >
-                  Activate & Inject Into 3-Song Stream
+                  {isSubmitting && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                  <span>Activate & Inject Into 3-Song Stream</span>
                 </button>
               </div>
             </form>
