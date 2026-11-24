@@ -32,40 +32,19 @@ export async function GET(req: NextRequest) {
     }
 
     if (!userId) {
-      // Graceful Fallback: Return latest catalog beats so dashboard always displays uploads
-      const { data: publicBeats } = await supabase
-        .from('beats')
-        .select(`
-          *,
-          licenses:beat_licenses (
-            type,
-            price_cents,
-            enabled
-          )
-        `)
-        .order('created_at', { ascending: false })
-        .limit(50);
-
-      const beats = publicBeats || [];
-      const totalPlaysCount = beats.reduce((acc, b) => acc + (Number(b.play_count) || 0), 0);
-      const totalDownloadsCount = beats.reduce(
-        (acc, b) => acc + (Number(b.free_commercial_downloads_count || b.download_count) || 0),
-        0
-      );
-
       return NextResponse.json({
         profile: {
           display_name: 'Creator Studio',
           handle: 'producer',
-          is_verified: true,
+          is_verified: false,
           trial_ends_at: null
         },
         availableBalanceNgn: 0,
         pendingBalanceNgn: 0,
         totalSalesCount: 0,
         totalSalesNgn: 0,
-        totalPlaysCount,
-        totalDownloadsCount,
+        totalPlaysCount: 0,
+        totalDownloadsCount: 0,
         monthlyDownloadsCount: 0,
         monthlyDownloadThreshold: 10000,
         monthlyThresholdPct: 0,
@@ -73,8 +52,8 @@ export async function GET(req: NextRequest) {
         currentMonthPeriod: new Date().toISOString().slice(0, 7) + '-01',
         downloadRewardNgn: 0,
         thresholdRemaining: 10000,
-        trialDaysRemaining: 85,
-        beats,
+        trialDaysRemaining: 0,
+        beats: [],
         purchases: []
       }, {
         headers: {
@@ -97,8 +76,8 @@ export async function GET(req: NextRequest) {
       (profile?.email && profile.email.toLowerCase() === 'damicoledj@gmail.com')
     );
 
-    // 2. Fetch Producer Beats with Licenses (order by created_at DESC so newest uploaded beats appear first)
-    let { data: dbBeats } = await supabase
+    // 2. Fetch Producer Beats with Licenses (strictly only beats uploaded by this creator)
+    const { data: dbBeats, error: beatsErr } = await supabase
       .from('beats')
       .select(`
         *,
@@ -111,27 +90,8 @@ export async function GET(req: NextRequest) {
       .eq('producer_id', userId)
       .order('created_at', { ascending: false });
 
-    // If an admin account logs into Creator Studio, or if no direct beats exist under this ID,
-    // load all platform beats so all created or uploaded beats are immediately visible
-    if (isAdminAccount || !dbBeats || dbBeats.length === 0) {
-      const { data: allBeats } = await supabase
-        .from('beats')
-        .select(`
-          *,
-          licenses:beat_licenses (
-            type,
-            price_cents,
-            enabled
-          )
-        `)
-        .order('created_at', { ascending: false });
-      if (allBeats && allBeats.length > 0) {
-        if (isAdminAccount) {
-          dbBeats = allBeats;
-        } else if (!dbBeats || dbBeats.length === 0) {
-          dbBeats = allBeats;
-        }
-      }
+    if (beatsErr) {
+      console.warn('Error fetching producer beats in telemetry:', beatsErr);
     }
 
     const beats = dbBeats || [];

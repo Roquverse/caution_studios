@@ -131,7 +131,7 @@ export default function BeatsCatalogPage() {
             setAvailableBalanceNgn(Number(payload.availableBalanceNgn || 0));
             setTotalSalesEarningsNgn(Number(payload.totalSalesEarningsNgn || 0));
 
-            if (Array.isArray(payload.beats) && payload.beats.length > 0) {
+            if (Array.isArray(payload.beats)) {
               const formatted = payload.beats.map(formatDbBeat);
               setBeatsList(formatted);
               return;
@@ -153,7 +153,7 @@ export default function BeatsCatalogPage() {
             .eq('producer_id', userId)
             .order('created_at', { ascending: false });
 
-          if (!userError && userBeats && userBeats.length > 0 && isMounted) {
+          if (!userError && userBeats && isMounted) {
             const formatted = userBeats.map(formatDbBeat);
             setBeatsList(formatted);
             setTotalPlays(formatted.reduce((sum, b) => sum + b.streamsCount, 0));
@@ -162,25 +162,11 @@ export default function BeatsCatalogPage() {
           }
         }
 
-        // Fallback: If no beats directly matched or session is generic, load latest catalog beats
-        const { data: allBeats, error: allErr } = await supabase
-          .from('beats')
-          .select(`
-            *,
-            licenses:beat_licenses (
-              type,
-              price_cents,
-              enabled
-            )
-          `)
-          .order('created_at', { ascending: false })
-          .limit(50);
-
-        if (!allErr && allBeats && isMounted) {
-          const formatted = allBeats.map(formatDbBeat);
-          setBeatsList(formatted);
-          setTotalPlays(formatted.reduce((sum, b) => sum + b.streamsCount, 0));
-          setTotalDownloads(formatted.reduce((sum, b) => sum + b.downloadsCount, 0));
+        // Strictly own catalog: never fall back to platform beats from other creators or admin
+        if (isMounted) {
+          setBeatsList([]);
+          setTotalPlays(0);
+          setTotalDownloads(0);
         }
       } catch (err) {
         console.warn('Failed to load real beats for creator catalog:', err);
@@ -223,10 +209,13 @@ export default function BeatsCatalogPage() {
 
     setDeletingId(id);
     try {
-      const { error } = await supabase
-        .from('beats')
-        .delete()
-        .eq('id', id);
+      const { data: { session } } = await supabase.auth.getSession();
+      let query = supabase.from('beats').delete().eq('id', id);
+      if (session?.user?.id) {
+        query = query.eq('producer_id', session.user.id);
+      }
+
+      const { error } = await query;
 
       if (!error) {
         setBeatsList((prev) => prev.filter((b) => b.id !== id));
